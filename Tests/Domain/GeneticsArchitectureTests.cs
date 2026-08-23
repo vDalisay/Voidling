@@ -4,6 +4,7 @@ using Voidling.Domain.Hatching;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shared;
 using VoidlingGame;
+using Xunit;
 
 namespace Voidling.Tests.Domain;
 
