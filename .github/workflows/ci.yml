@@ -36,11 +36,18 @@ jobs:
       - name: Build
         run: dotnet build Voidling.csproj --configuration Release --no-restore
 
-      - name: Enforce pure Domain boundary
+      - name: Enforce inward architecture boundaries
         shell: bash
         run: |
-          if grep -R -n -E 'using[[:space:]]+Godot|Godot\.' Scripts/Domain --include='*.cs'; then
-            echo 'Scripts/Domain must remain free of Godot dependencies.'
+          for layer in Scripts/Domain Scripts/Application; do
+            if grep -R -n -E 'using[[:space:]]+Godot|Godot\.' "$layer" --include='*.cs'; then
+              echo "$layer must remain free of Godot dependencies."
+              exit 1
+            fi
+          done
+
+          if grep -R -n -E 'GameSession\.Instance' Scripts/Domain Scripts/Application --include='*.cs'; then
+            echo 'Domain/Application must not use the GameSession service locator.'
             exit 1
           fi
 
