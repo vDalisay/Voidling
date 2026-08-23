@@ -102,6 +102,7 @@ public partial class RaceController : Node2D
         CreateHud();
         _running = true;
         QueueRedraw();
+        UpdatePlayerTracking();
         UpdateHud();
     }
 
@@ -158,6 +159,7 @@ public partial class RaceController : Node2D
             UpdateRacerPosition(racer, step);
         }
 
+        // The player stays exactly in the center of the race camera every frame.
         UpdatePlayerTracking();
         UpdateHud();
 
@@ -170,15 +172,19 @@ public partial class RaceController : Node2D
 
     public override void _Draw()
     {
-        DrawRect(new Rect2(0, 0, TrackEndX + 180.0f, ScreenHeight), Color.FromHtml("#A7D8C7"));
-        DrawRect(new Rect2(0, 102, TrackEndX + 180.0f, 166), Color.FromHtml("#8EBE85"));
+        // Extend scenery beyond both ends so an exactly-centered camera never exposes black space.
+        var worldLeft = -ScreenWidth;
+        var worldWidth = TrackEndX + ScreenWidth * 2.0f;
 
-        // One shared Pokeathlon/Chao-style track rather than four isolated lanes.
-        DrawRect(new Rect2(20, 126, TrackEndX + 90.0f, 118), Color.FromHtml("#D9774E"));
-        DrawLine(new Vector2(20, 126), new Vector2(TrackEndX + 90.0f, 126), Color.FromHtml("#E9B777"), 4.0f);
-        DrawLine(new Vector2(20, 244), new Vector2(TrackEndX + 90.0f, 244), Color.FromHtml("#9C6049"), 4.0f);
+        DrawRect(new Rect2(worldLeft, 0, worldWidth, ScreenHeight), Color.FromHtml("#A7D8C7"));
+        DrawRect(new Rect2(worldLeft, 102, worldWidth, 166), Color.FromHtml("#8EBE85"));
 
-        for (var x = 40.0f; x < TrackEndX; x += 80.0f)
+        // One shared Pokeathlon/Chao-style track rather than isolated lanes.
+        DrawRect(new Rect2(worldLeft, 126, worldWidth, 118), Color.FromHtml("#D9774E"));
+        DrawLine(new Vector2(worldLeft, 126), new Vector2(worldLeft + worldWidth, 126), Color.FromHtml("#E9B777"), 4.0f);
+        DrawLine(new Vector2(worldLeft, 244), new Vector2(worldLeft + worldWidth, 244), Color.FromHtml("#9C6049"), 4.0f);
+
+        for (var x = worldLeft + 40.0f; x < worldLeft + worldWidth; x += 80.0f)
             DrawLine(new Vector2(x, 184), new Vector2(x + 28, 184), new Color(0.95f, 0.72f, 0.52f, 0.34f), 2.0f);
 
         DrawLine(new Vector2(TrackEndX, 122), new Vector2(TrackEndX, 250), Colors.White, 4.0f);
@@ -194,9 +200,11 @@ public partial class RaceController : Node2D
         _camera = new Camera2D
         {
             Enabled = true,
-            Position = new Vector2(ScreenWidth * 0.5f, ScreenHeight * 0.5f),
-            PositionSmoothingEnabled = true,
-            PositionSmoothingSpeed = 7.0f
+            Position = _player == null
+                ? new Vector2(TrackStartX, ScreenHeight * 0.5f)
+                : new Vector2(_player.X, ScreenHeight * 0.5f),
+            Zoom = Vector2.One,
+            PositionSmoothingEnabled = false
         };
         AddChild(_camera);
     }
@@ -317,8 +325,8 @@ public partial class RaceController : Node2D
         if (_player == null)
             return;
 
-        var cameraX = Mathf.Clamp(_player.X, ScreenWidth * 0.5f, TrackEndX - ScreenWidth * 0.5f + 70.0f);
-        _camera.Position = new Vector2(cameraX, ScreenHeight * 0.5f);
+        _camera.Zoom = Vector2.One;
+        _camera.Position = new Vector2(_player.X, ScreenHeight * 0.5f);
         _playerMarker.Position = new Vector2(_player.X, _player.Sprite.Position.Y - 20.0f);
     }
 
@@ -439,12 +447,13 @@ public partial class RaceController : Node2D
         frames.SetAnimationLoop("run", true);
         frames.SetAnimationSpeed("run", 8.0);
 
+        // Races move left-to-right. Row 3 is the sheet's right-facing animation.
         for (var column = 0; column < 4; column++)
         {
             var atlas = new AtlasTexture
             {
                 Atlas = CharacterTexture,
-                Region = new Rect2(column * 48, 2 * 48, 48, 48)
+                Region = new Rect2(column * 48, 3 * 48, 48, 48)
             };
             frames.AddFrame("run", atlas);
         }
