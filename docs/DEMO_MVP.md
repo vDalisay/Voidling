@@ -2,14 +2,14 @@
 
 ## Purpose
 
-This is a deliberately small playable vertical slice for validating the creature-raising loop before expanding the garden simulation.
+This is the playable Godot 4.6 C# vertical slice for validating the creature-raising loop before expanding the simulation.
 
 ```text
 Buy / breed egg
       ↓
 See egg incubate in the garden
       ↓
-Hatch + inspect DNA / appearance / lineage
+Hatch + inspect Stats / DNA / appearance / lineage
       ↓
 Train with shop treats
       ↓
@@ -20,137 +20,93 @@ Breed stronger or more interesting bloodlines
 
 ## Garden and camera
 
-`Scenes/Garden.tscn` contains real Godot `TileMapLayer` nodes:
-
-- `WaterLayer`
-- `IslandLayer`
-
-Both use `Resources/Tiles/garden_tileset.tres` and the original Sprout Lands 16×16 atlas. The island is serialized tile data, not a flattened picture or a runtime-only generated map, so it remains editable in the Godot editor.
-
-The grass TileSet is configured as a terrain-aware atlas using distinct corner, edge and interior tiles. This follows the same terrain layout used by the public Sprout Lands TileMap Godot project rather than treating one corner sprite as a generic ground tile.
+`Scenes/Garden.tscn` contains real editable Godot `TileMapLayer` nodes backed by `Resources/Tiles/garden_tileset.tres` and the Sprout Lands 16×16 terrain atlas.
 
 ### Camera controls
 
-- **Middle mouse drag:** pan around the garden.
+- **LMB drag on empty ground:** pan around the garden.
+- **Middle mouse drag:** alternate pan control.
 - **Mouse wheel:** zoom in/out.
-- **Center:** restore the default camera position and zoom.
+- **Center:** restore the default camera.
+- **Eye button:** follow the currently selected Voidling with a centered camera.
 
-Open `Scenes/Garden.tscn`, select `IslandLayer`, then use Godot's TileMap/terrain tools to repaint the island. `WaterLayer` is available as a separate editable layer.
-
-The old decorative berries/plants/material props were removed from the starter island. The initial scenery now stays limited to terrain, trees and rocks.
+Hold LMB on a Voidling to pick it up. Release to place it elsewhere. Pickup uses a grab cursor and lifted shadow; placement has a drop/bounce and dust effect.
 
 ## Voidlings
 
-All MVP creatures use:
+All MVP creatures use the Sprout Lands base character sheet and individual color tinting. Children render at half adult size. World sprites have close grounded ellipse shadows and a pulsing selection circle.
 
-`Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png`
+Click the selected Voidling's name in its inspection panel to rename it inline. Names persist in saves and genealogy.
 
-A color tint differentiates individuals. They wander independently inside the garden. Click one to select it; use the **X** button in its profile to deselect it.
+Core stats are Run, Swim, Fly, Power and Stamina. There is no Intelligence or Luck.
 
-Core stats are:
+The selected inspection panel contains training controls, Details, Family tree and Goodbye. Persistent garden HUD panels hide whenever a foreground menu opens so they cannot overlap menu content.
 
-- Run
-- Swim
-- Fly
-- Power
-- Stamina
+## Details
 
-There is no Intelligence or Luck stat.
+Details always opens as the only foreground menu and hides the garden inspection panel while open.
 
-### DNA profile
+It has three pages:
 
-The selected Voidling has a **DNA** button. It exposes, per stat:
+- **Stats** — color-coded rank, level, current stat and level-progress bar.
+- **DNA** — genotype only: DNA1 and DNA2 for each ability plus color DNA. Current/trained stat values are intentionally not shown here.
+- **Visual** — current tint, appearance genes and Mutations.
 
-- allele A;
-- allele B;
-- currently expressed grade;
-- current trained/effective value.
+Stat colors are Run green, Swim yellow, Fly purple, Power red and Stamina white.
 
-It also shows color genes, generation, active inbreeding burden and rare-trait provenance/transmission state.
+The demo assigns one existing/new-save Voidling the **Angel** mutation, rendered as a halo in world and portraits.
 
-### Visual profile
+## Family tree
 
-The **Visual** button shows a larger portrait, current tint, expressed/base color genes and shiny-level appearance traits.
+Family tree is a clipped pannable overview with no scrollbars.
 
-### Family tree
+- LMB drag on empty space pans the tree.
+- Middle mouse remains an alternate pan binding.
+- Click a member for its compact stats/parents inspector.
+- Selected family cards darken.
+- Departed and historical inbreeding records remain visible.
 
-The **Family tree** button sits next to the parents information. It opens a scrollable genealogy view containing the whole connected family currently present in the save. Each node uses the Voidling's tinted sprite and name. Parent/child connections are drawn between generations, the selected Voidling is highlighted, and historical inbreeding marks stay visible even after the active burden is cleansed.
+## Shop, inventory and training
 
-## Shop
+The shop sells one training treat for each stat and mystery eggs. Store-egg genomes are fixed when that individual egg enters shop stock. Purchased eggs are placed visibly in the garden.
 
-The UI uses the Sprout Lands UI pack and pixel font. The shop sells:
-
-- one training treat for each stat;
-- three mystery eggs.
-
-Each shop egg receives its complete genome when that exact egg enters shop inventory. Buying, saving, loading or hatching does not reroll it. The shop can hide those predetermined values from the player.
-
-Purchased eggs are placed visibly into the garden and incubate there.
-
-## Training
-
-Buy a stat treat, select a Voidling, then press the small `+` button beside that stat. A treat adds a small randomized amount of training points. Training improves current performance but does not rewrite inherited DNA.
+Inventory shows item icons and owned counts. The selected Voidling's training buttons display `+1 (count)` and consume one item per click.
 
 ## Breeding and hatching
 
-Press **Breed** and choose two adult Voidlings. The relationship preview shows whether the pairing is related and what inbreeding burden the egg would inherit.
+Breeding is player initiated. The menu shows both parent sprites above the selectors and previews relatedness/inbreeding consequences.
 
-When breeding succeeds:
+The garden breeding sequence has parents walk together with heart particles, perform a short dance, show a larger breeding heart, then spawn the egg with a bounce/pop animation.
 
-1. both parent sprites pause their normal wandering;
-2. they walk toward one another;
-3. a small pixel heart appears;
-4. the bred egg is created and placed visibly between them;
-5. both parents resume wandering.
+Eggs visibly incubate, pulse more strongly/frequently as hatch approaches, burst at hatch, and the new child jumps out. There is no force hatch.
 
-Each stat independently inherits one allele from each parent. The child genome and viability are resolved when the egg is created and are never rerolled at hatch time.
+Inbreeding uses the 0/20/50/80/100% viability ladder and clean unrelated outcrossing reduces active burden one level per generation while keeping historical marks.
 
-Eggs hatch naturally after the MVP incubation timer. There is no force-hatch action. A newly hatched child appears where its egg was located.
+## Race
 
-### Inbreeding
+Race selection explicitly chooses one owned Voidling. All other racers are generated CPU opponents.
 
-The demo checks ancestry through a configurable depth. Related pairings escalate the child's burden:
+The course uses one shared side-view track and keeps the player centered at locked 1× camera zoom.
 
-| Burden | Hatch failure |
-|---:|---:|
-| 0 | 0% |
-| 1 | 20% |
-| 2 | 50% |
-| 3 | 80% |
-| 4 | 100% |
+- **Run:** ground pace and hurdle avoidance.
+- **Swim:** water-section speed using the dedicated `Assets/Sprout Sorry pack/Early Access/Ocean Pack/swimming.png` animation.
+- **Fly:** finite glide endurance across a raised water crossing. All racers launch into visible 2D elevation; stronger Fly travels farther. If glide endurance expires before the opposite bank, the racer visibly falls into the water and uses Swim for the remainder.
+- **Stamina:** continuous race energy and CHEER capacity.
 
-Failure is rolled once when the egg is created and stored in the save. Reloading cannot reroll it. Breeding a burdened Voidling with an unrelated burden-0 Voidling reduces the active burden by one level per clean generation; historical inbreeding remains visible in the family tree.
+CHEER spends Stamina, gives a two-second speed boost and renders trailing speed streak particles.
 
-## Rare appearance traits
+Auto Finish is ON by default. When the player finishes it deterministically fast-forwards remaining CPUs. If every CPU has already finished first, the race also ends immediately because the player's fourth-place result is known.
 
-Store/starter generation has an extremely small chance to found a rare appearance trait. Transmission depth is stored per trait:
+The finish screen uses centered 1st/2nd/3rd podium blocks and fourth place beside them in a puddle.
 
-- founder (`G0`) can transmit;
-- founder child (`G1`) can transmit;
-- second-generation carrier (`G2`) can display the trait but is terminal and cannot transmit it further.
+## Settings and persistence
 
-The MVP represents these visually with a small sparkle orbit and exposes their inheritance state in DNA/visual profiles.
+Settings are available from the top bar or ESC. Master volume and Auto Finish persist with the save.
 
-## Automated race
+The demo automatically saves to `user://voidling_mvp_save.json`. It includes active/departed lineage, genetics, mutations, inventory, eggs, placements and settings.
 
-Select one Voidling in the garden, then press **Race**.
+## Running and validation
 
-Exactly **one owned Voidling** enters the minigame: the currently selected one. All three opponents are temporary CPU-generated Voidlings. Other owned Voidlings are never inserted into the race automatically.
-
-The side-view race runs left-to-right with obstacles:
-
-- higher **Run** increases movement speed;
-- higher **Run** increases obstacle-avoidance chance;
-- failed avoidance causes a stumble delay;
-- successful avoidance shows a small jump;
-- **Stamina** reduces late-race fatigue.
-
-Race placement awards sprouts.
-
-## Persistence
-
-The demo automatically saves to:
-
-`user://voidling_mvp_save.json`
-
-Older MVP saves are migrated with garden positions for existing Voidlings and eggs. Use **Reset** only when you intentionally want to wipe the local MVP save and restore the starter state.
+- `build.bat` restores/builds the C# project.
+- `playgame.bat` launches the game directly without opening the editor.
+- GitHub Actions validates package restore, C# compilation and Godot headless project/scene parsing.
