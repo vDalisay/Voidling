@@ -1,6 +1,7 @@
 using Godot;
 using Voidling.Application.Breeding;
 using Voidling.Application.Persistence;
+using Voidling.Application.Simulation;
 using Voidling.Application.Training;
 using Voidling.Domain.Rules;
 using Voidling.Infrastructure.Audio;
@@ -29,6 +30,7 @@ public partial class GameBootstrap : Node
             new GodotJsonGameStateRepository(SavePath),
             new GodotAudioSettingsAdapter(),
             new GameStateMigrationService(rules),
+            new AdvanceSimulationUseCase(rules),
             new TrainingUseCase(rules),
             new BreedVoidlingsUseCase(rules));
 

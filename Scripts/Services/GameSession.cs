@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
 using Voidling.Application.Persistence;
 using Voidling.Application.Ports;
+using Voidling.Application.Simulation;
 using Voidling.Application.Training;
 
 namespace VoidlingGame;
@@ -28,6 +28,7 @@ public partial class GameSession : Node
     private IGameStateRepository? _stateRepository;
     private IAudioSettingsAdapter? _audioSettings;
     private GameStateMigrationService? _migrations;
+    private AdvanceSimulationUseCase? _simulation;
     private TrainingUseCase? _training;
     private BreedVoidlingsUseCase? _breeding;
 
@@ -35,6 +36,7 @@ public partial class GameSession : Node
         IGameStateRepository stateRepository,
         IAudioSettingsAdapter audioSettings,
         GameStateMigrationService migrations,
+        AdvanceSimulationUseCase simulation,
         TrainingUseCase training,
         BreedVoidlingsUseCase breeding)
     {
@@ -44,13 +46,14 @@ public partial class GameSession : Node
         _stateRepository = stateRepository ?? throw new ArgumentNullException(nameof(stateRepository));
         _audioSettings = audioSettings ?? throw new ArgumentNullException(nameof(audioSettings));
         _migrations = migrations ?? throw new ArgumentNullException(nameof(migrations));
+        _simulation = simulation ?? throw new ArgumentNullException(nameof(simulation));
         _training = training ?? throw new ArgumentNullException(nameof(training));
         _breeding = breeding ?? throw new ArgumentNullException(nameof(breeding));
     }
 
     public override void _Ready()
     {
-        if (_stateRepository == null || _audioSettings == null || _migrations == null || _training == null || _breeding == null)
+        if (_stateRepository == null || _audioSettings == null || _migrations == null || _simulation == null || _training == null || _breeding == null)
             throw new InvalidOperationException("GameSession must be created by the composition root.");
 
         Instance = this;
@@ -67,58 +70,29 @@ public partial class GameSession : Node
 
         var step = (float)_simulationAccumulator;
         _simulationAccumulator = 0.0;
-        var changed = false;
+        var result = _simulation!.Advance(State, step);
 
-        foreach (var creature in State.Voidlings)
+        foreach (var simulationEvent in result.Events)
         {
-            if (creature.BreedCooldownSeconds > 0.0f)
+            switch (simulationEvent)
             {
-                creature.BreedCooldownSeconds = Math.Max(0.0f, creature.BreedCooldownSeconds - step);
-                changed = true;
-            }
-
-            if (creature.Stage == LifeStage.Child)
-            {
-                creature.AgeSeconds += step;
-                if (creature.AgeSeconds >= GameRules.ChildToAdultSeconds)
-                {
-                    creature.Stage = LifeStage.Adult;
-                    ToastRequested?.Invoke($"{creature.Name} grew into an adult.");
-                }
-                changed = true;
+                case CreatureBecameAdultEvent adult:
+                    ToastRequested?.Invoke($"{adult.Name} grew into an adult.");
+                    break;
+                case CreatureHatchedEvent hatched:
+                    ToastRequested?.Invoke($"{hatched.Name} hatched.");
+                    break;
+                case EggFailedEvent:
+                    ToastRequested?.Invoke("An egg failed to hatch.");
+                    break;
             }
         }
 
-        var hatchQueue = new List<EggData>();
-        foreach (var egg in State.OwnedEggs)
-        {
-            if (egg.State != EggState.Incubating)
-                continue;
+        if (!result.Changed)
+            return;
 
-            egg.IncubationSeconds += step;
-            changed = true;
-            if (egg.IncubationSeconds >= egg.RequiredIncubationSeconds)
-                hatchQueue.Add(egg);
-        }
-
-        foreach (var egg in hatchQueue)
-        {
-            if (!egg.IsViable)
-            {
-                egg.State = EggState.Failed;
-                egg.FailureResolved = true;
-                ToastRequested?.Invoke("An egg failed to hatch.");
-                continue;
-            }
-
-            HatchEgg(egg);
-        }
-
-        if (changed || hatchQueue.Count > 0)
-        {
-            Save();
-            StateChanged?.Invoke();
-        }
+        Save();
+        StateChanged?.Invoke();
     }
 
     public void ResetDemo()
@@ -126,34 +100,6 @@ public partial class GameSession : Node
         State = CreateFreshState();
         ApplyAudioSettings();
         SaveAndNotify("Demo save reset.");
-    }
-
-    private void HatchEgg(EggData egg)
-    {
-        var suffix = State.Voidlings.Count + State.DepartedVoidlings.Count + 1;
-        var creature = new VoidlingData
-        {
-            Id = egg.Id,
-            Name = $"Voidling {suffix}",
-            Genome = egg.Genome,
-            Stage = LifeStage.Child,
-            ParentAId = egg.ParentAId,
-            ParentBId = egg.ParentBId,
-            FamilyGeneration = egg.FamilyGeneration,
-            InbreedingBurdenLevel = egg.InbreedingBurdenLevel,
-            InbreedingHistoryFlag = egg.InbreedingHistoryFlag,
-            TintHex = egg.TintHex,
-            RareTraits = egg.RareTraits,
-            WorldX = egg.WorldX,
-            WorldY = egg.WorldY
-        };
-
-        foreach (var statId in GameRules.StatIds)
-            creature.TrainingPoints[statId] = 0;
-
-        State.Voidlings.Add(creature);
-        State.OwnedEggs.Remove(egg);
-        ToastRequested?.Invoke($"{creature.Name} hatched.");
     }
 
     private void LoadOrCreate()
