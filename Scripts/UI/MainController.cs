@@ -132,14 +132,27 @@ public partial class MainController : Node
         _garden.Select(_selectedId);
         RebuildDetailsPanel();
         RebuildEggsPanel();
+
+        // Modal windows own the foreground. Keep the persistent garden HUD from
+        // bleeding into or overlapping their content.
+        if (_modal != null)
+            HideGardenHudPanels();
     }
 
     private VBoxContainer OpenModal(string title, Vector2 size)
     {
-        CloseModal();
-        var overlay = new Control { MouseFilter = Control.MouseFilterEnum.Stop, Position = Vector2.Zero, Size = new Vector2(ScreenWidth, ScreenHeight) };
+        CloseModal(false);
+        HideGardenHudPanels();
+
+        var overlay = new Control
+        {
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            Position = Vector2.Zero,
+            Size = new Vector2(ScreenWidth, ScreenHeight)
+        };
         _uiRoot.AddChild(overlay);
         _modal = overlay;
+
         var shade = new ColorRect
         {
             Color = new Color(0.16f, 0.24f, 0.20f, 0.48f),
@@ -148,13 +161,16 @@ public partial class MainController : Node
             MouseFilter = Control.MouseFilterEnum.Stop
         };
         overlay.AddChild(shade);
+
         var panel = UiFactory.CreatePanel(size);
         panel.Position = new Vector2((ScreenWidth - size.X) * 0.5f, (ScreenHeight - size.Y) * 0.5f);
         panel.Size = size;
         overlay.AddChild(panel);
+
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 7);
         panel.AddChild(box);
+
         var heading = new HBoxContainer();
         heading.AddThemeConstantOverride("separation", 7);
         var titleLabel = UiFactory.CreateTitle(title);
@@ -166,14 +182,28 @@ public partial class MainController : Node
         close.Pressed += CloseModal;
         heading.AddChild(close);
         box.AddChild(heading);
+
         return box;
     }
 
-    private void CloseModal()
+    private void HideGardenHudPanels()
+    {
+        if (_detailsPanel != null && GodotObject.IsInstanceValid(_detailsPanel))
+            _detailsPanel.Visible = false;
+        if (_eggsPanel != null && GodotObject.IsInstanceValid(_eggsPanel))
+            _eggsPanel.Visible = false;
+    }
+
+    private void CloseModal() => CloseModal(true);
+
+    private void CloseModal(bool restoreGardenHud)
     {
         if (_modal != null && GodotObject.IsInstanceValid(_modal))
             _modal.QueueFree();
         _modal = null;
+
+        if (restoreGardenHud && _race == null && _uiRoot != null && _uiRoot.Visible)
+            RefreshUi();
     }
 
     private void StartRace(VoidlingData selected)
@@ -181,6 +211,7 @@ public partial class MainController : Node
         _garden.SetGameplayActive(false);
         _garden.Visible = false;
         _uiRoot.Visible = false;
+
         _race = new RaceController();
         AddChild(_race);
         _race.ReturnRequested += EndRace;
@@ -192,6 +223,7 @@ public partial class MainController : Node
         if (_race != null && GodotObject.IsInstanceValid(_race))
             _race.QueueFree();
         _race = null;
+
         _garden.Visible = true;
         _garden.SetGameplayActive(true);
         _uiRoot.Visible = true;
@@ -202,6 +234,7 @@ public partial class MainController : Node
     {
         if (_selectedId != creatureId)
             _garden.StopFollowing();
+
         _selectedId = creatureId;
         RefreshUi();
     }
