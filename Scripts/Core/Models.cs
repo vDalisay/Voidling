@@ -64,7 +64,7 @@ public sealed class VoidlingData
     public string TintHex { get; set; } = "#F6F0C9";
     public List<RareTraitData> RareTraits { get; set; } = new();
 
-    // Initial world position. Wandering does not continuously write to the save.
+    // Initial/world placement. Normal wandering does not continuously write to the save.
     public float WorldX { get; set; }
     public float WorldY { get; set; }
 }
@@ -88,23 +88,22 @@ public sealed class EggData
     public string TintHex { get; set; } = "#F6F0C9";
     public List<RareTraitData> RareTraits { get; set; } = new();
 
-    // Eggs are real garden entities, so their location is part of save data.
     public float WorldX { get; set; }
     public float WorldY { get; set; }
 }
 
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 3;
+    public int SaveVersion { get; set; } = 4;
     public int Coins { get; set; } = 120;
     public long SeedCounter { get; set; } = 1;
     public List<VoidlingData> Voidlings { get; set; } = new();
-
-    // Voidlings that were permanently released from the farm. They are retained only
-    // as immutable lineage records so descendants never lose their genealogy.
     public List<VoidlingData> DepartedVoidlings { get; set; } = new();
-
     public List<EggData> OwnedEggs { get; set; } = new();
     public List<EggData> StoreEggs { get; set; } = new();
     public Dictionary<string, int> TrainingItems { get; set; } = new();
+
+    // Demo settings are kept in the same small save so playgame.bat launches retain them.
+    public float MasterVolume { get; set; } = 1.0f;
+    public bool AutoFinishRaces { get; set; } = true;
 }
