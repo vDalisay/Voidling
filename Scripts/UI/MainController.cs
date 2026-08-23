@@ -72,7 +72,7 @@ public partial class MainController : Node
         if (_modal != null)
             CloseModal();
         else
-            ShowSettings();
+            ShowSettingsExtended();
         GetViewport().SetInputAsHandled();
     }
 
@@ -95,7 +95,7 @@ public partial class MainController : Node
         AddTopButton(row, "Inventory", ShowInventory, 3, 68);
         AddTopButton(row, "Breed", ShowBreeding, 6, 57);
         AddTopButton(row, "Race", ShowRacePicker, 12, 57);
-        AddTopButton(row, "Settings", ShowSettings, -1, 67);
+        AddTopButton(row, "Settings", ShowSettingsExtended, -1, 67);
         AddTopButton(row, "Center", _garden.ResetCamera, -1, 57);
         AddTopButton(row, "Reset", ShowResetConfirm, -1, 54);
     }
@@ -133,8 +133,6 @@ public partial class MainController : Node
         RebuildDetailsPanel();
         RebuildEggsPanel();
 
-        // Modal windows own the foreground. Keep the persistent garden HUD from
-        // bleeding into or overlapping their content.
         if (_modal != null)
             HideGardenHudPanels();
     }
