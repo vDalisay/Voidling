@@ -149,6 +149,10 @@ public partial class GameSession : Node
         State.StoreEggs.Remove(egg);
         egg.Source = EggSource.Store;
         egg.IncubationSeconds = 0.0f;
+
+        var nestPosition = NextNestPosition();
+        egg.WorldX = nestPosition.X;
+        egg.WorldY = nestPosition.Y;
         State.OwnedEggs.Add(egg);
 
         // The replacement is generated now, when it enters store inventory.
@@ -188,7 +192,7 @@ public partial class GameSession : Node
             : "Unrelated pairing • no inbreeding penalty.";
     }
 
-    public bool TryBreed(string parentAId, string parentBId)
+    public bool TryBreed(string parentAId, string parentBId, Vector2 eggWorldPosition)
     {
         var a = FindVoidling(parentAId);
         var b = FindVoidling(parentBId);
@@ -231,7 +235,9 @@ public partial class GameSession : Node
             FailureResolved = true,
             RequiredIncubationSeconds = GameRules.EggIncubationSeconds,
             TintHex = GeneticsService.ResolveTint(genome),
-            RareTraits = rareTraits
+            RareTraits = rareTraits,
+            WorldX = eggWorldPosition.X,
+            WorldY = eggWorldPosition.Y
         };
 
         State.OwnedEggs.Add(egg);
@@ -301,7 +307,9 @@ public partial class GameSession : Node
             InbreedingBurdenLevel = egg.InbreedingBurdenLevel,
             InbreedingHistoryFlag = egg.InbreedingHistoryFlag,
             TintHex = egg.TintHex,
-            RareTraits = egg.RareTraits
+            RareTraits = egg.RareTraits,
+            WorldX = egg.WorldX,
+            WorldY = egg.WorldY
         };
 
         foreach (var statId in GameRules.StatIds)
@@ -340,6 +348,8 @@ public partial class GameSession : Node
 
     private void NormalizeState()
     {
+        State.SaveVersion = 2;
+
         foreach (var statId in GameRules.StatIds)
         {
             if (!State.TrainingItems.ContainsKey(statId))
@@ -352,14 +362,40 @@ public partial class GameSession : Node
             }
         }
 
+        // Migrate the first MVP save, which did not store world positions.
+        for (var i = 0; i < State.Voidlings.Count; i++)
+        {
+            var creature = State.Voidlings[i];
+            if (Math.Abs(creature.WorldX) < 0.01f && Math.Abs(creature.WorldY) < 0.01f)
+            {
+                var p = StarterSpawnPosition(i);
+                creature.WorldX = p.X;
+                creature.WorldY = p.Y;
+            }
+        }
+
+        for (var i = 0; i < State.OwnedEggs.Count; i++)
+        {
+            var egg = State.OwnedEggs[i];
+            if (Math.Abs(egg.WorldX) < 0.01f && Math.Abs(egg.WorldY) < 0.01f)
+            {
+                var p = NestPosition(i);
+                egg.WorldX = p.X;
+                egg.WorldY = p.Y;
+            }
+        }
+
         while (State.StoreEggs.Count < 3)
             State.StoreEggs.Add(CreateStoreEgg());
+
+        Save();
     }
 
     private GameStateData CreateFreshState()
     {
         var state = new GameStateData
         {
+            SaveVersion = 2,
             Coins = 120,
             SeedCounter = DateTime.UtcNow.Ticks
         };
@@ -369,8 +405,8 @@ public partial class GameSession : Node
 
         State = state;
 
-        var first = CreateStarter("Pip", "#E7A6B6");
-        var second = CreateStarter("Mallow", "#A9D5C0");
+        var first = CreateStarter("Pip", "#E7A6B6", StarterSpawnPosition(0));
+        var second = CreateStarter("Mallow", "#A9D5C0", StarterSpawnPosition(1));
         State.Voidlings.Add(first);
         State.Voidlings.Add(second);
 
@@ -380,13 +416,12 @@ public partial class GameSession : Node
         return State;
     }
 
-    private VoidlingData CreateStarter(string name, string tint)
+    private VoidlingData CreateStarter(string name, string tint, Vector2 position)
     {
         var seed = NextSeed();
         var id = NewId();
         var genome = GeneticsService.CreateRandomGenome(seed);
 
-        // Keep the requested visible starter colors while retaining their own hidden color genes.
         return new VoidlingData
         {
             Id = id,
@@ -396,7 +431,9 @@ public partial class GameSession : Node
             AgeSeconds = GameRules.ChildToAdultSeconds,
             TintHex = tint,
             RareTraits = GeneticsService.RollFounderTraits(seed, id),
-            TrainingPoints = GameRules.StatIds.ToDictionary(stat => stat, _ => 0)
+            TrainingPoints = GameRules.StatIds.ToDictionary(stat => stat, _ => 0),
+            WorldX = position.X,
+            WorldY = position.Y
         };
     }
 
@@ -418,6 +455,29 @@ public partial class GameSession : Node
             IsViable = true,
             FailureResolved = true
         };
+    }
+
+    private Vector2 NextNestPosition() => NestPosition(State.OwnedEggs.Count);
+
+    private static Vector2 NestPosition(int index)
+    {
+        var column = index % 5;
+        var row = index / 5;
+        return new Vector2(315 + column * 26, 275 + row * 24);
+    }
+
+    private static Vector2 StarterSpawnPosition(int index)
+    {
+        var positions = new[]
+        {
+            new Vector2(300, 185),
+            new Vector2(420, 210),
+            new Vector2(250, 250),
+            new Vector2(485, 160),
+            new Vector2(360, 290),
+            new Vector2(530, 250)
+        };
+        return positions[index % positions.Length];
     }
 
     private ulong NextSeed()
