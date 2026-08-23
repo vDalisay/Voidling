@@ -1,11 +1,19 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using Godot;
+using Voidling.Application.Ports;
+using Voidling.Infrastructure.Audio;
+using Voidling.Infrastructure.Persistence;
 
 namespace VoidlingGame;
 
+/// <summary>
+/// Transitional Godot lifetime facade. Existing presentation code still calls this API,
+/// while infrastructure and deterministic rules are progressively moved behind explicit
+/// collaborators. New features should prefer focused Application services over adding more
+/// responsibilities here.
+/// </summary>
 public partial class GameSession : Node
 {
     public static GameSession Instance { get; private set; } = null!;
@@ -16,12 +24,28 @@ public partial class GameSession : Node
     public GameStateData State { get; private set; } = new();
 
     private const string SavePath = "user://voidling_mvp_save.json";
-    private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
     private double _simulationAccumulator;
+    private IGameStateRepository? _stateRepository;
+    private IAudioSettingsAdapter? _audioSettings;
+
+    /// <summary>
+    /// Allows the future composition root and tests to inject platform adapters. The current
+    /// autoload path has safe Godot defaults so this refactor does not change scene setup.
+    /// </summary>
+    public void Configure(IGameStateRepository stateRepository, IAudioSettingsAdapter audioSettings)
+    {
+        if (IsInsideTree())
+            throw new InvalidOperationException("GameSession must be configured before entering the scene tree.");
+
+        _stateRepository = stateRepository ?? throw new ArgumentNullException(nameof(stateRepository));
+        _audioSettings = audioSettings ?? throw new ArgumentNullException(nameof(audioSettings));
+    }
 
     public override void _Ready()
     {
         Instance = this;
+        _stateRepository ??= new GodotJsonGameStateRepository(SavePath);
+        _audioSettings ??= new GodotAudioSettingsAdapter();
         LoadOrCreate();
         ApplyAudioSettings();
         SetProcess(true);
@@ -352,17 +376,12 @@ public partial class GameSession : Node
     {
         try
         {
-            if (Godot.FileAccess.FileExists(SavePath))
+            var loaded = _stateRepository!.Load();
+            if (loaded != null)
             {
-                using var file = Godot.FileAccess.Open(SavePath, Godot.FileAccess.ModeFlags.Read);
-                var json = file.GetAsText();
-                var loaded = JsonSerializer.Deserialize<GameStateData>(json, _jsonOptions);
-                if (loaded != null)
-                {
-                    State = loaded;
-                    NormalizeState();
-                    return;
-                }
+                State = loaded;
+                NormalizeState();
+                return;
             }
         }
         catch (Exception exception)
@@ -515,16 +534,7 @@ public partial class GameSession : Node
     }
 
     private void ApplyAudioSettings()
-    {
-        var bus = AudioServer.GetBusIndex("Master");
-        if (bus < 0)
-            return;
-
-        var volume = Mathf.Clamp(State.MasterVolume, 0.0f, 1.0f);
-        AudioServer.SetBusMute(bus, volume <= 0.001f);
-        if (volume > 0.001f)
-            AudioServer.SetBusVolumeDb(bus, Mathf.LinearToDb(volume));
-    }
+        => _audioSettings!.ApplyMasterVolume(State.MasterVolume);
 
     private Vector2 NextNestPosition() => NestPosition(State.OwnedEggs.Count);
 
@@ -568,8 +578,7 @@ public partial class GameSession : Node
     {
         try
         {
-            using var file = Godot.FileAccess.Open(SavePath, Godot.FileAccess.ModeFlags.Write);
-            file.StoreString(JsonSerializer.Serialize(State, _jsonOptions));
+            _stateRepository!.Save(State);
         }
         catch (Exception exception)
         {
