@@ -101,17 +101,33 @@ public partial class GardenController : Node2D
 
         if (inputEvent is InputEventMouseButton mouse)
         {
-            if (mouse.ButtonIndex == MouseButton.Left && !mouse.Pressed)
+            if (mouse.ButtonIndex == MouseButton.Left)
             {
-                if (_draggedId.Length > 0)
-                    DropGrabbedVoidling();
-                else
-                    ClearPendingGrab();
+                if (!mouse.Pressed)
+                {
+                    if (_draggedId.Length > 0)
+                        DropGrabbedVoidling();
+                    else
+                        ClearPendingGrab();
 
-                GetViewport().SetInputAsHandled();
-                return;
+                    _cameraDragging = false;
+                    GetViewport().SetInputAsHandled();
+                    return;
+                }
+
+                // Actor Area2D input is marked handled before it reaches this method.
+                // Therefore an unhandled LMB press is empty garden ground and can safely
+                // start a RollerCoaster-Tycoon-style camera drag without fighting pickup.
+                if (_pendingGrabId.Length == 0 && _draggedId.Length == 0)
+                {
+                    _cameraDragging = true;
+                    StopFollowing();
+                    GetViewport().SetInputAsHandled();
+                    return;
+                }
             }
 
+            // Keep middle mouse as a secondary pan binding for desktop users.
             if (mouse.ButtonIndex == MouseButton.Middle)
             {
                 _cameraDragging = mouse.Pressed;
@@ -242,7 +258,6 @@ public partial class GardenController : Node2D
             .SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
         await ToSignal(approach, Tween.SignalName.Finished);
 
-        // A brief mirrored side-to-side dance makes the event feel intentional rather than rushed.
         for (var step = 0; step < 3; step++)
         {
             var sign = step % 2 == 0 ? 1.0f : -1.0f;
