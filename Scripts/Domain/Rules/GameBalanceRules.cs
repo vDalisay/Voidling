@@ -26,6 +26,41 @@ public sealed record LifecycleRules(float ChildToAdultSeconds);
 public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice);
 
 /// <summary>
+/// Current race constants extracted from the MVP controller. Keeping them immutable and
+/// domain-owned lets the forthcoming headless simulator reuse exactly the same balancing
+/// while Godot presentation remains free to change independently.
+/// </summary>
+public sealed record RaceRules(
+    float BaseStamina,
+    float StaminaPerPoint,
+    float BaseStaminaDrainPerSecond,
+    float GroundBaseSpeed,
+    float GroundRunSpeedScale,
+    float SwimBaseSpeed,
+    float SwimSpeedScale,
+    float SwimExtraDrain,
+    float GlideBaseSpeed,
+    float GlideSpeedScale,
+    float GlideExtraDrain,
+    float FailedGlideSwimBaseSpeed,
+    float FailedGlideSwimSpeedScale,
+    float FailedGlideSwimExtraDrain,
+    float LowStaminaThreshold,
+    float LowStaminaSpeedMultiplier,
+    float ExhaustedSpeedMultiplier,
+    float CheerDurationSeconds,
+    float CheerCost,
+    float CheerSpeedMultiplier,
+    float GlideBaseDistance,
+    float GlideDistancePerFlyPoint,
+    float ObstacleAvoidBaseChance,
+    float ObstacleAvoidRunScale,
+    float ObstacleAvoidMaxChance,
+    float ObstacleBaseDelaySeconds,
+    float ObstacleLowRunDelaySeconds,
+    float ObstacleRollbackDistance);
+
+/// <summary>
 /// Immutable rules consumed by pure game logic. Godot Resource authoring adapters can
 /// validate and convert to this shape later; domain code never reads Resources directly.
 /// </summary>
@@ -36,7 +71,8 @@ public sealed record GameBalanceRules(
     HatchingRules Hatching,
     StatGrowthRules Stats,
     LifecycleRules Lifecycle,
-    ShopRules Shop)
+    ShopRules Shop,
+    RaceRules Racing)
 {
     public static GameBalanceRules DemoDefaults { get; } = new(
         Genetics: new GeneticsRules(
@@ -70,5 +106,34 @@ public sealed record GameBalanceRules(
             MaxLevel: 99,
             MaxTrainingPoints: 120),
         Lifecycle: new LifecycleRules(ChildToAdultSeconds: 45.0f),
-        Shop: new ShopRules(StoreEggPrice: 30, TrainingItemPrice: 8));
+        Shop: new ShopRules(StoreEggPrice: 30, TrainingItemPrice: 8),
+        Racing: new RaceRules(
+            BaseStamina: 72.0f,
+            StaminaPerPoint: 1.05f,
+            BaseStaminaDrainPerSecond: 2.1f,
+            GroundBaseSpeed: 31.0f,
+            GroundRunSpeedScale: 0.36f,
+            SwimBaseSpeed: 24.0f,
+            SwimSpeedScale: 0.35f,
+            SwimExtraDrain: 1.1f,
+            GlideBaseSpeed: 28.0f,
+            GlideSpeedScale: 0.40f,
+            GlideExtraDrain: 0.85f,
+            FailedGlideSwimBaseSpeed: 23.0f,
+            FailedGlideSwimSpeedScale: 0.33f,
+            FailedGlideSwimExtraDrain: 1.25f,
+            LowStaminaThreshold: 0.18f,
+            LowStaminaSpeedMultiplier: 0.90f,
+            ExhaustedSpeedMultiplier: 0.84f,
+            CheerDurationSeconds: 2.0f,
+            CheerCost: 24.0f,
+            CheerSpeedMultiplier: 1.22f,
+            GlideBaseDistance: 82.0f,
+            GlideDistancePerFlyPoint: 2.55f,
+            ObstacleAvoidBaseChance: 0.28f,
+            ObstacleAvoidRunScale: 0.67f,
+            ObstacleAvoidMaxChance: 0.95f,
+            ObstacleBaseDelaySeconds: 0.62f,
+            ObstacleLowRunDelaySeconds: 0.55f,
+            ObstacleRollbackDistance: 5.0f));
 }
