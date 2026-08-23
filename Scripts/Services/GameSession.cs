@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
+using Voidling.Application.Persistence;
 using Voidling.Application.Ports;
 using Voidling.Application.Training;
 
@@ -26,12 +27,14 @@ public partial class GameSession : Node
     private double _simulationAccumulator;
     private IGameStateRepository? _stateRepository;
     private IAudioSettingsAdapter? _audioSettings;
+    private GameStateMigrationService? _migrations;
     private TrainingUseCase? _training;
     private BreedVoidlingsUseCase? _breeding;
 
     public void Configure(
         IGameStateRepository stateRepository,
         IAudioSettingsAdapter audioSettings,
+        GameStateMigrationService migrations,
         TrainingUseCase training,
         BreedVoidlingsUseCase breeding)
     {
@@ -40,13 +43,14 @@ public partial class GameSession : Node
 
         _stateRepository = stateRepository ?? throw new ArgumentNullException(nameof(stateRepository));
         _audioSettings = audioSettings ?? throw new ArgumentNullException(nameof(audioSettings));
+        _migrations = migrations ?? throw new ArgumentNullException(nameof(migrations));
         _training = training ?? throw new ArgumentNullException(nameof(training));
         _breeding = breeding ?? throw new ArgumentNullException(nameof(breeding));
     }
 
     public override void _Ready()
     {
-        if (_stateRepository == null || _audioSettings == null || _training == null || _breeding == null)
+        if (_stateRepository == null || _audioSettings == null || _migrations == null || _training == null || _breeding == null)
             throw new InvalidOperationException("GameSession must be created by the composition root.");
 
         Instance = this;
@@ -175,28 +179,7 @@ public partial class GameSession : Node
 
     private void NormalizeState()
     {
-        var previousVersion = State.SaveVersion;
-        State.DepartedVoidlings ??= new List<VoidlingData>();
-
-        if (previousVersion < 4)
-        {
-            State.MasterVolume = 1.0f;
-            State.AutoFinishRaces = true;
-        }
-        State.SaveVersion = 4;
-
-        foreach (var statId in GameRules.StatIds)
-        {
-            if (!State.TrainingItems.ContainsKey(statId))
-                State.TrainingItems[statId] = 0;
-
-            foreach (var creature in State.Voidlings.Concat(State.DepartedVoidlings))
-            {
-                if (!creature.TrainingPoints.ContainsKey(statId))
-                    creature.TrainingPoints[statId] = 0;
-                creature.RareTraits ??= new List<RareTraitData>();
-            }
-        }
+        _migrations!.Normalize(State);
 
         for (var i = 0; i < State.Voidlings.Count; i++)
         {
@@ -212,7 +195,6 @@ public partial class GameSession : Node
         for (var i = 0; i < State.OwnedEggs.Count; i++)
         {
             var egg = State.OwnedEggs[i];
-            egg.RareTraits ??= new List<RareTraitData>();
             if (Math.Abs(egg.WorldX) < 0.01f && Math.Abs(egg.WorldY) < 0.01f)
             {
                 var p = NestPosition(i);
@@ -232,7 +214,7 @@ public partial class GameSession : Node
     {
         var state = new GameStateData
         {
-            SaveVersion = 4,
+            SaveVersion = GameStateMigrationService.CurrentSaveVersion,
             Coins = 120,
             SeedCounter = DateTime.UtcNow.Ticks,
             MasterVolume = 1.0f,
