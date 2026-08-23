@@ -53,22 +53,26 @@ public sealed class TrainingUseCase
         return new TrainingPurchaseResult(TrainingFailure.None);
     }
 
-    public TrainingApplicationResult ApplyTrainingItem(GameStateData state, string creatureId, string statId, ulong seed)
+    public TrainingFailure ValidateTrainingItem(GameStateData state, string creatureId, string statId)
     {
         ArgumentNullException.ThrowIfNull(state);
-
         if (!_rules.Genetics.StatIds.Contains(statId))
-            return new TrainingApplicationResult(TrainingFailure.UnknownStat, 0);
-
-        var creature = state.Voidlings.FirstOrDefault(v => v.Id == creatureId);
-        if (creature == null)
-            return new TrainingApplicationResult(TrainingFailure.CreatureNotFound, 0);
+            return TrainingFailure.UnknownStat;
+        if (state.Voidlings.All(v => v.Id != creatureId))
+            return TrainingFailure.CreatureNotFound;
 
         state.TrainingItems.TryGetValue(statId, out var count);
-        if (count <= 0)
-            return new TrainingApplicationResult(TrainingFailure.NoItemOwned, 0);
+        return count > 0 ? TrainingFailure.None : TrainingFailure.NoItemOwned;
+    }
 
-        state.TrainingItems[statId] = count - 1;
+    public TrainingApplicationResult ApplyTrainingItem(GameStateData state, string creatureId, string statId, ulong seed)
+    {
+        var failure = ValidateTrainingItem(state, creatureId, statId);
+        if (failure != TrainingFailure.None)
+            return new TrainingApplicationResult(failure, 0);
+
+        var creature = state.Voidlings.First(v => v.Id == creatureId);
+        state.TrainingItems[statId]--;
         var gain = StableRandom.Create(seed, $"training:{creatureId}:{statId}").Next(5, 10);
         creature.TrainingPoints.TryGetValue(statId, out var current);
         creature.TrainingPoints[statId] = Math.Min(_rules.Stats.MaxTrainingPoints, current + gain);
