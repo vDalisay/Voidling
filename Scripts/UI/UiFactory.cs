@@ -127,10 +127,10 @@ public static class UiFactory
         style.TextureMarginRight = 8;
         style.TextureMarginTop = 8;
         style.TextureMarginBottom = 8;
-        style.ContentMarginLeft = 10;
-        style.ContentMarginRight = 10;
-        style.ContentMarginTop = 10;
-        style.ContentMarginBottom = 10;
+        style.ContentMarginLeft = 12;
+        style.ContentMarginRight = 12;
+        style.ContentMarginTop = 11;
+        style.ContentMarginBottom = 11;
         return style;
     }
 
@@ -142,8 +142,8 @@ public static class UiFactory
         style.TextureMarginRight = 4;
         style.TextureMarginTop = 4;
         style.TextureMarginBottom = 4;
-        style.ContentMarginLeft = 7;
-        style.ContentMarginRight = 7;
+        style.ContentMarginLeft = 8;
+        style.ContentMarginRight = 8;
         style.ContentMarginTop = 4;
         style.ContentMarginBottom = 4;
         return style;
