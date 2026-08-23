@@ -1,4 +1,4 @@
-using System.Linq;
+using Voidling.Application.Shop;
 
 namespace VoidlingGame;
 
@@ -6,26 +6,31 @@ public partial class GameSession
 {
     public void BuyStoreEgg(string eggId)
     {
-        var egg = State.StoreEggs.FirstOrDefault(e => e.Id == eggId);
-        if (egg == null)
-            return;
-
-        if (State.Coins < GameRules.StoreEggPrice)
+        var failure = _shop!.ValidateStoreEggPurchase(State, eggId);
+        if (failure == ShopFailure.NotEnoughCurrency)
         {
             ToastRequested?.Invoke("Not enough sprouts.");
             return;
         }
+        if (failure != ShopFailure.None)
+            return;
 
-        State.Coins -= GameRules.StoreEggPrice;
-        State.StoreEggs.Remove(egg);
-        egg.Source = EggSource.Store;
-        egg.IncubationSeconds = 0.0f;
-
+        // Only allocate the replacement's persistent seed after the transaction is known to
+        // be valid. Failed clicks must not shift later deterministic random streams.
         var nestPosition = NextNestPosition();
-        egg.WorldX = nestPosition.X;
-        egg.WorldY = nestPosition.Y;
-        State.OwnedEggs.Add(egg);
-        State.StoreEggs.Add(CreateStoreEgg());
+        var replacementSeed = NextSeed();
+        var replacementId = NewId();
+        var result = _shop.BuyStoreEgg(
+            State,
+            eggId,
+            replacementId,
+            replacementSeed,
+            nestPosition.X,
+            nestPosition.Y);
+
+        if (!result.Succeeded)
+            return;
+
         SaveAndNotify("Bought a mystery egg.");
     }
 }
