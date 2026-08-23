@@ -23,10 +23,13 @@ public partial class RaceController : Node2D
     private const float CheerDuration = 2.0f;
     private const float CheerCost = 24.0f;
     private const float RunningStaminaDrainPerSecond = 2.1f;
-    private const float FlySuccessThreshold = 55.0f;
+    private const float FlightAltitude = 38.0f;
+    private const float FallDuration = 0.48f;
 
     private static readonly Texture2D CharacterTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
+    private static readonly Texture2D SwimmingTexture = GD.Load<Texture2D>(
+        "res://Assets/Sprout Sorry pack/Early Access/Ocean Pack/swimming.png");
     private static readonly Texture2D WaterTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Tilesets/Water.png");
     private static readonly Texture2D FenceTexture = GD.Load<Texture2D>(
@@ -49,6 +52,7 @@ public partial class RaceController : Node2D
     private Label _staminaLabel = null!;
     private Label _sectionLabel = null!;
     private RaceMiniMap _miniMap = null!;
+    private float _cheerParticleAccumulator;
 
     private sealed class Racer
     {
@@ -66,7 +70,10 @@ public partial class RaceController : Node2D
         public float CurrentStamina { get; set; }
         public bool FlightResolved { get; set; }
         public bool FlightFailed { get; set; }
+        public float FlightEndX { get; set; } = FlyEndX;
+        public float FallSeconds { get; set; }
         public bool Finished { get; set; }
+        public string VisualMode { get; set; } = "run";
     }
 
     public void Setup(VoidlingData selected)
@@ -77,6 +84,8 @@ public partial class RaceController : Node2D
 
         AddWaterSection(SwimStartX, SwimEndX);
         AddWaterSection(FlyStartX, FlyEndX);
+        AddFlightRamp(FlyStartX, true);
+        AddFlightRamp(FlyEndX, false);
 
         for (var i = 0; i < participants.Count; i++)
         {
@@ -88,14 +97,14 @@ public partial class RaceController : Node2D
             {
                 Polygon = BuildEllipsePoints(9.0f, 3.4f, 18),
                 Color = new Color(0.15f, 0.18f, 0.16f, 0.34f),
-                Position = new Vector2(TrackStartX, TrackY + _racerOffsets[i] + 4.0f),
+                Position = new Vector2(TrackStartX, TrackY + _racerOffsets[i] + 2.0f),
                 ZIndex = 7 + i
             };
             AddChild(shadow);
 
             var sprite = new AnimatedSprite2D
             {
-                SpriteFrames = BuildRunFrames(),
+                SpriteFrames = BuildRaceFrames(),
                 Position = new Vector2(TrackStartX, TrackY + _racerOffsets[i] - 8.0f),
                 Scale = new Vector2(0.72f, 0.72f),
                 Modulate = GameRules.TintColor(data.TintHex),
@@ -124,7 +133,7 @@ public partial class RaceController : Node2D
             AddHurdle(obstacleX);
 
         AddWorldLabel("SWIM", (SwimStartX + SwimEndX) * 0.5f, 108, GameRules.StatColor("swim"));
-        AddWorldLabel("FLY / SWIM", (FlyStartX + FlyEndX) * 0.5f, 108, GameRules.StatColor("fly"));
+        AddWorldLabel("GLIDE / SWIM", (FlyStartX + FlyEndX) * 0.5f, 108, GameRules.StatColor("fly"));
 
         CreateCamera();
         CreatePlayerMarker();
@@ -147,11 +156,36 @@ public partial class RaceController : Node2D
                 AdvanceRacer(racer, step, true);
         }
 
+        if (_player.CheerSeconds > 0.0f && !_player.Finished)
+        {
+            _cheerParticleAccumulator += step;
+            while (_cheerParticleAccumulator >= 0.075f)
+            {
+                _cheerParticleAccumulator -= 0.075f;
+                SpawnCheerSpeedParticle();
+            }
+        }
+        else
+        {
+            _cheerParticleAccumulator = 0.0f;
+        }
+
         UpdatePlayerTracking();
         UpdateHud();
 
-        if (_player.Finished && GameSession.Instance.State.AutoFinishRaces && _finishOrder.Count < _racers.Count)
-            FastForwardCpuFinishers();
+        if (GameSession.Instance.State.AutoFinishRaces && _finishOrder.Count < _racers.Count)
+        {
+            if (_player.Finished)
+            {
+                FastForwardCpuFinishers();
+            }
+            else if (_racers.Where(r => r != _player).All(r => r.Finished))
+            {
+                // Every CPU is already home, so the player's final position is known to
+                // be fourth. Do not make the player watch an uncontested remainder.
+                FinishPlayerAsLast();
+            }
+        }
 
         if (_finishOrder.Count == _racers.Count && !_resultsShown)
         {
@@ -174,7 +208,6 @@ public partial class RaceController : Node2D
         for (var x = worldLeft + 40.0f; x < worldLeft + worldWidth; x += 80.0f)
             DrawLine(new Vector2(x, TrackY), new Vector2(x + 28, TrackY), new Color(0.95f, 0.72f, 0.52f, 0.30f), 2.0f);
 
-        // Stronger checkerboard finish gate, spanning the full vertical track.
         DrawRect(new Rect2(TrackEndX - 10, TrackTop - 8, 20, TrackBottom - TrackTop + 16), Color.FromHtml("#F5F0DE"));
         const float square = 10.0f;
         for (var row = 0; row < 13; row++)
@@ -192,6 +225,7 @@ public partial class RaceController : Node2D
     private void AdvanceRacer(Racer racer, float step, bool updateVisual)
     {
         racer.CheerSeconds = Math.Max(0.0f, racer.CheerSeconds - step);
+        racer.FallSeconds = Math.Max(0.0f, racer.FallSeconds - step);
         var staminaDrain = RunningStaminaDrainPerSecond;
 
         if (racer.DelaySeconds > 0.0f)
@@ -212,32 +246,47 @@ public partial class RaceController : Node2D
         {
             speed = 24.0f + swim * 0.35f;
             staminaDrain += 1.1f;
+            if (updateVisual)
+                SetVisualMode(racer, "swim");
         }
         else if (InFlySection(racer.X))
         {
             if (!racer.FlightResolved)
+                ResolveFlightPlan(racer, fly);
+
+            if (!racer.FlightFailed && racer.X >= racer.FlightEndX && racer.FlightEndX < FlyEndX - 1.0f)
             {
-                racer.FlightResolved = true;
-                racer.FlightFailed = fly < FlySuccessThreshold;
-                if (racer.FlightFailed)
-                    racer.DelaySeconds = 0.26f; // brief fall/splash before swimming the rest.
+                racer.FlightFailed = true;
+                racer.FallSeconds = FallDuration;
             }
 
             if (racer.FlightFailed)
             {
                 speed = 23.0f + swim * 0.33f;
                 staminaDrain += 1.25f;
+                if (updateVisual && racer.FallSeconds <= 0.01f)
+                    SetVisualMode(racer, "swim");
             }
             else
             {
                 speed = 28.0f + fly * 0.40f;
                 staminaDrain += 0.85f;
+                if (updateVisual)
+                    SetVisualMode(racer, "glide");
             }
         }
-        else if (racer.X >= FlyEndX)
+        else
         {
-            racer.FlightResolved = false;
-            racer.FlightFailed = false;
+            if (racer.X >= FlyEndX)
+            {
+                racer.FlightResolved = false;
+                racer.FlightFailed = false;
+                racer.FlightEndX = FlyEndX;
+                racer.FallSeconds = 0.0f;
+            }
+
+            if (updateVisual)
+                SetVisualMode(racer, "run");
         }
 
         var staminaRatio = racer.MaxStamina <= 0.0f ? 0.0f : racer.CurrentStamina / racer.MaxStamina;
@@ -263,11 +312,25 @@ public partial class RaceController : Node2D
             racer.Finished = true;
             if (!_finishOrder.Contains(racer))
                 _finishOrder.Add(racer);
-            racer.Sprite.Stop();
+            if (updateVisual)
+                racer.Sprite.Stop();
         }
 
         if (updateVisual)
             UpdateRacerPosition(racer, step);
+    }
+
+    private static void ResolveFlightPlan(Racer racer, float fly)
+    {
+        racer.FlightResolved = true;
+        racer.FlightFailed = false;
+
+        // A low-Fly racer can still launch and visibly glide, but only for a limited
+        // horizontal distance. High Fly reaches the opposite bank. This replaces the
+        // old binary threshold and makes the fall point itself communicate the stat.
+        var sectionWidth = FlyEndX - FlyStartX;
+        var glideDistance = 82.0f + Mathf.Clamp(fly, 0.0f, 100.0f) * 2.55f;
+        racer.FlightEndX = Math.Min(FlyEndX, FlyStartX + Math.Min(sectionWidth, glideDistance));
     }
 
     private void FastForwardCpuFinishers()
@@ -290,6 +353,19 @@ public partial class RaceController : Node2D
             if (!_finishOrder.Contains(racer))
                 _finishOrder.Add(racer);
         }
+    }
+
+    private void FinishPlayerAsLast()
+    {
+        if (_player == null || _player.Finished)
+            return;
+
+        _player.X = TrackEndX;
+        _player.Finished = true;
+        _player.Sprite.Stop();
+        if (!_finishOrder.Contains(_player))
+            _finishOrder.Add(_player);
+        UpdateRacerPosition(_player, 0.0f);
     }
 
     private void CreateCamera()
@@ -388,7 +464,36 @@ public partial class RaceController : Node2D
 
         _player.CurrentStamina -= CheerCost;
         _player.CheerSeconds = CheerDuration;
+        _cheerParticleAccumulator = 0.075f;
+        SpawnCheerSpeedParticle();
         UpdateHud();
+    }
+
+    private void SpawnCheerSpeedParticle()
+    {
+        if (_player == null)
+            return;
+
+        var yJitter = (float)(_player.Random.NextDouble() * 18.0 - 9.0);
+        var length = 9.0f + (float)_player.Random.NextDouble() * 8.0f;
+        var streak = new Line2D
+        {
+            Width = 1.7f,
+            DefaultColor = Color.FromHtml("#FFF0A1"),
+            ZIndex = 8,
+            Points = new[]
+            {
+                new Vector2(_player.X - 13.0f - length, _player.Sprite.Position.Y + 8.0f + yJitter),
+                new Vector2(_player.X - 13.0f, _player.Sprite.Position.Y + 8.0f + yJitter)
+            }
+        };
+        AddChild(streak);
+
+        var tween = CreateTween().SetParallel(true);
+        tween.TweenProperty(streak, "position:x", -20.0f, 0.28)
+            .SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(streak, "modulate:a", 0.0f, 0.28);
+        tween.Finished += streak.QueueFree;
     }
 
     private void UpdateHud()
@@ -409,7 +514,7 @@ public partial class RaceController : Node2D
         }
         else if (InFlySection(_player.X))
         {
-            _sectionLabel.Text = _player.FlightFailed ? "FELL! SWIM" : "FLY";
+            _sectionLabel.Text = _player.FlightFailed ? "FELL! SWIM" : "GLIDE";
             _sectionLabel.AddThemeColorOverride("font_color", _player.FlightFailed ? GameRules.StatColor("swim") : GameRules.StatColor("fly"));
         }
         else
@@ -454,6 +559,7 @@ public partial class RaceController : Node2D
     {
         var yOffset = 0.0f;
         var shadowScale = Vector2.One;
+        var shadowAlpha = 0.34f;
 
         if (racer.JumpSeconds > 0.0f)
         {
@@ -462,20 +568,81 @@ public partial class RaceController : Node2D
             yOffset = -Mathf.Sin(normalized * Mathf.Pi) * 17.0f;
             shadowScale = new Vector2(0.75f, 0.75f);
         }
-        else if (InSwimSection(racer.X) || (InFlySection(racer.X) && racer.FlightFailed))
+        else if (InSwimSection(racer.X))
         {
             yOffset = 7.0f + Mathf.Sin((float)Time.GetTicksMsec() / 150.0f + racer.BaseY) * 2.0f;
-            shadowScale = new Vector2(0.55f, 0.55f);
+            shadowScale = new Vector2(0.45f, 0.45f);
+            shadowAlpha = 0.15f;
         }
-        else if (InFlySection(racer.X) && !racer.FlightFailed)
+        else if (InFlySection(racer.X))
         {
-            yOffset = -29.0f + Mathf.Sin((float)Time.GetTicksMsec() / 180.0f + racer.BaseY) * 2.0f;
-            shadowScale = new Vector2(0.65f, 0.65f);
+            if (racer.FlightFailed)
+            {
+                if (racer.FallSeconds > 0.0f)
+                {
+                    var fallProgress = 1.0f - racer.FallSeconds / FallDuration;
+                    var startAltitude = -FlightAltitude + Mathf.Sin((float)Time.GetTicksMsec() / 180.0f + racer.BaseY) * 1.5f;
+                    yOffset = Mathf.Lerp(startAltitude, 7.0f, Mathf.Clamp(fallProgress, 0.0f, 1.0f));
+                    racer.Sprite.Rotation = Mathf.Lerp(-0.08f, 0.16f, fallProgress);
+                    shadowScale = new Vector2(0.45f + fallProgress * 0.15f, 0.45f + fallProgress * 0.15f);
+                    shadowAlpha = 0.12f + fallProgress * 0.08f;
+                }
+                else
+                {
+                    yOffset = 7.0f + Mathf.Sin((float)Time.GetTicksMsec() / 150.0f + racer.BaseY) * 2.0f;
+                    racer.Sprite.Rotation = 0.0f;
+                    shadowScale = new Vector2(0.45f, 0.45f);
+                    shadowAlpha = 0.15f;
+                }
+            }
+            else
+            {
+                var takeoff = Mathf.Clamp((racer.X - FlyStartX) / 45.0f, 0.0f, 1.0f);
+                var landing = racer.FlightEndX >= FlyEndX - 1.0f
+                    ? Mathf.Clamp((FlyEndX - racer.X) / 45.0f, 0.0f, 1.0f)
+                    : 1.0f;
+                var altitudeFactor = Math.Min(takeoff, landing);
+                yOffset = -FlightAltitude * altitudeFactor + Mathf.Sin((float)Time.GetTicksMsec() / 190.0f + racer.BaseY) * 1.8f;
+                racer.Sprite.Rotation = -0.08f + Mathf.Sin((float)Time.GetTicksMsec() / 260.0f + racer.BaseY) * 0.025f;
+                shadowScale = new Vector2(0.48f, 0.48f);
+                shadowAlpha = 0.12f;
+            }
+        }
+        else
+        {
+            racer.Sprite.Rotation = 0.0f;
         }
 
         racer.Sprite.Position = new Vector2(racer.X, racer.BaseY - 8.0f + yOffset);
-        racer.Shadow.Position = new Vector2(racer.X, racer.BaseY + 4.0f);
+        racer.Shadow.Position = new Vector2(racer.X, racer.BaseY + 2.0f);
         racer.Shadow.Scale = shadowScale;
+        var shadowColor = racer.Shadow.Color;
+        shadowColor.A = shadowAlpha;
+        racer.Shadow.Color = shadowColor;
+    }
+
+    private static void SetVisualMode(Racer racer, string mode)
+    {
+        if (racer.VisualMode == mode)
+            return;
+
+        racer.VisualMode = mode;
+        racer.Sprite.Rotation = 0.0f;
+        switch (mode)
+        {
+            case "swim":
+                racer.Sprite.Play("swim");
+                racer.Sprite.SpeedScale = 1.0f;
+                break;
+            case "glide":
+                racer.Sprite.Play("run");
+                racer.Sprite.SpeedScale = 0.48f;
+                break;
+            default:
+                racer.Sprite.Play("run");
+                racer.Sprite.SpeedScale = 1.0f;
+                break;
+        }
     }
 
     private static bool InSwimSection(float x) => x >= SwimStartX && x < SwimEndX;
@@ -527,6 +694,30 @@ public partial class RaceController : Node2D
         }
     }
 
+    private void AddFlightRamp(float x, bool launch)
+    {
+        var ramp = new Polygon2D
+        {
+            Polygon = launch
+                ? new[] { new Vector2(-24, 18), new Vector2(24, -6), new Vector2(24, 18) }
+                : new[] { new Vector2(-24, -6), new Vector2(24, 18), new Vector2(-24, 18) },
+            Color = Color.FromHtml("#D99B63"),
+            Position = new Vector2(x, TrackY - 3),
+            ZIndex = 4
+        };
+        AddChild(ramp);
+        var edge = new Line2D
+        {
+            Width = 2.0f,
+            DefaultColor = Color.FromHtml("#8D654F"),
+            Points = launch
+                ? new[] { new Vector2(-24, 18), new Vector2(24, -6) }
+                : new[] { new Vector2(-24, -6), new Vector2(24, 18) },
+            ZIndex = 5
+        };
+        ramp.AddChild(edge);
+    }
+
     private void AddHurdle(float x)
     {
         var tile = new AtlasTexture
@@ -535,7 +726,6 @@ public partial class RaceController : Node2D
             Region = new Rect2(0, 0, 16, 16)
         };
 
-        // Repeat the fence tile so the hurdle visibly spans the entire track width vertically.
         for (var y = TrackTop + 9.0f; y < TrackBottom; y += 18.0f)
         {
             var obstacle = new Sprite2D
@@ -595,17 +785,19 @@ public partial class RaceController : Node2D
         var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         box.AddThemeConstantOverride("separation", 4);
         panel.AddChild(box);
-        box.AddChild(UiFactory.CreateTitle($"RACE RESULTS — YOU #{selectedPlace}"));
+        var resultTitle = UiFactory.CreateTitle($"RACE RESULTS — YOU #{selectedPlace}");
+        resultTitle.HorizontalAlignment = HorizontalAlignment.Center;
+        box.AddChild(resultTitle);
 
         var stage = new Control { CustomMinimumSize = new Vector2(480, 192) };
         box.AddChild(stage);
 
         if (_finishOrder.Count >= 4)
         {
-            AddPodiumSlot(stage, _finishOrder[1], 2, new Vector2(64, 72), new Vector2(100, 83));
-            AddPodiumSlot(stage, _finishOrder[0], 1, new Vector2(185, 42), new Vector2(110, 113));
-            AddPodiumSlot(stage, _finishOrder[2], 3, new Vector2(316, 92), new Vector2(92, 63));
-            AddFourthPlacePuddle(stage, _finishOrder[3], new Vector2(410, 114));
+            AddPodiumSlot(stage, _finishOrder[1], 2, new Vector2(55, 105), new Vector2(100, 67));
+            AddPodiumSlot(stage, _finishOrder[0], 1, new Vector2(181, 72), new Vector2(112, 100));
+            AddPodiumSlot(stage, _finishOrder[2], 3, new Vector2(319, 120), new Vector2(92, 52));
+            AddFourthPlacePuddle(stage, _finishOrder[3], new Vector2(428, 112));
         }
 
         var button = UiFactory.CreateButton("Return to Garden");
@@ -614,9 +806,9 @@ public partial class RaceController : Node2D
         box.AddChild(button);
     }
 
-    private static void AddPodiumSlot(Control stage, Racer racer, int place, Vector2 position, Vector2 blockSize)
+    private static void AddPodiumSlot(Control stage, Racer racer, int place, Vector2 blockPosition, Vector2 blockSize)
     {
-        var block = new PanelContainer { Position = position + new Vector2(0, 49), Size = blockSize };
+        var block = new PanelContainer { Position = blockPosition, Size = blockSize };
         var style = new StyleBoxFlat
         {
             BgColor = place == 1 ? Color.FromHtml("#EBCB63") : place == 2 ? Color.FromHtml("#CDD0C8") : Color.FromHtml("#C28B5D"),
@@ -633,14 +825,16 @@ public partial class RaceController : Node2D
         placeLabel.VerticalAlignment = VerticalAlignment.Center;
         block.AddChild(placeLabel);
 
+        var portraitX = blockPosition.X + (blockSize.X - 48.0f) * 0.5f;
+        var portraitY = blockPosition.Y - 49.0f;
         var portrait = UiFactory.CreatePortrait(racer.Data, new Vector2(48, 48));
-        portrait.Position = position;
+        portrait.Position = new Vector2(portraitX, portraitY);
         portrait.Size = new Vector2(48, 48);
         stage.AddChild(portrait);
 
         var name = UiFactory.CreateLabel(racer.Data.Name, 6);
-        name.Position = new Vector2(position.X - 20, position.Y - 14);
-        name.Size = new Vector2(90, 14);
+        name.Position = new Vector2(blockPosition.X + (blockSize.X - 100.0f) * 0.5f, portraitY - 15.0f);
+        name.Size = new Vector2(100, 14);
         name.HorizontalAlignment = HorizontalAlignment.Center;
         stage.AddChild(name);
     }
@@ -649,8 +843,8 @@ public partial class RaceController : Node2D
     {
         var puddle = new PanelContainer
         {
-            Position = position + new Vector2(-7, 38),
-            Size = new Vector2(68, 15)
+            Position = new Vector2(position.X - 8, position.Y + 41),
+            Size = new Vector2(62, 14)
         };
         var puddleStyle = new StyleBoxFlat
         {
@@ -668,9 +862,9 @@ public partial class RaceController : Node2D
         portrait.Size = new Vector2(48, 48);
         stage.AddChild(portrait);
 
-        var name = UiFactory.CreateLabel($"4th\n{racer.Data.Name}", 6);
-        name.Position = new Vector2(position.X - 10, position.Y - 25);
-        name.Size = new Vector2(70, 28);
+        var name = UiFactory.CreateLabel($"4th • {racer.Data.Name}", 6);
+        name.Position = new Vector2(position.X - 18, position.Y - 17);
+        name.Size = new Vector2(84, 14);
         name.HorizontalAlignment = HorizontalAlignment.Center;
         stage.AddChild(name);
     }
@@ -686,14 +880,14 @@ public partial class RaceController : Node2D
         return points;
     }
 
-    private static SpriteFrames BuildRunFrames()
+    private static SpriteFrames BuildRaceFrames()
     {
         var frames = new SpriteFrames();
         frames.RemoveAnimation("default");
+
         frames.AddAnimation("run");
         frames.SetAnimationLoop("run", true);
         frames.SetAnimationSpeed("run", 8.0);
-
         for (var column = 0; column < 4; column++)
         {
             var atlas = new AtlasTexture
@@ -703,6 +897,22 @@ public partial class RaceController : Node2D
             };
             frames.AddFrame("run", atlas);
         }
+
+        // The Sprout Sorry Ocean Pack swimming sheet is an 8x8 grid of 48px frames.
+        // Row 3 is the side/right-facing cycle, matching the race's left-to-right view.
+        frames.AddAnimation("swim");
+        frames.SetAnimationLoop("swim", true);
+        frames.SetAnimationSpeed("swim", 10.0);
+        for (var column = 0; column < 8; column++)
+        {
+            var atlas = new AtlasTexture
+            {
+                Atlas = SwimmingTexture,
+                Region = new Rect2(column * 48, 3 * 48, 48, 48)
+            };
+            frames.AddFrame("swim", atlas);
+        }
+
         return frames;
     }
 }
