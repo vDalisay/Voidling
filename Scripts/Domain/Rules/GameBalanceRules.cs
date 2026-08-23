@@ -13,6 +13,8 @@ public sealed record GeneticsRules(
     IReadOnlyList<string> FounderTraitIds,
     int RelatedAncestorDepth);
 
+public sealed record AppearanceRules(IReadOnlyList<string> PaletteHex);
+
 public sealed record BreedingRules(float CooldownSeconds, IReadOnlyList<int> HatchFailurePercentByBurden);
 
 public sealed record HatchingRules(float IncubationSeconds);
@@ -29,6 +31,7 @@ public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice);
 /// </summary>
 public sealed record GameBalanceRules(
     GeneticsRules Genetics,
+    AppearanceRules Appearance,
     BreedingRules Breeding,
     HatchingRules Hatching,
     StatGrowthRules Stats,
@@ -45,6 +48,19 @@ public sealed record GameBalanceRules(
             RareTraitTransmissionChance: 0.10,
             FounderTraitIds: Array.AsReadOnly(new[] { "Lustrous", "Prismatic", "Aurora" }),
             RelatedAncestorDepth: 3),
+        Appearance: new AppearanceRules(Array.AsReadOnly(new[]
+        {
+            "#F6F0C9",
+            "#E7A6B6",
+            "#A9D5C0",
+            "#B7B2E8",
+            "#F0C778",
+            "#A8C8EC",
+            "#D4A7E8",
+            "#E9B690",
+            "#AFCB7A",
+            "#D9D1C6"
+        })),
         Breeding: new BreedingRules(
             CooldownSeconds: 8.0f,
             HatchFailurePercentByBurden: Array.AsReadOnly(new[] { 0, 20, 50, 80, 100 })),
