@@ -104,18 +104,21 @@ public partial class MainController : Node
         if (data == null)
             return;
 
+        // OpenModal closes any existing menu and hides the persistent inspection/egg HUD,
+        // leaving Details as the single foreground context.
         var box = OpenModal($"{data.Name.ToUpperInvariant()} — DETAILS", new Vector2(536, 318));
 
         var tabs = new HBoxContainer();
         tabs.AddThemeConstantOverride("separation", 5);
+        var statsTab = UiFactory.CreateButton("Stats");
         var dnaTab = UiFactory.CreateButton("DNA");
         var visualTab = UiFactory.CreateButton("Visual");
-        dnaTab.CustomMinimumSize = new Vector2(92, 23);
-        visualTab.CustomMinimumSize = new Vector2(92, 23);
-        dnaTab.ToggleMode = true;
-        visualTab.ToggleMode = true;
-        tabs.AddChild(dnaTab);
-        tabs.AddChild(visualTab);
+        foreach (var tab in new[] { statsTab, dnaTab, visualTab })
+        {
+            tab.CustomMinimumSize = new Vector2(92, 23);
+            tab.ToggleMode = true;
+            tabs.AddChild(tab);
+        }
         box.AddChild(tabs);
 
         var body = new VBoxContainer
@@ -136,39 +139,60 @@ public partial class MainController : Node
             }
         }
 
+        void SelectTab(Button active)
+        {
+            statsTab.ButtonPressed = active == statsTab;
+            dnaTab.ButtonPressed = active == dnaTab;
+            visualTab.ButtonPressed = active == visualTab;
+        }
+
+        void RenderStats()
+        {
+            ClearBody();
+            SelectTab(statsTab);
+
+            var header = new HBoxContainer();
+            header.AddThemeConstantOverride("separation", 12);
+            header.AddChild(UiFactory.CreatePortrait(data, new Vector2(58, 58)));
+            var summary = new VBoxContainer();
+            summary.AddThemeConstantOverride("separation", 2);
+            summary.AddChild(UiFactory.CreateLabel(data.Stage == LifeStage.Adult ? "ADULT" : "CHILD", 8));
+            summary.AddChild(UiFactory.CreateLabel("Rank controls potential; level/progress reflects training.", 6));
+            header.AddChild(summary);
+            body.AddChild(header);
+
+            foreach (var statId in GameRules.StatIds)
+                body.AddChild(CreateDetailsStatRow(data, statId));
+        }
+
         void RenderDna()
         {
             ClearBody();
-            dnaTab.ButtonPressed = true;
-            visualTab.ButtonPressed = false;
+            SelectTab(dnaTab);
 
-            var header = new HBoxContainer();
-            header.AddThemeConstantOverride("separation", 10);
-            header.AddChild(UiFactory.CreatePortrait(data, new Vector2(54, 54)));
+            var intro = new HBoxContainer();
+            intro.AddThemeConstantOverride("separation", 10);
+            intro.AddChild(UiFactory.CreatePortrait(data, new Vector2(54, 54)));
             var summary = new VBoxContainer();
             summary.AddThemeConstantOverride("separation", 2);
             summary.AddChild(UiFactory.CreateLabel($"Generation {data.FamilyGeneration}", 8));
             summary.AddChild(UiFactory.CreateLabel($"Inbreeding burden: {data.InbreedingBurdenLevel}", 7));
-            summary.AddChild(UiFactory.CreateLabel("STATS are expressed; DNA1 and DNA2 are inherited.", 6));
-            header.AddChild(summary);
-            body.AddChild(header);
+            summary.AddChild(UiFactory.CreateLabel("DNA1 and DNA2 are the two inherited ability genes.", 6));
+            intro.AddChild(summary);
+            body.AddChild(intro);
 
             body.AddChild(CreateDnaHeaderRow());
             foreach (var statId in GameRules.StatIds)
                 body.AddChild(CreateDnaStatRow(data, statId));
 
-            var expressedColor = data.Genome.ExpressedColorIndex == 0
-                ? data.Genome.ColorAlleleA
-                : data.Genome.ColorAlleleB;
             body.AddChild(UiFactory.CreateLabel(
-                $"Color DNA: #{data.Genome.ColorAlleleA} / #{data.Genome.ColorAlleleB}  • shows #{expressedColor}", 6));
+                $"Color DNA1 #{data.Genome.ColorAlleleA}    DNA2 #{data.Genome.ColorAlleleB}", 7));
         }
 
         void RenderVisual()
         {
             ClearBody();
-            dnaTab.ButtonPressed = false;
-            visualTab.ButtonPressed = true;
+            SelectTab(visualTab);
 
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 18);
@@ -205,19 +229,54 @@ public partial class MainController : Node
             }
         }
 
+        statsTab.Pressed += RenderStats;
         dnaTab.Pressed += RenderDna;
         visualTab.Pressed += RenderVisual;
-        RenderDna();
+        RenderStats();
+    }
+
+    private static Control CreateDetailsStatRow(VoidlingData data, string statId)
+    {
+        var panel = new PanelContainer { CustomMinimumSize = new Vector2(472, 29) };
+        var tint = GameRules.StatColor(statId);
+        var background = tint;
+        background.A = statId == "stamina" ? 0.55f : 0.22f;
+        var style = new StyleBoxFlat { BgColor = background, BorderColor = Color.FromHtml("#BE916C") };
+        style.SetBorderWidthAll(1);
+        style.ContentMarginLeft = style.ContentMarginRight = 6;
+        style.ContentMarginTop = style.ContentMarginBottom = 3;
+        panel.AddThemeStyleboxOverride("panel", style);
+
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 8);
+        panel.AddChild(row);
+
+        var gene = GameRules.GetGene(data, statId);
+        var name = UiFactory.CreateLabel(GameRules.StatDisplayNames[statId].ToUpperInvariant(), 8);
+        name.CustomMinimumSize = new Vector2(75, 19);
+        name.AddThemeColorOverride("font_color", tint);
+        name.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
+        name.AddThemeConstantOverride("outline_size", 1);
+        row.AddChild(name);
+
+        var values = UiFactory.CreateLabel(
+            $"RANK {GameRules.GradeName(gene.ExpressedValue)}   LV {GameRules.StatLevel(data, statId):00}   STAT {Mathf.RoundToInt(GameRules.EffectiveStat(data, statId)):00}", 7);
+        values.CustomMinimumSize = new Vector2(205, 19);
+        row.AddChild(values);
+
+        var progress = CreateStatProgressBar(data, statId, new Vector2(165, 8));
+        progress.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        row.AddChild(progress);
+        return panel;
     }
 
     private static Control CreateDnaHeaderRow()
     {
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 4);
-        row.AddChild(CreateDnaCell("", 92, 7, true));
-        row.AddChild(CreateDnaCell("STATS", 126, 7, true));
-        row.AddChild(CreateDnaCell("DNA1", 92, 7, true));
-        row.AddChild(CreateDnaCell("DNA2", 92, 7, true));
+        row.AddChild(CreateDnaCell("GENE", 176, 7, true));
+        row.AddChild(CreateDnaCell("DNA1", 142, 7, true));
+        row.AddChild(CreateDnaCell("DNA2", 142, 7, true));
         return row;
     }
 
@@ -229,14 +288,11 @@ public partial class MainController : Node
 
         var identity = GameRules.StatColor(statId);
         var bg = identity;
-        bg.A = statId == "stamina" ? 0.72f : 0.32f;
+        bg.A = statId == "stamina" ? 0.65f : 0.28f;
 
-        row.AddChild(CreateDnaCell(GameRules.StatDisplayNames[statId].ToUpperInvariant(), 92, 7, false, bg, identity));
-        row.AddChild(CreateDnaCell(
-            $"{GameRules.GradeName(gene.ExpressedValue)}  LV{GameRules.StatLevel(data, statId):00}  {Mathf.RoundToInt(GameRules.EffectiveStat(data, statId))}",
-            126, 7, false, Color.FromHtml("#FFF0A6")));
-        row.AddChild(CreateDnaCell(GameRules.GradeName(gene.AlleleA), 92, 9, false));
-        row.AddChild(CreateDnaCell(GameRules.GradeName(gene.AlleleB), 92, 9, false));
+        row.AddChild(CreateDnaCell(GameRules.StatDisplayNames[statId].ToUpperInvariant(), 176, 7, false, bg, identity));
+        row.AddChild(CreateDnaCell(GameRules.GradeName(gene.AlleleA), 142, 9, false));
+        row.AddChild(CreateDnaCell(GameRules.GradeName(gene.AlleleB), 142, 9, false));
         return row;
     }
 
@@ -279,7 +335,7 @@ public partial class MainController : Node
             return;
 
         var box = OpenModal($"{data.Name.ToUpperInvariant()} — FAMILY TREE", new Vector2(612, 330));
-        var note = UiFactory.CreateLabel("Drag the overview with middle mouse. Click a family member for stats and parents.", 6);
+        var note = UiFactory.CreateLabel("Drag empty space with left mouse. Click a family member for stats and parents.", 6);
         box.AddChild(note);
 
         var content = new HBoxContainer();
@@ -383,7 +439,7 @@ public partial class MainController : Node
         autoFinish.ToggleMode = true;
         autoFinish.ButtonPressed = GameSession.Instance.State.AutoFinishRaces;
         autoFinish.CustomMinimumSize = new Vector2(190, 25);
-        autoFinish.TooltipText = "When your racer finishes, instantly simulate the remaining CPU racers.";
+        autoFinish.TooltipText = "Finish once either you finish or every CPU has already finished.";
         autoFinish.Pressed += () =>
         {
             GameSession.Instance.SetAutoFinishRaces(autoFinish.ButtonPressed);
