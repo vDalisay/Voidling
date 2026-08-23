@@ -15,7 +15,7 @@ public partial class RaceController : Node2D
     private static readonly Texture2D ObstacleTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Basic Grass Biom things 1.png");
 
-    private readonly float[] _obstacleXs = { 145.0f, 250.0f, 355.0f };
+    private readonly float[] _obstacleXs = { 190.0f, 330.0f, 470.0f };
     private readonly List<Racer> _racers = new();
     private readonly List<Racer> _finishOrder = new();
     private bool _running;
@@ -26,9 +26,8 @@ public partial class RaceController : Node2D
     {
         public VoidlingData Data { get; init; } = null!;
         public AnimatedSprite2D Sprite { get; init; } = null!;
-        public Label NameLabel { get; init; } = null!;
         public Random Random { get; init; } = null!;
-        public float X { get; set; } = 34.0f;
+        public float X { get; set; } = 45.0f;
         public float LaneY { get; init; }
         public int NextObstacle { get; set; }
         public float DelaySeconds { get; set; }
@@ -47,35 +46,34 @@ public partial class RaceController : Node2D
         for (var i = 0; i < participants.Count; i++)
         {
             var data = participants[i];
-            var laneY = 58.0f + i * 50.0f;
+            var laneY = 74.0f + i * 66.0f;
 
             var sprite = new AnimatedSprite2D
             {
                 SpriteFrames = BuildRunFrames(),
-                Position = new Vector2(34, laneY - 8),
-                Scale = new Vector2(0.62f, 0.62f),
+                Position = new Vector2(45, laneY - 8),
+                Scale = new Vector2(0.68f, 0.68f),
                 Modulate = GameRules.TintColor(data.TintHex)
             };
             AddChild(sprite);
             sprite.Play("run");
 
-            var label = UiFactory.CreateLabel(data.Name, 9);
-            label.Position = new Vector2(6, laneY + 10);
-            label.Size = new Vector2(100, 16);
+            var label = UiFactory.CreateLabel(data.Id == selected.Id ? $"{data.Name}  YOU" : $"{data.Name}  CPU", 9);
+            label.Position = new Vector2(10, laneY + 13);
+            label.Size = new Vector2(135, 16);
             AddChild(label);
 
             var racer = new Racer
             {
                 Data = data,
                 Sprite = sprite,
-                NameLabel = label,
                 Random = GeneticsService.CreateRandom(seed, $"race:{data.Id}:{i}"),
                 LaneY = laneY
             };
             _racers.Add(racer);
 
-            for (var obstacle = 0; obstacle < _obstacleXs.Length; obstacle++)
-                AddObstacle(_obstacleXs[obstacle], laneY);
+            foreach (var obstacleX in _obstacleXs)
+                AddObstacle(obstacleX, laneY);
         }
 
         _running = true;
@@ -103,9 +101,9 @@ public partial class RaceController : Node2D
 
             var run = GameRules.EffectiveStat(racer.Data, "run");
             var stamina = GameRules.EffectiveStat(racer.Data, "stamina");
-            var progress = Mathf.Clamp((racer.X - 34.0f) / 405.0f, 0.0f, 1.0f);
+            var progress = Mathf.Clamp((racer.X - 45.0f) / 535.0f, 0.0f, 1.0f);
 
-            var speed = 23.0f + run * 0.27f;
+            var speed = 27.0f + run * 0.34f;
             if (progress > 0.62f)
                 speed *= 0.78f + stamina * 0.0022f;
 
@@ -118,9 +116,9 @@ public partial class RaceController : Node2D
                 racer.NextObstacle++;
             }
 
-            if (racer.X >= 439.0f)
+            if (racer.X >= 580.0f)
             {
-                racer.X = 439.0f;
+                racer.X = 580.0f;
                 racer.Finished = true;
                 _finishOrder.Add(racer);
                 racer.Sprite.Stop();
@@ -138,20 +136,20 @@ public partial class RaceController : Node2D
 
     public override void _Draw()
     {
-        DrawRect(new Rect2(0, 0, 480, 270), Color.FromHtml("#A7D8C7"));
+        DrawRect(new Rect2(0, 0, 640, 360), Color.FromHtml("#A7D8C7"));
 
         for (var i = 0; i < 4; i++)
         {
-            var y = 42 + i * 50;
-            DrawRect(new Rect2(20, y, 440, 38), Color.FromHtml("#C8DC7A"));
-            DrawLine(new Vector2(20, y + 38), new Vector2(460, y + 38), Color.FromHtml("#7F9D65"), 2.0f);
+            var y = 54 + i * 66;
+            DrawRect(new Rect2(24, y, 592, 48), Color.FromHtml("#C8DC7A"));
+            DrawLine(new Vector2(24, y + 48), new Vector2(616, y + 48), Color.FromHtml("#7F9D65"), 2.0f);
         }
 
-        DrawLine(new Vector2(438, 38), new Vector2(438, 232), Color.FromHtml("#F4F0D9"), 3.0f);
-        for (var y = 38; y < 232; y += 12)
+        DrawLine(new Vector2(579, 48), new Vector2(579, 310), Color.FromHtml("#F4F0D9"), 3.0f);
+        for (var y = 48; y < 310; y += 12)
         {
             if ((y / 12) % 2 == 0)
-                DrawRect(new Rect2(438, y, 5, 6), Color.FromHtml("#596159"));
+                DrawRect(new Rect2(579, y, 5, 6), Color.FromHtml("#596159"));
         }
     }
 
@@ -160,9 +158,7 @@ public partial class RaceController : Node2D
         var avoidChance = Mathf.Clamp(0.28f + run / 100.0f * 0.67f, 0.28f, 0.95f);
 
         if (racer.Random.NextDouble() <= avoidChance)
-        {
             racer.JumpSeconds = 0.58f;
-        }
         else
         {
             racer.DelaySeconds = 0.62f + (100.0f - run) / 100.0f * 0.55f;
@@ -186,29 +182,24 @@ public partial class RaceController : Node2D
 
     private List<VoidlingData> BuildParticipants(VoidlingData selected, ulong seed)
     {
+        // Minigames are Chao-style: exactly one owned entrant; every opponent is generated for the event.
         var result = new List<VoidlingData> { selected };
+        var cpuNames = new[] { "Fern", "Moss", "Puck", "Clover", "Pebble", "Dew" };
 
-        foreach (var other in GameSession.Instance.State.Voidlings.Where(v => v.Id != selected.Id).Take(3))
-            result.Add(other);
-
-        var cpuNames = new[] { "Fern", "Moss", "Puck", "Clover" };
-        var cpuIndex = 0;
-
-        while (result.Count < 4)
+        for (var cpuIndex = 0; cpuIndex < 3; cpuIndex++)
         {
-            var cpuSeed = seed + (ulong)(100 + cpuIndex);
+            var cpuSeed = seed + (ulong)(100 + cpuIndex * 17);
             var genome = GeneticsService.CreateRandomGenome(cpuSeed);
             var cpu = new VoidlingData
             {
                 Id = $"cpu-{cpuIndex}-{cpuSeed}",
-                Name = cpuNames[cpuIndex % cpuNames.Length],
+                Name = cpuNames[(int)(cpuSeed % (ulong)cpuNames.Length)],
                 Genome = genome,
                 Stage = LifeStage.Adult,
                 TintHex = GeneticsService.ResolveTint(genome),
                 TrainingPoints = GameRules.StatIds.ToDictionary(id => id, _ => 0)
             };
             result.Add(cpu);
-            cpuIndex++;
         }
 
         return result;
@@ -226,7 +217,7 @@ public partial class RaceController : Node2D
         {
             Texture = atlas,
             Position = new Vector2(x, laneY),
-            Scale = new Vector2(1.25f, 1.25f)
+            Scale = new Vector2(1.3f, 1.3f)
         };
         AddChild(obstacle);
     }
@@ -234,8 +225,8 @@ public partial class RaceController : Node2D
     private void CreateBackdropLabel()
     {
         var title = UiFactory.CreateTitle("AUTOMATED RUN TRIAL");
-        title.Position = new Vector2(168, 8);
-        title.Size = new Vector2(200, 24);
+        title.Position = new Vector2(224, 12);
+        title.Size = new Vector2(230, 24);
         AddChild(title);
     }
 
@@ -255,13 +246,11 @@ public partial class RaceController : Node2D
         center.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         canvas.AddChild(center);
 
-        var panel = UiFactory.CreatePanel(new Vector2(260, 170));
+        var panel = UiFactory.CreatePanel(new Vector2(280, 185));
         center.AddChild(panel);
 
-        var box = new VBoxContainer
-        {
-            Alignment = BoxContainer.AlignmentMode.Center
-        };
+        var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        box.AddThemeConstantOverride("separation", 5);
         panel.AddChild(box);
 
         box.AddChild(UiFactory.CreateTitle($"FINISH — #{selectedPlace}"));
@@ -269,12 +258,9 @@ public partial class RaceController : Node2D
         for (var i = 0; i < _finishOrder.Count; i++)
         {
             var racer = _finishOrder[i];
-            var marker = racer.Data.Id == _selectedId ? "  < YOU" : "";
-            box.AddChild(UiFactory.CreateLabel($"{i + 1}. {racer.Data.Name}{marker}", 11));
+            var marker = racer.Data.Id == _selectedId ? "  < YOU" : "  CPU";
+            box.AddChild(UiFactory.CreateLabel($"{i + 1}. {racer.Data.Name}{marker}", 10));
         }
-
-        var spacer = new Control { CustomMinimumSize = new Vector2(1, 5) };
-        box.AddChild(spacer);
 
         var button = UiFactory.CreateButton("Return to Garden");
         button.Pressed += () => ReturnRequested?.Invoke();
