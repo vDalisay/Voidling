@@ -119,7 +119,8 @@ public partial class FamilyTreeView : Control
 
     public override void _GuiInput(InputEvent inputEvent)
     {
-        if (inputEvent is InputEventMouseButton mouse && mouse.ButtonIndex == MouseButton.Middle)
+        if (inputEvent is InputEventMouseButton mouse &&
+            (mouse.ButtonIndex == MouseButton.Left || mouse.ButtonIndex == MouseButton.Middle))
         {
             _panning = mouse.Pressed;
             AcceptEvent();
