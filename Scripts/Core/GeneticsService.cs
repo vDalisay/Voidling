@@ -21,6 +21,7 @@ public static class GeneticsService
     private static readonly RelationshipService Relationships = new(Rules.Genetics.RelatedAncestorDepth);
     private static readonly InbreedingBurdenService InbreedingBurden = new();
     private static readonly HatchViabilityService HatchViability = new(Rules.Breeding);
+    private static readonly ColorPhenotypeResolver Colors = new(Rules.Appearance);
 
     public static GenomeData CreateRandomGenome(ulong seed)
         => GenomeFactory.CreateRandom(seed);
@@ -29,11 +30,7 @@ public static class GeneticsService
         => GenomeInheritance.CreateChild(parentA, parentB, seed);
 
     public static string ResolveTint(GenomeData genome)
-    {
-        var index = genome.ExpressedColorIndex == 0 ? genome.ColorAlleleA : genome.ColorAlleleB;
-        index = Math.Clamp(index, 0, GameRules.PaletteHex.Length - 1);
-        return GameRules.PaletteHex[index];
-    }
+        => Colors.ResolveTint(genome);
 
     public static List<RareTraitData> RollFounderTraits(ulong seed, string founderId)
         => RareTraits.RollFounderTraits(seed, founderId);
