@@ -3,6 +3,14 @@ setlocal EnableExtensions
 
 cd /d "%~dp0"
 
+set "GODOT_EXE=C:\Users\Home\Downloads\Godot_v4.6.1-stable_mono_win64\Godot_v4.6.1-stable_mono_win64.exe"
+if not exist "%GODOT_EXE%" (
+    echo [ERROR] Godot was not found at:
+    echo         %GODOT_EXE%
+    pause
+    exit /b 1
+)
+
 echo ========================================
 echo   Voidling - Build
 echo ========================================

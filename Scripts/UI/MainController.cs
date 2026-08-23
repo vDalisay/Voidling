@@ -99,9 +99,8 @@ public partial class MainController : Node
     private void BuildToast()
     {
         _toastLabel = UiFactory.CreateLabel("", 10);
-        _toastLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        _toastLabel.Position = new Vector2(120, 330);
-        _toastLabel.Size = new Vector2(400, 22);
+        _toastLabel.Position = new Vector2(20, 329);
+        _toastLabel.Size = new Vector2(380, 16);
         _toastLabel.AddThemeColorOverride("font_color", Color.FromHtml("#F9F4D8"));
         _toastLabel.AddThemeColorOverride("font_shadow_color", Color.FromHtml("#465247"));
         _toastLabel.AddThemeConstantOverride("shadow_offset_x", 1);
@@ -388,11 +387,9 @@ public partial class MainController : Node
     private void ShowRaceConfirm()
     {
         var selected = GameSession.Instance.FindVoidling(_selectedId);
+        selected ??= GameSession.Instance.State.Voidlings.FirstOrDefault();
         if (selected == null)
-        {
-            ShowToast("Select the Voidling you want to enter first.");
             return;
-        }
 
         var box = OpenModal("AUTOMATED RACE", new Vector2(330, 165));
         var run = (int)Math.Round(GameRules.EffectiveStat(selected, "run"));
