@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Application.Breeding;
 using Voidling.Application.Ports;
-using Voidling.Infrastructure.Audio;
-using Voidling.Infrastructure.Persistence;
+using Voidling.Application.Training;
 
 namespace VoidlingGame;
 
@@ -23,29 +23,33 @@ public partial class GameSession : Node
 
     public GameStateData State { get; private set; } = new();
 
-    private const string SavePath = "user://voidling_mvp_save.json";
     private double _simulationAccumulator;
     private IGameStateRepository? _stateRepository;
     private IAudioSettingsAdapter? _audioSettings;
+    private TrainingUseCase? _training;
+    private BreedVoidlingsUseCase? _breeding;
 
-    /// <summary>
-    /// Allows the future composition root and tests to inject platform adapters. The current
-    /// autoload path has safe Godot defaults so this refactor does not change scene setup.
-    /// </summary>
-    public void Configure(IGameStateRepository stateRepository, IAudioSettingsAdapter audioSettings)
+    public void Configure(
+        IGameStateRepository stateRepository,
+        IAudioSettingsAdapter audioSettings,
+        TrainingUseCase training,
+        BreedVoidlingsUseCase breeding)
     {
         if (IsInsideTree())
             throw new InvalidOperationException("GameSession must be configured before entering the scene tree.");
 
         _stateRepository = stateRepository ?? throw new ArgumentNullException(nameof(stateRepository));
         _audioSettings = audioSettings ?? throw new ArgumentNullException(nameof(audioSettings));
+        _training = training ?? throw new ArgumentNullException(nameof(training));
+        _breeding = breeding ?? throw new ArgumentNullException(nameof(breeding));
     }
 
     public override void _Ready()
     {
+        if (_stateRepository == null || _audioSettings == null || _training == null || _breeding == null)
+            throw new InvalidOperationException("GameSession must be created by the composition root.");
+
         Instance = this;
-        _stateRepository ??= new GodotJsonGameStateRepository(SavePath);
-        _audioSettings ??= new GodotAudioSettingsAdapter();
         LoadOrCreate();
         ApplyAudioSettings();
         SetProcess(true);
@@ -128,19 +132,18 @@ public partial class GameSession : Node
 
     public void BuyTrainingItem(string statId)
     {
-        if (!GameRules.StatIds.Contains(statId))
-            return;
-
-        if (State.Coins < GameRules.TrainingItemPrice)
+        var result = _training!.BuyTrainingItem(State, statId);
+        switch (result.Failure)
         {
-            ToastRequested?.Invoke("Not enough sprouts.");
-            return;
+            case TrainingFailure.None:
+                SaveAndNotify($"Bought a {GameRules.StatDisplayNames[statId]} treat.");
+                break;
+            case TrainingFailure.NotEnoughCurrency:
+                ToastRequested?.Invoke("Not enough sprouts.");
+                break;
+            default:
+                return;
         }
-
-        State.Coins -= GameRules.TrainingItemPrice;
-        State.TrainingItems.TryGetValue(statId, out var count);
-        State.TrainingItems[statId] = count + 1;
-        SaveAndNotify($"Bought a {GameRules.StatDisplayNames[statId]} treat.");
     }
 
     public void UseTrainingItem(string creatureId, string statId)
@@ -149,19 +152,19 @@ public partial class GameSession : Node
         if (creature == null)
             return;
 
-        State.TrainingItems.TryGetValue(statId, out var count);
-        if (count <= 0)
+        var seed = NextSeed();
+        var result = _training!.ApplyTrainingItem(State, creatureId, statId, seed);
+        switch (result.Failure)
         {
-            ToastRequested?.Invoke($"Buy a {GameRules.StatDisplayNames[statId]} treat first.");
-            return;
+            case TrainingFailure.None:
+                SaveAndNotify($"{creature.Name} gained +{result.Gain} {GameRules.StatDisplayNames[statId]} training.");
+                break;
+            case TrainingFailure.NoItemOwned:
+                ToastRequested?.Invoke($"Buy a {GameRules.StatDisplayNames[statId]} treat first.");
+                break;
+            default:
+                return;
         }
-
-        State.TrainingItems[statId] = count - 1;
-        var rng = GeneticsService.CreateRandom(NextSeed(), $"training:{creatureId}:{statId}");
-        var gain = rng.Next(5, 10);
-        creature.TrainingPoints.TryGetValue(statId, out var current);
-        creature.TrainingPoints[statId] = Math.Min(120, current + gain);
-        SaveAndNotify($"{creature.Name} gained +{gain} {GameRules.StatDisplayNames[statId]} training.");
     }
 
     public void BuyStoreEgg(string eggId)
@@ -191,88 +194,53 @@ public partial class GameSession : Node
 
     public string GetBreedingPreview(string parentAId, string parentBId)
     {
-        var a = FindVoidling(parentAId);
-        var b = FindVoidling(parentBId);
+        var preview = _breeding!.Preview(State, parentAId, parentBId);
+        if (!preview.CanBreed)
+        {
+            return preview.Failure switch
+            {
+                BreedingFailure.SameParent => "Choose two different Voidlings.",
+                BreedingFailure.ParentNotAdult => "Both parents must be adults.",
+                BreedingFailure.ParentOnCooldown => "One parent is still on breeding cooldown.",
+                _ => "Choose two adults."
+            };
+        }
 
-        if (a == null || b == null)
-            return "Choose two adults.";
-        if (a.Id == b.Id)
-            return "Choose two different Voidlings.";
-        if (a.Stage != LifeStage.Adult || b.Stage != LifeStage.Adult)
-            return "Both parents must be adults.";
-        if (a.BreedCooldownSeconds > 0.0f || b.BreedCooldownSeconds > 0.0f)
-            return "One parent is still on breeding cooldown.";
-
-        var lineage = GetLineageVoidlings();
-        var related = GeneticsService.AreRelated(a, b, lineage);
-        var burden = GeneticsService.ComputeChildBurden(a, b, related);
-        var failure = GameRules.HatchFailurePercent(burden);
-
-        if (related)
-            return $"Related pairing • inbreeding level {burden} • {failure}% hatch-failure risk.";
-
-        if (burden < Math.Max(a.InbreedingBurdenLevel, b.InbreedingBurdenLevel))
-            return $"Clean outcross • inherited burden falls to level {burden}.";
-
-        return burden > 0
-            ? $"Unrelated pairing • inherited burden remains level {burden}."
+        if (preview.Related)
+            return $"Related pairing • inbreeding level {preview.ChildBurden} • {preview.HatchFailurePercent}% hatch-failure risk.";
+        if (preview.IsCleanOutcross)
+            return $"Clean outcross • inherited burden falls to level {preview.ChildBurden}.";
+        return preview.ChildBurden > 0
+            ? $"Unrelated pairing • inherited burden remains level {preview.ChildBurden}."
             : "Unrelated pairing • no inbreeding penalty.";
     }
 
     public bool TryBreed(string parentAId, string parentBId, Vector2 eggWorldPosition)
     {
-        var a = FindVoidling(parentAId);
-        var b = FindVoidling(parentBId);
-
-        if (a == null || b == null || a.Id == b.Id)
-            return false;
-
-        if (a.Stage != LifeStage.Adult || b.Stage != LifeStage.Adult)
+        var preview = _breeding!.Preview(State, parentAId, parentBId);
+        if (!preview.CanBreed)
         {
-            ToastRequested?.Invoke("Both parents must be adults.");
+            if (preview.Failure == BreedingFailure.ParentNotAdult)
+                ToastRequested?.Invoke("Both parents must be adults.");
+            else if (preview.Failure == BreedingFailure.ParentOnCooldown)
+                ToastRequested?.Invoke("A parent is still on breeding cooldown.");
             return false;
         }
 
-        if (a.BreedCooldownSeconds > 0.0f || b.BreedCooldownSeconds > 0.0f)
-        {
-            ToastRequested?.Invoke("A parent is still on breeding cooldown.");
+        var result = _breeding.Execute(
+            State,
+            parentAId,
+            parentBId,
+            NextSeed(),
+            NewId(),
+            eggWorldPosition.X,
+            eggWorldPosition.Y);
+
+        if (!result.Succeeded)
             return false;
-        }
 
-        var seed = NextSeed();
-        var eggId = NewId();
-        var related = GeneticsService.AreRelated(a, b, GetLineageVoidlings());
-        var burden = GeneticsService.ComputeChildBurden(a, b, related);
-        var genome = GeneticsService.CreateChildGenome(a, b, seed);
-        var rareTraits = GeneticsService.InheritRareTraits(a, b, seed);
-        var viable = GeneticsService.RollViability(seed, burden);
-
-        var egg = new EggData
-        {
-            Id = eggId,
-            Source = EggSource.Bred,
-            Seed = seed,
-            Genome = genome,
-            ParentAId = a.Id,
-            ParentBId = b.Id,
-            FamilyGeneration = Math.Max(a.FamilyGeneration, b.FamilyGeneration) + 1,
-            InbreedingBurdenLevel = burden,
-            InbreedingHistoryFlag = related || a.InbreedingHistoryFlag || b.InbreedingHistoryFlag,
-            IsViable = viable,
-            FailureResolved = true,
-            RequiredIncubationSeconds = GameRules.EggIncubationSeconds,
-            TintHex = GeneticsService.ResolveTint(genome),
-            RareTraits = rareTraits,
-            WorldX = eggWorldPosition.X,
-            WorldY = eggWorldPosition.Y
-        };
-
-        State.OwnedEggs.Add(egg);
-        a.BreedCooldownSeconds = GameRules.BreedCooldownSeconds;
-        b.BreedCooldownSeconds = GameRules.BreedCooldownSeconds;
-
-        var warning = related
-            ? $" Egg carries level {burden} inbreeding risk ({GameRules.HatchFailurePercent(burden)}%)."
+        var warning = result.Related
+            ? $" Egg carries level {result.ChildBurden} inbreeding risk ({result.HatchFailurePercent}%)."
             : "";
         SaveAndNotify($"Breeding produced an egg.{warning}");
         return true;
