@@ -15,13 +15,15 @@ public static class UiFactory
     private static readonly Texture2D IconTexture =
         GD.Load<Texture2D>(UiRoot + "Icons/All Icons.png");
 
+    private static readonly Texture2D CharacterTexture = GD.Load<Texture2D>(
+        "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
+
+    private static readonly Font PixelFont = GD.Load<Font>(
+        "res://Assets/Sprout Lands - UI Pack - Basic pack/fonts/pixelFont-7-8x14-sproutLands.ttf");
+
     public static PanelContainer CreatePanel(Vector2 minimumSize)
     {
-        var panel = new PanelContainer
-        {
-            CustomMinimumSize = minimumSize
-        };
-
+        var panel = new PanelContainer { CustomMinimumSize = minimumSize };
         panel.AddThemeStyleboxOverride("panel", CreatePanelStyle());
         return panel;
     }
@@ -31,7 +33,7 @@ public static class UiFactory
         var button = new Button
         {
             Text = text,
-            CustomMinimumSize = new Vector2(62, 22),
+            CustomMinimumSize = new Vector2(72, 24),
             FocusMode = Control.FocusModeEnum.None
         };
 
@@ -39,12 +41,11 @@ public static class UiFactory
         button.AddThemeStyleboxOverride("hover", CreateButtonStyle(new Rect2(16, 0, 16, 16)));
         button.AddThemeStyleboxOverride("pressed", CreateButtonStyle(new Rect2(0, 16, 16, 16)));
         button.AddThemeStyleboxOverride("disabled", CreateButtonStyle(new Rect2(16, 16, 16, 16)));
-
         button.AddThemeColorOverride("font_color", Color.FromHtml("#4F5948"));
         button.AddThemeColorOverride("font_hover_color", Color.FromHtml("#35443B"));
         button.AddThemeColorOverride("font_pressed_color", Color.FromHtml("#35443B"));
         button.AddThemeColorOverride("font_disabled_color", Color.FromHtml("#8A927B"));
-        button.AddThemeFontSizeOverride("font_size", 10);
+        ApplyPixelFont(button, 10);
 
         if (iconIndex >= 0)
         {
@@ -57,12 +58,9 @@ public static class UiFactory
 
     public static Label CreateLabel(string text, int size = 10)
     {
-        var label = new Label
-        {
-            Text = text
-        };
+        var label = new Label { Text = text };
         label.AddThemeColorOverride("font_color", Color.FromHtml("#465247"));
-        label.AddThemeFontSizeOverride("font_size", size);
+        ApplyPixelFont(label, size);
         return label;
     }
 
@@ -71,6 +69,25 @@ public static class UiFactory
         var label = CreateLabel(text, 14);
         label.AddThemeColorOverride("font_color", Color.FromHtml("#3B5044"));
         return label;
+    }
+
+    public static TextureRect CreatePortrait(VoidlingData data, Vector2 minimumSize)
+    {
+        var atlas = new AtlasTexture
+        {
+            Atlas = CharacterTexture,
+            Region = new Rect2(0, 0, 48, 48)
+        };
+
+        return new TextureRect
+        {
+            Texture = atlas,
+            Modulate = GameRules.TintColor(data.TintHex),
+            CustomMinimumSize = minimumSize,
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
     }
 
     public static AtlasTexture CreateIcon(int index)
@@ -86,7 +103,7 @@ public static class UiFactory
         };
     }
 
-    public static MarginContainer Pad(Control child, int margin = 7)
+    public static MarginContainer Pad(Control child, int margin = 10)
     {
         var container = new MarginContainer();
         container.AddThemeConstantOverride("margin_left", margin);
@@ -97,43 +114,38 @@ public static class UiFactory
         return container;
     }
 
+    public static void ApplyPixelFont(Control control, int size)
+    {
+        control.AddThemeFontOverride("font", PixelFont);
+        control.AddThemeFontSizeOverride("font_size", size);
+    }
+
     private static StyleBoxTexture CreatePanelStyle()
     {
-        var style = new StyleBoxTexture
-        {
-            Texture = PanelTexture
-        };
+        var style = new StyleBoxTexture { Texture = PanelTexture };
         style.TextureMarginLeft = 8;
         style.TextureMarginRight = 8;
         style.TextureMarginTop = 8;
         style.TextureMarginBottom = 8;
-        style.ContentMarginLeft = 8;
-        style.ContentMarginRight = 8;
-        style.ContentMarginTop = 8;
-        style.ContentMarginBottom = 8;
+        style.ContentMarginLeft = 10;
+        style.ContentMarginRight = 10;
+        style.ContentMarginTop = 10;
+        style.ContentMarginBottom = 10;
         return style;
     }
 
     private static StyleBoxTexture CreateButtonStyle(Rect2 region)
     {
-        var atlas = new AtlasTexture
-        {
-            Atlas = ButtonTexture,
-            Region = region
-        };
-
-        var style = new StyleBoxTexture
-        {
-            Texture = atlas
-        };
+        var atlas = new AtlasTexture { Atlas = ButtonTexture, Region = region };
+        var style = new StyleBoxTexture { Texture = atlas };
         style.TextureMarginLeft = 4;
         style.TextureMarginRight = 4;
         style.TextureMarginTop = 4;
         style.TextureMarginBottom = 4;
-        style.ContentMarginLeft = 5;
-        style.ContentMarginRight = 5;
-        style.ContentMarginTop = 3;
-        style.ContentMarginBottom = 3;
+        style.ContentMarginLeft = 7;
+        style.ContentMarginRight = 7;
+        style.ContentMarginTop = 4;
+        style.ContentMarginBottom = 4;
         return style;
     }
 }
