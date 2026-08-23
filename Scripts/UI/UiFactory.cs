@@ -30,9 +30,10 @@ public static class UiFactory
 
     public static Button CreateButton(string text, int iconIndex = -1)
     {
+        var useEyeIcon = text == "◉";
         var button = new Button
         {
-            Text = text,
+            Text = useEyeIcon ? "" : text,
             CustomMinimumSize = new Vector2(72, 24),
             FocusMode = Control.FocusModeEnum.None
         };
@@ -47,7 +48,14 @@ public static class UiFactory
         button.AddThemeColorOverride("font_disabled_color", Color.FromHtml("#8A927B"));
         ApplyPixelFont(button, 10);
 
-        if (iconIndex >= 0)
+        if (useEyeIcon)
+        {
+            var center = new CenterContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+            center.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+            center.AddChild(new EyeIcon());
+            button.AddChild(center);
+        }
+        else if (iconIndex >= 0)
         {
             button.Icon = CreateIcon(iconIndex);
             button.ExpandIcon = false;
