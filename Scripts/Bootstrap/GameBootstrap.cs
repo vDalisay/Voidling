@@ -1,6 +1,7 @@
 using Godot;
 using Voidling.Application.Breeding;
 using Voidling.Application.Persistence;
+using Voidling.Application.Racing;
 using Voidling.Application.Roster;
 using Voidling.Application.Settings;
 using Voidling.Application.Shop;
@@ -38,7 +39,8 @@ public partial class GameBootstrap : Node
             new BreedVoidlingsUseCase(rules),
             new ShopUseCase(rules),
             new SettingsUseCase(),
-            new VoidlingRosterUseCase());
+            new VoidlingRosterUseCase(),
+            new RaceResultUseCase(rules));
 
         AddChild(session);
     }

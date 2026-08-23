@@ -58,7 +58,8 @@ public sealed record RaceRules(
     float ObstacleAvoidMaxChance,
     float ObstacleBaseDelaySeconds,
     float ObstacleLowRunDelaySeconds,
-    float ObstacleRollbackDistance);
+    float ObstacleRollbackDistance,
+    IReadOnlyList<int> PlacementRewards);
 
 /// <summary>
 /// Immutable rules consumed by pure game logic. Godot Resource authoring adapters can
@@ -135,5 +136,6 @@ public sealed record GameBalanceRules(
             ObstacleAvoidMaxChance: 0.95f,
             ObstacleBaseDelaySeconds: 0.62f,
             ObstacleLowRunDelaySeconds: 0.55f,
-            ObstacleRollbackDistance: 5.0f));
+            ObstacleRollbackDistance: 5.0f,
+            PlacementRewards: Array.AsReadOnly(new[] { 30, 20, 10, 5 }))));
 }

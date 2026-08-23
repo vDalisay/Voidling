@@ -4,16 +4,8 @@ public partial class GameSession
 {
     public void AddRaceReward(int place)
     {
-        var reward = place switch
-        {
-            1 => 30,
-            2 => 20,
-            3 => 10,
-            _ => 5
-        };
-
-        State.Coins += reward;
-        SaveAndNotify($"Race reward: +{reward} sprouts.");
+        var result = _raceResults!.AwardPlacement(State, place);
+        SaveAndNotify($"Race reward: +{result.Reward} sprouts.");
     }
 
     public void SetMasterVolume(float value)
