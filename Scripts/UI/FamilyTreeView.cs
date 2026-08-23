@@ -267,19 +267,7 @@ public partial class FamilyTreeView : Control
             ChildId = childId
         };
 
-    private static void DrawConnectionPath(ConnectionPath path, Color color, float width)
-    {
-        foreach (var segment in path.Segments)
-            DrawLineStatic(segment.From, segment.To, color, width);
-    }
-
-    private static void DrawLineStatic(Vector2 from, Vector2 to, Color color, float width)
-    {
-        // DrawLine itself is an instance CanvasItem API. This helper exists only to
-        // keep path rendering calls compact and is replaced by the caller below.
-    }
-
-    private void DrawConnectionPathInstance(ConnectionPath path, Color color, float width)
+    private void DrawConnectionPath(ConnectionPath path, Color color, float width)
     {
         foreach (var segment in path.Segments)
             DrawLine(segment.From, segment.To, color, width, true);
