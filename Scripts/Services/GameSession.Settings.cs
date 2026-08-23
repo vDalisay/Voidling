@@ -1,5 +1,3 @@
-using Godot;
-
 namespace VoidlingGame;
 
 public partial class GameSession
@@ -20,15 +18,17 @@ public partial class GameSession
 
     public void SetMasterVolume(float value)
     {
-        State.MasterVolume = Mathf.Clamp(value, 0.0f, 1.0f);
+        if (!_settings!.SetMasterVolume(State, value))
+            return;
+
         ApplyAudioSettings();
         Save();
     }
 
     public void SetAutoFinishRaces(bool enabled)
     {
-        State.AutoFinishRaces = enabled;
-        Save();
+        if (_settings!.SetAutoFinishRaces(State, enabled))
+            Save();
     }
 
     public ulong CreateRaceSeed()

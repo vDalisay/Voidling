@@ -1,6 +1,7 @@
 using Godot;
 using Voidling.Application.Breeding;
 using Voidling.Application.Persistence;
+using Voidling.Application.Settings;
 using Voidling.Application.Shop;
 using Voidling.Application.Simulation;
 using Voidling.Application.Training;
@@ -34,7 +35,8 @@ public partial class GameBootstrap : Node
             new AdvanceSimulationUseCase(rules),
             new TrainingUseCase(rules),
             new BreedVoidlingsUseCase(rules),
-            new ShopUseCase(rules));
+            new ShopUseCase(rules),
+            new SettingsUseCase());
 
         AddChild(session);
     }
