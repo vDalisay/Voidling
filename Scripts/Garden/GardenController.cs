@@ -101,30 +101,26 @@ public partial class GardenController : Node2D
 
         if (inputEvent is InputEventMouseButton mouse)
         {
-            if (mouse.ButtonIndex == MouseButton.Left)
+            if (mouse.ButtonIndex == MouseButton.Left && !mouse.Pressed &&
+                (_draggedId.Length > 0 || _pendingGrabId.Length > 0))
             {
-                if (!mouse.Pressed)
-                {
-                    if (_draggedId.Length > 0)
-                        DropGrabbedVoidling();
-                    else
-                        ClearPendingGrab();
+                if (_draggedId.Length > 0)
+                    DropGrabbedVoidling();
+                else
+                    ClearPendingGrab();
 
-                    _cameraDragging = false;
-                    GetViewport().SetInputAsHandled();
-                    return;
-                }
+                GetViewport().SetInputAsHandled();
+                return;
+            }
 
-                // Actor Area2D input is marked handled before it reaches this method.
-                // Therefore an unhandled LMB press is empty garden ground and can safely
-                // start a RollerCoaster-Tycoon-style camera drag without fighting pickup.
-                if (_pendingGrabId.Length == 0 && _draggedId.Length == 0)
-                {
-                    _cameraDragging = true;
+            // RMB owns garden camera dragging so LMB remains free for interaction.
+            if (mouse.ButtonIndex == MouseButton.Right)
+            {
+                _cameraDragging = mouse.Pressed;
+                if (mouse.Pressed)
                     StopFollowing();
-                    GetViewport().SetInputAsHandled();
-                    return;
-                }
+                GetViewport().SetInputAsHandled();
+                return;
             }
 
             // Keep middle mouse as a secondary pan binding for desktop users.
