@@ -21,6 +21,7 @@ public partial class VoidlingActor : Node2D
     private bool _selected;
     private bool _rare;
     private bool _interactionLocked;
+    private bool _pickedUp;
 
     public void Setup(VoidlingData data, Rect2 wanderBounds, Vector2 startPosition)
     {
@@ -57,7 +58,10 @@ public partial class VoidlingActor : Node2D
 
     public override void _Process(double delta)
     {
-        if (_sprite == null || _interactionLocked)
+        if (_selected || _rare)
+            QueueRedraw();
+
+        if (_sprite == null || _interactionLocked || _pickedUp)
             return;
 
         var step = (float)delta;
@@ -79,9 +83,6 @@ public partial class VoidlingActor : Node2D
                 Mathf.Clamp(Position.Y, _wanderBounds.Position.Y, _wanderBounds.End.Y));
             PlayForDirection(direction);
         }
-
-        if (_rare)
-            QueueRedraw();
     }
 
     public void SetSelected(bool selected)
@@ -93,21 +94,37 @@ public partial class VoidlingActor : Node2D
     public void SetInteractionLocked(bool locked)
     {
         _interactionLocked = locked;
-        if (locked)
-            _sprite.Stop();
-        else
+        RefreshMovementState();
+    }
+
+    public void SetPickedUp(bool pickedUp)
+    {
+        _pickedUp = pickedUp;
+        ZIndex = pickedUp ? 90 : 0;
+
+        if (_sprite != null)
         {
-            PickNewTarget();
-            _sprite.Play("walk_down");
+            _sprite.Scale = pickedUp ? new Vector2(0.72f, 0.72f) : new Vector2(0.62f, 0.62f);
+            _sprite.Position = pickedUp ? new Vector2(0, -13) : new Vector2(0, -8);
         }
+
+        RefreshMovementState();
+        QueueRedraw();
     }
 
     public override void _Draw()
     {
         if (_selected)
         {
-            DrawArc(new Vector2(0, 5), 14.0f, 0.0f, Mathf.Tau, 24,
-                Color.FromHtml("#FFF4A8"), 2.0f);
+            var phase = (float)Time.GetTicksMsec() / 220.0f;
+            var pulse = (Mathf.Sin(phase) + 1.0f) * 0.5f;
+            var radius = 10.5f + pulse * 1.25f;
+            var color = Color.FromHtml("#FFF4A8");
+            color.A = 0.70f + pulse * 0.25f;
+
+            // The sprite artwork sits above the actor origin. Center the selection ring
+            // around the Voidling's feet instead of below the character.
+            DrawArc(new Vector2(0, -2), radius, 0.0f, Mathf.Tau, 28, color, 1.6f);
         }
 
         if (_rare)
@@ -120,6 +137,21 @@ public partial class VoidlingActor : Node2D
                 DrawCircle(p, 1.2f, Color.FromHtml("#FFF7B7"));
             }
         }
+    }
+
+    private void RefreshMovementState()
+    {
+        if (_sprite == null)
+            return;
+
+        if (_interactionLocked || _pickedUp)
+        {
+            _sprite.Stop();
+            return;
+        }
+
+        PickNewTarget();
+        _sprite.Play("walk_down");
     }
 
     private void PickNewTarget()
@@ -169,10 +201,12 @@ public partial class VoidlingActor : Node2D
     {
         var frames = new SpriteFrames();
         frames.RemoveAnimation("default");
+
+        // Sprout Lands sheet row order: front/down, back/up, left, right.
         AddDirection(frames, "walk_down", 0);
-        AddDirection(frames, "walk_left", 1);
-        AddDirection(frames, "walk_right", 2);
-        AddDirection(frames, "walk_up", 3);
+        AddDirection(frames, "walk_up", 1);
+        AddDirection(frames, "walk_left", 2);
+        AddDirection(frames, "walk_right", 3);
         return frames;
     }
 
