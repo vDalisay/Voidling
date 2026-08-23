@@ -176,8 +176,6 @@ public partial class VoidlingActor : Node2D
     {
         var shadowAlpha = _pickedUp ? 0.26f : 0.20f;
         var shadowWidth = (_pickedUp ? 10.0f : 8.0f) * (_baseScale / 0.62f + 0.45f);
-        // Keep the contact shadow tucked directly under the feet. The lifted sprite still
-        // separates from it while carried, preserving the pickup depth cue.
         DrawEllipse(new Vector2(0, 1.0f), new Vector2(shadowWidth, Math.Max(2.1f, shadowWidth * 0.30f)), new Color(0.20f, 0.24f, 0.20f, shadowAlpha));
 
         if (_selected)
@@ -204,12 +202,29 @@ public partial class VoidlingActor : Node2D
         }
 
         if (_angelMutation)
+            DrawAngelHalo();
+    }
+
+    private void DrawAngelHalo()
+    {
+        var child = _baseScale < 0.5f;
+        var center = new Vector2(0, child ? -15.0f : -29.0f);
+        var radiusX = child ? 5.2f : 8.8f;
+        var radiusY = child ? 1.7f : 2.8f;
+        const int points = 32;
+        var ellipse = new Vector2[points];
+        for (var i = 0; i < points; i++)
         {
-            var haloY = _baseScale < 0.5f ? -15.0f : -29.0f;
-            var haloRadius = _baseScale < 0.5f ? 4.5f : 7.5f;
-            DrawArc(new Vector2(0, haloY), haloRadius, 0.0f, Mathf.Tau, 28, Color.FromHtml("#F2D258"), 2.0f);
-            DrawArc(new Vector2(0, haloY + 0.7f), haloRadius * 0.72f, 0.0f, Mathf.Tau, 24, Color.FromHtml("#FFF2A8"), 1.0f);
+            var angle = Mathf.Tau * i / points;
+            ellipse[i] = center + new Vector2(Mathf.Cos(angle) * radiusX, Mathf.Sin(angle) * radiusY);
         }
+
+        for (var i = points / 2; i < points; i++)
+            DrawLine(ellipse[i], ellipse[(i + 1) % points], Color.FromHtml("#B98C32"), child ? 1.1f : 1.5f, true);
+        for (var i = 0; i < points / 2; i++)
+            DrawLine(ellipse[i], ellipse[i + 1], Color.FromHtml("#F1CE55"), child ? 1.4f : 2.0f, true);
+        for (var i = 2; i < 7; i++)
+            DrawLine(ellipse[i], ellipse[i + 1], Color.FromHtml("#FFF2A8"), 0.9f, true);
     }
 
     private void RefreshMovementState()
