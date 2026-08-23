@@ -1,112 +1,83 @@
 # Voidling Demo MVP
 
-## Purpose
+This branch is the playable Godot 4.6 C# vertical slice for validating the initial raising/breeding/racing loop.
 
-This is the playable Godot 4.6 C# vertical slice for validating the creature-raising loop before expanding the simulation.
+## Core loop
 
 ```text
-Buy / breed egg
-      ↓
-See egg incubate in the garden
-      ↓
-Hatch + inspect Stats / DNA / appearance / lineage
-      ↓
-Train with shop treats
-      ↓
-Automated race against CPU Voidlings
-      ↓
-Breed stronger or more interesting bloodlines
+Buy / breed egg → hatch → inspect → train → race → breed the next generation
 ```
 
-## Garden and camera
+## Garden
 
-`Scenes/Garden.tscn` contains real editable Godot `TileMapLayer` nodes backed by `Resources/Tiles/garden_tileset.tres` and the Sprout Lands 16×16 terrain atlas.
-
-### Camera controls
-
-- **LMB drag on empty ground:** pan around the garden.
-- **Middle mouse drag:** alternate pan control.
-- **Mouse wheel:** zoom in/out.
-- **Center:** restore the default camera.
-- **Eye button:** follow the currently selected Voidling with a centered camera.
-
-Hold LMB on a Voidling to pick it up. Release to place it elsewhere. Pickup uses a grab cursor and lifted shadow; placement has a drop/bounce and dust effect.
-
-## Voidlings
-
-All MVP creatures use the Sprout Lands base character sheet and individual color tinting. Children render at half adult size. World sprites have close grounded ellipse shadows and a pulsing selection circle.
-
-Click the selected Voidling's name in its inspection panel to rename it inline. Names persist in saves and genealogy.
-
-Core stats are Run, Swim, Fly, Power and Stamina. There is no Intelligence or Luck.
-
-The selected inspection panel contains training controls, Details, Family tree and Goodbye. Persistent garden HUD panels hide whenever a foreground menu opens so they cannot overlap menu content.
+- Editable Sprout Lands `TileMapLayer` island using `Resources/Tiles/garden_tileset.tres`.
+- LMB drag on empty ground pans the camera; middle mouse is an alternate pan binding.
+- Mouse wheel zoom, Center reset and eye-button follow mode.
+- Click a selected Voidling's name to rename it inline; the name persists into saves and genealogy.
+- Hold LMB on a Voidling to pick it up and release to place it, with grab cursor, lifted sprite/shadow, drop bounce and dust.
+- Voidlings have close grounded ellipse shadows, a centered pulsing selection ring, tint variation and half-size child sprites.
+- Persistent garden HUD panels hide whenever a foreground menu opens, preventing the lower-left egg/status box or inspection panel from overlapping menus.
 
 ## Details
 
-Details always opens as the only foreground menu and hides the garden inspection panel while open.
+Opening Details closes/replaces any other menu context and hides the selected inspection panel until Details is dismissed.
 
-It has three pages:
+Details has three tabs:
 
-- **Stats** — color-coded rank, level, current stat and level-progress bar.
-- **DNA** — genotype only: DNA1 and DNA2 for each ability plus color DNA. Current/trained stat values are intentionally not shown here.
-- **Visual** — current tint, appearance genes and Mutations.
+- **Stats** — Chao-inspired color-coded rank, level, current stat and progress bar.
+- **DNA** — genotype only: DNA1 and DNA2 for each ability plus color DNA. Trained/current stat values are intentionally absent.
+- **Visual** — tint/appearance information and Mutations.
 
 Stat colors are Run green, Swim yellow, Fly purple, Power red and Stamina white.
 
-The demo assigns one existing/new-save Voidling the **Angel** mutation, rendered as a halo in world and portraits.
+One existing/new-save Voidling receives the demo **Angel** mutation, displayed with a halo.
 
 ## Family tree
 
-Family tree is a clipped pannable overview with no scrollbars.
-
-- LMB drag on empty space pans the tree.
-- Middle mouse remains an alternate pan binding.
-- Click a member for its compact stats/parents inspector.
-- Selected family cards darken.
+- Pannable clipped overview with no scrollbars.
+- LMB drag on empty space pans; middle mouse remains an alternate binding.
+- Family cards show sprites, names, generation and parent links.
+- Clicking a member opens its compact stats/parents inspector.
+- Selected cards darken.
 - Departed and historical inbreeding records remain visible.
 
-## Shop, inventory and training
+## Shop / inventory / training
 
-The shop sells one training treat for each stat and mystery eggs. Store-egg genomes are fixed when that individual egg enters shop stock. Purchased eggs are placed visibly in the garden.
+- Shop sells stat treats and mystery eggs.
+- Store eggs are rolled when that exact egg enters stock.
+- Inventory lists item icons and counts.
+- Training buttons show `+1 (count)` and consume one owned item.
 
-Inventory shows item icons and owned counts. The selected Voidling's training buttons display `+1 (count)` and consume one item per click.
+## Breeding / hatching
 
-## Breeding and hatching
-
-Breeding is player initiated. The menu shows both parent sprites above the selectors and previews relatedness/inbreeding consequences.
-
-The garden breeding sequence has parents walk together with heart particles, perform a short dance, show a larger breeding heart, then spawn the egg with a bounce/pop animation.
-
-Eggs visibly incubate, pulse more strongly/frequently as hatch approaches, burst at hatch, and the new child jumps out. There is no force hatch.
-
-Inbreeding uses the 0/20/50/80/100% viability ladder and clean unrelated outcrossing reduces active burden one level per generation while keeping historical marks.
+- Player-selected parents only, with parent portraits in the breeding menu.
+- Parents approach with heart particles, dance, show a breeding heart, and spawn a bouncing egg.
+- Eggs exist on the island, pulse increasingly toward hatch, burst, and spawn a jumping child.
+- Inbreeding viability uses the 0/20/50/80/100% ladder; clean unrelated outcrossing reduces active burden one level per generation while preserving family-tree history.
 
 ## Race
 
-Race selection explicitly chooses one owned Voidling. All other racers are generated CPU opponents.
+Exactly one owned Voidling is selected for the race; all opponents are generated CPUs. The side-view camera remains centered on the player at locked 1× zoom.
 
-The course uses one shared side-view track and keeps the player centered at locked 1× camera zoom.
+- **Run:** ground speed and hurdle avoidance.
+- **Swim:** water speed using the dedicated Ocean Pack `Assets/Sprout Sorry pack/Early Access/Ocean Pack/swimming.png` animation.
+- **Fly:** finite glide endurance across a raised water crossing. Racers launch into visible vertical elevation; stronger Fly sustains the glide farther. If endurance runs out, the racer visibly drops into the water and switches to Swim for the remaining crossing.
+- **Stamina:** ongoing race energy and CHEER capacity.
 
-- **Run:** ground pace and hurdle avoidance.
-- **Swim:** water-section speed using the dedicated `Assets/Sprout Sorry pack/Early Access/Ocean Pack/swimming.png` animation.
-- **Fly:** finite glide endurance across a raised water crossing. All racers launch into visible 2D elevation; stronger Fly travels farther. If glide endurance expires before the opposite bank, the racer visibly falls into the water and uses Swim for the remainder.
-- **Stamina:** continuous race energy and CHEER capacity.
+CHEER spends Stamina, gives a two-second speed boost and emits trailing speed streak particles.
 
-CHEER spends Stamina, gives a two-second speed boost and renders trailing speed streak particles.
+Auto Finish defaults ON. It fast-forwards CPUs once the player finishes; if all CPUs have already finished while the player is still running, the race ends immediately because fourth place is already determined.
 
-Auto Finish is ON by default. When the player finishes it deterministically fast-forwards remaining CPUs. If every CPU has already finished first, the race also ends immediately because the player's fourth-place result is known.
+The results screen uses aligned 1st/2nd/3rd podium blocks and fourth place beside them in a puddle.
 
-The finish screen uses centered 1st/2nd/3rd podium blocks and fourth place beside them in a puddle.
+## Settings / persistence
 
-## Settings and persistence
+- Settings are available from the top bar or ESC.
+- Master volume and Auto Finish persist.
+- Save data includes active/departed lineage, genomes, mutations, inventory, eggs, placements and settings.
 
-Settings are available from the top bar or ESC. Master volume and Auto Finish persist with the save.
+## Running / validation
 
-The demo automatically saves to `user://voidling_mvp_save.json`. It includes active/departed lineage, genetics, mutations, inventory, eggs, placements and settings.
-
-## Running and validation
-
-- `build.bat` restores/builds the C# project.
-- `playgame.bat` launches the game directly without opening the editor.
-- GitHub Actions validates package restore, C# compilation and Godot headless project/scene parsing.
+- `build.bat` builds the C# project.
+- `playgame.bat` launches directly without opening the editor.
+- GitHub Actions validates restore, C# compilation, and headless Godot project/scene parsing.
