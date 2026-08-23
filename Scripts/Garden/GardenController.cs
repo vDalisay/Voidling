@@ -56,6 +56,14 @@ public partial class GardenController : Node2D
 
         if (_draggedId.Length > 0)
         {
+            // Use the global button state as a fallback so the Voidling is still
+            // dropped if a UI Control consumes the LMB release event.
+            if (!Input.IsMouseButtonPressed(MouseButton.Left))
+            {
+                DropGrabbedVoidling();
+                return;
+            }
+
             if (_actors.TryGetValue(_draggedId, out var dragged))
                 dragged.Position = ClampToGarden(_actorsRoot.ToLocal(GetGlobalMousePosition()));
             return;
