@@ -1,9 +1,15 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Voidling.Domain.Rules;
+using Voidling.Domain.Stats;
 
 namespace VoidlingGame;
 
+/// <summary>
+/// Legacy compatibility facade. Gameplay formulas are moving into typed Domain rules/services;
+/// presentation-only labels/colors remain here until their consuming screens migrate.
+/// </summary>
 public static class GameRules
 {
     public const int StoreEggPrice = 30;
@@ -19,6 +25,8 @@ public static class GameRules
     public const int MaxStatLevel = 99;
     public const string AngelMutationId = "Angel";
 
+    private static readonly StatCalculator Stats = new(GameBalanceRules.DemoDefaults.Stats);
+
     public static readonly string[] StatIds = { "run", "swim", "fly", "power", "stamina" };
 
     public static readonly IReadOnlyDictionary<string, string> StatDisplayNames =
@@ -31,7 +39,7 @@ public static class GameRules
             ["stamina"] = "Stamina"
         };
 
-    // Chao-inspired stat identity colors used consistently in the farm UI, DNA view and race HUD.
+    // Presentation catalog retained for compatibility with the current UI.
     public static readonly IReadOnlyDictionary<string, Color> StatColors =
         new Dictionary<string, Color>(StringComparer.Ordinal)
         {
@@ -78,27 +86,19 @@ public static class GameRules
     };
 
     public static int GetTrainingPoints(VoidlingData data, string statId)
-        => data.TrainingPoints.TryGetValue(statId, out var points) ? points : 0;
+        => Stats.GetTrainingPoints(data, statId);
 
     public static int StatLevel(VoidlingData data, string statId)
-        => Math.Clamp(1 + GetTrainingPoints(data, statId) / TrainingPointsPerLevel, 1, MaxStatLevel);
+        => Stats.GetLevel(data, statId);
 
     public static float StatLevelProgress(VoidlingData data, string statId)
-    {
-        if (StatLevel(data, statId) >= MaxStatLevel)
-            return 1.0f;
-        return (GetTrainingPoints(data, statId) % TrainingPointsPerLevel) / (float)TrainingPointsPerLevel;
-    }
+        => Stats.GetLevelProgress(data, statId);
 
     public static GenePairData GetGene(VoidlingData data, string statId)
-        => data.Genome.AbilityGenes.TryGetValue(statId, out var gene) ? gene : new GenePairData();
+        => StatCalculator.GetGene(data, statId);
 
     public static float EffectiveStat(VoidlingData data, string statId)
-    {
-        var grade = GetGene(data, statId).ExpressedValue;
-        var training = GetTrainingPoints(data, statId);
-        return Math.Clamp(12.0f + grade * 13.0f + training * 0.55f, 0.0f, 100.0f);
-    }
+        => Stats.GetEffectiveStat(data, statId);
 
     public static Color StatColor(string statId)
         => StatColors.TryGetValue(statId, out var color) ? color : Colors.White;
