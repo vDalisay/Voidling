@@ -20,6 +20,7 @@ public partial class VoidlingActor : Node2D
     private float _walkSpeed;
     private bool _selected;
     private bool _rare;
+    private bool _interactionLocked;
 
     public void Setup(VoidlingData data, Rect2 wanderBounds, Vector2 startPosition)
     {
@@ -28,8 +29,7 @@ public partial class VoidlingActor : Node2D
         Position = startPosition;
         _walkSpeed = data.Stage == LifeStage.Adult ? 20.0f : 17.0f;
         _rare = data.RareTraits.Count > 0;
-
-        _rng.Seed = unchecked((uint)data.Id.GetHashCode()) + 17UL;
+        _rng.Seed = StableSeed(data.Id);
 
         _sprite = new AnimatedSprite2D
         {
@@ -41,16 +41,10 @@ public partial class VoidlingActor : Node2D
         AddChild(_sprite);
         _sprite.Play("walk_down");
 
-        var area = new Area2D
-        {
-            InputPickable = true
-        };
+        var area = new Area2D { InputPickable = true };
         var collision = new CollisionShape2D
         {
-            Shape = new RectangleShape2D
-            {
-                Size = new Vector2(23, 27)
-            },
+            Shape = new RectangleShape2D { Size = new Vector2(23, 27) },
             Position = new Vector2(0, -8)
         };
         area.AddChild(collision);
@@ -63,13 +57,13 @@ public partial class VoidlingActor : Node2D
 
     public override void _Process(double delta)
     {
-        if (_sprite == null)
+        if (_sprite == null || _interactionLocked)
             return;
 
         var step = (float)delta;
         _nextTargetSeconds -= step;
-
         var toTarget = _target - Position;
+
         if (_nextTargetSeconds <= 0.0f || toTarget.LengthSquared() < 9.0f)
         {
             PickNewTarget();
@@ -96,18 +90,24 @@ public partial class VoidlingActor : Node2D
         QueueRedraw();
     }
 
+    public void SetInteractionLocked(bool locked)
+    {
+        _interactionLocked = locked;
+        if (locked)
+            _sprite.Stop();
+        else
+        {
+            PickNewTarget();
+            _sprite.Play("walk_down");
+        }
+    }
+
     public override void _Draw()
     {
         if (_selected)
         {
-            DrawArc(
-                new Vector2(0, 5),
-                14.0f,
-                0.0f,
-                Mathf.Tau,
-                24,
-                Color.FromHtml("#FFF4A8"),
-                2.0f);
+            DrawArc(new Vector2(0, 5), 14.0f, 0.0f, Mathf.Tau, 24,
+                Color.FromHtml("#FFF4A8"), 2.0f);
         }
 
         if (_rare)
@@ -133,7 +133,6 @@ public partial class VoidlingActor : Node2D
     private void PlayForDirection(Vector2 direction)
     {
         StringName animation;
-
         if (Mathf.Abs(direction.X) > Mathf.Abs(direction.Y))
             animation = direction.X < 0.0f ? "walk_left" : "walk_right";
         else
@@ -146,23 +145,34 @@ public partial class VoidlingActor : Node2D
     private void OnInputEvent(Node viewport, InputEvent inputEvent, long shapeIndex)
     {
         if (inputEvent is InputEventMouseButton mouse &&
-            mouse.ButtonIndex == MouseButton.Left &&
-            mouse.Pressed)
+            mouse.ButtonIndex == MouseButton.Left && mouse.Pressed)
         {
             Clicked?.Invoke(CreatureId);
+            GetViewport().SetInputAsHandled();
         }
+    }
+
+    private static ulong StableSeed(string text)
+    {
+        const ulong offset = 14695981039346656037UL;
+        const ulong prime = 1099511628211UL;
+        var hash = offset;
+        foreach (var c in text)
+        {
+            hash ^= c;
+            hash *= prime;
+        }
+        return hash;
     }
 
     private static SpriteFrames BuildSpriteFrames()
     {
         var frames = new SpriteFrames();
         frames.RemoveAnimation("default");
-
         AddDirection(frames, "walk_down", 0);
         AddDirection(frames, "walk_left", 1);
         AddDirection(frames, "walk_right", 2);
         AddDirection(frames, "walk_up", 3);
-
         return frames;
     }
 
