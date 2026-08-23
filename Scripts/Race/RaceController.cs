@@ -20,11 +20,11 @@ public partial class RaceController : Node2D
     private const float SwimEndX = 760.0f;
     private const float FlyStartX = 1080.0f;
     private const float FlyEndX = 1370.0f;
+    private const float RampStartX = FlyStartX - 72.0f;
     private const float CheerDuration = 2.0f;
     private const float CheerCost = 24.0f;
     private const float RunningStaminaDrainPerSecond = 2.1f;
     private const float FlightAltitude = 38.0f;
-    private const float FallDuration = 0.48f;
 
     private static readonly Texture2D CharacterTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
@@ -71,7 +71,6 @@ public partial class RaceController : Node2D
         public bool FlightResolved { get; set; }
         public bool FlightFailed { get; set; }
         public float FlightEndX { get; set; } = FlyEndX;
-        public float FallSeconds { get; set; }
         public bool Finished { get; set; }
         public string VisualMode { get; set; } = "run";
     }
@@ -84,8 +83,7 @@ public partial class RaceController : Node2D
 
         AddWaterSection(SwimStartX, SwimEndX);
         AddWaterSection(FlyStartX, FlyEndX);
-        AddFlightRamp(FlyStartX, true);
-        AddFlightRamp(FlyEndX, false);
+        AddFlightRamp();
 
         for (var i = 0; i < participants.Count; i++)
         {
@@ -112,6 +110,13 @@ public partial class RaceController : Node2D
             };
             AddChild(sprite);
             sprite.Play("run");
+
+            // Challenge mutation presentation is derived from this participant's own
+            // traits. This prevents a selected Angel preview from leaking onto every
+            // racer and keeps mutations visible during the minigame itself.
+            var mutationAdornment = new MutationAdornment2D();
+            mutationAdornment.Setup(data, sprite);
+            AddChild(mutationAdornment);
 
             var racer = new Racer
             {
@@ -181,8 +186,6 @@ public partial class RaceController : Node2D
             }
             else if (_racers.Where(r => r != _player).All(r => r.Finished))
             {
-                // Every CPU is already home, so the player's final position is known to
-                // be fourth. Do not make the player watch an uncontested remainder.
                 FinishPlayerAsLast();
             }
         }
@@ -225,7 +228,6 @@ public partial class RaceController : Node2D
     private void AdvanceRacer(Racer racer, float step, bool updateVisual)
     {
         racer.CheerSeconds = Math.Max(0.0f, racer.CheerSeconds - step);
-        racer.FallSeconds = Math.Max(0.0f, racer.FallSeconds - step);
         var staminaDrain = RunningStaminaDrainPerSecond;
 
         if (racer.DelaySeconds > 0.0f)
@@ -255,16 +257,13 @@ public partial class RaceController : Node2D
                 ResolveFlightPlan(racer, fly);
 
             if (!racer.FlightFailed && racer.X >= racer.FlightEndX && racer.FlightEndX < FlyEndX - 1.0f)
-            {
                 racer.FlightFailed = true;
-                racer.FallSeconds = FallDuration;
-            }
 
             if (racer.FlightFailed)
             {
                 speed = 23.0f + swim * 0.33f;
                 staminaDrain += 1.25f;
-                if (updateVisual && racer.FallSeconds <= 0.01f)
+                if (updateVisual)
                     SetVisualMode(racer, "swim");
             }
             else
@@ -282,7 +281,6 @@ public partial class RaceController : Node2D
                 racer.FlightResolved = false;
                 racer.FlightFailed = false;
                 racer.FlightEndX = FlyEndX;
-                racer.FallSeconds = 0.0f;
             }
 
             if (updateVisual)
@@ -325,9 +323,6 @@ public partial class RaceController : Node2D
         racer.FlightResolved = true;
         racer.FlightFailed = false;
 
-        // A low-Fly racer can still launch and visibly glide, but only for a limited
-        // horizontal distance. High Fly reaches the opposite bank. This replaces the
-        // old binary threshold and makes the fall point itself communicate the stat.
         var sectionWidth = FlyEndX - FlyStartX;
         var glideDistance = 82.0f + Mathf.Clamp(fly, 0.0f, 100.0f) * 2.55f;
         racer.FlightEndX = Math.Min(FlyEndX, FlyStartX + Math.Min(sectionWidth, glideDistance));
@@ -514,8 +509,13 @@ public partial class RaceController : Node2D
         }
         else if (InFlySection(_player.X))
         {
-            _sectionLabel.Text = _player.FlightFailed ? "FELL! SWIM" : "GLIDE";
+            _sectionLabel.Text = _player.FlightFailed ? "SWIM" : "GLIDE";
             _sectionLabel.AddThemeColorOverride("font_color", _player.FlightFailed ? GameRules.StatColor("swim") : GameRules.StatColor("fly"));
+        }
+        else if (InLaunchRamp(_player.X))
+        {
+            _sectionLabel.Text = "TAKEOFF";
+            _sectionLabel.AddThemeColorOverride("font_color", GameRules.StatColor("fly"));
         }
         else
         {
@@ -574,38 +574,38 @@ public partial class RaceController : Node2D
             shadowScale = new Vector2(0.45f, 0.45f);
             shadowAlpha = 0.15f;
         }
+        else if (InLaunchRamp(racer.X))
+        {
+            var progress = Mathf.Clamp((racer.X - RampStartX) / (FlyStartX - RampStartX), 0.0f, 1.0f);
+            progress = progress * progress * (3.0f - 2.0f * progress);
+            yOffset = -FlightAltitude * progress;
+            racer.Sprite.Rotation = -0.09f * progress;
+            shadowScale = Vector2.One.Lerp(new Vector2(0.52f, 0.52f), progress);
+            shadowAlpha = Mathf.Lerp(0.34f, 0.14f, progress);
+        }
         else if (InFlySection(racer.X))
         {
             if (racer.FlightFailed)
             {
-                if (racer.FallSeconds > 0.0f)
-                {
-                    var fallProgress = 1.0f - racer.FallSeconds / FallDuration;
-                    var startAltitude = -FlightAltitude + Mathf.Sin((float)Time.GetTicksMsec() / 180.0f + racer.BaseY) * 1.5f;
-                    yOffset = Mathf.Lerp(startAltitude, 7.0f, Mathf.Clamp(fallProgress, 0.0f, 1.0f));
-                    racer.Sprite.Rotation = Mathf.Lerp(-0.08f, 0.16f, fallProgress);
-                    shadowScale = new Vector2(0.45f + fallProgress * 0.15f, 0.45f + fallProgress * 0.15f);
-                    shadowAlpha = 0.12f + fallProgress * 0.08f;
-                }
-                else
-                {
-                    yOffset = 7.0f + Mathf.Sin((float)Time.GetTicksMsec() / 150.0f + racer.BaseY) * 2.0f;
-                    racer.Sprite.Rotation = 0.0f;
-                    shadowScale = new Vector2(0.45f, 0.45f);
-                    shadowAlpha = 0.15f;
-                }
+                yOffset = 7.0f + Mathf.Sin((float)Time.GetTicksMsec() / 150.0f + racer.BaseY) * 2.0f;
+                racer.Sprite.Rotation = 0.0f;
+                shadowScale = new Vector2(0.45f, 0.45f);
+                shadowAlpha = 0.15f;
             }
             else
             {
-                var takeoff = Mathf.Clamp((racer.X - FlyStartX) / 45.0f, 0.0f, 1.0f);
-                var landing = racer.FlightEndX >= FlyEndX - 1.0f
-                    ? Mathf.Clamp((FlyEndX - racer.X) / 45.0f, 0.0f, 1.0f)
-                    : 1.0f;
-                var altitudeFactor = Math.Min(takeoff, landing);
-                yOffset = -FlightAltitude * altitudeFactor + Mathf.Sin((float)Time.GetTicksMsec() / 190.0f + racer.BaseY) * 1.8f;
-                racer.Sprite.Rotation = -0.08f + Mathf.Sin((float)Time.GetTicksMsec() / 260.0f + racer.BaseY) * 0.025f;
-                shadowScale = new Vector2(0.48f, 0.48f);
-                shadowAlpha = 0.12f;
+                var glideSpan = Math.Max(1.0f, racer.FlightEndX - FlyStartX);
+                var glideProgress = Mathf.Clamp((racer.X - FlyStartX) / glideSpan, 0.0f, 1.0f);
+                var easedDescent = Mathf.Pow(glideProgress, 1.35f);
+                var fallsIntoWater = racer.FlightEndX < FlyEndX - 1.0f;
+                var destinationY = fallsIntoWater ? 7.0f : 0.0f;
+                yOffset = Mathf.Lerp(-FlightAltitude, destinationY, easedDescent) +
+                          Mathf.Sin((float)Time.GetTicksMsec() / 210.0f + racer.BaseY) * 1.2f * (1.0f - glideProgress);
+                racer.Sprite.Rotation = Mathf.Lerp(-0.08f, 0.08f, glideProgress);
+                shadowScale = new Vector2(
+                    Mathf.Lerp(0.48f, fallsIntoWater ? 0.45f : 0.82f, glideProgress),
+                    Mathf.Lerp(0.48f, fallsIntoWater ? 0.45f : 0.82f, glideProgress));
+                shadowAlpha = Mathf.Lerp(0.11f, fallsIntoWater ? 0.15f : 0.26f, glideProgress);
             }
         }
         else
@@ -636,7 +636,7 @@ public partial class RaceController : Node2D
                 break;
             case "glide":
                 racer.Sprite.Play("run");
-                racer.Sprite.SpeedScale = 0.48f;
+                racer.Sprite.SpeedScale = 0.38f;
                 break;
             default:
                 racer.Sprite.Play("run");
@@ -647,6 +647,7 @@ public partial class RaceController : Node2D
 
     private static bool InSwimSection(float x) => x >= SwimStartX && x < SwimEndX;
     private static bool InFlySection(float x) => x >= FlyStartX && x < FlyEndX;
+    private static bool InLaunchRamp(float x) => x >= RampStartX && x < FlyStartX;
 
     private List<VoidlingData> BuildParticipants(VoidlingData selected, ulong seed)
     {
@@ -694,28 +695,45 @@ public partial class RaceController : Node2D
         }
     }
 
-    private void AddFlightRamp(float x, bool launch)
+    private void AddFlightRamp()
     {
-        var ramp = new Polygon2D
+        // The takeoff structure spans the entire visible depth of the track so every
+        // racer visually climbs the same ramp instead of walking over a center-lane prop.
+        const float laneBandHeight = 28.0f;
+        var width = FlyStartX - RampStartX;
+        var centerX = (RampStartX + FlyStartX) * 0.5f;
+
+        for (var y = TrackTop; y < TrackBottom; y += laneBandHeight)
         {
-            Polygon = launch
-                ? new[] { new Vector2(-24, 18), new Vector2(24, -6), new Vector2(24, 18) }
-                : new[] { new Vector2(-24, -6), new Vector2(24, 18), new Vector2(-24, 18) },
-            Color = Color.FromHtml("#D99B63"),
-            Position = new Vector2(x, TrackY - 3),
-            ZIndex = 4
-        };
-        AddChild(ramp);
-        var edge = new Line2D
-        {
-            Width = 2.0f,
-            DefaultColor = Color.FromHtml("#8D654F"),
-            Points = launch
-                ? new[] { new Vector2(-24, 18), new Vector2(24, -6) }
-                : new[] { new Vector2(-24, -6), new Vector2(24, 18) },
-            ZIndex = 5
-        };
-        ramp.AddChild(edge);
+            var bandHeight = Math.Min(laneBandHeight, TrackBottom - y);
+            var ramp = new Polygon2D
+            {
+                Polygon = new[]
+                {
+                    new Vector2(-width * 0.5f, bandHeight * 0.45f),
+                    new Vector2(width * 0.5f, -bandHeight * 0.45f),
+                    new Vector2(width * 0.5f, bandHeight * 0.5f),
+                    new Vector2(-width * 0.5f, bandHeight * 0.5f)
+                },
+                Color = Color.FromHtml("#D99B63"),
+                Position = new Vector2(centerX, y + bandHeight * 0.5f),
+                ZIndex = 4
+            };
+            AddChild(ramp);
+
+            var edge = new Line2D
+            {
+                Width = 2.0f,
+                DefaultColor = Color.FromHtml("#8D654F"),
+                Points = new[]
+                {
+                    new Vector2(-width * 0.5f, bandHeight * 0.45f),
+                    new Vector2(width * 0.5f, -bandHeight * 0.45f)
+                },
+                ZIndex = 5
+            };
+            ramp.AddChild(edge);
+        }
     }
 
     private void AddHurdle(float x)
@@ -898,8 +916,6 @@ public partial class RaceController : Node2D
             frames.AddFrame("run", atlas);
         }
 
-        // The Sprout Sorry Ocean Pack swimming sheet is an 8x8 grid of 48px frames.
-        // Row 3 is the side/right-facing cycle, matching the race's left-to-right view.
         frames.AddAnimation("swim");
         frames.SetAnimationLoop("swim", true);
         frames.SetAnimationSpeed("swim", 10.0);
