@@ -4,6 +4,7 @@ using Godot;
 using Voidling.Application.Breeding;
 using Voidling.Application.Persistence;
 using Voidling.Application.Ports;
+using Voidling.Application.Roster;
 using Voidling.Application.Settings;
 using Voidling.Application.Shop;
 using Voidling.Application.Simulation;
@@ -35,6 +36,7 @@ public partial class GameSession : Node
     private BreedVoidlingsUseCase? _breeding;
     private ShopUseCase? _shop;
     private SettingsUseCase? _settings;
+    private VoidlingRosterUseCase? _roster;
 
     public void Configure(
         IGameStateRepository stateRepository,
@@ -44,7 +46,8 @@ public partial class GameSession : Node
         TrainingUseCase training,
         BreedVoidlingsUseCase breeding,
         ShopUseCase shop,
-        SettingsUseCase settings)
+        SettingsUseCase settings,
+        VoidlingRosterUseCase roster)
     {
         if (IsInsideTree())
             throw new InvalidOperationException("GameSession must be configured before entering the scene tree.");
@@ -57,13 +60,14 @@ public partial class GameSession : Node
         _breeding = breeding ?? throw new ArgumentNullException(nameof(breeding));
         _shop = shop ?? throw new ArgumentNullException(nameof(shop));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _roster = roster ?? throw new ArgumentNullException(nameof(roster));
     }
 
     public override void _Ready()
     {
         if (_stateRepository == null || _audioSettings == null || _migrations == null ||
             _simulation == null || _training == null || _breeding == null || _shop == null ||
-            _settings == null)
+            _settings == null || _roster == null)
         {
             throw new InvalidOperationException("GameSession must be created by the composition root.");
         }
