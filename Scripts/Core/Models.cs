@@ -95,10 +95,15 @@ public sealed class EggData
 
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 2;
+    public int SaveVersion { get; set; } = 3;
     public int Coins { get; set; } = 120;
     public long SeedCounter { get; set; } = 1;
     public List<VoidlingData> Voidlings { get; set; } = new();
+
+    // Voidlings that were permanently released from the farm. They are retained only
+    // as immutable lineage records so descendants never lose their genealogy.
+    public List<VoidlingData> DepartedVoidlings { get; set; } = new();
+
     public List<EggData> OwnedEggs { get; set; } = new();
     public List<EggData> StoreEggs { get; set; } = new();
     public Dictionary<string, int> TrainingItems { get; set; } = new();

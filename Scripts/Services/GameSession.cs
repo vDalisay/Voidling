@@ -34,7 +34,6 @@ public partial class GameSession : Node
 
         var step = (float)_simulationAccumulator;
         _simulationAccumulator = 0.0;
-
         var changed = false;
 
         foreach (var creature in State.Voidlings)
@@ -58,7 +57,6 @@ public partial class GameSession : Node
         }
 
         var hatchQueue = new List<EggData>();
-
         foreach (var egg in State.OwnedEggs)
         {
             if (egg.State != EggState.Incubating)
@@ -66,7 +64,6 @@ public partial class GameSession : Node
 
             egg.IncubationSeconds += step;
             changed = true;
-
             if (egg.IncubationSeconds >= egg.RequiredIncubationSeconds)
                 hatchQueue.Add(egg);
         }
@@ -93,6 +90,16 @@ public partial class GameSession : Node
 
     public VoidlingData? FindVoidling(string id)
         => State.Voidlings.FirstOrDefault(v => v.Id == id);
+
+    public VoidlingData? FindLineageVoidling(string id)
+        => State.Voidlings.FirstOrDefault(v => v.Id == id)
+           ?? State.DepartedVoidlings.FirstOrDefault(v => v.Id == id);
+
+    public IReadOnlyList<VoidlingData> GetLineageVoidlings()
+        => State.Voidlings.Concat(State.DepartedVoidlings).ToList();
+
+    public bool IsDeparted(string id)
+        => State.DepartedVoidlings.Any(v => v.Id == id);
 
     public void BuyTrainingItem(string statId)
     {
@@ -129,7 +136,6 @@ public partial class GameSession : Node
         var gain = rng.Next(5, 10);
         creature.TrainingPoints.TryGetValue(statId, out var current);
         creature.TrainingPoints[statId] = Math.Min(120, current + gain);
-
         SaveAndNotify($"{creature.Name} gained +{gain} {GameRules.StatDisplayNames[statId]} training.");
     }
 
@@ -155,7 +161,7 @@ public partial class GameSession : Node
         egg.WorldY = nestPosition.Y;
         State.OwnedEggs.Add(egg);
 
-        // The replacement is generated now, when it enters store inventory.
+        // Replacement genetics are generated now, when the replacement enters inventory.
         State.StoreEggs.Add(CreateStoreEgg());
         SaveAndNotify("Bought a mystery egg. Its genetics were already fixed in the shop.");
     }
@@ -167,17 +173,15 @@ public partial class GameSession : Node
 
         if (a == null || b == null)
             return "Choose two adults.";
-
         if (a.Id == b.Id)
             return "Choose two different Voidlings.";
-
         if (a.Stage != LifeStage.Adult || b.Stage != LifeStage.Adult)
             return "Both parents must be adults.";
-
         if (a.BreedCooldownSeconds > 0.0f || b.BreedCooldownSeconds > 0.0f)
             return "One parent is still on breeding cooldown.";
 
-        var related = GeneticsService.AreRelated(a, b, State.Voidlings);
+        var lineage = GetLineageVoidlings();
+        var related = GeneticsService.AreRelated(a, b, lineage);
         var burden = GeneticsService.ComputeChildBurden(a, b, related);
         var failure = GameRules.HatchFailurePercent(burden);
 
@@ -214,7 +218,7 @@ public partial class GameSession : Node
 
         var seed = NextSeed();
         var eggId = NewId();
-        var related = GeneticsService.AreRelated(a, b, State.Voidlings);
+        var related = GeneticsService.AreRelated(a, b, GetLineageVoidlings());
         var burden = GeneticsService.ComputeChildBurden(a, b, related);
         var genome = GeneticsService.CreateChildGenome(a, b, seed);
         var rareTraits = GeneticsService.InheritRareTraits(a, b, seed);
@@ -247,7 +251,6 @@ public partial class GameSession : Node
         var warning = related
             ? $" Egg carries level {burden} inbreeding risk ({GameRules.HatchFailurePercent(burden)}%)."
             : "";
-
         SaveAndNotify($"Breeding produced an egg.{warning}");
         return true;
     }
@@ -260,6 +263,18 @@ public partial class GameSession : Node
 
         State.OwnedEggs.Remove(egg);
         SaveAndNotify("Removed the failed egg.");
+    }
+
+    public bool SayGoodbye(string creatureId)
+    {
+        var creature = FindVoidling(creatureId);
+        if (creature == null)
+            return false;
+
+        State.Voidlings.Remove(creature);
+        State.DepartedVoidlings.Add(creature);
+        SaveAndNotify($"{creature.Name} left the farm forever. Their family record remains.");
+        return true;
     }
 
     public void AddRaceReward(int place)
@@ -277,7 +292,7 @@ public partial class GameSession : Node
     }
 
     public string NameFor(string id)
-        => FindVoidling(id)?.Name ?? "Unknown";
+        => FindLineageVoidling(id)?.Name ?? "Unknown";
 
     public ulong CreateRaceSeed()
     {
@@ -294,7 +309,7 @@ public partial class GameSession : Node
 
     private void HatchEgg(EggData egg)
     {
-        var suffix = State.Voidlings.Count + 1;
+        var suffix = State.Voidlings.Count + State.DepartedVoidlings.Count + 1;
         var creature = new VoidlingData
         {
             Id = egg.Id,
@@ -348,21 +363,22 @@ public partial class GameSession : Node
 
     private void NormalizeState()
     {
-        State.SaveVersion = 2;
+        State.SaveVersion = 3;
+        State.DepartedVoidlings ??= new List<VoidlingData>();
 
         foreach (var statId in GameRules.StatIds)
         {
             if (!State.TrainingItems.ContainsKey(statId))
                 State.TrainingItems[statId] = 0;
 
-            foreach (var creature in State.Voidlings)
+            foreach (var creature in State.Voidlings.Concat(State.DepartedVoidlings))
             {
                 if (!creature.TrainingPoints.ContainsKey(statId))
                     creature.TrainingPoints[statId] = 0;
             }
         }
 
-        // Migrate the first MVP save, which did not store world positions.
+        // Migrate older MVP saves that did not store world positions.
         for (var i = 0; i < State.Voidlings.Count; i++)
         {
             var creature = State.Voidlings[i];
@@ -395,7 +411,7 @@ public partial class GameSession : Node
     {
         var state = new GameStateData
         {
-            SaveVersion = 2,
+            SaveVersion = 3,
             Coins = 120,
             SeedCounter = DateTime.UtcNow.Ticks
         };
@@ -404,11 +420,8 @@ public partial class GameSession : Node
             state.TrainingItems[statId] = 1;
 
         State = state;
-
-        var first = CreateStarter("Pip", "#E7A6B6", StarterSpawnPosition(0));
-        var second = CreateStarter("Mallow", "#A9D5C0", StarterSpawnPosition(1));
-        State.Voidlings.Add(first);
-        State.Voidlings.Add(second);
+        State.Voidlings.Add(CreateStarter("Pip", "#E7A6B6", StarterSpawnPosition(0)));
+        State.Voidlings.Add(CreateStarter("Mallow", "#A9D5C0", StarterSpawnPosition(1)));
 
         for (var i = 0; i < 3; i++)
             State.StoreEggs.Add(CreateStoreEgg());

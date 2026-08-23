@@ -84,7 +84,7 @@ public partial class MainController : Node
         row.AddChild(breed);
 
         var race = UiFactory.CreateButton("Race", 12);
-        race.Pressed += ShowRaceConfirm;
+        race.Pressed += ShowRacePicker;
         row.AddChild(race);
 
         var center = UiFactory.CreateButton("Center");
@@ -100,7 +100,7 @@ public partial class MainController : Node
     {
         _toastLabel = UiFactory.CreateLabel("", 10);
         _toastLabel.Position = new Vector2(20, 329);
-        _toastLabel.Size = new Vector2(380, 16);
+        _toastLabel.Size = new Vector2(390, 16);
         _toastLabel.AddThemeColorOverride("font_color", Color.FromHtml("#F9F4D8"));
         _toastLabel.AddThemeColorOverride("font_shadow_color", Color.FromHtml("#465247"));
         _toastLabel.AddThemeConstantOverride("shadow_offset_x", 1);
@@ -131,13 +131,13 @@ public partial class MainController : Node
         if (data == null)
             return;
 
-        _detailsPanel = UiFactory.CreatePanel(new Vector2(198, 262));
-        _detailsPanel.Position = new Vector2(430, 58);
-        _detailsPanel.Size = new Vector2(198, 262);
+        _detailsPanel = UiFactory.CreatePanel(new Vector2(204, 274));
+        _detailsPanel.Position = new Vector2(424, 56);
+        _detailsPanel.Size = new Vector2(204, 274);
         _uiRoot.AddChild(_detailsPanel);
 
         var box = new VBoxContainer();
-        box.AddThemeConstantOverride("separation", 4);
+        box.AddThemeConstantOverride("separation", 3);
         _detailsPanel.AddChild(box);
 
         var heading = new HBoxContainer();
@@ -167,7 +167,7 @@ public partial class MainController : Node
 
             var label = UiFactory.CreateLabel(
                 $"{GameRules.StatDisplayNames[statId],-7} {GameRules.GradeName(gene.ExpressedValue)}  {effective:00}", 8);
-            label.CustomMinimumSize = new Vector2(112, 18);
+            label.CustomMinimumSize = new Vector2(116, 18);
             label.TooltipText = $"DNA {GameRules.GradeName(gene.AlleleA)}/{GameRules.GradeName(gene.AlleleB)} • training {GameRules.GetTrainingPoints(data, statId)}";
             row.AddChild(label);
 
@@ -182,32 +182,39 @@ public partial class MainController : Node
         }
 
         var profileButtons = new HBoxContainer();
-        profileButtons.AddThemeConstantOverride("separation", 6);
+        profileButtons.AddThemeConstantOverride("separation", 5);
         var dna = UiFactory.CreateButton("DNA");
-        dna.CustomMinimumSize = new Vector2(76, 22);
+        dna.CustomMinimumSize = new Vector2(76, 21);
         dna.Pressed += ShowDnaProfile;
         profileButtons.AddChild(dna);
         var visual = UiFactory.CreateButton("Visual");
-        visual.CustomMinimumSize = new Vector2(76, 22);
+        visual.CustomMinimumSize = new Vector2(76, 21);
         visual.Pressed += ShowVisualProfile;
         profileButtons.AddChild(visual);
         box.AddChild(profileButtons);
 
-        var familyRow = new HBoxContainer();
-        familyRow.AddThemeConstantOverride("separation", 4);
         var parentText = data.ParentAId.Length > 0
             ? $"Parents: {GameSession.Instance.NameFor(data.ParentAId)} + {GameSession.Instance.NameFor(data.ParentBId)}"
             : "Parents: starter/store line";
         var parents = UiFactory.CreateLabel(parentText, 7);
-        parents.CustomMinimumSize = new Vector2(105, 28);
         parents.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        familyRow.AddChild(parents);
+        parents.CustomMinimumSize = new Vector2(174, 24);
+        box.AddChild(parents);
+
+        var actions = new HBoxContainer();
+        actions.AddThemeConstantOverride("separation", 5);
         var familyTree = UiFactory.CreateButton("Family tree");
-        familyTree.CustomMinimumSize = new Vector2(67, 25);
-        UiFactory.ApplyPixelFont(familyTree, 6);
+        familyTree.CustomMinimumSize = new Vector2(91, 22);
+        UiFactory.ApplyPixelFont(familyTree, 7);
         familyTree.Pressed += ShowFamilyTree;
-        familyRow.AddChild(familyTree);
-        box.AddChild(familyRow);
+        actions.AddChild(familyTree);
+        var goodbye = UiFactory.CreateButton("Goodbye");
+        goodbye.CustomMinimumSize = new Vector2(76, 22);
+        UiFactory.ApplyPixelFont(goodbye, 7);
+        goodbye.AddThemeColorOverride("font_color", Color.FromHtml("#9C514B"));
+        goodbye.Pressed += () => ShowGoodbyeFirst(data.Id);
+        actions.AddChild(goodbye);
+        box.AddChild(actions);
 
         if (data.InbreedingHistoryFlag || data.InbreedingBurdenLevel > 0)
         {
@@ -384,24 +391,81 @@ public partial class MainController : Node
         box.AddChild(UiFactory.CreateLabel("The parents approach, a heart appears, then their egg is placed between them.", 7));
     }
 
-    private void ShowRaceConfirm()
+    private void ShowRacePicker()
     {
-        var selected = GameSession.Instance.FindVoidling(_selectedId);
-        selected ??= GameSession.Instance.State.Voidlings.FirstOrDefault();
-        if (selected == null)
-            return;
+        var owned = GameSession.Instance.State.Voidlings.ToList();
+        var box = OpenModal("CHOOSE A RACER", new Vector2(550, 306));
 
-        var box = OpenModal("AUTOMATED RACE", new Vector2(330, 165));
-        var run = (int)Math.Round(GameRules.EffectiveStat(selected, "run"));
-        box.AddChild(UiFactory.CreateLabel($"Enter {selected.Name}?  • Run {run}", 10));
-        var info = UiFactory.CreateLabel("Only this owned Voidling enters. The other three racers are generated CPU opponents.", 8);
-        info.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        box.AddChild(info);
+        if (owned.Count == 0)
+        {
+            box.AddChild(UiFactory.CreateLabel("No Voidlings are currently on the farm.", 10));
+            return;
+        }
+
+        var chosen = owned.FirstOrDefault(v => v.Id == _selectedId) ?? owned[0];
+        box.AddChild(UiFactory.CreateLabel("Choose exactly one owned Voidling. Every opponent will be generated for this race.", 8));
+
+        var scroll = new ScrollContainer
+        {
+            CustomMinimumSize = new Vector2(510, 92),
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        var cards = new HBoxContainer();
+        cards.AddThemeConstantOverride("separation", 8);
+        scroll.AddChild(cards);
+        box.AddChild(scroll);
+
+        var previewRow = new HBoxContainer();
+        previewRow.AddThemeConstantOverride("separation", 14);
+        var previewPortrait = UiFactory.CreatePortrait(chosen, new Vector2(82, 82));
+        previewRow.AddChild(previewPortrait);
+        var previewText = new VBoxContainer();
+        previewText.AddThemeConstantOverride("separation", 3);
+        var previewName = UiFactory.CreateTitle(chosen.Name);
+        var previewStats = UiFactory.CreateLabel("", 8);
+        previewText.AddChild(previewName);
+        previewText.AddChild(previewStats);
+        previewRow.AddChild(previewText);
+        box.AddChild(previewRow);
+
+        void UpdatePreview(VoidlingData candidate)
+        {
+            chosen = candidate;
+            previewPortrait.Modulate = GameRules.TintColor(candidate.TintHex);
+            previewName.Text = candidate.Name;
+            previewStats.Text = string.Join("   ", GameRules.StatIds.Select(stat =>
+                $"{GameRules.StatDisplayNames[stat]} {(int)Math.Round(GameRules.EffectiveStat(candidate, stat))}"));
+        }
+
+        foreach (var creature in owned)
+        {
+            var entry = new VBoxContainer { CustomMinimumSize = new Vector2(86, 80) };
+            entry.AddThemeConstantOverride("separation", 1);
+
+            var card = UiFactory.CreateButton("");
+            card.CustomMinimumSize = new Vector2(82, 60);
+            var portrait = UiFactory.CreatePortrait(creature, new Vector2(50, 50));
+            portrait.Position = new Vector2(16, 4);
+            portrait.Size = new Vector2(50, 50);
+            card.AddChild(portrait);
+            var captured = creature;
+            card.Pressed += () => UpdatePreview(captured);
+            entry.AddChild(card);
+
+            var name = UiFactory.CreateLabel(creature.Name, 7);
+            name.HorizontalAlignment = HorizontalAlignment.Center;
+            name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+            entry.AddChild(name);
+            cards.AddChild(entry);
+        }
+
+        UpdatePreview(chosen);
         var start = UiFactory.CreateButton("Start Race");
+        start.CustomMinimumSize = new Vector2(170, 27);
         start.Pressed += () =>
         {
             CloseModal();
-            StartRace(selected);
+            StartRace(chosen);
         };
         box.AddChild(start);
     }
@@ -495,21 +559,149 @@ public partial class MainController : Node
         if (data == null)
             return;
 
-        var box = OpenModal($"{data.Name.ToUpperInvariant()} — FAMILY TREE", new Vector2(604, 324));
-        var note = UiFactory.CreateLabel("Parents are above descendants. Historical inbreeding marks remain visible after the active burden is cleansed.", 7);
+        var box = OpenModal($"{data.Name.ToUpperInvariant()} — FAMILY TREE", new Vector2(612, 330));
+        var note = UiFactory.CreateLabel("Click any family member for stats and parents. Grey LEFT nodes remain forever after a Voidling leaves the farm.", 7);
         note.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         box.AddChild(note);
 
+        var content = new HBoxContainer();
+        content.AddThemeConstantOverride("separation", 8);
+        box.AddChild(content);
+
         var scroll = new ScrollContainer
         {
-            CustomMinimumSize = new Vector2(565, 245),
+            CustomMinimumSize = new Vector2(425, 252),
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             SizeFlagsVertical = Control.SizeFlags.ExpandFill
         };
+        content.AddChild(scroll);
+
         var tree = new FamilyTreeView();
-        tree.Build(data.Id, GameSession.Instance.State.Voidlings);
+        tree.Build(data.Id, GameSession.Instance.State.Voidlings, GameSession.Instance.State.DepartedVoidlings);
         scroll.AddChild(tree);
-        box.AddChild(scroll);
+
+        var inspector = UiFactory.CreatePanel(new Vector2(153, 252));
+        inspector.CustomMinimumSize = new Vector2(153, 252);
+        inspector.Visible = false;
+        content.AddChild(inspector);
+        var inspectorBox = new VBoxContainer();
+        inspectorBox.AddThemeConstantOverride("separation", 3);
+        inspector.AddChild(inspectorBox);
+
+        void ShowMember(string memberId)
+        {
+            var member = GameSession.Instance.FindLineageVoidling(memberId);
+            if (member == null)
+                return;
+
+            foreach (var old in inspectorBox.GetChildren())
+            {
+                inspectorBox.RemoveChild(old);
+                old.QueueFree();
+            }
+
+            inspector.Visible = true;
+            tree.SetSelectedMember(memberId);
+
+            var heading = new HBoxContainer();
+            var memberName = UiFactory.CreateTitle(member.Name);
+            memberName.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            heading.AddChild(memberName);
+            var dismiss = UiFactory.CreateButton("X");
+            dismiss.CustomMinimumSize = new Vector2(24, 20);
+            dismiss.Pressed += () => inspector.Visible = false;
+            heading.AddChild(dismiss);
+            inspectorBox.AddChild(heading);
+
+            var portrait = UiFactory.CreatePortrait(member, new Vector2(62, 62));
+            if (GameSession.Instance.IsDeparted(member.Id))
+                portrait.SelfModulate = new Color(0.55f, 0.55f, 0.55f, 0.72f);
+            inspectorBox.AddChild(portrait);
+
+            if (GameSession.Instance.IsDeparted(member.Id))
+            {
+                var gone = UiFactory.CreateLabel("LEFT THE FARM", 7);
+                gone.AddThemeColorOverride("font_color", Color.FromHtml("#8B6257"));
+                inspectorBox.AddChild(gone);
+            }
+
+            foreach (var statId in GameRules.StatIds)
+            {
+                var gene = GameRules.GetGene(member, statId);
+                var value = (int)Math.Round(GameRules.EffectiveStat(member, statId));
+                inspectorBox.AddChild(UiFactory.CreateLabel(
+                    $"{GameRules.StatDisplayNames[statId]}  {GameRules.GradeName(gene.ExpressedValue)}  {value}", 7));
+            }
+
+            var parentText = member.ParentAId.Length > 0
+                ? $"Parents:\n{GameSession.Instance.NameFor(member.ParentAId)}\n+ {GameSession.Instance.NameFor(member.ParentBId)}"
+                : "Parents:\nFounder / store line";
+            var parents = UiFactory.CreateLabel(parentText, 7);
+            parents.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            inspectorBox.AddChild(parents);
+        }
+
+        tree.MemberSelected += ShowMember;
+    }
+
+    private void ShowGoodbyeFirst(string creatureId)
+    {
+        var data = GameSession.Instance.FindVoidling(creatureId);
+        if (data == null)
+            return;
+
+        var box = OpenModal("SAY GOODBYE?", new Vector2(390, 165));
+        var text = UiFactory.CreateLabel(
+            $"Send {data.Name} away from the farm? They will disappear from the garden, but remain in every family tree as a departed family member.", 8);
+        text.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        box.AddChild(text);
+
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 10);
+        var cancel = UiFactory.CreateButton("Cancel");
+        cancel.Pressed += CloseModal;
+        row.AddChild(cancel);
+        var next = UiFactory.CreateButton("Continue");
+        next.Pressed += () => ShowGoodbyeFinal(creatureId);
+        row.AddChild(next);
+        box.AddChild(row);
+    }
+
+    private void ShowGoodbyeFinal(string creatureId)
+    {
+        var data = GameSession.Instance.FindVoidling(creatureId);
+        if (data == null)
+        {
+            CloseModal();
+            return;
+        }
+
+        var box = OpenModal("FINAL WARNING", new Vector2(405, 175));
+        var warning = UiFactory.CreateLabel(
+            $"This cannot be undone. If you say goodbye now, {data.Name} leaves the farm forever. Their grey family-tree memorial is the only record that remains.", 8);
+        warning.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        warning.AddThemeColorOverride("font_color", Color.FromHtml("#9C514B"));
+        box.AddChild(warning);
+
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 10);
+        var keep = UiFactory.CreateButton("Keep Voidling");
+        keep.Pressed += CloseModal;
+        row.AddChild(keep);
+        var goodbye = UiFactory.CreateButton("Goodbye forever");
+        goodbye.AddThemeColorOverride("font_color", Color.FromHtml("#9C514B"));
+        goodbye.Pressed += () =>
+        {
+            CloseModal();
+            if (GameSession.Instance.SayGoodbye(creatureId))
+            {
+                _selectedId = "";
+                _garden.ClearSelection();
+                RefreshUi();
+            }
+        };
+        row.AddChild(goodbye);
+        box.AddChild(row);
     }
 
     private void ShowResetConfirm()

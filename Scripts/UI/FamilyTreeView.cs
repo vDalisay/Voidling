@@ -7,121 +7,238 @@ namespace VoidlingGame;
 
 public partial class FamilyTreeView : Control
 {
+    public event Action<string>? MemberSelected;
+
     private readonly Dictionary<string, Rect2> _cardRects = new(StringComparer.Ordinal);
-    private readonly List<(string ParentId, string ChildId)> _links = new();
+    private readonly Dictionary<string, VoidlingData> _membersById = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _departedIds = new(StringComparer.Ordinal);
+    private readonly List<string> _visibleMemberIds = new();
     private string _selectedId = "";
 
-    public void Build(string selectedId, IReadOnlyList<VoidlingData> allVoidlings)
+    public void Build(
+        string selectedId,
+        IReadOnlyList<VoidlingData> activeVoidlings,
+        IReadOnlyList<VoidlingData> departedVoidlings)
     {
         foreach (var child in GetChildren())
             child.QueueFree();
 
         _cardRects.Clear();
-        _links.Clear();
+        _membersById.Clear();
+        _departedIds.Clear();
+        _visibleMemberIds.Clear();
         _selectedId = selectedId;
 
-        var byId = allVoidlings.ToDictionary(v => v.Id, StringComparer.Ordinal);
-        if (!byId.ContainsKey(selectedId))
+        foreach (var member in activeVoidlings)
+            _membersById[member.Id] = member;
+        foreach (var member in departedVoidlings)
+        {
+            _membersById[member.Id] = member;
+            _departedIds.Add(member.Id);
+        }
+
+        if (!_membersById.ContainsKey(selectedId))
             return;
 
-        var connectedIds = CollectConnectedFamily(selectedId, allVoidlings, byId);
-        var members = connectedIds.Select(id => byId[id]).ToList();
-
-        foreach (var member in members)
-        {
-            if (member.ParentAId.Length > 0 && connectedIds.Contains(member.ParentAId))
-                _links.Add((member.ParentAId, member.Id));
-            if (member.ParentBId.Length > 0 && connectedIds.Contains(member.ParentBId))
-                _links.Add((member.ParentBId, member.Id));
-        }
+        var allMembers = _membersById.Values.ToList();
+        var connectedIds = CollectConnectedFamily(selectedId, allMembers, _membersById);
+        var members = connectedIds.Select(id => _membersById[id]).ToList();
+        _visibleMemberIds.AddRange(connectedIds);
 
         var groups = members
             .GroupBy(v => v.FamilyGeneration)
             .OrderBy(g => g.Key)
             .ToList();
 
-        const float cardWidth = 92.0f;
-        const float cardHeight = 68.0f;
-        const float horizontalGap = 22.0f;
-        const float verticalGap = 30.0f;
-        const float margin = 24.0f;
+        const float cardWidth = 108.0f;
+        const float cardHeight = 82.0f;
+        const float horizontalGap = 34.0f;
+        const float verticalGap = 50.0f;
+        const float margin = 28.0f;
 
         var widest = groups.Count == 0 ? 1 : groups.Max(g => g.Count());
-        var contentWidth = Math.Max(540.0f, margin * 2 + widest * cardWidth + Math.Max(0, widest - 1) * horizontalGap);
-        var contentHeight = Math.Max(220.0f, margin * 2 + groups.Count * cardHeight + Math.Max(0, groups.Count - 1) * verticalGap);
+        var contentWidth = Math.Max(610.0f, margin * 2 + widest * cardWidth + Math.Max(0, widest - 1) * horizontalGap);
+        var contentHeight = Math.Max(240.0f, margin * 2 + groups.Count * cardHeight + Math.Max(0, groups.Count - 1) * verticalGap);
         CustomMinimumSize = new Vector2(contentWidth, contentHeight);
         Size = CustomMinimumSize;
 
         for (var generationIndex = 0; generationIndex < groups.Count; generationIndex++)
         {
-            var row = groups[generationIndex].OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
-            var rowWidth = row.Count * cardWidth + Math.Max(0, row.Count - 1) * horizontalGap;
+            var generationMembers = groups[generationIndex].ToList();
+            generationMembers.Sort((left, right) =>
+            {
+                var leftAnchor = ParentAnchor(left);
+                var rightAnchor = ParentAnchor(right);
+                var comparison = leftAnchor.CompareTo(rightAnchor);
+                return comparison != 0
+                    ? comparison
+                    : string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase);
+            });
+
+            var rowWidth = generationMembers.Count * cardWidth + Math.Max(0, generationMembers.Count - 1) * horizontalGap;
             var startX = (contentWidth - rowWidth) * 0.5f;
             var y = margin + generationIndex * (cardHeight + verticalGap);
 
-            for (var i = 0; i < row.Count; i++)
+            for (var i = 0; i < generationMembers.Count; i++)
             {
-                var member = row[i];
-                var rect = new Rect2(new Vector2(startX + i * (cardWidth + horizontalGap), y), new Vector2(cardWidth, cardHeight));
+                var member = generationMembers[i];
+                var rect = new Rect2(
+                    new Vector2(startX + i * (cardWidth + horizontalGap), y),
+                    new Vector2(cardWidth, cardHeight));
                 _cardRects[member.Id] = rect;
-                AddCard(member, rect);
+                AddCard(member, rect, _departedIds.Contains(member.Id));
             }
         }
 
         QueueRedraw();
     }
 
+    public void SetSelectedMember(string memberId)
+    {
+        _selectedId = memberId;
+        QueueRedraw();
+    }
+
     public override void _Draw()
     {
-        foreach (var link in _links)
+        var lineColor = Color.FromHtml("#E9E5CD");
+
+        // Draw each child's complete parent connection as one family unit. This avoids
+        // the dangling half-branches produced by drawing each parent link independently.
+        foreach (var childId in _visibleMemberIds)
         {
-            if (!_cardRects.TryGetValue(link.ParentId, out var parent) ||
-                !_cardRects.TryGetValue(link.ChildId, out var child))
+            if (!_membersById.TryGetValue(childId, out var child) ||
+                !_cardRects.TryGetValue(childId, out var childRect))
                 continue;
 
-            var start = new Vector2(parent.GetCenter().X, parent.End.Y);
-            var end = new Vector2(child.GetCenter().X, child.Position.Y);
-            var middleY = (start.Y + end.Y) * 0.5f;
-            var lineColor = Color.FromHtml("#E9E5CD");
-            DrawLine(start, new Vector2(start.X, middleY), lineColor, 2.0f);
-            DrawLine(new Vector2(start.X, middleY), new Vector2(end.X, middleY), lineColor, 2.0f);
-            DrawLine(new Vector2(end.X, middleY), end, lineColor, 2.0f);
+            var parentRects = new List<Rect2>();
+            if (!string.IsNullOrWhiteSpace(child.ParentAId) && _cardRects.TryGetValue(child.ParentAId, out var parentA))
+                parentRects.Add(parentA);
+            if (!string.IsNullOrWhiteSpace(child.ParentBId) && _cardRects.TryGetValue(child.ParentBId, out var parentB))
+                parentRects.Add(parentB);
+
+            if (parentRects.Count == 0)
+                continue;
+
+            var childTop = new Vector2(childRect.GetCenter().X, childRect.Position.Y);
+            var highestParentBottom = parentRects.Max(rect => rect.End.Y);
+            var junctionY = highestParentBottom + Math.Max(12.0f, (childTop.Y - highestParentBottom) * 0.46f);
+
+            if (parentRects.Count == 1)
+            {
+                var parentBottom = new Vector2(parentRects[0].GetCenter().X, parentRects[0].End.Y);
+                DrawLine(parentBottom, new Vector2(parentBottom.X, junctionY), lineColor, 2.0f);
+                DrawLine(new Vector2(parentBottom.X, junctionY), new Vector2(childTop.X, junctionY), lineColor, 2.0f);
+                DrawLine(new Vector2(childTop.X, junctionY), childTop, lineColor, 2.0f);
+                continue;
+            }
+
+            var leftParent = parentRects.OrderBy(rect => rect.GetCenter().X).First();
+            var rightParent = parentRects.OrderBy(rect => rect.GetCenter().X).Last();
+            var leftBottom = new Vector2(leftParent.GetCenter().X, leftParent.End.Y);
+            var rightBottom = new Vector2(rightParent.GetCenter().X, rightParent.End.Y);
+
+            DrawLine(leftBottom, new Vector2(leftBottom.X, junctionY), lineColor, 2.0f);
+            DrawLine(rightBottom, new Vector2(rightBottom.X, junctionY), lineColor, 2.0f);
+            DrawLine(new Vector2(leftBottom.X, junctionY), new Vector2(rightBottom.X, junctionY), lineColor, 2.0f);
+
+            var coupleX = (leftBottom.X + rightBottom.X) * 0.5f;
+            var branchY = Math.Min(childTop.Y - 10.0f, junctionY + 16.0f);
+            DrawLine(new Vector2(coupleX, junctionY), new Vector2(coupleX, branchY), lineColor, 2.0f);
+            DrawLine(new Vector2(coupleX, branchY), new Vector2(childTop.X, branchY), lineColor, 2.0f);
+            DrawLine(new Vector2(childTop.X, branchY), childTop, lineColor, 2.0f);
         }
 
         if (_cardRects.TryGetValue(_selectedId, out var selected))
-            DrawRect(selected.Grow(2.0f), Color.FromHtml("#FFF0A6"), false, 2.0f);
+            DrawRect(selected.Grow(3.0f), Color.FromHtml("#FFF0A6"), false, 2.0f);
     }
 
-    private void AddCard(VoidlingData member, Rect2 rect)
+    private float ParentAnchor(VoidlingData member)
+    {
+        var anchors = new List<float>();
+        if (!string.IsNullOrWhiteSpace(member.ParentAId) && _cardRects.TryGetValue(member.ParentAId, out var a))
+            anchors.Add(a.GetCenter().X);
+        if (!string.IsNullOrWhiteSpace(member.ParentBId) && _cardRects.TryGetValue(member.ParentBId, out var b))
+            anchors.Add(b.GetCenter().X);
+
+        return anchors.Count == 0 ? float.MaxValue : anchors.Average();
+    }
+
+    private void AddCard(VoidlingData member, Rect2 rect, bool departed)
     {
         var panel = UiFactory.CreatePanel(rect.Size);
         panel.Position = rect.Position;
         panel.Size = rect.Size;
-        panel.MouseFilter = MouseFilterEnum.Ignore;
+        panel.MouseFilter = MouseFilterEnum.Pass;
         AddChild(panel);
 
         var column = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
         column.AddThemeConstantOverride("separation", 0);
         panel.AddChild(column);
 
-        var portrait = UiFactory.CreatePortrait(member, new Vector2(34, 36));
+        var portrait = UiFactory.CreatePortrait(member, new Vector2(38, 38));
+        if (departed)
+            portrait.SelfModulate = new Color(0.55f, 0.55f, 0.55f, 0.72f);
         column.AddChild(portrait);
 
         var name = UiFactory.CreateLabel(member.Name, 8);
         name.HorizontalAlignment = HorizontalAlignment.Center;
-        name.CustomMinimumSize = new Vector2(70, 13);
+        name.CustomMinimumSize = new Vector2(82, 13);
         name.MouseFilter = MouseFilterEnum.Ignore;
         column.AddChild(name);
 
-        var marker = member.InbreedingHistoryFlag
+        var generationText = member.InbreedingHistoryFlag
             ? $"G{member.FamilyGeneration} • INBRED"
             : $"G{member.FamilyGeneration}";
-        var detail = UiFactory.CreateLabel(marker, 6);
+        if (departed)
+            generationText += " • LEFT";
+
+        var detail = UiFactory.CreateLabel(generationText, 6);
         detail.HorizontalAlignment = HorizontalAlignment.Center;
         detail.MouseFilter = MouseFilterEnum.Ignore;
         if (member.InbreedingHistoryFlag)
             detail.AddThemeColorOverride("font_color", Color.FromHtml("#A75D55"));
+        else if (departed)
+            detail.AddThemeColorOverride("font_color", Color.FromHtml("#7A7267"));
         column.AddChild(detail);
+
+        var parentSummary = ParentSummary(member);
+        if (parentSummary.Length > 0)
+        {
+            var parents = UiFactory.CreateLabel(parentSummary, 5);
+            parents.HorizontalAlignment = HorizontalAlignment.Center;
+            parents.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            parents.CustomMinimumSize = new Vector2(82, 15);
+            parents.MouseFilter = MouseFilterEnum.Ignore;
+            column.AddChild(parents);
+        }
+
+        var click = new Button
+        {
+            Flat = true,
+            Text = "",
+            Position = Vector2.Zero,
+            Size = rect.Size,
+            FocusMode = FocusModeEnum.None,
+            MouseFilter = MouseFilterEnum.Stop
+        };
+        click.Pressed += () =>
+        {
+            _selectedId = member.Id;
+            QueueRedraw();
+            MemberSelected?.Invoke(member.Id);
+        };
+        panel.AddChild(click);
+    }
+
+    private string ParentSummary(VoidlingData member)
+    {
+        if (string.IsNullOrWhiteSpace(member.ParentAId) && string.IsNullOrWhiteSpace(member.ParentBId))
+            return "";
+
+        var first = _membersById.TryGetValue(member.ParentAId, out var a) ? a.Name : "?";
+        var second = _membersById.TryGetValue(member.ParentBId, out var b) ? b.Name : "?";
+        return $"P: {first} + {second}";
     }
 
     private static HashSet<string> CollectConnectedFamily(
@@ -139,9 +256,9 @@ public partial class FamilyTreeView : Control
             if (!result.Add(id) || !byId.TryGetValue(id, out var current))
                 continue;
 
-            if (current.ParentAId.Length > 0 && byId.ContainsKey(current.ParentAId))
+            if (!string.IsNullOrWhiteSpace(current.ParentAId) && byId.ContainsKey(current.ParentAId))
                 queue.Enqueue(current.ParentAId);
-            if (current.ParentBId.Length > 0 && byId.ContainsKey(current.ParentBId))
+            if (!string.IsNullOrWhiteSpace(current.ParentBId) && byId.ContainsKey(current.ParentBId))
                 queue.Enqueue(current.ParentBId);
 
             foreach (var child in allVoidlings)
