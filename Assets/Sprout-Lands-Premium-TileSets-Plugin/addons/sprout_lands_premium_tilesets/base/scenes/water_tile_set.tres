@@ -1,0 +1,19 @@
+[gd_resource type="TileSet" load_steps=3 format=3 uid="uid://dp7w6nsvbk7cd"]
+
+[ext_resource type="Texture2D" uid="uid://slp11rqyxyqx" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/water frames/Water.png" id="1_3dx6s"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ipp0a"]
+texture = ExtResource("1_3dx6s")
+0:0/animation_columns = 4
+0:0/animation_speed = 2.0
+0:0/animation_mode = 1
+0:0/animation_frame_0/duration = 1.0
+0:0/animation_frame_1/duration = 1.0
+0:0/animation_frame_2/duration = 1.0
+0:0/animation_frame_3/duration = 1.0
+0:0/0 = 0
+0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+
+[resource]
+physics_layer_0/collision_layer = 1
+sources/0 = SubResource("TileSetAtlasSource_ipp0a")

@@ -1,0 +1,15 @@
+Installation instructions
+
+1.  Copy the `Objects` and `Tilesets` folders from your premium sprite pack folder into `addons/sprout_lands_premium_tilesets/assets/`.
+	1.  Select the option to overwrite or replace the existing placeholder files.
+2.  Move the `addons/sprout_lands_premium_tilesets` folder into your project's `addons/` folder.
+	1.  Add the `addons/` (case-sensitive) folder if it does not exist.
+3.  Open/Reload the project.  
+4.  Enable the plugin from the Project Settings > Plugins tab.  
+	If it's enabled for the first time,
+	1.  A dialogue window will appear asking to copy the example scenes out of `addons/`.
+	2.  The example test scene shows some tiles. It doesn't have any player controller.
+
+Check README.md for more instructions.
+
+Thanks for purchasing!
