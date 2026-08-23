@@ -31,7 +31,10 @@ if not exist "Voidling.csproj" (
 )
 
 echo [1/2] Restoring packages...
-"%DOTNET_EXE%" restore "Voidling.csproj" --configfile "%~dp0NuGet.Config"
+rem Use the local packages shipped with the installed Godot .NET build first,
+rem while retaining nuget.org as a fallback. NuGet.Config itself stays
+rem cross-platform so GitHub Actions/Linux can restore normally.
+"%DOTNET_EXE%" restore "Voidling.csproj" --source "%GODOT_NUGET_SOURCE%" --source "https://api.nuget.org/v3/index.json"
 if errorlevel 1 goto :failed
 
 echo.
