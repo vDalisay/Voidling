@@ -15,6 +15,9 @@ public static class GameRules
     public const double RareFounderTraitChance = 0.0005;
     public const double RareTraitTransmissionChance = 0.50;
     public const int RelatedAncestorDepth = 3;
+    public const int TrainingPointsPerLevel = 12;
+    public const int MaxStatLevel = 99;
+    public const string AngelMutationId = "Angel";
 
     public static readonly string[] StatIds = { "run", "swim", "fly", "power", "stamina" };
 
@@ -26,6 +29,17 @@ public static class GameRules
             ["fly"] = "Fly",
             ["power"] = "Power",
             ["stamina"] = "Stamina"
+        };
+
+    // Chao-inspired stat identity colors used consistently in the farm UI, DNA view and race HUD.
+    public static readonly IReadOnlyDictionary<string, Color> StatColors =
+        new Dictionary<string, Color>(StringComparer.Ordinal)
+        {
+            ["run"] = Color.FromHtml("#78C96A"),
+            ["swim"] = Color.FromHtml("#F2D45C"),
+            ["fly"] = Color.FromHtml("#B47AE5"),
+            ["power"] = Color.FromHtml("#E7655A"),
+            ["stamina"] = Color.FromHtml("#F7F3E7")
         };
 
     public static readonly string[] PaletteHex =
@@ -66,6 +80,16 @@ public static class GameRules
     public static int GetTrainingPoints(VoidlingData data, string statId)
         => data.TrainingPoints.TryGetValue(statId, out var points) ? points : 0;
 
+    public static int StatLevel(VoidlingData data, string statId)
+        => Math.Clamp(1 + GetTrainingPoints(data, statId) / TrainingPointsPerLevel, 1, MaxStatLevel);
+
+    public static float StatLevelProgress(VoidlingData data, string statId)
+    {
+        if (StatLevel(data, statId) >= MaxStatLevel)
+            return 1.0f;
+        return (GetTrainingPoints(data, statId) % TrainingPointsPerLevel) / (float)TrainingPointsPerLevel;
+    }
+
     public static GenePairData GetGene(VoidlingData data, string statId)
         => data.Genome.AbilityGenes.TryGetValue(statId, out var gene) ? gene : new GenePairData();
 
@@ -75,6 +99,12 @@ public static class GameRules
         var training = GetTrainingPoints(data, statId);
         return Math.Clamp(12.0f + grade * 13.0f + training * 0.55f, 0.0f, 100.0f);
     }
+
+    public static Color StatColor(string statId)
+        => StatColors.TryGetValue(statId, out var color) ? color : Colors.White;
+
+    public static bool HasMutation(VoidlingData data, string mutationId)
+        => data.RareTraits.Exists(t => string.Equals(t.TraitId, mutationId, StringComparison.OrdinalIgnoreCase));
 
     public static Color TintColor(string html)
         => string.IsNullOrWhiteSpace(html) ? Colors.White : Color.FromHtml(html);
