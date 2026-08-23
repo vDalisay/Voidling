@@ -63,6 +63,10 @@ public sealed class VoidlingData
     public bool InbreedingHistoryFlag { get; set; }
     public string TintHex { get; set; } = "#F6F0C9";
     public List<RareTraitData> RareTraits { get; set; } = new();
+
+    // Initial world position. Wandering does not continuously write to the save.
+    public float WorldX { get; set; }
+    public float WorldY { get; set; }
 }
 
 public sealed class EggData
@@ -83,11 +87,15 @@ public sealed class EggData
     public float RequiredIncubationSeconds { get; set; }
     public string TintHex { get; set; } = "#F6F0C9";
     public List<RareTraitData> RareTraits { get; set; } = new();
+
+    // Eggs are real garden entities, so their location is part of save data.
+    public float WorldX { get; set; }
+    public float WorldY { get; set; }
 }
 
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 1;
+    public int SaveVersion { get; set; } = 2;
     public int Coins { get; set; } = 120;
     public long SeedCounter { get; set; } = 1;
     public List<VoidlingData> Voidlings { get; set; } = new();
