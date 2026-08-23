@@ -1,4 +1,7 @@
 using Godot;
+using Voidling.Application.Breeding;
+using Voidling.Application.Training;
+using Voidling.Domain.Rules;
 using Voidling.Infrastructure.Audio;
 using Voidling.Infrastructure.Persistence;
 using VoidlingGame;
@@ -15,6 +18,7 @@ public partial class GameBootstrap : Node
 
     public override void _Ready()
     {
+        var rules = GameBalanceRules.DemoDefaults;
         var session = new GameSession
         {
             Name = nameof(GameSession)
@@ -22,7 +26,9 @@ public partial class GameBootstrap : Node
 
         session.Configure(
             new GodotJsonGameStateRepository(SavePath),
-            new GodotAudioSettingsAdapter());
+            new GodotAudioSettingsAdapter(),
+            new TrainingUseCase(rules),
+            new BreedVoidlingsUseCase(rules));
 
         AddChild(session);
     }
