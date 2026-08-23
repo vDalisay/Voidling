@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions EnableDelayedExpansion
+setlocal EnableExtensions
 
 cd /d "%~dp0"
 
@@ -31,7 +31,7 @@ if not defined GODOT_BIN (
 echo.
 echo ========================================
 echo   Voidling - Play
-necho ========================================
+echo ========================================
 echo Godot: %GODOT_BIN%
 echo.
 
