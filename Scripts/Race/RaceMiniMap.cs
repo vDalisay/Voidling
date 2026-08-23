@@ -49,7 +49,7 @@ public partial class RaceMiniMap : Control
         }
     }
 
-    private static void DrawPoint(RaceMiniMapPoint point, float left, float right, float centerY)
+    private void DrawPoint(RaceMiniMapPoint point, float left, float right, float centerY)
     {
         var x = Mathf.Lerp(left, right, Mathf.Clamp(point.Progress, 0.0f, 1.0f));
         DrawCircle(new Vector2(x, centerY), 3.5f, point.Color);
