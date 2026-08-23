@@ -38,14 +38,7 @@ public static class UiFactory
             FocusMode = Control.FocusModeEnum.None
         };
 
-        button.AddThemeStyleboxOverride("normal", CreateButtonStyle(new Rect2(0, 0, 16, 16)));
-        button.AddThemeStyleboxOverride("hover", CreateButtonStyle(new Rect2(16, 0, 16, 16)));
-        button.AddThemeStyleboxOverride("pressed", CreateButtonStyle(new Rect2(0, 16, 16, 16)));
-        button.AddThemeStyleboxOverride("disabled", CreateButtonStyle(new Rect2(16, 16, 16, 16)));
-        button.AddThemeColorOverride("font_color", Color.FromHtml("#4F5948"));
-        button.AddThemeColorOverride("font_hover_color", Color.FromHtml("#35443B"));
-        button.AddThemeColorOverride("font_pressed_color", Color.FromHtml("#35443B"));
-        button.AddThemeColorOverride("font_disabled_color", Color.FromHtml("#8A927B"));
+        ApplyButtonChrome(button);
         ApplyPixelFont(button, 10);
 
         if (useEyeIcon)
@@ -62,6 +55,26 @@ public static class UiFactory
         }
 
         return button;
+    }
+
+    // The source sheet is 32x128: each color row has an unpressed tile on the left
+    // and a pressed tile on the right. The old implementation accidentally treated
+    // the next color row as the pressed state. Hover is derived by tinting the normal
+    // tile, so every button now has a visibly distinct normal/hover/pressed state.
+    public static void ApplyButtonChrome(Button button)
+    {
+        button.AddThemeStyleboxOverride("normal", CreateButtonStyle(new Rect2(0, 0, 16, 16), Colors.White));
+        button.AddThemeStyleboxOverride("hover", CreateButtonStyle(new Rect2(0, 0, 16, 16), Color.FromHtml("#FFF6C9")));
+        button.AddThemeStyleboxOverride("pressed", CreateButtonStyle(new Rect2(16, 0, 16, 16), Colors.White));
+        button.AddThemeStyleboxOverride("hover_pressed", CreateButtonStyle(new Rect2(16, 0, 16, 16), Color.FromHtml("#FFF2B4")));
+        button.AddThemeStyleboxOverride("disabled", CreateButtonStyle(new Rect2(0, 0, 16, 16), new Color(0.72f, 0.74f, 0.68f, 0.78f)));
+        button.AddThemeStyleboxOverride("focus", CreateButtonStyle(new Rect2(0, 0, 16, 16), Color.FromHtml("#FFF6C9")));
+
+        button.AddThemeColorOverride("font_color", Color.FromHtml("#4F5948"));
+        button.AddThemeColorOverride("font_hover_color", Color.FromHtml("#2F4437"));
+        button.AddThemeColorOverride("font_pressed_color", Color.FromHtml("#2F4437"));
+        button.AddThemeColorOverride("font_hover_pressed_color", Color.FromHtml("#2F4437"));
+        button.AddThemeColorOverride("font_disabled_color", Color.FromHtml("#8A927B"));
     }
 
     public static Label CreateLabel(string text, int size = 10)
@@ -87,15 +100,35 @@ public static class UiFactory
             Region = new Rect2(0, 0, 48, 48)
         };
 
-        return new TextureRect
+        var portrait = new TextureRect
         {
             Texture = atlas,
-            Modulate = GameRules.TintColor(data.TintHex),
             CustomMinimumSize = minimumSize,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
+        SetPortraitData(portrait, data);
+        return portrait;
+    }
+
+    public static void SetPortraitData(TextureRect portrait, VoidlingData data)
+    {
+        portrait.SelfModulate = GameRules.TintColor(data.TintHex);
+        var oldHalo = portrait.GetNodeOrNull<Control>("__mutation_halo");
+        oldHalo?.QueueFree();
+
+        if (!GameRules.HasMutation(data, GameRules.AngelMutationId))
+            return;
+
+        var halo = new HaloBadge
+        {
+            Name = "__mutation_halo",
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            ZIndex = 5
+        };
+        halo.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        portrait.AddChild(halo);
     }
 
     public static AtlasTexture CreateIcon(int index)
@@ -142,18 +175,22 @@ public static class UiFactory
         return style;
     }
 
-    private static StyleBoxTexture CreateButtonStyle(Rect2 region)
+    private static StyleBoxTexture CreateButtonStyle(Rect2 region, Color modulate)
     {
         var atlas = new AtlasTexture { Atlas = ButtonTexture, Region = region };
-        var style = new StyleBoxTexture { Texture = atlas };
+        var style = new StyleBoxTexture
+        {
+            Texture = atlas,
+            ModulateColor = modulate
+        };
         style.TextureMarginLeft = 4;
         style.TextureMarginRight = 4;
         style.TextureMarginTop = 4;
         style.TextureMarginBottom = 4;
-        style.ContentMarginLeft = 8;
-        style.ContentMarginRight = 8;
-        style.ContentMarginTop = 4;
-        style.ContentMarginBottom = 4;
+        style.ContentMarginLeft = 7;
+        style.ContentMarginRight = 7;
+        style.ContentMarginTop = 3;
+        style.ContentMarginBottom = 3;
         return style;
     }
 }
