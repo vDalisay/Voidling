@@ -9,6 +9,8 @@ public partial class GardenController : Node2D
 {
     public event Action<string>? VoidlingSelected;
 
+    private const float HoldToPickUpSeconds = 0.16f;
+
     private static readonly Texture2D EggTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
 
@@ -20,8 +22,13 @@ public partial class GardenController : Node2D
     private Node2D _eggsRoot = null!;
     private Camera2D _camera = null!;
     private string _selectedId = "";
+    private string _followId = "";
+    private string _pendingGrabId = "";
+    private string _draggedId = "";
+    private float _pendingGrabSeconds;
     private int _spawnIndex;
     private bool _cameraDragging;
+    private bool _inputEnabled = true;
 
     public override void _Ready()
     {
@@ -39,13 +46,58 @@ public partial class GardenController : Node2D
             GameSession.Instance.StateChanged -= Refresh;
     }
 
+    public override void _Process(double delta)
+    {
+        if (!_inputEnabled)
+            return;
+
+        if (_followId.Length > 0 && _actors.TryGetValue(_followId, out var followed) && !_cameraDragging)
+            _camera.Position = followed.Position;
+
+        if (_draggedId.Length > 0)
+        {
+            if (_actors.TryGetValue(_draggedId, out var dragged))
+                dragged.Position = ClampToGarden(_actorsRoot.ToLocal(GetGlobalMousePosition()));
+            return;
+        }
+
+        if (_pendingGrabId.Length == 0)
+            return;
+
+        if (!Input.IsMouseButtonPressed(MouseButton.Left))
+        {
+            ClearPendingGrab();
+            return;
+        }
+
+        _pendingGrabSeconds += (float)delta;
+        if (_pendingGrabSeconds >= HoldToPickUpSeconds)
+            StartGrab();
+    }
+
     public override void _UnhandledInput(InputEvent inputEvent)
     {
+        if (!_inputEnabled)
+            return;
+
         if (inputEvent is InputEventMouseButton mouse)
         {
+            if (mouse.ButtonIndex == MouseButton.Left && !mouse.Pressed)
+            {
+                if (_draggedId.Length > 0)
+                    DropGrabbedVoidling();
+                else
+                    ClearPendingGrab();
+
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
             if (mouse.ButtonIndex == MouseButton.Middle)
             {
                 _cameraDragging = mouse.Pressed;
+                if (mouse.Pressed)
+                    StopFollowing();
                 GetViewport().SetInputAsHandled();
                 return;
             }
@@ -55,17 +107,29 @@ public partial class GardenController : Node2D
                 var factor = mouse.ButtonIndex == MouseButton.WheelUp ? 1.12f : 1.0f / 1.12f;
                 var next = Mathf.Clamp(_camera.Zoom.X * factor, 0.70f, 2.35f);
                 _camera.Zoom = new Vector2(next, next);
-                ClampCamera();
+                if (_followId.Length == 0)
+                    ClampCamera();
                 GetViewport().SetInputAsHandled();
                 return;
             }
         }
 
-        if (inputEvent is InputEventMouseMotion motion && _cameraDragging)
+        if (inputEvent is InputEventMouseMotion motion)
         {
-            _camera.Position -= motion.Relative / _camera.Zoom.X;
-            ClampCamera();
-            GetViewport().SetInputAsHandled();
+            if (_draggedId.Length > 0)
+            {
+                if (_actors.TryGetValue(_draggedId, out var dragged))
+                    dragged.Position = ClampToGarden(_actorsRoot.ToLocal(GetGlobalMousePosition()));
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            if (_cameraDragging)
+            {
+                _camera.Position -= motion.Relative / _camera.Zoom.X;
+                ClampCamera();
+                GetViewport().SetInputAsHandled();
+            }
         }
     }
 
@@ -80,8 +144,43 @@ public partial class GardenController : Node2D
 
     public void ResetCamera()
     {
+        StopFollowing();
         _camera.Position = new Vector2(416, 240);
         _camera.Zoom = Vector2.One;
+    }
+
+    public void ToggleFollowVoidling(string creatureId)
+    {
+        if (_followId == creatureId)
+        {
+            StopFollowing();
+            return;
+        }
+
+        if (!_actors.TryGetValue(creatureId, out var actor))
+            return;
+
+        _followId = creatureId;
+        _camera.Position = actor.Position;
+    }
+
+    public void StopFollowing() => _followId = "";
+
+    public bool IsFollowing(string creatureId) => _followId == creatureId;
+
+    public void SetGameplayActive(bool active)
+    {
+        _inputEnabled = active;
+        _cameraDragging = false;
+        ClearPendingGrab();
+
+        if (_draggedId.Length > 0)
+            DropGrabbedVoidling();
+
+        if (!active)
+            StopFollowing();
+
+        _camera.Enabled = active;
     }
 
     public Vector2 GetActorWorldPosition(string creatureId)
@@ -148,6 +247,13 @@ public partial class GardenController : Node2D
         {
             _actors[staleId].QueueFree();
             _actors.Remove(staleId);
+
+            if (_followId == staleId)
+                StopFollowing();
+            if (_pendingGrabId == staleId)
+                ClearPendingGrab();
+            if (_draggedId == staleId)
+                _draggedId = "";
         }
 
         foreach (var data in GameSession.Instance.State.Voidlings)
@@ -161,7 +267,7 @@ public partial class GardenController : Node2D
 
             var actor = new VoidlingActor();
             actor.Setup(data, _wanderBounds, start);
-            actor.Clicked += OnActorClicked;
+            actor.Clicked += OnActorPressed;
             _actorsRoot.AddChild(actor);
             _actors[data.Id] = actor;
         }
@@ -201,6 +307,52 @@ public partial class GardenController : Node2D
         }
     }
 
+    private void OnActorPressed(string creatureId)
+    {
+        Select(creatureId);
+        VoidlingSelected?.Invoke(creatureId);
+
+        _pendingGrabId = creatureId;
+        _pendingGrabSeconds = 0.0f;
+    }
+
+    private void StartGrab()
+    {
+        var creatureId = _pendingGrabId;
+        ClearPendingGrab();
+
+        if (creatureId.Length == 0 || !_actors.TryGetValue(creatureId, out var actor))
+            return;
+
+        _draggedId = creatureId;
+        actor.SetPickedUp(true);
+        actor.Position = ClampToGarden(_actorsRoot.ToLocal(GetGlobalMousePosition()));
+    }
+
+    private void DropGrabbedVoidling()
+    {
+        var creatureId = _draggedId;
+        _draggedId = "";
+
+        if (creatureId.Length == 0 || !_actors.TryGetValue(creatureId, out var actor))
+            return;
+
+        actor.Position = ClampToGarden(actor.Position);
+        actor.SetPickedUp(false);
+        GameSession.Instance.MoveVoidling(creatureId, actor.Position);
+    }
+
+    private void ClearPendingGrab()
+    {
+        _pendingGrabId = "";
+        _pendingGrabSeconds = 0.0f;
+    }
+
+    private Vector2 ClampToGarden(Vector2 position)
+        => new(
+            Mathf.Clamp(position.X, _wanderBounds.Position.X, _wanderBounds.End.X),
+            Mathf.Clamp(position.Y, _wanderBounds.Position.Y, _wanderBounds.End.Y));
+
     private Vector2 NextSpawnPosition()
     {
         var preset = new[]
@@ -220,11 +372,5 @@ public partial class GardenController : Node2D
         _camera.Position = new Vector2(
             Mathf.Clamp(_camera.Position.X, 260.0f, 570.0f),
             Mathf.Clamp(_camera.Position.Y, 150.0f, 330.0f));
-    }
-
-    private void OnActorClicked(string creatureId)
-    {
-        Select(creatureId);
-        VoidlingSelected?.Invoke(creatureId);
     }
 }
