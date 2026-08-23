@@ -28,10 +28,23 @@ public partial class MainController : Node
 
         var heading = new HBoxContainer();
         heading.AddThemeConstantOverride("separation", 4);
-        var title = UiFactory.CreateTitle(data.Name);
-        title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        title.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-        heading.AddChild(title);
+
+        var nameButton = new Button
+        {
+            Text = data.Name,
+            Flat = true,
+            FocusMode = Control.FocusModeEnum.None,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
+            TooltipText = "Click to rename"
+        };
+        UiFactory.ApplyPixelFont(nameButton, 14);
+        nameButton.AddThemeColorOverride("font_color", Color.FromHtml("#3B5044"));
+        nameButton.AddThemeColorOverride("font_hover_color", Color.FromHtml("#263B31"));
+        nameButton.AddThemeColorOverride("font_pressed_color", Color.FromHtml("#263B31"));
+        heading.AddChild(nameButton);
+
+        nameButton.Pressed += () => BeginInlineRename(heading, nameButton, data);
 
         var follow = UiFactory.CreateButton("◉");
         follow.CustomMinimumSize = new Vector2(28, 23);
@@ -88,6 +101,45 @@ public partial class MainController : Node
         goodbye.Pressed += () => ShowGoodbyeFirst(data.Id);
         actions.AddChild(goodbye);
         box.AddChild(actions);
+    }
+
+    private void BeginInlineRename(HBoxContainer heading, Button nameButton, VoidlingData data)
+    {
+        if (!GodotObject.IsInstanceValid(nameButton) || !nameButton.Visible)
+            return;
+
+        nameButton.Visible = false;
+        var edit = new LineEdit
+        {
+            Text = data.Name,
+            MaxLength = 18,
+            CustomMinimumSize = new Vector2(118, 23),
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SelectAllOnFocus = true
+        };
+        UiFactory.ApplyPixelFont(edit, 10);
+        heading.AddChild(edit);
+        heading.MoveChild(edit, 0);
+
+        var committed = false;
+        void CommitRename()
+        {
+            if (committed || !GodotObject.IsInstanceValid(edit))
+                return;
+            committed = true;
+
+            if (!GameSession.Instance.RenameVoidling(data.Id, edit.Text))
+            {
+                edit.QueueFree();
+                if (GodotObject.IsInstanceValid(nameButton))
+                    nameButton.Visible = true;
+            }
+        }
+
+        edit.TextSubmitted += _ => CommitRename();
+        edit.FocusExited += CommitRename;
+        edit.GrabFocus();
+        edit.SelectAll();
     }
 
     private Control CreateProfileStatBlock(VoidlingData data, string statId)
