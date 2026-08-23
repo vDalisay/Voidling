@@ -106,4 +106,5 @@ public sealed class GameStateData
     // Demo settings are kept in the same small save so playgame.bat launches retain them.
     public float MasterVolume { get; set; } = 1.0f;
     public bool AutoFinishRaces { get; set; } = true;
+    public bool EdgePanning { get; set; } = true;
 }
