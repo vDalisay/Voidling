@@ -26,6 +26,7 @@ Double-click:
 
 - `build.bat` — restores NuGet packages and builds the Debug C# project.
 - `playgame.bat` — builds the project, locates Godot 4.6 .NET, and launches the game directly.
+- `openeditor.bat` — locates Godot and the .NET SDK, then opens this project in the editor.
 
 For a faster launch when the C# code has already been built:
 
@@ -33,10 +34,18 @@ For a faster launch when the C# code has already been built:
 playgame.bat --no-build
 ```
 
-`playgame.bat` checks `GODOT_EXE`, your PATH, and several common Godot install folders. If Godot is installed somewhere else, set it once with:
+All three launchers use `godot-env.bat`. It automatically supports both repository machines by checking:
+
+- `%USERPROFILE%\Documents\Godot`;
+- the extracted Godot folder under `%USERPROFILE%\Downloads`;
+- a user-local .NET installation beside Godot or under `%USERPROFILE%\.dotnet`;
+- a system .NET SDK available on `PATH`.
+
+If either tool is installed somewhere else, set an override once with:
 
 ```bat
 setx GODOT_EXE "C:\path\to\Godot_v4.6.1-stable_mono_win64.exe"
+setx DOTNET_ROOT "C:\path\to\dotnet"
 ```
 
 Open a new terminal after `setx`.

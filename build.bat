@@ -3,26 +3,25 @@ setlocal EnableExtensions
 
 cd /d "%~dp0"
 
-set "GODOT_EXE=C:\Users\Home\Downloads\Godot_v4.6.1-stable_mono_win64\Godot_v4.6.1-stable_mono_win64.exe"
-if not exist "%GODOT_EXE%" (
-    echo [ERROR] Godot was not found at:
-    echo         %GODOT_EXE%
+call "%~dp0godot-env.bat"
+if errorlevel 1 (
     pause
     exit /b 1
 )
+
+set "DOTNET_CLI_HOME=%~dp0"
+set "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1"
+set "DOTNET_CLI_TELEMETRY_OPTOUT=1"
+set "APPDATA=%~dp0.appdata"
+set "NUGET_PACKAGES=%~dp0.nuget\packages"
+set "NUGET_HTTP_CACHE_PATH=%~dp0.nuget\http-cache"
 
 echo ========================================
 echo   Voidling - Build
 echo ========================================
+echo Godot: %GODOT_EXE%
+echo .NET:  %DOTNET_EXE%
 echo.
-
-where dotnet >nul 2>nul
-if errorlevel 1 (
-    echo [ERROR] .NET SDK was not found on PATH.
-    echo Install the .NET 8 SDK, then try again.
-    pause
-    exit /b 1
-)
 
 if not exist "Voidling.csproj" (
     echo [ERROR] Voidling.csproj was not found in:
@@ -32,12 +31,12 @@ if not exist "Voidling.csproj" (
 )
 
 echo [1/2] Restoring packages...
-dotnet restore "Voidling.csproj"
+"%DOTNET_EXE%" restore "Voidling.csproj" --configfile "%~dp0NuGet.Config"
 if errorlevel 1 goto :failed
 
 echo.
 echo [2/2] Building Debug configuration...
-dotnet build "Voidling.csproj" --configuration Debug --no-restore
+"%DOTNET_EXE%" build "Voidling.csproj" --configuration Debug --no-restore
 if errorlevel 1 goto :failed
 
 echo.

@@ -3,7 +3,11 @@ setlocal EnableExtensions
 
 cd /d "%~dp0"
 
-set "GODOT_BIN=C:\Users\Home\Downloads\Godot_v4.6.1-stable_mono_win64\Godot_v4.6.1-stable_mono_win64.exe"
+call "%~dp0godot-env.bat"
+if errorlevel 1 (
+    pause
+    exit /b 1
+)
 
 set "SKIP_BUILD=0"
 if /I "%~1"=="--no-build" set "SKIP_BUILD=1"
@@ -14,26 +18,15 @@ if "%SKIP_BUILD%"=="0" (
     if errorlevel 1 exit /b 1
 )
 
-if not exist "%GODOT_BIN%" (
-    echo.
-    echo ========================================
-    echo   GODOT .NET NOT FOUND
-    echo ========================================
-    echo.
-    echo Godot was not found at:
-    echo   %GODOT_BIN%
-    pause
-    exit /b 1
-)
-
 echo.
 echo ========================================
 echo   Voidling - Play
 echo ========================================
-echo Godot: %GODOT_BIN%
+echo Godot: %GODOT_EXE%
+echo .NET:  %DOTNET_EXE%
 echo.
 
-"%GODOT_BIN%" --path "%CD%"
+"%GODOT_EXE%" --path "%CD%"
 set "GAME_EXIT=%ERRORLEVEL%"
 
 if not "%GAME_EXIT%"=="0" (
