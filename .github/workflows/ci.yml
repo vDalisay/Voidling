@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/demo-mvp
+      - architecture/futureproof-foundation
   pull_request:
 
 jobs:
@@ -26,11 +27,25 @@ jobs:
           version: 4.6.0
           use-dotnet: true
 
-      - name: Restore
-        run: dotnet restore
+      - name: Restore game
+        run: dotnet restore Voidling.csproj
+
+      - name: Restore tests
+        run: dotnet restore Tests/Voidling.Tests.csproj
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build Voidling.csproj --configuration Release --no-restore
+
+      - name: Enforce pure Domain boundary
+        shell: bash
+        run: |
+          if grep -R -n -E 'using[[:space:]]+Godot|Godot\.' Scripts/Domain --include='*.cs'; then
+            echo 'Scripts/Domain must remain free of Godot dependencies.'
+            exit 1
+          fi
+
+      - name: Domain and application tests
+        run: dotnet test Tests/Voidling.Tests.csproj --configuration Release --no-restore
 
       - name: Parse project and scenes
         run: godot --headless --path . --editor --quit-after 12
