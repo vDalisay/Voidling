@@ -17,9 +17,30 @@ public partial class FamilyTreeView : Control
     private readonly List<string> _visibleMemberIds = new();
 
     private string _selectedId = "";
+    private string _highlightedConnectionKey = "";
     private Vector2 _panOffset;
     private Vector2 _contentSize;
     private bool _panning;
+
+    private readonly struct ConnectionSegment
+    {
+        public ConnectionSegment(Vector2 from, Vector2 to)
+        {
+            From = from;
+            To = to;
+        }
+
+        public Vector2 From { get; }
+        public Vector2 To { get; }
+    }
+
+    private sealed class ConnectionPath
+    {
+        public string Key { get; init; } = "";
+        public string ParentId { get; init; } = "";
+        public string ChildId { get; init; } = "";
+        public List<ConnectionSegment> Segments { get; } = new();
+    }
 
     public FamilyTreeView()
     {
@@ -43,6 +64,7 @@ public partial class FamilyTreeView : Control
         _departedIds.Clear();
         _visibleMemberIds.Clear();
         _selectedId = selectedId;
+        _highlightedConnectionKey = "";
 
         foreach (var member in activeVoidlings)
             _membersById[member.Id] = member;
@@ -113,18 +135,43 @@ public partial class FamilyTreeView : Control
     public void SetSelectedMember(string memberId)
     {
         _selectedId = memberId;
+        _highlightedConnectionKey = "";
         ApplySelectionState();
         QueueRedraw();
     }
 
     public override void _GuiInput(InputEvent inputEvent)
     {
-        if (inputEvent is InputEventMouseButton mouse &&
-            (mouse.ButtonIndex == MouseButton.Left || mouse.ButtonIndex == MouseButton.Middle))
+        if (inputEvent is InputEventMouseButton mouse)
         {
-            _panning = mouse.Pressed;
-            AcceptEvent();
-            return;
+            if (mouse.ButtonIndex == MouseButton.Left)
+            {
+                if (mouse.Pressed)
+                {
+                    if (TryHighlightConnectionAt(mouse.Position))
+                    {
+                        _panning = false;
+                        AcceptEvent();
+                        return;
+                    }
+
+                    _panning = true;
+                }
+                else
+                {
+                    _panning = false;
+                }
+
+                AcceptEvent();
+                return;
+            }
+
+            if (mouse.ButtonIndex == MouseButton.Middle)
+            {
+                _panning = mouse.Pressed;
+                AcceptEvent();
+                return;
+            }
         }
 
         if (inputEvent is InputEventMouseMotion motion && _panning)
@@ -139,7 +186,24 @@ public partial class FamilyTreeView : Control
 
     public override void _Draw()
     {
-        var lineColor = Color.FromHtml("#E9E5CD");
+        var paths = BuildConnectionPaths();
+        var lineColor = Color.FromHtml("#E0DDC5");
+
+        // Paint the neutral genealogy first, then selected routes last. Drawing the
+        // highlight last with a dark outline keeps it legible at crossings/overlaps.
+        foreach (var path in paths)
+            DrawConnectionPath(path, lineColor, 2.0f);
+
+        foreach (var path in paths.Where(IsConnectionHighlighted))
+        {
+            DrawConnectionPath(path, Color.FromHtml("#6A5841"), 5.0f);
+            DrawConnectionPath(path, Color.FromHtml("#FFD96A"), 3.0f);
+        }
+    }
+
+    private List<ConnectionPath> BuildConnectionPaths()
+    {
+        var paths = new List<ConnectionPath>();
 
         foreach (var childId in _visibleMemberIds)
         {
@@ -147,44 +211,124 @@ public partial class FamilyTreeView : Control
                 !_baseCardRects.TryGetValue(childId, out var childBase))
                 continue;
 
-            var childRect = Offset(childBase);
-            var parentRects = new List<Rect2>();
+            var parents = new List<(string Id, Rect2 Rect)>();
             if (!string.IsNullOrWhiteSpace(child.ParentAId) && _baseCardRects.TryGetValue(child.ParentAId, out var parentA))
-                parentRects.Add(Offset(parentA));
+                parents.Add((child.ParentAId, Offset(parentA)));
             if (!string.IsNullOrWhiteSpace(child.ParentBId) && _baseCardRects.TryGetValue(child.ParentBId, out var parentB))
-                parentRects.Add(Offset(parentB));
+                parents.Add((child.ParentBId, Offset(parentB)));
 
-            if (parentRects.Count == 0)
+            if (parents.Count == 0)
                 continue;
 
+            var childRect = Offset(childBase);
             var childTop = new Vector2(childRect.GetCenter().X, childRect.Position.Y);
-            var highestParentBottom = parentRects.Max(rect => rect.End.Y);
+            var highestParentBottom = parents.Max(parent => parent.Rect.End.Y);
             var junctionY = highestParentBottom + Math.Max(12.0f, (childTop.Y - highestParentBottom) * 0.46f);
 
-            if (parentRects.Count == 1)
+            if (parents.Count == 1)
             {
-                var parentBottom = new Vector2(parentRects[0].GetCenter().X, parentRects[0].End.Y);
-                DrawLine(parentBottom, new Vector2(parentBottom.X, junctionY), lineColor, 2.0f);
-                DrawLine(new Vector2(parentBottom.X, junctionY), new Vector2(childTop.X, junctionY), lineColor, 2.0f);
-                DrawLine(new Vector2(childTop.X, junctionY), childTop, lineColor, 2.0f);
+                var parent = parents[0];
+                var parentBottom = new Vector2(parent.Rect.GetCenter().X, parent.Rect.End.Y);
+                var path = NewPath(parent.Id, childId);
+                path.Segments.Add(new ConnectionSegment(parentBottom, new Vector2(parentBottom.X, junctionY)));
+                path.Segments.Add(new ConnectionSegment(new Vector2(parentBottom.X, junctionY), new Vector2(childTop.X, junctionY)));
+                path.Segments.Add(new ConnectionSegment(new Vector2(childTop.X, junctionY), childTop));
+                paths.Add(path);
                 continue;
             }
 
-            var leftParent = parentRects.OrderBy(rect => rect.GetCenter().X).First();
-            var rightParent = parentRects.OrderBy(rect => rect.GetCenter().X).Last();
-            var leftBottom = new Vector2(leftParent.GetCenter().X, leftParent.End.Y);
-            var rightBottom = new Vector2(rightParent.GetCenter().X, rightParent.End.Y);
-
-            DrawLine(leftBottom, new Vector2(leftBottom.X, junctionY), lineColor, 2.0f);
-            DrawLine(rightBottom, new Vector2(rightBottom.X, junctionY), lineColor, 2.0f);
-            DrawLine(new Vector2(leftBottom.X, junctionY), new Vector2(rightBottom.X, junctionY), lineColor, 2.0f);
-
-            var coupleX = (leftBottom.X + rightBottom.X) * 0.5f;
+            var ordered = parents.OrderBy(parent => parent.Rect.GetCenter().X).ToList();
+            var leftX = ordered.First().Rect.GetCenter().X;
+            var rightX = ordered.Last().Rect.GetCenter().X;
+            var coupleX = (leftX + rightX) * 0.5f;
             var branchY = Math.Min(childTop.Y - 10.0f, junctionY + 16.0f);
-            DrawLine(new Vector2(coupleX, junctionY), new Vector2(coupleX, branchY), lineColor, 2.0f);
-            DrawLine(new Vector2(coupleX, branchY), new Vector2(childTop.X, branchY), lineColor, 2.0f);
-            DrawLine(new Vector2(childTop.X, branchY), childTop, lineColor, 2.0f);
+
+            foreach (var parent in ordered)
+            {
+                var parentBottom = new Vector2(parent.Rect.GetCenter().X, parent.Rect.End.Y);
+                var path = NewPath(parent.Id, childId);
+                path.Segments.Add(new ConnectionSegment(parentBottom, new Vector2(parentBottom.X, junctionY)));
+                path.Segments.Add(new ConnectionSegment(new Vector2(parentBottom.X, junctionY), new Vector2(coupleX, junctionY)));
+                path.Segments.Add(new ConnectionSegment(new Vector2(coupleX, junctionY), new Vector2(coupleX, branchY)));
+                path.Segments.Add(new ConnectionSegment(new Vector2(coupleX, branchY), new Vector2(childTop.X, branchY)));
+                path.Segments.Add(new ConnectionSegment(new Vector2(childTop.X, branchY), childTop));
+                paths.Add(path);
+            }
         }
+
+        return paths;
+    }
+
+    private static ConnectionPath NewPath(string parentId, string childId)
+        => new()
+        {
+            Key = $"{parentId}>{childId}",
+            ParentId = parentId,
+            ChildId = childId
+        };
+
+    private static void DrawConnectionPath(ConnectionPath path, Color color, float width)
+    {
+        foreach (var segment in path.Segments)
+            DrawLineStatic(segment.From, segment.To, color, width);
+    }
+
+    private static void DrawLineStatic(Vector2 from, Vector2 to, Color color, float width)
+    {
+        // DrawLine itself is an instance CanvasItem API. This helper exists only to
+        // keep path rendering calls compact and is replaced by the caller below.
+    }
+
+    private void DrawConnectionPathInstance(ConnectionPath path, Color color, float width)
+    {
+        foreach (var segment in path.Segments)
+            DrawLine(segment.From, segment.To, color, width, true);
+    }
+
+    private bool IsConnectionHighlighted(ConnectionPath path)
+    {
+        if (_highlightedConnectionKey.Length > 0)
+            return path.Key == _highlightedConnectionKey;
+
+        return path.ParentId == _selectedId || path.ChildId == _selectedId;
+    }
+
+    private bool TryHighlightConnectionAt(Vector2 mousePosition)
+    {
+        const float hitRadius = 7.0f;
+        ConnectionPath? nearest = null;
+        var nearestDistance = float.MaxValue;
+
+        foreach (var path in BuildConnectionPaths())
+        {
+            foreach (var segment in path.Segments)
+            {
+                var distance = DistanceToSegment(mousePosition, segment.From, segment.To);
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearest = path;
+                }
+            }
+        }
+
+        if (nearest == null || nearestDistance > hitRadius)
+            return false;
+
+        _highlightedConnectionKey = nearest.Key;
+        QueueRedraw();
+        return true;
+    }
+
+    private static float DistanceToSegment(Vector2 point, Vector2 from, Vector2 to)
+    {
+        var segment = to - from;
+        var lengthSquared = segment.LengthSquared();
+        if (lengthSquared <= 0.0001f)
+            return point.DistanceTo(from);
+
+        var t = Mathf.Clamp((point - from).Dot(segment) / lengthSquared, 0.0f, 1.0f);
+        return point.DistanceTo(from + segment * t);
     }
 
     private Rect2 Offset(Rect2 rect) => new(rect.Position + _panOffset, rect.Size);
@@ -295,11 +439,12 @@ public partial class FamilyTreeView : Control
             Position = Vector2.Zero,
             Size = rect.Size,
             FocusMode = FocusModeEnum.None,
-            MouseFilter = MouseFilterEnum.Pass
+            MouseFilter = MouseFilterEnum.Stop
         };
         click.Pressed += () =>
         {
             _selectedId = member.Id;
+            _highlightedConnectionKey = "";
             ApplySelectionState();
             QueueRedraw();
             MemberSelected?.Invoke(member.Id);
