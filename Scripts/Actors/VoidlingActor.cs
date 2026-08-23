@@ -29,7 +29,7 @@ public partial class VoidlingActor : Node2D
         _walkSpeed = data.Stage == LifeStage.Adult ? 20.0f : 17.0f;
         _rare = data.RareTraits.Count > 0;
 
-        _rng.Seed = (ulong)Math.Abs(data.Id.GetHashCode()) + 17UL;
+        _rng.Seed = unchecked((uint)data.Id.GetHashCode()) + 17UL;
 
         _sprite = new AnimatedSprite2D
         {
