@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using Godot;
 
 namespace VoidlingGame;
@@ -57,10 +59,6 @@ public static class UiFactory
         return button;
     }
 
-    // The source sheet is 32x128: each color row has an unpressed tile on the left
-    // and a pressed tile on the right. The old implementation accidentally treated
-    // the next color row as the pressed state. Hover is derived by tinting the normal
-    // tile, so every button now has a visibly distinct normal/hover/pressed state.
     public static void ApplyButtonChrome(Button button)
     {
         button.AddThemeStyleboxOverride("normal", CreateButtonStyle(new Rect2(0, 0, 16, 16), Colors.White));
@@ -115,20 +113,36 @@ public static class UiFactory
     public static void SetPortraitData(TextureRect portrait, VoidlingData data)
     {
         portrait.SelfModulate = GameRules.TintColor(data.TintHex);
-        var oldHalo = portrait.GetNodeOrNull<Control>("__mutation_halo");
-        oldHalo?.QueueFree();
 
-        if (!GameRules.HasMutation(data, GameRules.AngelMutationId))
+        // Reused preview portraits must remove the previous creature's mutation layer
+        // immediately. QueueFree left the old halo visible for another frame and made
+        // non-Angel racers appear to inherit the selected racer's halo.
+        var oldBadge = portrait.GetNodeOrNull<Control>("__mutation_badge");
+        if (oldBadge != null && GodotObject.IsInstanceValid(oldBadge))
+            oldBadge.Free();
+
+        // Clean up legacy badge nodes from older UI code as well.
+        var oldHalo = portrait.GetNodeOrNull<Control>("__mutation_halo");
+        if (oldHalo != null && GodotObject.IsInstanceValid(oldHalo))
+            oldHalo.Free();
+
+        if (data.RareTraits == null || data.RareTraits.Count == 0)
             return;
 
-        var halo = new HaloBadge
+        var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
+        var otherTraits = data.RareTraits.Count(t =>
+            !string.Equals(t.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase));
+
+        var badge = new HaloBadge
         {
-            Name = "__mutation_halo",
+            Name = "__mutation_badge",
             MouseFilter = Control.MouseFilterEnum.Ignore,
-            ZIndex = 5
+            ZIndex = 5,
+            ShowAngel = hasAngel,
+            SparkleCount = otherTraits
         };
-        halo.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        portrait.AddChild(halo);
+        badge.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        portrait.AddChild(badge);
     }
 
     public static AtlasTexture CreateIcon(int index)
