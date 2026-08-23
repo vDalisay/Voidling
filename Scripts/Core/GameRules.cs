@@ -13,7 +13,7 @@ public static class GameRules
     public const float BreedCooldownSeconds = 8.0f;
     public const double HigherAlleleExpressionChance = 0.70;
     public const double RareFounderTraitChance = 0.0005;
-    public const double RareTraitTransmissionChance = 0.50;
+    public const double RareTraitTransmissionChance = 0.10;
     public const int RelatedAncestorDepth = 3;
     public const int TrainingPointsPerLevel = 12;
     public const int MaxStatLevel = 99;
