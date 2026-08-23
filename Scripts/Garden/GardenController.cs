@@ -31,6 +31,7 @@ public partial class GardenController : Node2D
     private bool _cameraDragging;
     private bool _inputEnabled = true;
     private bool _initialRefreshComplete;
+    private float _zoomTarget = 1.0f;
 
     private sealed class EggVisual
     {
@@ -44,6 +45,7 @@ public partial class GardenController : Node2D
         _actorsRoot = GetNode<Node2D>("Actors");
         _eggsRoot = GetNode<Node2D>("Eggs");
         _camera = GetNode<Camera2D>("Camera2D");
+        _zoomTarget = _camera.Zoom.X;
 
         GameSession.Instance.StateChanged += Refresh;
         Refresh();
@@ -60,6 +62,12 @@ public partial class GardenController : Node2D
     public override void _Process(double delta)
     {
         UpdateEggPulse();
+
+        var zoomBlend = 1.0f - Mathf.Exp(-12.0f * (float)delta);
+        var zoom = Mathf.Lerp(_camera.Zoom.X, _zoomTarget, zoomBlend);
+        if (Mathf.Abs(zoom - _zoomTarget) < 0.001f)
+            zoom = _zoomTarget;
+        _camera.Zoom = new Vector2(zoom, zoom);
 
         if (!_inputEnabled)
             return;
@@ -136,8 +144,7 @@ public partial class GardenController : Node2D
             if (mouse.Pressed && (mouse.ButtonIndex == MouseButton.WheelUp || mouse.ButtonIndex == MouseButton.WheelDown))
             {
                 var factor = mouse.ButtonIndex == MouseButton.WheelUp ? 1.12f : 1.0f / 1.12f;
-                var next = Mathf.Clamp(_camera.Zoom.X * factor, 0.70f, 2.35f);
-                _camera.Zoom = new Vector2(next, next);
+                _zoomTarget = Mathf.Clamp(_zoomTarget * factor, 0.70f, 2.35f);
                 if (_followId.Length == 0)
                     ClampCamera();
                 GetViewport().SetInputAsHandled();
@@ -177,7 +184,7 @@ public partial class GardenController : Node2D
     {
         StopFollowing();
         _camera.Position = new Vector2(416, 240);
-        _camera.Zoom = Vector2.One;
+        _zoomTarget = 1.0f;
     }
 
     public void ToggleFollowVoidling(string creatureId)

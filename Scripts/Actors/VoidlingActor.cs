@@ -38,7 +38,9 @@ public partial class VoidlingActor : Node2D
         _rng.Seed = StableSeed(data.Id);
 
         _baseScale = data.Stage == LifeStage.Adult ? 0.62f : 0.31f;
-        _baseSpriteY = data.Stage == LifeStage.Adult ? -8.0f : -4.0f;
+        // The source frames are 48px tall with the visible feet ending 8px below
+        // the frame center. Put those feet on the actor's world-space ground pivot.
+        _baseSpriteY = -8.0f * _baseScale;
 
         _sprite = new AnimatedSprite2D
         {
@@ -175,18 +177,20 @@ public partial class VoidlingActor : Node2D
     public override void _Draw()
     {
         var shadowAlpha = _pickedUp ? 0.26f : 0.20f;
-        var shadowWidth = (_pickedUp ? 10.0f : 8.0f) * (_baseScale / 0.62f + 0.45f);
-        DrawEllipse(new Vector2(0, 1.0f), new Vector2(shadowWidth, Math.Max(2.1f, shadowWidth * 0.30f)), new Color(0.20f, 0.24f, 0.20f, shadowAlpha));
+        var shadowWidth = _baseScale < 0.5f ? 2.8f : 5.2f;
+        if (_pickedUp)
+            shadowWidth *= 1.08f;
+        DrawEllipse(new Vector2(0, 0.8f), new Vector2(shadowWidth, _baseScale < 0.5f ? 1.1f : 1.8f), new Color(0.20f, 0.24f, 0.20f, shadowAlpha));
 
         if (_selected)
         {
             var phase = (float)Time.GetTicksMsec() / 220.0f;
             var pulse = (Mathf.Sin(phase) + 1.0f) * 0.5f;
-            var baseRadius = _baseScale < 0.5f ? 6.5f : 10.5f;
+            var baseRadius = _baseScale < 0.5f ? 4.2f : 7.2f;
             var radius = baseRadius + pulse * 1.25f;
             var color = Color.FromHtml("#FFF4A8");
             color.A = 0.70f + pulse * 0.25f;
-            DrawArc(new Vector2(0, 0), radius, 0.0f, Mathf.Tau, 28, color, 1.6f);
+            DrawArc(Vector2.Zero, radius, 0.0f, Mathf.Tau, 24, color, 1.0f, false);
         }
 
         if (_rareSparkle)

@@ -12,9 +12,8 @@ public partial class VoidlingActor
         var childScale = _baseScale < 0.5f;
         var halo = new PerspectiveHaloWorld
         {
-            Position = new Vector2(0, childScale ? -13.5f : -26.0f),
-            RadiusX = childScale ? 5.2f : 9.2f,
-            RadiusY = childScale ? 1.55f : 2.65f,
+            Position = new Vector2(0, childScale ? -10.5f : -22.0f),
+            Compact = childScale,
             ZIndex = 4
         };
         AddChild(halo);

@@ -405,6 +405,7 @@ public partial class MainController : Node
         }
 
         tree.MemberSelected += ShowMember;
+        ShowMember(data.Id);
     }
 
     private void ShowSettings()
