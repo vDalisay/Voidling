@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://bsawune1lqe2r"
+path="res://.godot/imported/punch_6.wav-e589ce591f7d11afdb088cf5ef69a801.sample"
+
+[deps]
+
+source_file="res://Assets/Sprout Sorry pack/Audio/punch_6.wav"
+dest_files=["res://.godot/imported/punch_6.wav-e589ce591f7d11afdb088cf5ef69a801.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

@@ -1,5 +1,10 @@
 ; Engine configuration file.
-; Voidling MVP - Godot 4.6 .NET
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
@@ -33,7 +38,6 @@ project/assembly_name="Voidling"
 
 [rendering]
 
-textures/default_filters/use_nearest_mipmap_filter=false
 textures/canvas_textures/default_texture_filter=0
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
