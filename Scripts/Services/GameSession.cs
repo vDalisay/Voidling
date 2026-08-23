@@ -23,6 +23,7 @@ public partial class GameSession : Node
     {
         Instance = this;
         LoadOrCreate();
+        ApplyAudioSettings();
         SetProcess(true);
     }
 
@@ -160,10 +161,8 @@ public partial class GameSession : Node
         egg.WorldX = nestPosition.X;
         egg.WorldY = nestPosition.Y;
         State.OwnedEggs.Add(egg);
-
-        // Replacement genetics are generated now, when the replacement enters inventory.
         State.StoreEggs.Add(CreateStoreEgg());
-        SaveAndNotify("Bought a mystery egg. Its genetics were already fixed in the shop.");
+        SaveAndNotify("Bought a mystery egg.");
     }
 
     public string GetBreedingPreview(string parentAId, string parentBId)
@@ -291,6 +290,19 @@ public partial class GameSession : Node
         SaveAndNotify($"Race reward: +{reward} sprouts.");
     }
 
+    public void SetMasterVolume(float value)
+    {
+        State.MasterVolume = Mathf.Clamp(value, 0.0f, 1.0f);
+        ApplyAudioSettings();
+        Save();
+    }
+
+    public void SetAutoFinishRaces(bool enabled)
+    {
+        State.AutoFinishRaces = enabled;
+        Save();
+    }
+
     public string NameFor(string id)
         => FindLineageVoidling(id)?.Name ?? "Unknown";
 
@@ -304,6 +316,7 @@ public partial class GameSession : Node
     public void ResetDemo()
     {
         State = CreateFreshState();
+        ApplyAudioSettings();
         SaveAndNotify("Demo save reset.");
     }
 
@@ -363,8 +376,15 @@ public partial class GameSession : Node
 
     private void NormalizeState()
     {
-        State.SaveVersion = 3;
+        var previousVersion = State.SaveVersion;
         State.DepartedVoidlings ??= new List<VoidlingData>();
+
+        if (previousVersion < 4)
+        {
+            State.MasterVolume = 1.0f;
+            State.AutoFinishRaces = true;
+        }
+        State.SaveVersion = 4;
 
         foreach (var statId in GameRules.StatIds)
         {
@@ -375,10 +395,10 @@ public partial class GameSession : Node
             {
                 if (!creature.TrainingPoints.ContainsKey(statId))
                     creature.TrainingPoints[statId] = 0;
+                creature.RareTraits ??= new List<RareTraitData>();
             }
         }
 
-        // Migrate older MVP saves that did not store world positions.
         for (var i = 0; i < State.Voidlings.Count; i++)
         {
             var creature = State.Voidlings[i];
@@ -393,6 +413,7 @@ public partial class GameSession : Node
         for (var i = 0; i < State.OwnedEggs.Count; i++)
         {
             var egg = State.OwnedEggs[i];
+            egg.RareTraits ??= new List<RareTraitData>();
             if (Math.Abs(egg.WorldX) < 0.01f && Math.Abs(egg.WorldY) < 0.01f)
             {
                 var p = NestPosition(i);
@@ -404,6 +425,7 @@ public partial class GameSession : Node
         while (State.StoreEggs.Count < 3)
             State.StoreEggs.Add(CreateStoreEgg());
 
+        EnsureAngelMutation();
         Save();
     }
 
@@ -411,9 +433,11 @@ public partial class GameSession : Node
     {
         var state = new GameStateData
         {
-            SaveVersion = 3,
+            SaveVersion = 4,
             Coins = 120,
-            SeedCounter = DateTime.UtcNow.Ticks
+            SeedCounter = DateTime.UtcNow.Ticks,
+            MasterVolume = 1.0f,
+            AutoFinishRaces = true
         };
 
         foreach (var statId in GameRules.StatIds)
@@ -422,11 +446,31 @@ public partial class GameSession : Node
         State = state;
         State.Voidlings.Add(CreateStarter("Pip", "#E7A6B6", StarterSpawnPosition(0)));
         State.Voidlings.Add(CreateStarter("Mallow", "#A9D5C0", StarterSpawnPosition(1)));
+        EnsureAngelMutation();
 
         for (var i = 0; i < 3; i++)
             State.StoreEggs.Add(CreateStoreEgg());
 
         return State;
+    }
+
+    private void EnsureAngelMutation()
+    {
+        if (State.Voidlings.Concat(State.DepartedVoidlings)
+            .Any(v => GameRules.HasMutation(v, GameRules.AngelMutationId)))
+            return;
+        if (State.Voidlings.Count == 0)
+            return;
+
+        var rng = GeneticsService.CreateRandom(unchecked((ulong)State.SeedCounter), "demo:angel-mutation");
+        var chosen = State.Voidlings[rng.Next(State.Voidlings.Count)];
+        chosen.RareTraits.Add(new RareTraitData
+        {
+            TraitId = GameRules.AngelMutationId,
+            FounderCreatureId = chosen.Id,
+            GenerationFromFounder = 0,
+            CanTransmit = true
+        });
     }
 
     private VoidlingData CreateStarter(string name, string tint, Vector2 position)
@@ -468,6 +512,18 @@ public partial class GameSession : Node
             IsViable = true,
             FailureResolved = true
         };
+    }
+
+    private void ApplyAudioSettings()
+    {
+        var bus = AudioServer.GetBusIndex("Master");
+        if (bus < 0)
+            return;
+
+        var volume = Mathf.Clamp(State.MasterVolume, 0.0f, 1.0f);
+        AudioServer.SetBusMute(bus, volume <= 0.001f);
+        if (volume > 0.001f)
+            AudioServer.SetBusVolumeDb(bus, Mathf.LinearToDb(volume));
     }
 
     private Vector2 NextNestPosition() => NestPosition(State.OwnedEggs.Count);
