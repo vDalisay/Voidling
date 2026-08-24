@@ -31,6 +31,29 @@ public readonly record struct RaceParticipantStateSnapshot(
     RaceTerrain Terrain);
 
 /// <summary>
+/// Result-affecting state exposed strictly for deterministic diagnostics/replay verification. The
+/// random generator itself stays encapsulated; RandomDrawCount plus the immutable race seed and
+/// participant identity identifies the same deterministic point in that participant's RNG stream.
+/// </summary>
+public readonly record struct RaceParticipantDeterministicState(
+    string ParticipantId,
+    float X,
+    float MaxStamina,
+    float CurrentStamina,
+    float DelaySeconds,
+    float CheerSeconds,
+    bool GlideResolved,
+    bool GlideFailed,
+    float GlideEndX,
+    bool Finished,
+    int NextObstacleIndex,
+    int RandomDrawCount);
+
+public sealed record RaceDeterministicStateSnapshot(
+    IReadOnlyList<RaceParticipantDeterministicState> Participants,
+    IReadOnlyList<string> FinishOrder);
+
+/// <summary>
 /// Deterministic fixed-step race simulation for the current demo course. It owns every state
 /// transition that can affect race results; Godot frame rate, sprites, camera, VFX, and animation
 /// cannot consume its random stream or alter finish order.
@@ -55,6 +78,7 @@ public sealed class RaceSimulation
         public Random Random { get; init; } = null!;
         public float X { get; set; }
         public int NextObstacleIndex { get; set; }
+        public int RandomDrawCount { get; set; }
         public float DelaySeconds { get; set; }
         public float CheerSeconds { get; set; }
         public float MaxStamina { get; init; }
@@ -110,6 +134,29 @@ public sealed class RaceSimulation
         if (!_participantsById.TryGetValue(participantId, out var state))
             throw new KeyNotFoundException($"Unknown race participant '{participantId}'.");
         return Snapshot(state);
+    }
+
+    public RaceDeterministicStateSnapshot GetDeterministicStateSnapshot()
+    {
+        var participants = _participants
+            .Select(state => new RaceParticipantDeterministicState(
+                ParticipantId: state.Participant.CreatureId,
+                X: state.X,
+                MaxStamina: state.MaxStamina,
+                CurrentStamina: state.CurrentStamina,
+                DelaySeconds: state.DelaySeconds,
+                CheerSeconds: state.CheerSeconds,
+                GlideResolved: state.GlideResolved,
+                GlideFailed: state.GlideFailed,
+                GlideEndX: state.GlideEndX,
+                Finished: state.Finished,
+                NextObstacleIndex: state.NextObstacleIndex,
+                RandomDrawCount: state.RandomDrawCount))
+            .ToArray();
+
+        return new RaceDeterministicStateSnapshot(
+            Array.AsReadOnly(participants),
+            Array.AsReadOnly(_finishOrder.ToArray()));
     }
 
     public IReadOnlyList<RaceSimulationEvent> Advance(double elapsedSeconds)
@@ -260,7 +307,9 @@ public sealed class RaceSimulation
         if (state.X < _course.Obstacles[obstacleIndex] - ObstacleTriggerLead)
             return;
 
-        var avoided = _performance.AvoidsObstacle(state.Participant, state.Random.NextDouble());
+        var randomRoll = state.Random.NextDouble();
+        state.RandomDrawCount++;
+        var avoided = _performance.AvoidsObstacle(state.Participant, randomRoll);
         if (!avoided)
         {
             state.DelaySeconds = _performance.GetObstacleDelaySeconds(state.Participant);
