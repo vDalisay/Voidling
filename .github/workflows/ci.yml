@@ -46,18 +46,15 @@ jobs:
             fi
           done
 
-          if grep -R -n -E 'GameSession\.Instance' Scripts/Domain Scripts/Application --include='*.cs'; then
-            echo 'Domain/Application must not use the GameSession service locator.'
-            exit 1
-          fi
-
           if grep -R -n -E 'GameSession\.Instance|GameRules\.' Scripts/Presentation --include='*.cs'; then
             echo 'Standalone Presentation components must receive view state and emit intent; do not reach through legacy GameSession/GameRules facades.'
             exit 1
           fi
 
-          if grep -n -E 'GameSession\.Instance' Scripts/UI/MainController*.cs Scripts/Garden/GardenController*.cs; then
-            echo 'MainController/GardenController have migrated away from the static GameSession locator; keep their session dependencies explicit.'
+          locator_uses="$(grep -R -n -E 'GameSession\.Instance' Scripts --include='*.cs' | grep -v '^Scripts/Services/' || true)"
+          if [ -n "$locator_uses" ]; then
+            echo "$locator_uses"
+            echo 'GameSession.Instance is restricted to the transitional Services compatibility surface. Pass/resolve explicit session dependencies elsewhere.'
             exit 1
           fi
 
