@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Common;
 
 namespace VoidlingGame;
 
@@ -53,7 +54,7 @@ public partial class MainController : Node
             UiFactory.SetPortraitData(previewPortrait, candidate);
             previewName.Text = candidate.Name;
             previewStats.Text = string.Join("   ", GameRules.StatIds.Select(stat =>
-                $"{GameRules.StatDisplayNames[stat]} {GameRules.GradeName(GameRules.GetGene(candidate, stat).ExpressedValue)} {Mathf.RoundToInt(GameRules.EffectiveStat(candidate, stat))}"));
+                $"{StatPresentationCatalog.NameFor(stat)} {GameRules.GradeName(GameRules.GetGene(candidate, stat).ExpressedValue)} {Mathf.RoundToInt(GameRules.EffectiveStat(candidate, stat))}"));
 
             foreach (var pair in cardButtons)
                 pair.Value.ButtonPressed = pair.Key == candidate.Id;
@@ -238,7 +239,7 @@ public partial class MainController : Node
     private static Control CreateDetailsStatRow(VoidlingData data, string statId)
     {
         var panel = new PanelContainer { CustomMinimumSize = new Vector2(472, 29) };
-        var tint = GameRules.StatColor(statId);
+        var tint = StatPresentationCatalog.ColorFor(statId);
         var background = tint;
         background.A = statId == "stamina" ? 0.55f : 0.22f;
         var style = new StyleBoxFlat { BgColor = background, BorderColor = Color.FromHtml("#BE916C") };
@@ -252,7 +253,7 @@ public partial class MainController : Node
         panel.AddChild(row);
 
         var gene = GameRules.GetGene(data, statId);
-        var name = UiFactory.CreateLabel(GameRules.StatDisplayNames[statId].ToUpperInvariant(), 8);
+        var name = UiFactory.CreateLabel(StatPresentationCatalog.NameFor(statId).ToUpperInvariant(), 8);
         name.CustomMinimumSize = new Vector2(75, 19);
         name.AddThemeColorOverride("font_color", tint);
         name.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
@@ -286,11 +287,11 @@ public partial class MainController : Node
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 4);
 
-        var identity = GameRules.StatColor(statId);
+        var identity = StatPresentationCatalog.ColorFor(statId);
         var bg = identity;
         bg.A = statId == "stamina" ? 0.65f : 0.28f;
 
-        row.AddChild(CreateDnaCell(GameRules.StatDisplayNames[statId].ToUpperInvariant(), 176, 7, false, bg, identity));
+        row.AddChild(CreateDnaCell(StatPresentationCatalog.NameFor(statId).ToUpperInvariant(), 176, 7, false, bg, identity));
         row.AddChild(CreateDnaCell(GameRules.GradeName(gene.AlleleA), 142, 9, false));
         row.AddChild(CreateDnaCell(GameRules.GradeName(gene.AlleleB), 142, 9, false));
         return row;
@@ -391,8 +392,8 @@ public partial class MainController : Node
             {
                 var gene = GameRules.GetGene(member, statId);
                 var stat = UiFactory.CreateLabel(
-                    $"{GameRules.StatDisplayNames[statId]}  {GameRules.GradeName(gene.ExpressedValue)}  LV{GameRules.StatLevel(member, statId)}", 6);
-                stat.AddThemeColorOverride("font_color", GameRules.StatColor(statId));
+                    $"{StatPresentationCatalog.NameFor(statId)}  {GameRules.GradeName(gene.ExpressedValue)}  LV{GameRules.StatLevel(member, statId)}", 6);
+                stat.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(statId));
                 inspectorBox.AddChild(stat);
             }
 
