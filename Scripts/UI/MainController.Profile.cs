@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Common;
 
 namespace VoidlingGame;
 
@@ -153,10 +154,10 @@ public partial class MainController : Node
         var effective = (int)Math.Round(GameRules.EffectiveStat(data, statId));
         var level = GameRules.StatLevel(data, statId);
         var count = _session.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0;
-        var color = GameRules.StatColor(statId);
+        var color = StatPresentationCatalog.ColorFor(statId);
 
         var label = UiFactory.CreateLabel(
-            $"{GameRules.StatDisplayNames[statId].ToUpperInvariant(),-7} {GameRules.GradeName(gene.ExpressedValue)}  LV{level:00}  {effective:00}", 7);
+            $"{StatPresentationCatalog.NameFor(statId).ToUpperInvariant(),-7} {GameRules.GradeName(gene.ExpressedValue)}  LV{level:00}  {effective:00}", 7);
         label.CustomMinimumSize = new Vector2(142, 17);
         label.AddThemeColorOverride("font_color", color);
         label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
@@ -189,7 +190,7 @@ public partial class MainController : Node
             CustomMinimumSize = size
         };
         var background = new StyleBoxFlat { BgColor = Color.FromHtml("#6D6658") };
-        var fill = new StyleBoxFlat { BgColor = GameRules.StatColor(statId) };
+        var fill = new StyleBoxFlat { BgColor = StatPresentationCatalog.ColorFor(statId) };
         background.CornerRadiusTopLeft = background.CornerRadiusTopRight = 1;
         background.CornerRadiusBottomLeft = background.CornerRadiusBottomRight = 1;
         fill.CornerRadiusTopLeft = fill.CornerRadiusTopRight = 1;
@@ -257,7 +258,7 @@ public partial class MainController : Node
         {
             var statId = GameRules.StatIds[i];
             var count = _session.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0;
-            list.AddChild(CreateInventoryRow(UiFactory.CreateIcon(18 + i), $"{GameRules.StatDisplayNames[statId]} Treat", count));
+            list.AddChild(CreateInventoryRow(UiFactory.CreateIcon(18 + i), $"{StatPresentationCatalog.NameFor(statId)} Treat", count));
         }
 
         var eggAtlas = new AtlasTexture
