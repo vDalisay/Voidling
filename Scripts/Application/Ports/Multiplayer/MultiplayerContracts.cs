@@ -38,11 +38,16 @@ public sealed record LobbyOperationResult(bool Success, LobbySnapshot? Lobby, st
         => new(false, null, error);
 }
 
+/// <summary>
+/// Steam Networking Messages channels. Ordering is only assumed within one reliable channel.
+/// </summary>
 public enum NetworkChannel
 {
     Session = 0,
-    Challenge = 1,
-    Trade = 2
+    Zone = 1,
+    Challenge = 2,
+    Trade = 3,
+    GardenTransient = 4
 }
 
 public enum DeliveryMode
