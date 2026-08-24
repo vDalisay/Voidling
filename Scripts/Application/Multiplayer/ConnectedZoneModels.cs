@@ -113,6 +113,26 @@ public sealed class ConnectedZoneState
         return Revision;
     }
 
+    public bool RetainOwners(IReadOnlySet<PlatformUserId> allowedOwners)
+    {
+        ArgumentNullException.ThrowIfNull(allowedOwners);
+
+        var removed = false;
+        foreach (var key in _voidlings.Keys.ToArray())
+        {
+            if (allowedOwners.Contains(key.OwnerId))
+                continue;
+
+            _voidlings.Remove(key);
+            removed = true;
+        }
+
+        if (removed)
+            Revision++;
+
+        return removed;
+    }
+
     public ZoneDeltaApplyResult ApplyPublished(
         long authorityEpoch,
         long revision,
