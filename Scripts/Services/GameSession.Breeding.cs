@@ -5,9 +5,14 @@ namespace VoidlingGame;
 
 public partial class GameSession
 {
+    public BreedingPreview GetBreedingPreviewData(string parentAId, string parentBId)
+        => _breeding!.Preview(State, parentAId, parentBId);
+
+    // Transitional compatibility text for legacy callers. New presentation should consume the
+    // structured BreedingPreview and own its localized wording.
     public string GetBreedingPreview(string parentAId, string parentBId)
     {
-        var preview = _breeding!.Preview(State, parentAId, parentBId);
+        var preview = GetBreedingPreviewData(parentAId, parentBId);
         if (!preview.CanBreed)
         {
             return preview.Failure switch
@@ -30,7 +35,7 @@ public partial class GameSession
 
     public bool TryBreed(string parentAId, string parentBId, Vector2 eggWorldPosition)
     {
-        var preview = _breeding!.Preview(State, parentAId, parentBId);
+        var preview = GetBreedingPreviewData(parentAId, parentBId);
         if (!preview.CanBreed)
         {
             if (preview.Failure == BreedingFailure.ParentNotAdult)
@@ -40,7 +45,7 @@ public partial class GameSession
             return false;
         }
 
-        var result = _breeding.Execute(
+        var result = _breeding!.Execute(
             State,
             parentAId,
             parentBId,
