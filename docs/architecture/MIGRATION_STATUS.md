@@ -12,7 +12,7 @@
 
 `Scripts/Domain/**` is Godot-free and CI-enforced.
 
-Implemented seams:
+Implemented seams include:
 
 - deterministic named RNG streams (`StableRandom`);
 - typed immutable `GameBalanceRules`;
@@ -25,15 +25,19 @@ Implemented seams:
 - store-egg creation;
 - stat calculation/progression;
 - immutable race participant snapshots;
-- pure race performance formulas for ground/swim/glide, stamina, cheering, glide endurance and obstacles.
+- race performance formulas;
+- data-described demo race course/segments;
+- deterministic fixed-step `RaceSimulation` owning movement, stamina, cheer, glide endurance/failure, obstacle outcomes and finish order.
 
-The old `GeneticsService` and `GameRules` remain compatibility facades for presentation code. New deterministic rules should go into Domain rather than expanding those facades.
+Race simulation is frame-chunk independent and supports headless fast-forward through the exact same fixed-step path used during normal progression.
+
+The old `GeneticsService` and `GameRules` remain compatibility facades for legacy callers. New deterministic rules belong in Domain rather than expanding those facades.
 
 ### Application — Godot-free use cases
 
-`Scripts/Application/**` is Godot-free and CI-enforced. It also may not reach back through `GameSession.Instance`.
+`Scripts/Application/**` is Godot-free and CI-enforced. It may not reach back through `GameSession.Instance`.
 
-Implemented use cases/services:
+Implemented use cases/services include:
 
 - `BreedVoidlingsUseCase`;
 - `TrainingUseCase`;
@@ -42,6 +46,7 @@ Implemented use cases/services:
 - `SettingsUseCase`;
 - `VoidlingRosterUseCase` for identity, world-position persistence, departure and failed-egg removal;
 - `RaceParticipantSnapshotFactory`;
+- `RaceEntryFactory` for immutable player/CPU race entry creation;
 - `RaceResultUseCase`;
 - `GameStateMigrationService`.
 
@@ -61,129 +66,163 @@ Designer-facing active balance data lives in:
 
 - `Resources/Balance/demo_balance.tres`
 
-The Resource is loaded only by Bootstrap and converted before entering Application/Domain. Product invariants such as stable stat IDs, inbreeding tiers and fixed identity catalogs are intentionally not exposed as casual tuning knobs yet.
+The Resource is loaded only by Bootstrap and converted before entering Application/Domain. Product invariants such as stable stat IDs, inbreeding tiers and fixed identity catalogs are intentionally not exposed as casual tuning knobs. Race tuning is not duplicated in the Inspector while the authored resource does not yet control those values.
 
 ### Bootstrap
 
 `Scripts/Bootstrap/GameBootstrap.cs` is the explicit composition root. It is the one place that intentionally sees concrete Infrastructure plus Application/Domain implementations.
 
-It loads the designer-authored balance Resource once, converts it to immutable domain rules, and supplies that same rules object to the Application services. The transitional `GameRules` presentation facade is configured from the same object so old UI paths cannot drift onto a second set of defaults.
+It loads the designer-authored balance Resource once, converts it to immutable domain rules, and supplies that same rules object to the Application services. The transitional `GameRules` facade is configured from the same object so legacy callers cannot drift onto a second ruleset.
 
 No DI container has been introduced. Manual composition remains small and readable.
 
-### Presentation reference architecture
+### Presentation
 
-`Scripts/Presentation/UI/Settings/SettingsScreen.cs` is the first standalone screen component:
+Standalone Presentation components now include:
 
-- receives immutable/current UI state;
-- renders Godot controls;
-- emits player intent through C# events;
-- does not know about `GameSession`, persistence or `AudioServer`.
+- `SettingsScreen`;
+- `ShopScreen`;
+- `BreedingScreen`;
+- `ModalHost` for overlay/window lifetime;
+- `RaceScreen`, a Godot-only shell over the pure `RaceSimulation`;
+- `StatPresentationCatalog` for player-facing stat labels/colors.
 
-Use it as the reference pattern when Shop, Breeding, Race Picker, Details and other screens are migrated out of `MainController`.
+These components do not reach through `GameSession.Instance` or the `GameRules` compatibility facade; CI enforces that boundary for `Scripts/Presentation/**`.
+
+`RaceScreen` receives an immutable `RaceEntry`, maps simulation snapshots/events to sprites/camera/HUD/minimap/podium, sends cheer through `RaceSimulation.TryCheer`, and uses the simulator's fast-forward path. VFX has a separate non-authoritative RNG, so particle timing can no longer perturb race outcomes.
+
+The legacy result-owning `Scripts/Race/RaceController*.cs` implementation has been removed.
+
+The root `MainController` still coordinates legacy UI partials, but it no longer repeatedly reaches through the static service locator. It resolves the composed `GameSession` once and its partials use that explicit reference. Modal lifetime is delegated to `ModalHost`.
+
+Stat display names/colors have moved out of `GameRules` into `StatPresentationCatalog`. Stable stat IDs and gameplay formulas remain outside Presentation.
 
 ### Localization
 
 Godot's native translation pipeline is registered through `Localization/strings.csv`.
 
-Currently migrated representative UI:
+Migrated representative UI includes:
 
 - global top navigation/currency label;
-- Settings screen and settings tooltips.
+- Settings;
+- Shop;
+- Breeding and breeding validation/risk text.
 
 Use semantic keys (`UI_*`) for new player-facing presentation text. User-created Voidling names remain literal.
 
-The direct Windows launcher now performs Godot's import phase before starting the game. This ensures a clean clone generates CSV translation resources rather than relying on an existing `.godot` cache.
+The direct Windows launcher performs Godot's import phase before starting the game so a clean clone generates CSV translation resources instead of relying on an existing `.godot` cache.
 
 ### Tests and CI
 
-The architecture branch has fast xUnit coverage for genetics, inbreeding, mutations, migration, simulation, shop transactions, settings, roster operations and race performance.
+The architecture branch has fast xUnit coverage for genetics, inbreeding, mutations, migration, lifecycle simulation, shop transactions, settings, roster operations, race performance and deterministic race simulation.
 
-CI currently performs:
+Race tests characterize:
+
+- current demo course geometry/terrain;
+- finish order/event equivalence across different elapsed-time chunk sizes;
+- normal progression versus fast-forward equivalence;
+- cheer as a simulation command;
+- simulation-owned auto-completion/placement.
+
+CI performs:
 
 1. game restore;
 2. test restore;
 3. Release build;
-4. Domain/Application boundary enforcement;
+4. architecture boundary enforcement;
 5. domain/application tests;
 6. Debug build for Godot editor-side C# integration;
 7. blocking Godot `--import` resource import;
 8. verification that the CSV localization resource was generated;
-9. actual headless main-scene runtime smoke test with runtime errors treated as CI failures.
+9. actual headless main-scene runtime smoke test with runtime errors treated as failures.
 
-CI rejects `Godot` references in Domain/Application and rejects `GameSession.Instance` from those inward layers. The two-stage Godot import/runtime check exists because a short editor scan can return exit code zero while still logging unresolved resources or autoload errors.
+CI rejects Godot references in Domain/Application, rejects `GameSession.Instance` from inward layers, and prevents new `Scripts/Presentation/**` components from reaching through `GameSession.Instance` or `GameRules`.
 
 ## Intentionally transitional code
 
-These files are **not** examples for new feature architecture:
+These files are **not** examples for new feature architecture.
 
 ### `GameSession`
 
-`Scripts/Services/GameSession*.cs` remains a Godot-owned compatibility/lifetime facade because existing presentation code already calls it. Most mutable gameplay operations now delegate to Application use cases, but it still owns compatibility responsibilities such as:
+`Scripts/Services/GameSession*.cs` remains a Godot-owned compatibility/lifetime facade because legacy world/UI code already calls its public API. Most mutable gameplay operations delegate to Application use cases, but it still owns compatibility responsibilities such as:
 
-- static `Instance` access for legacy presentation;
+- a static `Instance` entry point for remaining legacy world code;
 - save timing/event forwarding;
 - initial demo state/spawn placement;
 - presentation toast wording;
 - compatibility seed/ID allocation.
 
-Do not add new feature rules here. New features should enter through Application/Domain and be adapted by the facade only while legacy presentation still requires it.
+The root UI coordinator no longer uses the static entry point, but Garden/other untouched legacy code may still do so. Remove those references incrementally when those features are touched; do not add new feature rules here.
 
 ### `GameRules`
 
-`Scripts/Core/GameRules.cs` still combines presentation labels/colors with compatibility accessors. Domain formulas and balance data have already moved inward, and Bootstrap configures this facade from the exact same immutable rules used by Application.
+`Scripts/Core/GameRules.cs` is now narrower. Player-facing stat labels/colors have moved to Presentation. It still exposes compatibility accessors for existing gameplay values/formulas, stable IDs, tint conversion and mutation lookup.
 
-Do not add new deterministic formulas to `GameRules`. New presentation catalogs can gradually replace its label/color responsibilities as screens migrate.
+Do not add new deterministic formulas or presentation catalogs to `GameRules`. Move remaining responsibilities inward/outward as their callers migrate.
 
 ### `MainController`
 
-The partial files improve navigation but the object is still a legacy UI coordinator. `SettingsScreen` demonstrates the target component pattern.
+The root object is still a legacy UI/navigation coordinator and several screens (race picker, Details, Inventory, family tree/goodbye/reset flows) are still implemented in partial files.
 
-Migrate screens one at a time when they are next modified; do not perform a risky visual rewrite solely to eliminate partial classes.
-
-### `RaceController`
-
-This is the largest remaining architecture hotspot. The branch has extracted immutable entry snapshots and the pure numeric performance model, but `Scripts/Race/RaceController.cs` still owns the current frame-by-frame race state, CPU progression, finish ordering and Godot presentation together.
-
-**Rule for incoming race features:** Power sections, route forks, shortcuts, personality decisions, deterministic replay, batch simulation and course graphs should be implemented in the planned pure `RaceSimulation` / course model first. Do not grow another large switch inside `RaceController`.
-
-The eventual direction remains:
-
-```text
-Race entry snapshot(s)
-  → pure RaceSimulation + authored course data
-  → RaceState / RaceEvents
-  → Godot RacePresentationController
-```
-
-The current extracted `RacePerformanceModel` is the compatibility seam for that migration; it is not intended to become a second competing simulator.
+Its dependency pattern is improved: it holds one explicit session reference instead of using `GameSession.Instance` throughout its partials, and modal lifetime is owned by `ModalHost`. Continue extracting screens when they are substantially modified rather than performing a visual rewrite solely to eliminate partial classes.
 
 ### Garden
 
-`GardenController` is currently presentation-heavy but valid for the demo. Keep lifecycle/genetics/breeding outcomes out of it. Camera, pickup/drop and VFX can become composed presentation components when those areas are next extended.
+`GardenController` is presentation-heavy but acceptable for the current demo. Keep lifecycle/genetics/breeding outcomes out of it. Camera, pickup/drop and breeding/hatching animation can become composed presentation components when those areas are next extended.
 
-## Rules for the next implementation-plan features
+Remaining static `GameSession.Instance` access in Garden/related legacy presentation is a Phase D cleanup target when those controllers are touched.
 
-When adding a feature, choose the layer by responsibility:
+## Completed major migration phases
 
-- inherited trait, stat, lifecycle, race decision or deterministic rule → **Domain**;
-- player action/use-case sequencing → **Application**;
-- filesystem/audio/Steam/Godot Resource/platform integration → **Infrastructure**;
-- input, camera, sprite, UI, VFX, animation → **Presentation**;
-- concrete object graph wiring → **Bootstrap**.
+### Phase B — deterministic domain seams
 
-Prefer extending an existing focused service before inventing another abstraction. Introduce a factory, builder, strategy or state machine only when creation/variation/transition complexity actually exists.
+Completed for the current demo feature set. Genetics, breeding-related rules, stats and racing now have focused pure-C# collaborators/characterization tests.
+
+### Phase C — persistence/application seams
+
+Completed for the current demo's high-churn operations. Persistence is behind a repository port and migrations/use cases are testable without scenes.
+
+### Phase D — composition/service-locator removal
+
+Substantially complete, not globally finished. Bootstrap is explicit and new Presentation/Application code does not depend on the static session locator. The root UI has also migrated away from it. Remaining untouched Garden/legacy components can be migrated incrementally.
+
+### Phase E — race simulation extraction
+
+Completed for the demo race:
+
+```text
+immutable RaceEntry / participant snapshots
+  → pure RaceCourse + RaceSimulation
+  → RaceState snapshots / RaceEvents
+  → Godot RaceScreen presentation
+  → placement event
+  → Application race reward handoff
+```
+
+There is one result-authoritative simulator. Animation, camera and VFX edits cannot consume its outcome RNG or change finish order. Headless batch/fast-forward simulation is possible.
+
+### Phase F — UI decomposition/localization foundation
+
+The reference foundation is in place:
+
+- shared `ModalHost`;
+- Settings, Shop and Breeding standalone screens;
+- localization CSV/project registration and clean-clone import verification;
+- Presentation boundary enforcement;
+- stat presentation catalog separated from gameplay rules.
+
+Phase F does **not** require every legacy panel to be rewritten before feature work can continue. Future screens should follow these reference components.
 
 ## Next architecture migrations
 
-These are future slices, not blockers for ordinary non-race feature development:
+These are incremental follow-ups, not reasons to rewrite stable demo code:
 
-1. Convert the next substantially modified modal (Shop or Breeding) to a standalone Presentation screen following `SettingsScreen`.
-2. When race gameplay expands, create the pure deterministic `RaceSimulation` and make the Godot controller consume it rather than duplicating rules.
-3. Move presentation-only stat labels/colors out of the `GameRules` compatibility facade as related screens migrate.
-4. Replace feature-level `GameSession.Instance` access incrementally with explicit setup dependencies as scene/controllers are touched.
-5. Add additional custom Godot Resources only for rules/content that designers actually need to author; do not pre-create every roadmap type.
+1. When Race Picker, Details/Inventory, Family Tree or another legacy modal is next substantially changed, move it into a standalone Presentation component using immutable view state + intent events.
+2. Remove remaining `GameSession.Instance` access from Garden/other touched legacy presentation controllers through explicit setup/scene-owned references.
+3. Move remaining presentation-only tint/mutation formatting out of `GameRules` as related screens migrate; do not duplicate domain identity/rules in Presentation.
+4. Introduce additional Godot Resources only when the next roadmap feature has concrete designer-authored content/tuning that consumes them.
+5. Add ADRs for durable architecture decisions when a decision first needs history/trade-off context; do not create ceremonial ADRs for obvious local refactors.
 
 ## Merge invariant
 
-This architecture work must not intentionally alter current demo gameplay or reroll existing persisted genetics. Before merge, the exact PR head must pass the full CI sequence above and the PR description must document any remaining transitional boundary explicitly.
+This architecture work must not intentionally alter current demo gameplay, race balance or persisted genetics. Before merge, the exact PR head must pass the full CI sequence above, the PR description must reflect the actual remaining transitional boundaries, and PR #2 remains draft until the user decides the architecture work is complete.
