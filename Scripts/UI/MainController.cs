@@ -18,9 +18,6 @@ public partial class MainController : Node
     private ModalHost _modalHost = null!;
     private Label _coinsLabel = null!;
     private PanelContainer? _detailsPanel;
-    // Transitional field retained only for the old, now-unused RebuildEggsPanel helper in the
-    // Profile partial. The garden HUD no longer creates that panel.
-    private PanelContainer? _eggsPanel;
     private PanelContainer _gardenLogPanel = null!;
     private GardenEventLog _gardenEventLog = null!;
     private Label _toastLabel = null!;
@@ -173,8 +170,6 @@ public partial class MainController : Node
     {
         if (_detailsPanel != null && GodotObject.IsInstanceValid(_detailsPanel))
             _detailsPanel.Visible = false;
-        if (_eggsPanel != null && GodotObject.IsInstanceValid(_eggsPanel))
-            _eggsPanel.Visible = false;
         if (_gardenLogPanel != null && GodotObject.IsInstanceValid(_gardenLogPanel))
             _gardenLogPanel.Visible = false;
     }
