@@ -4,6 +4,7 @@ using Godot;
 using Voidling.Application.Breeding;
 using Voidling.Application.Multiplayer;
 using Voidling.Application.Multiplayer.Challenges;
+using Voidling.Application.Multiplayer.Racing;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Application.Persistence;
 using Voidling.Application.Racing;
@@ -35,6 +36,7 @@ public partial class GameBootstrap : Node
     private MultiplayerConnectionService? _multiplayerConnection;
     private ConnectedZoneService? _connectedZone;
     private ChallengeCoordinator? _challengeCoordinator;
+    private MultiplayerRaceStartCoordinator? _multiplayerRaceStarts;
     private TradeNetworkCoordinator? _tradeCoordinator;
 
     public override void _Ready()
@@ -45,7 +47,7 @@ public partial class GameBootstrap : Node
         // the exact same immutable rules used below so there is only one effective ruleset.
         GameRules.Configure(rules);
 
-        ComposeOptionalMultiplayer();
+        ComposeOptionalMultiplayer(rules);
 
         var stateRepository = new GodotJsonGameStateRepository(SavePath);
         var session = new GameSession
@@ -71,7 +73,7 @@ public partial class GameBootstrap : Node
         ComposeMultiplayerProbeIfRequested(session);
     }
 
-    private void ComposeOptionalMultiplayer()
+    private void ComposeOptionalMultiplayer(GameBalanceRules rules)
     {
         var multiplayer = OptionalMultiplayerComposer.Create();
         _multiplayerConnection = multiplayer.Connection;
@@ -79,6 +81,15 @@ public partial class GameBootstrap : Node
         _challengeCoordinator = multiplayer.Challenges;
         _challengeCoordinator.ProtocolRejected += reason =>
             GD.PushWarning($"Rejected multiplayer challenge packet: {reason}");
+
+        _multiplayerRaceStarts = new MultiplayerRaceStartCoordinator(
+            _multiplayerConnection,
+            _challengeCoordinator,
+            rules);
+        _multiplayerRaceStarts.ProtocolRejected += reason =>
+            GD.PushWarning($"Rejected multiplayer race packet: {reason}");
+        _multiplayerRaceStarts.RacePreparationFailed += (challengeId, reason) =>
+            GD.PushWarning($"Multiplayer race {challengeId} preparation failed: {reason}");
 
         if (multiplayer.RuntimeNode != null)
         {
