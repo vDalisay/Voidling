@@ -1,6 +1,6 @@
 # Steam multiplayer connectivity spike
 
-This is a developer-only test for the first multiplayer foundation. It is not production multiplayer UI.
+This is a developer-only integration test for the multiplayer foundation. It is not production multiplayer UI.
 
 ## Offline-first invariant
 
@@ -31,11 +31,18 @@ To immediately open the Steam invite overlay after lobby creation:
 --voidling-mp-host --voidling-mp-invite
 ```
 
+To also publish the first locally owned Voidling into the connected Garden replication model:
+
+```text
+--voidling-mp-host --voidling-mp-publish-first
+```
+
 Expected log:
 
 ```text
 [multiplayer-probe] host succeeded for lobby <id>
 [multiplayer-probe] share lobby id <id> with the second account or use Steam invite.
+[multiplayer-probe] published <name> (<creature-id>) into the connected zone
 ```
 
 The friends-only lobby is capped at 16 members.
@@ -48,16 +55,42 @@ Launch the second account with:
 --voidling-mp-join=<lobby-id>
 ```
 
-Expected log on both peers after the join/hello exchange:
+To make the second player publish their first locally owned Voidling as well:
+
+```text
+--voidling-mp-join=<lobby-id> --voidling-mp-publish-first
+```
+
+Expected log on both peers after the join/hello exchange and full-state synchronization:
 
 ```text
 [multiplayer-probe] lobby <id>, owner <steam-id>, members 2
 [multiplayer-probe] hello from <persona> (<steam-id>)
+[multiplayer-probe] zone lobby <id>, host <steam-id>, epoch 1, revision <n>, shared Voidlings <count>
+[multiplayer-probe] shared <name> (<creature-id>) owner <steam-id> at <x>,<y>
 ```
 
 Accepting a Steam invite while the probe is active also uses the `join_requested` callback and joins the requested lobby.
 
-## What this spike proves
+## Connected Garden replication behavior under test
+
+The current spike implements a transient, host-coordinated connected-zone model:
+
+- the Steam lobby owner orders reliable Garden mutations;
+- each published Voidling remains owned only by its source save;
+- network snapshots are presentation/session data and are never inserted into another player's `GameStateData`;
+- clients request a compact full snapshot when joining/rejoining;
+- the host broadcasts canonical publish/remove events with a monotonically increasing revision;
+- clients request another full snapshot if they detect a revision gap;
+- embedded sender IDs must match the Steam Networking Messages transport identity;
+- a player cannot publish/remove a session entity while claiming another Steam user's ownership;
+- repeated command IDs are ignored by the host;
+- when Steam changes the lobby owner, the replicated state is retained and the authority epoch increments;
+- departed lobby members' shared Voidlings are purged by the host and a new full snapshot is broadcast.
+
+This is intentionally low-frequency state replication. Ordinary remote idle/wander animation is not streamed frame-by-frame.
+
+## What this spike now proves
 
 - optional GodotSteam initialization;
 - friends-only Steam lobby creation/join;
@@ -66,16 +99,20 @@ Accepting a Steam invite while the probe is active also uses the `join_requested
 - Networking Messages session acceptance for lobby members;
 - reliable, versioned `Hello` message transport;
 - sender-ID validation against the transport identity;
+- full connected-Garden snapshots for late joiners;
+- host-ordered Voidling publish/remove replication;
+- revision-gap recovery path;
+- basic lobby-owner migration/session epoch handling;
 - no Steam requirement for normal singleplayer startup/CI.
 
 ## What it deliberately does not prove yet
 
-- connected Garden Voidling replication;
-- host migration/session epochs;
-- trade prepare/commit journal;
+- production connected-zone placement UI or remote Garden actors;
+- low-frequency transient position/facing corrections;
+- trade prepare/commit journal and lineage transfer;
 - race/challenge synchronization;
 - leaderboards;
 - daily friend race;
 - production multiplayer UI.
 
-Those are subsequent implementation phases after this connectivity boundary is validated with two real Steam accounts.
+Those are subsequent implementation phases. The next product-facing step is to bind the replicated `ConnectedZoneSnapshot` to a placeable Garden-zone presentation without making remote Voidlings part of the local save/simulation aggregate.
