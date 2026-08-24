@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Voidling.Application.Breeding;
+using Voidling.Domain.Breeding;
 using Voidling.Domain.Rules;
 using VoidlingGame;
 
@@ -13,9 +15,10 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 4;
+    public const int CurrentSaveVersion = 5;
 
     private readonly GameBalanceRules _rules;
+    private readonly LineageArchiveService _lineage = new();
 
     public GameStateMigrationService(GameBalanceRules rules)
     {
@@ -29,6 +32,7 @@ public sealed class GameStateMigrationService
 
         state.Voidlings ??= new List<VoidlingData>();
         state.DepartedVoidlings ??= new List<VoidlingData>();
+        state.LineageArchive ??= new List<LineageArchiveEntry>();
         state.OwnedEggs ??= new List<EggData>();
         state.StoreEggs ??= new List<EggData>();
         state.TrainingItems ??= new Dictionary<string, int>(StringComparer.Ordinal);
@@ -60,6 +64,11 @@ public sealed class GameStateMigrationService
 
         foreach (var egg in state.OwnedEggs.Concat(state.StoreEggs))
             egg.RareTraits ??= new List<RareTraitData>();
+
+        // Version 5 introduces a minimal persistent ancestry graph. Populate it from every full
+        // creature record already known locally, while preserving archive-only ancestors imported
+        // by future multiplayer trades. This is deterministic and never changes genes or IDs.
+        _lineage.EnsureCurrentEntries(state);
 
         state.SaveVersion = CurrentSaveVersion;
     }
