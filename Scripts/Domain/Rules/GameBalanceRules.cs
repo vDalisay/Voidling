@@ -137,5 +137,5 @@ public sealed record GameBalanceRules(
             ObstacleBaseDelaySeconds: 0.62f,
             ObstacleLowRunDelaySeconds: 0.55f,
             ObstacleRollbackDistance: 5.0f,
-            PlacementRewards: Array.AsReadOnly(new[] { 30, 20, 10, 5 }))));
+            PlacementRewards: Array.AsReadOnly(new[] { 30, 20, 10, 5 })));
 }
