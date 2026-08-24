@@ -1,7 +1,9 @@
 using System;
+using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
 using Voidling.Application.Multiplayer;
+using Voidling.Application.Multiplayer.Trading;
 using Voidling.Application.Persistence;
 using Voidling.Application.Racing;
 using Voidling.Application.Roster;
@@ -31,6 +33,7 @@ public partial class GameBootstrap : Node
     // Future multiplayer presentation should receive these dependencies explicitly when composed.
     private MultiplayerConnectionService? _multiplayerConnection;
     private ConnectedZoneService? _connectedZone;
+    private TradeNetworkCoordinator? _tradeCoordinator;
 
     public override void _Ready()
     {
@@ -42,13 +45,14 @@ public partial class GameBootstrap : Node
 
         ComposeOptionalMultiplayer();
 
+        var stateRepository = new GodotJsonGameStateRepository(SavePath);
         var session = new GameSession
         {
             Name = nameof(GameSession)
         };
 
         session.Configure(
-            new GodotJsonGameStateRepository(SavePath),
+            stateRepository,
             new GodotAudioSettingsAdapter(),
             new GameStateMigrationService(rules),
             new AdvanceSimulationUseCase(rules),
@@ -61,6 +65,7 @@ public partial class GameBootstrap : Node
         session.ConfigureRacing(new RaceEntryFactory(rules));
 
         AddChild(session);
+        ComposeTrading(rules, stateRepository, session);
         ComposeMultiplayerProbeIfRequested(session);
     }
 
@@ -79,6 +84,57 @@ public partial class GameBootstrap : Node
 
         // This is informational, never fatal. Single-player must remain fully functional offline.
         GD.Print(multiplayer.UnavailableReason ?? "Steam multiplayer unavailable; continuing in single-player mode.");
+    }
+
+    private void ComposeTrading(
+        GameBalanceRules rules,
+        GodotJsonGameStateRepository stateRepository,
+        GameSession session)
+    {
+        if (_multiplayerConnection == null)
+            return;
+
+        var transfers = new TradeTransferService(rules);
+        RecoverInterruptedTradePrepares(transfers, stateRepository, session);
+
+        _tradeCoordinator = new TradeNetworkCoordinator(
+            _multiplayerConnection,
+            transfers,
+            stateRepository,
+            () => session.State);
+        _tradeCoordinator.LocalStateChanged += session.NotifyExternallyPersistedStateChanged;
+        _tradeCoordinator.ProtocolRejected += reason =>
+            GD.PushWarning($"Rejected multiplayer trade packet: {reason}");
+    }
+
+    private static void RecoverInterruptedTradePrepares(
+        TradeTransferService transfers,
+        GodotJsonGameStateRepository stateRepository,
+        GameSession session)
+    {
+        var interrupted = session.State.PendingTradeJournal
+            .Select(entry => entry.TradeId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (interrupted.Length == 0)
+            return;
+
+        foreach (var tradeId in interrupted)
+            transfers.AbortPrepared(session.State, tradeId);
+
+        try
+        {
+            stateRepository.Save(session.State);
+            session.NotifyExternallyPersistedStateChanged();
+            GD.Print($"Recovered {interrupted.Length} interrupted pre-commit multiplayer trade(s) by aborting them locally.");
+        }
+        catch (Exception exception)
+        {
+            // Recovery is an unlock operation only. A persistence problem must not prevent the
+            // offline/singleplayer game from starting; the same idempotent recovery will retry next launch.
+            GD.PushWarning($"Could not persist interrupted trade recovery: {exception.Message}");
+        }
     }
 
     private void ComposeMultiplayerProbeIfRequested(GameSession session)
