@@ -51,23 +51,16 @@ public partial class MutationAdornment2D : Node2D
 
         var spriteScale = Mathf.Abs(_target.Scale.X);
         if (_showAngel)
-            DrawPerspectiveHalo(VoidlingMutationVisualMetrics.ForSpriteTarget(spriteScale));
+            DrawPixelHalo(VoidlingMutationVisualMetrics.ForSpriteTarget(spriteScale));
 
         if (_sparkleCount > 0)
             DrawTraitSparkles(spriteScale);
     }
 
-    private void DrawPerspectiveHalo(AngelHaloVisual halo)
+    private void DrawPixelHalo(AngelHaloVisual halo)
     {
-        var ellipse = VoidlingMutationVisualMetrics.BuildEllipse(halo);
-        var half = ellipse.Length / 2;
-
-        for (var i = half; i < ellipse.Length; i++)
-            DrawLine(ellipse[i], ellipse[(i + 1) % ellipse.Length], Color.FromHtml("#B98C32"), halo.BackWidth, true);
-        for (var i = 0; i < half; i++)
-            DrawLine(ellipse[i], ellipse[i + 1], Color.FromHtml("#F1CE55"), halo.FrontWidth, true);
-        for (var i = 2; i < 7; i++)
-            DrawLine(ellipse[i], ellipse[i + 1], Color.FromHtml("#FFF2A8"), halo.ShineWidth, true);
+        foreach (var pixel in VoidlingMutationVisualMetrics.BuildPixels(halo))
+            DrawRect(pixel.Rect, VoidlingMutationVisualMetrics.ColorFor(pixel.Tone));
     }
 
     private void DrawTraitSparkles(float spriteScale)
