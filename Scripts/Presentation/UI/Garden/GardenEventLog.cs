@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 using VoidlingGame;
 
@@ -53,8 +54,6 @@ public partial class GardenEventLog : VBoxContainer
             return;
 
         _history.Text = string.Join("\n", _entries.Select(entry => $"• {entry}"));
-        // Godot follows the latest line when new events arrive. The scroll bar remains enabled,
-        // so the player can manually scroll back through the current session between events.
         _history.ScrollToLine(Math.Max(0, _entries.Count - 1));
     }
 }
