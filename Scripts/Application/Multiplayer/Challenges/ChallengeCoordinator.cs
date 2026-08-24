@@ -177,8 +177,8 @@ public sealed class ChallengeCoordinator
     }
 
     /// <summary>
-    /// Starts a mode after its caller has built immutable mode-specific start data. Multiplayer race
-    /// synchronization adds a payload-hash acknowledgement before invoking this boundary.
+    /// Starts a mode after its caller has built immutable mode-specific start data. Race challenges
+    /// must already be Ready, which prevents presentation from bypassing the race hash handshake.
     /// </summary>
     public ChallengeOperationResult StartChallenge(
         string challengeId,
@@ -189,7 +189,9 @@ public sealed class ChallengeCoordinator
             return ChallengeOperationResult.Failed(context.Error);
         if (startPayload.Length > ChallengeValidation.MaxStartPayloadBytes)
             return ChallengeOperationResult.Failed("Challenge start payload is too large.");
-        if (!_connection.IsLocalHost && context.Snapshot!.CreatorId != context.Local!.Id)
+        if (context.Snapshot!.Kind == ChallengeKind.Race && context.Snapshot.Phase != ChallengePhase.Ready)
+            return ChallengeOperationResult.Failed("Race challenge must complete its synchronized Ready handshake before starting.");
+        if (!_connection.IsLocalHost && context.Snapshot.CreatorId != context.Local!.Id)
             return ChallengeOperationResult.Failed("Only the challenge creator or lobby host can start it.");
 
         var bytes = startPayload.ToArray();
@@ -321,7 +323,11 @@ public sealed class ChallengeCoordinator
             return;
         }
 
-        ProtocolRejected?.Invoke("Challenge packet was malformed or used an unsupported message type.");
+        if (MultiplayerProtocol.TryPeekMessageType(packet.Payload.Span, out var messageType) &&
+            messageType.StartsWith("challenge.", StringComparison.Ordinal))
+        {
+            ProtocolRejected?.Invoke("Challenge packet was malformed or used an unsupported challenge message type.");
+        }
     }
 
     private void HandleHostOffer(
@@ -428,6 +434,7 @@ public sealed class ChallengeCoordinator
         if (!_connection.IsLocalHost ||
             !_challenges.TryGetValue(challengeId, out var current) ||
             current.Phase is not (ChallengePhase.Offered or ChallengePhase.Forming or ChallengePhase.Ready) ||
+            (current.Kind == ChallengeKind.Race && current.Phase != ChallengePhase.Ready) ||
             current.Participants.Length < 2 ||
             startPayload == null ||
             startPayload.Length > ChallengeValidation.MaxStartPayloadBytes)
@@ -568,8 +575,8 @@ public sealed class ChallengeCoordinator
                 var creatorPresent = _connection.IsLobbyMember(snapshot.CreatorId);
                 var remaining = snapshot.Participants.Where(_connection.IsLobbyMember).ToArray();
                 if (!creatorPresent ||
-                    snapshot.Phase is ChallengePhase.Ready or ChallengePhase.Running &&
-                    remaining.Length != snapshot.Participants.Length)
+                    ((snapshot.Phase is ChallengePhase.Ready or ChallengePhase.Running) &&
+                     remaining.Length != snapshot.Participants.Length))
                 {
                     PublishHostState(Cancelled(snapshot));
                     continue;
