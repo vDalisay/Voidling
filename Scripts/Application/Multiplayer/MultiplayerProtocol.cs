@@ -335,4 +335,41 @@ public static class MultiplayerProtocol
             return false;
         }
     }
+
+    /// <summary>
+    /// Safely inspects an envelope for protocol routing without interpreting its payload. This lets
+    /// multiple typed sub-protocols share one transport channel without treating each other as malformed.
+    /// </summary>
+    internal static bool TryPeekMessageType(ReadOnlySpan<byte> bytes, out string messageType)
+    {
+        messageType = string.Empty;
+        if (bytes.Length == 0 || bytes.Length > MaxPacketBytes)
+            return false;
+
+        try
+        {
+            var envelope = JsonSerializer.Deserialize<Envelope>(bytes);
+            if (envelope == null ||
+                envelope.ProtocolVersion != CurrentVersion ||
+                string.IsNullOrWhiteSpace(envelope.MessageType) ||
+                envelope.MessageType.Length > 128 ||
+                string.IsNullOrWhiteSpace(envelope.MessageId) ||
+                !Guid.TryParseExact(envelope.MessageId, "N", out _) ||
+                envelope.SenderId == 0)
+            {
+                return false;
+            }
+
+            messageType = envelope.MessageType;
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
+    }
 }
