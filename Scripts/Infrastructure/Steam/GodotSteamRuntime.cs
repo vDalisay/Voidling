@@ -10,6 +10,7 @@ namespace Voidling.Infrastructure.Steam;
 public partial class GodotSteamRuntime : Node
 {
     private GodotSteamApi? _api;
+    private Action? _pollAction;
 
     internal event Action<long, long>? LobbyCreated;
     internal event Action<long, long, bool, long>? LobbyJoined;
@@ -17,12 +18,21 @@ public partial class GodotSteamRuntime : Node
     internal event Action? LobbyMembershipChanged;
     internal event Action<long>? NetworkingMessagesSessionRequested;
 
-    internal void Configure(GodotSteamApi api)
+    internal void Configure(GodotSteamApi api, Action? pollAction = null)
     {
         if (IsInsideTree())
             throw new InvalidOperationException("GodotSteamRuntime must be configured before entering the scene tree.");
 
         _api = api ?? throw new ArgumentNullException(nameof(api));
+        _pollAction = pollAction;
+    }
+
+    internal void SetPollAction(Action pollAction)
+    {
+        if (IsInsideTree())
+            throw new InvalidOperationException("GodotSteamRuntime polling must be configured before entering the scene tree.");
+
+        _pollAction = pollAction ?? throw new ArgumentNullException(nameof(pollAction));
     }
 
     public override void _Ready()
@@ -46,7 +56,10 @@ public partial class GodotSteamRuntime : Node
     }
 
     public override void _Process(double delta)
-        => _api?.RunCallbacks();
+    {
+        _api?.RunCallbacks();
+        _pollAction?.Invoke();
+    }
 
     private void ConnectIfPresent(string signalName, Callable callable)
     {
