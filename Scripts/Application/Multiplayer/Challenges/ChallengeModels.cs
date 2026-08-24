@@ -49,7 +49,10 @@ public sealed record ChallengeOperationResult(bool Success, string? ChallengeId,
 public static class ChallengeValidation
 {
     public const int MaxParticipants = 4;
-    public const int MaxStartPayloadBytes = 48 * 1024;
+
+    // System.Text.Json base64-encodes byte arrays, so the raw mode payload must remain comfortably
+    // below the shared 64 KiB envelope limit after base64 expansion and metadata overhead.
+    public const int MaxStartPayloadBytes = 24 * 1024;
 
     public static bool IsValidSnapshot(ChallengeSnapshot? snapshot)
     {
