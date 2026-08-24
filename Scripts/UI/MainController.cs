@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Presentation.Racing;
+using Voidling.Presentation.UI.Common;
 
 namespace VoidlingGame;
 
@@ -17,10 +18,10 @@ public partial class MainController : Node
     private GardenController _garden = null!;
     private CanvasLayer _uiLayer = null!;
     private Control _uiRoot = null!;
+    private ModalHost _modalHost = null!;
     private Label _coinsLabel = null!;
     private PanelContainer? _detailsPanel;
     private PanelContainer? _eggsPanel;
-    private Control? _modal;
     private Label _toastLabel = null!;
     private float _toastSeconds;
     private string _selectedId = "";
@@ -40,6 +41,9 @@ public partial class MainController : Node
 
         BuildTopBar();
         BuildToast();
+
+        _modalHost = new ModalHost { ZIndex = 100 };
+        _uiRoot.AddChild(_modalHost);
 
         GameSession.Instance.StateChanged += RefreshUi;
         GameSession.Instance.ToastRequested += ShowToast;
@@ -70,7 +74,7 @@ public partial class MainController : Node
         if (_race != null || !inputEvent.IsActionPressed("ui_cancel"))
             return;
 
-        if (_modal != null)
+        if (_modalHost.IsOpen)
             CloseModal();
         else
             ShowSettingsExtended();
@@ -134,55 +138,16 @@ public partial class MainController : Node
         RebuildDetailsPanel();
         RebuildEggsPanel();
 
-        if (_modal != null)
+        if (_modalHost.IsOpen)
             HideGardenHudPanels();
     }
 
     private VBoxContainer OpenModal(string title, Vector2 size)
     {
-        CloseModal(false);
+        if (_modalHost.IsOpen)
+            CloseModal(false);
         HideGardenHudPanels();
-
-        var overlay = new Control
-        {
-            MouseFilter = Control.MouseFilterEnum.Stop,
-            Position = Vector2.Zero,
-            Size = new Vector2(ScreenWidth, ScreenHeight)
-        };
-        _uiRoot.AddChild(overlay);
-        _modal = overlay;
-
-        var shade = new ColorRect
-        {
-            Color = new Color(0.16f, 0.24f, 0.20f, 0.48f),
-            Position = Vector2.Zero,
-            Size = new Vector2(ScreenWidth, ScreenHeight),
-            MouseFilter = Control.MouseFilterEnum.Stop
-        };
-        overlay.AddChild(shade);
-
-        var panel = UiFactory.CreatePanel(size);
-        panel.Position = new Vector2((ScreenWidth - size.X) * 0.5f, (ScreenHeight - size.Y) * 0.5f);
-        panel.Size = size;
-        overlay.AddChild(panel);
-
-        var box = new VBoxContainer();
-        box.AddThemeConstantOverride("separation", 7);
-        panel.AddChild(box);
-
-        var heading = new HBoxContainer();
-        heading.AddThemeConstantOverride("separation", 7);
-        var titleLabel = UiFactory.CreateTitle(title);
-        titleLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        titleLabel.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-        heading.AddChild(titleLabel);
-        var close = UiFactory.CreateButton("X");
-        close.CustomMinimumSize = new Vector2(30, 23);
-        close.Pressed += CloseModal;
-        heading.AddChild(close);
-        box.AddChild(heading);
-
-        return box;
+        return _modalHost.Open(title, size, CloseModal);
     }
 
     private void HideGardenHudPanels()
@@ -197,9 +162,7 @@ public partial class MainController : Node
 
     private void CloseModal(bool restoreGardenHud)
     {
-        if (_modal != null && GodotObject.IsInstanceValid(_modal))
-            _modal.QueueFree();
-        _modal = null;
+        _modalHost.Close();
 
         if (restoreGardenHud && _race == null && _uiRoot != null && _uiRoot.Visible)
             RefreshUi();
