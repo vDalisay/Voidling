@@ -17,7 +17,7 @@ public partial class GameSession
 
     /// <summary>
     /// Allocates one persistent race seed and snapshots the selected Voidling plus generated CPU
-    /// opponents before presentation starts. The RaceController receives no live mutable state.
+    /// opponents before presentation starts. The RaceScreen receives no live mutable state.
     /// </summary>
     public RaceEntry CreateRaceEntryFor(string selectedCreatureId)
     {
@@ -37,8 +37,8 @@ public partial class GameSession
         if (_raceResults == null)
             throw new InvalidOperationException("RaceResultUseCase was not configured by Bootstrap.");
 
-        var result = _raceResults.Apply(State, placement);
-        SaveAndNotify($"Race reward: +{result.CoinsAwarded} sprouts.");
-        return result.CoinsAwarded;
+        var result = _raceResults.AwardPlacement(State, placement);
+        SaveAndNotify($"Race reward: +{result.Reward} sprouts.");
+        return result.Reward;
     }
 }
