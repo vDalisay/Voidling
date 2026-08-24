@@ -67,6 +67,8 @@ The Resource is loaded only by Bootstrap and converted before entering Applicati
 
 `Scripts/Bootstrap/GameBootstrap.cs` is the explicit composition root. It is the one place that intentionally sees concrete Infrastructure plus Application/Domain implementations.
 
+It loads the designer-authored balance Resource once, converts it to immutable domain rules, and supplies that same rules object to the Application services. The transitional `GameRules` presentation facade is configured from the same object so old UI paths cannot drift onto a second set of defaults.
+
 No DI container has been introduced. Manual composition remains small and readable.
 
 ### Presentation reference architecture
@@ -91,6 +93,8 @@ Currently migrated representative UI:
 
 Use semantic keys (`UI_*`) for new player-facing presentation text. User-created Voidling names remain literal.
 
+The direct Windows launcher now performs Godot's import phase before starting the game. This ensures a clean clone generates CSV translation resources rather than relying on an existing `.godot` cache.
+
 ### Tests and CI
 
 The architecture branch has fast xUnit coverage for genetics, inbreeding, mutations, migration, simulation, shop transactions, settings, roster operations and race performance.
@@ -102,9 +106,12 @@ CI currently performs:
 3. Release build;
 4. Domain/Application boundary enforcement;
 5. domain/application tests;
-6. Godot headless project/scene parse.
+6. Debug build for Godot editor-side C# integration;
+7. blocking Godot `--import` resource import;
+8. verification that the CSV localization resource was generated;
+9. actual headless main-scene runtime smoke test with runtime errors treated as CI failures.
 
-CI rejects `Godot` references in Domain/Application and rejects `GameSession.Instance` from those inward layers.
+CI rejects `Godot` references in Domain/Application and rejects `GameSession.Instance` from those inward layers. The two-stage Godot import/runtime check exists because a short editor scan can return exit code zero while still logging unresolved resources or autoload errors.
 
 ## Intentionally transitional code
 
@@ -124,7 +131,7 @@ Do not add new feature rules here. New features should enter through Application
 
 ### `GameRules`
 
-`Scripts/Core/GameRules.cs` still combines presentation labels/colors with compatibility accessors. Domain formulas and balance data have already moved inward.
+`Scripts/Core/GameRules.cs` still combines presentation labels/colors with compatibility accessors. Domain formulas and balance data have already moved inward, and Bootstrap configures this facade from the exact same immutable rules used by Application.
 
 Do not add new deterministic formulas to `GameRules`. New presentation catalogs can gradually replace its label/color responsibilities as screens migrate.
 
