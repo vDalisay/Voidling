@@ -8,6 +8,7 @@ namespace Voidling.Infrastructure.Multiplayer;
 
 public sealed record OptionalMultiplayerComposition(
     MultiplayerConnectionService Connection,
+    ConnectedZoneService ConnectedZone,
     Node? RuntimeNode,
     bool SteamAvailable,
     string? UnavailableReason);
@@ -47,12 +48,13 @@ public static class OptionalMultiplayerComposer
             ILobbyService lobbies = new SteamLobbyService(api, runtime, identity);
             IMultiplayerTransport transport = new SteamNetworkingMessagesTransport(api, runtime, lobbies);
             var connection = new MultiplayerConnectionService(identity, lobbies, transport);
+            var connectedZone = new ConnectedZoneService(connection);
             runtime.SetPollAction(connection.Poll);
 
             if (!connection.IsAvailable)
                 return CreateOffline(connection.UnavailableReason ?? "Steam multiplayer is unavailable.");
 
-            return new OptionalMultiplayerComposition(connection, runtime, true, null);
+            return new OptionalMultiplayerComposition(connection, connectedZone, runtime, true, null);
         }
         catch (Exception exception)
         {
@@ -66,7 +68,8 @@ public static class OptionalMultiplayerComposer
         var lobbies = new OfflineLobbyService(reason);
         var transport = new OfflineMultiplayerTransport(reason);
         var connection = new MultiplayerConnectionService(identity, lobbies, transport);
-        return new OptionalMultiplayerComposition(connection, null, false, reason);
+        var connectedZone = new ConnectedZoneService(connection);
+        return new OptionalMultiplayerComposition(connection, connectedZone, null, false, reason);
     }
 
     private static ulong ResolveSteamAppId()
