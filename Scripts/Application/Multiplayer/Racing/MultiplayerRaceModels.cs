@@ -1,10 +1,12 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Voidling.Application.Multiplayer.Challenges;
 using Voidling.Application.Ports.Multiplayer;
 using Voidling.Application.Racing;
 using Voidling.Domain.Racing;
@@ -215,7 +217,7 @@ public static class MultiplayerRaceStartCodec
     {
         payload = default!;
         error = null;
-        if (bytes.Length == 0 || bytes.Length > Multiplayer.Challenges.ChallengeValidation.MaxStartPayloadBytes)
+        if (bytes.Length == 0 || bytes.Length > ChallengeValidation.MaxStartPayloadBytes)
         {
             error = "Multiplayer race start payload has an invalid size.";
             return false;
@@ -287,7 +289,7 @@ public static class MultiplayerRaceValidation
         }
 
         var array = entrants.ToArray();
-        if (array.Length is < 2 or > Multiplayer.Challenges.ChallengeValidation.MaxParticipants)
+        if (array.Length is < 2 or > ChallengeValidation.MaxParticipants)
         {
             error = "Multiplayer races require between 2 and 4 participants.";
             return false;
@@ -365,7 +367,7 @@ public static class StableRaceSeed
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(challengeId);
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"voidling:multiplayer-race:v1:{challengeId}"));
-        var seed = BitConverter.ToUInt64(hash, 0);
+        var seed = BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan(0, sizeof(ulong)));
         return seed == 0 ? 1UL : seed;
     }
 }
