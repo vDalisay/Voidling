@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Godot;
 using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Details;
 using Voidling.Presentation.UI.Racing;
 
 namespace VoidlingGame;
@@ -54,228 +55,46 @@ public partial class MainController : Node
         if (data == null)
             return;
 
-        // OpenModal closes any existing menu and hides the persistent inspection/egg HUD,
-        // leaving Details as the single foreground context.
+        var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
+        var otherMutations = data.RareTraits?.Count(trait =>
+            !string.Equals(trait.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
+        var stats = GameRules.StatIds.Select(statId =>
+        {
+            var gene = GameRules.GetGene(data, statId);
+            return new DetailsStatViewState(
+                StatPresentationCatalog.NameFor(statId),
+                StatPresentationCatalog.ColorFor(statId),
+                GameRules.GradeName(gene.ExpressedValue),
+                GameRules.StatLevel(data, statId),
+                Mathf.RoundToInt(GameRules.EffectiveStat(data, statId)),
+                GameRules.StatLevelProgress(data, statId),
+                GameRules.GradeName(gene.AlleleA),
+                GameRules.GradeName(gene.AlleleB));
+        }).ToArray();
+        var rareTraits = data.RareTraits.Select(trait => new DetailsRareTraitViewState(
+            trait.TraitId,
+            _session.NameFor(trait.FounderCreatureId),
+            trait.GenerationFromFounder,
+            trait.CanTransmit)).ToArray();
+
+        var state = new DetailsScreenState(
+            data.Name,
+            data.Stage == LifeStage.Adult,
+            data.FamilyGeneration,
+            data.InbreedingBurdenLevel,
+            GameRules.TintColor(data.TintHex),
+            hasAngel,
+            otherMutations,
+            data.Genome.ColorAlleleA,
+            data.Genome.ColorAlleleB,
+            data.Genome.ExpressedColorIndex,
+            stats,
+            rareTraits);
+
         var box = OpenModal($"{data.Name.ToUpperInvariant()} — DETAILS", new Vector2(536, 318));
-
-        var tabs = new HBoxContainer();
-        tabs.AddThemeConstantOverride("separation", 5);
-        var statsTab = UiFactory.CreateButton("Stats");
-        var dnaTab = UiFactory.CreateButton("DNA");
-        var visualTab = UiFactory.CreateButton("Visual");
-        foreach (var tab in new[] { statsTab, dnaTab, visualTab })
-        {
-            tab.CustomMinimumSize = new Vector2(92, 23);
-            tab.ToggleMode = true;
-            tabs.AddChild(tab);
-        }
-        box.AddChild(tabs);
-
-        var body = new VBoxContainer
-        {
-            CustomMinimumSize = new Vector2(492, 238),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill
-        };
-        body.AddThemeConstantOverride("separation", 5);
-        box.AddChild(body);
-
-        void ClearBody()
-        {
-            foreach (var child in body.GetChildren())
-            {
-                body.RemoveChild(child);
-                child.QueueFree();
-            }
-        }
-
-        void SelectTab(Button active)
-        {
-            statsTab.ButtonPressed = active == statsTab;
-            dnaTab.ButtonPressed = active == dnaTab;
-            visualTab.ButtonPressed = active == visualTab;
-        }
-
-        void RenderStats()
-        {
-            ClearBody();
-            SelectTab(statsTab);
-
-            var header = new HBoxContainer();
-            header.AddThemeConstantOverride("separation", 12);
-            header.AddChild(UiFactory.CreatePortrait(data, new Vector2(58, 58)));
-            var summary = new VBoxContainer();
-            summary.AddThemeConstantOverride("separation", 2);
-            summary.AddChild(UiFactory.CreateLabel(data.Stage == LifeStage.Adult ? "ADULT" : "CHILD", 8));
-            summary.AddChild(UiFactory.CreateLabel("Rank controls potential; level/progress reflects training.", 6));
-            header.AddChild(summary);
-            body.AddChild(header);
-
-            foreach (var statId in GameRules.StatIds)
-                body.AddChild(CreateDetailsStatRow(data, statId));
-        }
-
-        void RenderDna()
-        {
-            ClearBody();
-            SelectTab(dnaTab);
-
-            var intro = new HBoxContainer();
-            intro.AddThemeConstantOverride("separation", 10);
-            intro.AddChild(UiFactory.CreatePortrait(data, new Vector2(54, 54)));
-            var summary = new VBoxContainer();
-            summary.AddThemeConstantOverride("separation", 2);
-            summary.AddChild(UiFactory.CreateLabel($"Generation {data.FamilyGeneration}", 8));
-            summary.AddChild(UiFactory.CreateLabel($"Inbreeding burden: {data.InbreedingBurdenLevel}", 7));
-            summary.AddChild(UiFactory.CreateLabel("DNA1 and DNA2 are the two inherited ability genes.", 6));
-            intro.AddChild(summary);
-            body.AddChild(intro);
-
-            body.AddChild(CreateDnaHeaderRow());
-            foreach (var statId in GameRules.StatIds)
-                body.AddChild(CreateDnaStatRow(data, statId));
-
-            body.AddChild(UiFactory.CreateLabel(
-                $"Color DNA1 #{data.Genome.ColorAlleleA}    DNA2 #{data.Genome.ColorAlleleB}", 7));
-        }
-
-        void RenderVisual()
-        {
-            ClearBody();
-            SelectTab(visualTab);
-
-            var row = new HBoxContainer();
-            row.AddThemeConstantOverride("separation", 18);
-            row.AddChild(UiFactory.CreatePortrait(data, new Vector2(130, 130)));
-
-            var info = new VBoxContainer();
-            info.AddThemeConstantOverride("separation", 7);
-            info.AddChild(UiFactory.CreateLabel("CURRENT APPEARANCE", 9));
-            info.AddChild(new ColorRect
-            {
-                Color = GameRules.TintColor(data.TintHex),
-                CustomMinimumSize = new Vector2(118, 30)
-            });
-            var expressedColor = data.Genome.ExpressedColorIndex == 0
-                ? data.Genome.ColorAlleleA
-                : data.Genome.ColorAlleleB;
-            info.AddChild(UiFactory.CreateLabel($"Shown color DNA: #{expressedColor}", 7));
-            info.AddChild(UiFactory.CreateLabel($"Color DNA: #{data.Genome.ColorAlleleA} / #{data.Genome.ColorAlleleB}", 7));
-            row.AddChild(info);
-            body.AddChild(row);
-
-            if (data.RareTraits.Count == 0)
-            {
-                body.AddChild(UiFactory.CreateLabel("Mutation: none", 8));
-            }
-            else
-            {
-                foreach (var trait in data.RareTraits)
-                {
-                    var founderName = _session.NameFor(trait.FounderCreatureId);
-                    body.AddChild(UiFactory.CreateLabel(
-                        $"Mutation: {trait.TraitId}  • founder {founderName}  • G{trait.GenerationFromFounder}  • {(trait.CanTransmit ? "can pass on" : "terminal")}", 7));
-                }
-            }
-        }
-
-        statsTab.Pressed += RenderStats;
-        dnaTab.Pressed += RenderDna;
-        visualTab.Pressed += RenderVisual;
-        RenderStats();
-    }
-
-    private static Control CreateDetailsStatRow(VoidlingData data, string statId)
-    {
-        var panel = new PanelContainer { CustomMinimumSize = new Vector2(472, 29) };
-        var tint = StatPresentationCatalog.ColorFor(statId);
-        var background = tint;
-        background.A = statId == "stamina" ? 0.55f : 0.22f;
-        var style = new StyleBoxFlat { BgColor = background, BorderColor = Color.FromHtml("#BE916C") };
-        style.SetBorderWidthAll(1);
-        style.ContentMarginLeft = style.ContentMarginRight = 6;
-        style.ContentMarginTop = style.ContentMarginBottom = 3;
-        panel.AddThemeStyleboxOverride("panel", style);
-
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 8);
-        panel.AddChild(row);
-
-        var gene = GameRules.GetGene(data, statId);
-        var name = UiFactory.CreateLabel(StatPresentationCatalog.NameFor(statId).ToUpperInvariant(), 8);
-        name.CustomMinimumSize = new Vector2(75, 19);
-        name.AddThemeColorOverride("font_color", tint);
-        name.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
-        name.AddThemeConstantOverride("outline_size", 1);
-        row.AddChild(name);
-
-        var values = UiFactory.CreateLabel(
-            $"RANK {GameRules.GradeName(gene.ExpressedValue)}   LV {GameRules.StatLevel(data, statId):00}   STAT {Mathf.RoundToInt(GameRules.EffectiveStat(data, statId)):00}", 7);
-        values.CustomMinimumSize = new Vector2(205, 19);
-        row.AddChild(values);
-
-        var progress = CreateStatProgressBar(data, statId, new Vector2(165, 8));
-        progress.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        row.AddChild(progress);
-        return panel;
-    }
-
-    private static Control CreateDnaHeaderRow()
-    {
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 4);
-        row.AddChild(CreateDnaCell("GENE", 176, 7, true));
-        row.AddChild(CreateDnaCell("DNA1", 142, 7, true));
-        row.AddChild(CreateDnaCell("DNA2", 142, 7, true));
-        return row;
-    }
-
-    private static Control CreateDnaStatRow(VoidlingData data, string statId)
-    {
-        var gene = GameRules.GetGene(data, statId);
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 4);
-
-        var identity = StatPresentationCatalog.ColorFor(statId);
-        var bg = identity;
-        bg.A = statId == "stamina" ? 0.65f : 0.28f;
-
-        row.AddChild(CreateDnaCell(StatPresentationCatalog.NameFor(statId).ToUpperInvariant(), 176, 7, false, bg, identity));
-        row.AddChild(CreateDnaCell(GameRules.GradeName(gene.AlleleA), 142, 9, false));
-        row.AddChild(CreateDnaCell(GameRules.GradeName(gene.AlleleB), 142, 9, false));
-        return row;
-    }
-
-    private static Control CreateDnaCell(
-        string text,
-        float width,
-        int fontSize,
-        bool header,
-        Color? background = null,
-        Color? fontColor = null)
-    {
-        var panel = new PanelContainer { CustomMinimumSize = new Vector2(width, header ? 19 : 23) };
-        var style = new StyleBoxFlat
-        {
-            BgColor = background ?? (header ? Color.FromHtml("#C9B98D") : Color.FromHtml("#F1DCAA")),
-            BorderColor = Color.FromHtml("#BE916C")
-        };
-        style.SetBorderWidthAll(1);
-        style.ContentMarginLeft = style.ContentMarginRight = 3;
-        style.ContentMarginTop = style.ContentMarginBottom = 2;
-        panel.AddThemeStyleboxOverride("panel", style);
-
-        var label = UiFactory.CreateLabel(text, fontSize);
-        label.HorizontalAlignment = HorizontalAlignment.Center;
-        label.VerticalAlignment = VerticalAlignment.Center;
-        if (fontColor.HasValue)
-        {
-            label.AddThemeColorOverride("font_color", fontColor.Value);
-            label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
-            label.AddThemeConstantOverride("outline_size", 1);
-        }
-        panel.AddChild(label);
-        return panel;
+        var screen = new DetailsScreen();
+        screen.Configure(state);
+        box.AddChild(screen);
     }
 
     private void ShowFamilyTree()
