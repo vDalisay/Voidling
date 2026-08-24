@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Godot;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
@@ -7,10 +6,10 @@ using Voidling.Domain.Stats;
 namespace VoidlingGame;
 
 /// <summary>
-/// Legacy compatibility facade. Gameplay formulas are moving into typed Domain rules/services;
-/// presentation-only labels/colors remain here until their consuming screens migrate.
+/// Legacy compatibility facade. Gameplay formulas are moving into typed Domain rules/services.
 /// Bootstrap configures this facade with the same immutable rules used by Application so legacy
-/// presentation cannot drift from designer-authored balance during the incremental migration.
+/// callers cannot drift from designer-authored balance during the incremental migration.
+/// Presentation labels/colors have moved to Presentation catalogs and must not be added here.
 /// </summary>
 public static class GameRules
 {
@@ -32,27 +31,6 @@ public static class GameRules
     public static int MaxStatLevel => _balance.Stats.MaxLevel;
 
     public static readonly string[] StatIds = { "run", "swim", "fly", "power", "stamina" };
-
-    public static readonly IReadOnlyDictionary<string, string> StatDisplayNames =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["run"] = "Run",
-            ["swim"] = "Swim",
-            ["fly"] = "Fly",
-            ["power"] = "Power",
-            ["stamina"] = "Stamina"
-        };
-
-    // Presentation catalog retained for compatibility with the current UI.
-    public static readonly IReadOnlyDictionary<string, Color> StatColors =
-        new Dictionary<string, Color>(StringComparer.Ordinal)
-        {
-            ["run"] = Color.FromHtml("#78C96A"),
-            ["swim"] = Color.FromHtml("#F2D45C"),
-            ["fly"] = Color.FromHtml("#B47AE5"),
-            ["power"] = Color.FromHtml("#E7655A"),
-            ["stamina"] = Color.FromHtml("#F7F3E7")
-        };
 
     public static readonly string[] PaletteHex =
     {
@@ -108,9 +86,6 @@ public static class GameRules
 
     public static float EffectiveStat(VoidlingData data, string statId)
         => _stats.GetEffectiveStat(data, statId);
-
-    public static Color StatColor(string statId)
-        => StatColors.TryGetValue(statId, out var color) ? color : Colors.White;
 
     public static bool HasMutation(VoidlingData data, string mutationId)
         => data.RareTraits.Exists(t => string.Equals(t.TraitId, mutationId, StringComparison.OrdinalIgnoreCase));
