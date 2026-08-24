@@ -10,6 +10,7 @@ using Voidling.Application.Training;
 using Voidling.Domain.Rules;
 using Voidling.Infrastructure.Audio;
 using Voidling.Infrastructure.Persistence;
+using Voidling.Infrastructure.Resources;
 using VoidlingGame;
 
 namespace Voidling.Bootstrap;
@@ -21,10 +22,11 @@ namespace Voidling.Bootstrap;
 public partial class GameBootstrap : Node
 {
     private const string SavePath = "user://voidling_mvp_save.json";
+    private const string BalancePath = "res://Resources/Balance/demo_balance.tres";
 
     public override void _Ready()
     {
-        var rules = GameBalanceRules.DemoDefaults;
+        var rules = LoadBalanceRules();
         var session = new GameSession
         {
             Name = nameof(GameSession)
@@ -43,5 +45,15 @@ public partial class GameBootstrap : Node
             new RaceResultUseCase(rules));
 
         AddChild(session);
+    }
+
+    private static GameBalanceRules LoadBalanceRules()
+    {
+        var authored = ResourceLoader.Load<GameBalanceResource>(BalancePath);
+        if (authored != null)
+            return authored.ToDomainRules();
+
+        GD.PushWarning($"Could not load balance resource at {BalancePath}; using code defaults.");
+        return GameBalanceRules.DemoDefaults;
     }
 }
