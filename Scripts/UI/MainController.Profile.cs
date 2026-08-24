@@ -13,7 +13,7 @@ public partial class MainController : Node
             _detailsPanel.QueueFree();
         _detailsPanel = null;
 
-        var data = GameSession.Instance.FindVoidling(_selectedId);
+        var data = _session.FindVoidling(_selectedId);
         if (data == null)
             return;
 
@@ -79,7 +79,7 @@ public partial class MainController : Node
         box.AddChild(details);
 
         var parentText = data.ParentAId.Length > 0
-            ? $"Parents: {GameSession.Instance.NameFor(data.ParentAId)} + {GameSession.Instance.NameFor(data.ParentBId)}"
+            ? $"Parents: {_session.NameFor(data.ParentAId)} + {_session.NameFor(data.ParentBId)}"
             : "Parents: starter/store line";
         var parents = UiFactory.CreateLabel(parentText, 6);
         parents.AutowrapMode = TextServer.AutowrapMode.WordSmart;
@@ -128,7 +128,7 @@ public partial class MainController : Node
                 return;
             committed = true;
 
-            if (!GameSession.Instance.RenameVoidling(data.Id, edit.Text))
+            if (!_session.RenameVoidling(data.Id, edit.Text))
             {
                 edit.QueueFree();
                 if (GodotObject.IsInstanceValid(nameButton))
@@ -152,7 +152,7 @@ public partial class MainController : Node
         var gene = GameRules.GetGene(data, statId);
         var effective = (int)Math.Round(GameRules.EffectiveStat(data, statId));
         var level = GameRules.StatLevel(data, statId);
-        var count = GameSession.Instance.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0;
+        var count = _session.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0;
         var color = GameRules.StatColor(statId);
 
         var label = UiFactory.CreateLabel(
@@ -169,7 +169,7 @@ public partial class MainController : Node
         UiFactory.ApplyPixelFont(use, 6);
         use.Disabled = count <= 0;
         var capturedStat = statId;
-        use.Pressed += () => GameSession.Instance.UseTrainingItem(_selectedId, capturedStat);
+        use.Pressed += () => _session.UseTrainingItem(_selectedId, capturedStat);
         row.AddChild(use);
         container.AddChild(row);
 
@@ -213,7 +213,7 @@ public partial class MainController : Node
         row.AddThemeConstantOverride("separation", 8);
         _eggsPanel.AddChild(row);
 
-        var eggs = GameSession.Instance.State.OwnedEggs;
+        var eggs = _session.State.OwnedEggs;
         var text = new VBoxContainer { CustomMinimumSize = new Vector2(292, 32) };
         text.AddChild(UiFactory.CreateLabel($"Eggs on island: {eggs.Count}", 8));
         if (eggs.Count == 0)
@@ -233,7 +233,7 @@ public partial class MainController : Node
             var discard = UiFactory.CreateButton("Discard");
             discard.CustomMinimumSize = new Vector2(66, 22);
             UiFactory.ApplyPixelFont(discard, 7);
-            discard.Pressed += () => GameSession.Instance.DiscardFailedEgg(failed.Id);
+            discard.Pressed += () => _session.DiscardFailedEgg(failed.Id);
             row.AddChild(discard);
         }
     }
@@ -256,7 +256,7 @@ public partial class MainController : Node
         for (var i = 0; i < GameRules.StatIds.Length; i++)
         {
             var statId = GameRules.StatIds[i];
-            var count = GameSession.Instance.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0;
+            var count = _session.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0;
             list.AddChild(CreateInventoryRow(UiFactory.CreateIcon(18 + i), $"{GameRules.StatDisplayNames[statId]} Treat", count));
         }
 
@@ -265,7 +265,7 @@ public partial class MainController : Node
             Atlas = EggTexture,
             Region = new Rect2(0, 0, EggTexture.GetWidth(), EggTexture.GetHeight())
         };
-        list.AddChild(CreateInventoryRow(eggAtlas, "Eggs on Island", GameSession.Instance.State.OwnedEggs.Count));
+        list.AddChild(CreateInventoryRow(eggAtlas, "Eggs on Island", _session.State.OwnedEggs.Count));
     }
 
     private static Control CreateInventoryRow(Texture2D iconTexture, string itemName, int count)
