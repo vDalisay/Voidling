@@ -28,8 +28,9 @@ public partial class GameBootstrap : Node
     private const string BalancePath = "res://Resources/Balance/demo_balance.tres";
 
     // Kept private: Bootstrap owns lifetime/composition, but it is not a service locator.
-    // Future multiplayer presentation should receive this dependency explicitly when composed.
+    // Future multiplayer presentation should receive these dependencies explicitly when composed.
     private MultiplayerConnectionService? _multiplayerConnection;
+    private ConnectedZoneService? _connectedZone;
 
     public override void _Ready()
     {
@@ -40,7 +41,6 @@ public partial class GameBootstrap : Node
         GameRules.Configure(rules);
 
         ComposeOptionalMultiplayer();
-        ComposeMultiplayerProbeIfRequested();
 
         var session = new GameSession
         {
@@ -61,12 +61,14 @@ public partial class GameBootstrap : Node
         session.ConfigureRacing(new RaceEntryFactory(rules));
 
         AddChild(session);
+        ComposeMultiplayerProbeIfRequested(session);
     }
 
     private void ComposeOptionalMultiplayer()
     {
         var multiplayer = OptionalMultiplayerComposer.Create();
         _multiplayerConnection = multiplayer.Connection;
+        _connectedZone = multiplayer.ConnectedZone;
 
         if (multiplayer.RuntimeNode != null)
         {
@@ -79,9 +81,9 @@ public partial class GameBootstrap : Node
         GD.Print(multiplayer.UnavailableReason ?? "Steam multiplayer unavailable; continuing in single-player mode.");
     }
 
-    private void ComposeMultiplayerProbeIfRequested()
+    private void ComposeMultiplayerProbeIfRequested(GameSession session)
     {
-        if (_multiplayerConnection == null)
+        if (_multiplayerConnection == null || _connectedZone == null)
             return;
 
         var args = OS.GetCmdlineArgs();
@@ -102,7 +104,7 @@ public partial class GameBootstrap : Node
         {
             Name = nameof(MultiplayerConnectivityProbe)
         };
-        probe.Configure(_multiplayerConnection, args);
+        probe.Configure(_multiplayerConnection, _connectedZone, session, args);
         AddChild(probe);
     }
 
