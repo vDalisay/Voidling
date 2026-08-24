@@ -20,6 +20,24 @@ if "%SKIP_BUILD%"=="0" (
 
 echo.
 echo ========================================
+echo   Voidling - Import resources
+echo ========================================
+echo Godot: %GODOT_EXE%
+echo.
+
+rem A direct command-line game launch does not provide the editor's normal import pass.
+rem Import first so a clean clone has CSV translations and any other generated resources.
+"%GODOT_EXE%" --headless --path "%CD%" --import
+set "IMPORT_EXIT=%ERRORLEVEL%"
+if not "%IMPORT_EXIT%"=="0" (
+    echo.
+    echo [ERROR] Godot resource import exited with code %IMPORT_EXIT%.
+    pause
+    exit /b %IMPORT_EXIT%
+)
+
+echo.
+echo ========================================
 echo   Voidling - Play
 echo ========================================
 echo Godot: %GODOT_EXE%
