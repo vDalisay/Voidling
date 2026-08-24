@@ -28,12 +28,14 @@ public sealed class LineageArchiveServiceTests
 
         new GameStateMigrationService(Rules).Normalize(state);
 
-        Assert.Equal(5, state.SaveVersion);
+        Assert.Equal(GameStateMigrationService.CurrentSaveVersion, state.SaveVersion);
         Assert.Same(genome, creature.Genome);
         var entry = Assert.Single(state.LineageArchive);
         Assert.Equal(creature.Id, entry.CreatureId);
         Assert.Equal("parent-a", entry.ParentAId);
         Assert.Equal("parent-b", entry.ParentBId);
+        Assert.Empty(state.PendingTradeJournal);
+        Assert.Empty(state.AppliedTradeIds);
     }
 
     [Fact]
