@@ -38,6 +38,7 @@ public partial class GardenEventLog : VBoxContainer
         UiFactory.ApplyPixelFont(_history, 6);
         _history.AddThemeColorOverride("default_color", Color.FromHtml("#465247"));
         AddChild(_history);
+        RefreshText();
     }
 
     public void Append(string message)
@@ -45,11 +46,15 @@ public partial class GardenEventLog : VBoxContainer
         if (string.IsNullOrWhiteSpace(message))
             return;
 
-        var normalized = message.Trim();
-        _entries.Enqueue(normalized);
+        _entries.Enqueue(message.Trim());
         while (_entries.Count > MaxEntries)
             _entries.Dequeue();
 
+        RefreshText();
+    }
+
+    private void RefreshText()
+    {
         if (_history == null || !GodotObject.IsInstanceValid(_history))
             return;
 
