@@ -165,6 +165,15 @@ msgstr "{0} Treat"
 msgid "UI_INVENTORY_EGGS"
 msgstr "Eggs on Island"
 
+msgid "UI_INVENTORY_FAILED_EGGS"
+msgstr "FAILED EGGS"
+
+msgid "UI_INVENTORY_FAILED_EGG"
+msgstr "Failed Egg {0}"
+
+msgid "UI_INVENTORY_DISCARD"
+msgstr "Discard"
+
 msgid "UI_DETAILS_STATS"
 msgstr "Stats"
 
