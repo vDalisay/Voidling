@@ -64,16 +64,19 @@ jobs:
       - name: Build debug for Godot editor
         run: dotnet build Voidling.csproj --configuration Debug --no-restore
 
-      # --import waits until asset imports finish. This is required for CSV translations and
-      # other source assets; --quit-after is frame-based and previously let CI exit mid-scan.
+      # --import waits until source assets are imported. --quit-after is frame-based and can
+      # let CI exit mid-scan, so keep this blocking pass even though localization is now a
+      # directly loadable committed gettext file rather than a generated CSV artifact.
       - name: Import Godot resources
         run: godot --headless --path . --import
 
-      - name: Verify localization import
+      - name: Verify localization source
         shell: bash
         run: |
-          if [ ! -f Localization/strings.en.translation ]; then
-            echo 'Godot did not generate Localization/strings.en.translation from strings.csv.'
+          test -f Localization/en.po
+          grep -q 'res://Localization/en.po' project.godot
+          if grep -q 'strings\.en\.translation' project.godot; then
+            echo 'project.godot must not reference a generated translation artifact.'
             exit 1
           fi
 
