@@ -17,10 +17,17 @@ public partial class MutationAdornment2D : Node2D
 
     public void Setup(VoidlingData data, AnimatedSprite2D target)
     {
-        _target = target;
-        _showAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
-        _sparkleCount = data.RareTraits.Count(t =>
+        var showAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
+        var sparkleCount = data.RareTraits.Count(t =>
             !string.Equals(t.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase));
+        Setup(showAngel, sparkleCount, target);
+    }
+
+    public void Setup(bool showAngel, int sparkleCount, AnimatedSprite2D target)
+    {
+        _target = target;
+        _showAngel = showAngel;
+        _sparkleCount = Math.Max(0, sparkleCount);
         ZIndex = target.ZIndex + 8;
         Position = target.Position;
         QueueRedraw();
