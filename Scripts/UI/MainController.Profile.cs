@@ -200,45 +200,6 @@ public partial class MainController : Node
         return bar;
     }
 
-    private void RebuildEggsPanel()
-    {
-        if (_eggsPanel != null && GodotObject.IsInstanceValid(_eggsPanel))
-            _eggsPanel.QueueFree();
-
-        _eggsPanel = UiFactory.CreatePanel(new Vector2(386, 54));
-        _eggsPanel.Position = new Vector2(10, 294);
-        _eggsPanel.Size = new Vector2(386, 54);
-        _uiRoot.AddChild(_eggsPanel);
-
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 8);
-        _eggsPanel.AddChild(row);
-
-        var eggs = _session.State.OwnedEggs;
-        var text = new VBoxContainer { CustomMinimumSize = new Vector2(292, 32) };
-        text.AddChild(UiFactory.CreateLabel($"Eggs on island: {eggs.Count}", 8));
-        if (eggs.Count == 0)
-            text.AddChild(UiFactory.CreateLabel("Buy or breed an egg to place it in the garden.", 6));
-        else
-        {
-            var summaries = eggs.Take(5).Select(egg => egg.State == EggState.Failed
-                ? "FAILED"
-                : $"{Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds))}s");
-            text.AddChild(UiFactory.CreateLabel(string.Join("  •  ", summaries), 6));
-        }
-        row.AddChild(text);
-
-        var failed = eggs.FirstOrDefault(e => e.State == EggState.Failed);
-        if (failed != null)
-        {
-            var discard = UiFactory.CreateButton("Discard");
-            discard.CustomMinimumSize = new Vector2(66, 22);
-            UiFactory.ApplyPixelFont(discard, 7);
-            discard.Pressed += () => _session.DiscardFailedEgg(failed.Id);
-            row.AddChild(discard);
-        }
-    }
-
     private void ShowInventory()
     {
         var items = GameRules.StatIds
