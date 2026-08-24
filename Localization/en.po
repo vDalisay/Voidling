@@ -254,3 +254,9 @@ msgstr "You placed #{0}"
 
 msgid "UI_RACE_RETURN"
 msgstr "Return to Garden"
+
+msgid "UI_GARDEN_LOG_TITLE"
+msgstr "GARDEN LOG"
+
+msgid "UI_GARDEN_LOG_STARTED"
+msgstr "Garden session started."
