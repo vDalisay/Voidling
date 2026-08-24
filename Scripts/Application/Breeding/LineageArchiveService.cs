@@ -46,6 +46,17 @@ public sealed class LineageArchiveService
         return state.LineageArchive.ToArray();
     }
 
+    public bool CanMerge(
+        GameStateData state,
+        IEnumerable<LineageArchiveEntry> incomingEntries,
+        out string? error)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(incomingEntries);
+        EnsureCurrentEntries(state);
+        return TryBuildMerged(state.LineageArchive, incomingEntries, out _, out error);
+    }
+
     /// <summary>
     /// Merges lineage received from another player. Conflicting ancestry identity is rejected;
     /// cosmetic/biographical metadata may refresh when the stable ancestry identity matches.
@@ -58,40 +69,11 @@ public sealed class LineageArchiveService
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(incomingEntries);
         EnsureCurrentEntries(state);
-        error = null;
 
-        var current = state.LineageArchive.ToDictionary(
-            entry => entry.CreatureId,
-            entry => entry,
-            StringComparer.Ordinal);
+        if (!TryBuildMerged(state.LineageArchive, incomingEntries, out var merged, out error))
+            return false;
 
-        var staged = new Dictionary<string, LineageArchiveEntry>(current, StringComparer.Ordinal);
-        foreach (var incoming in incomingEntries)
-        {
-            if (!IsValid(incoming))
-            {
-                error = "Incoming lineage contains an invalid entry.";
-                return false;
-            }
-
-            if (staged.TryGetValue(incoming.CreatureId, out var existing))
-            {
-                if (!existing.HasSameLineageIdentity(incoming))
-                {
-                    error = $"Lineage conflict for creature '{incoming.CreatureId}'.";
-                    return false;
-                }
-
-                staged[incoming.CreatureId] = MergeEquivalent(existing, incoming);
-                continue;
-            }
-
-            staged.Add(incoming.CreatureId, incoming);
-        }
-
-        state.LineageArchive = staged.Values
-            .OrderBy(entry => entry.CreatureId, StringComparer.Ordinal)
-            .ToList();
+        state.LineageArchive = merged!;
         return true;
     }
 
@@ -142,6 +124,51 @@ public sealed class LineageArchiveService
         return selected.Values
             .OrderBy(entry => entry.CreatureId, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private static bool TryBuildMerged(
+        IEnumerable<LineageArchiveEntry> existingEntries,
+        IEnumerable<LineageArchiveEntry> incomingEntries,
+        out List<LineageArchiveEntry>? merged,
+        out string? error)
+    {
+        merged = null;
+        error = null;
+
+        var staged = new Dictionary<string, LineageArchiveEntry>(StringComparer.Ordinal);
+        foreach (var existing in existingEntries)
+        {
+            if (IsValid(existing) && !staged.ContainsKey(existing.CreatureId))
+                staged.Add(existing.CreatureId, existing);
+        }
+
+        foreach (var incoming in incomingEntries)
+        {
+            if (!IsValid(incoming))
+            {
+                error = "Incoming lineage contains an invalid entry.";
+                return false;
+            }
+
+            if (staged.TryGetValue(incoming.CreatureId, out var existing))
+            {
+                if (!existing.HasSameLineageIdentity(incoming))
+                {
+                    error = $"Lineage conflict for creature '{incoming.CreatureId}'.";
+                    return false;
+                }
+
+                staged[incoming.CreatureId] = MergeEquivalent(existing, incoming);
+                continue;
+            }
+
+            staged.Add(incoming.CreatureId, incoming);
+        }
+
+        merged = staged.Values
+            .OrderBy(entry => entry.CreatureId, StringComparer.Ordinal)
+            .ToList();
+        return true;
     }
 
     private static LineageArchiveEntry MergeEquivalent(
