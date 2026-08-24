@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Inventory;
 
 namespace VoidlingGame;
 
@@ -241,63 +241,21 @@ public partial class MainController : Node
 
     private void ShowInventory()
     {
-        var box = OpenModal("INVENTORY", new Vector2(380, 292));
-        box.AddChild(UiFactory.CreateLabel("Items you currently own", 9));
-        var scroll = new ScrollContainer
-        {
-            CustomMinimumSize = new Vector2(340, 198),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill
-        };
-        box.AddChild(scroll);
-        var list = new VBoxContainer();
-        list.AddThemeConstantOverride("separation", 5);
-        scroll.AddChild(list);
+        var items = GameRules.StatIds
+            .Select((statId, index) => new InventoryItemViewState(
+                string.Format(Tr("UI_INVENTORY_TREAT"), StatPresentationCatalog.NameFor(statId)),
+                _session.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0,
+                18 + index))
+            .ToList();
+        items.Add(new InventoryItemViewState(
+            Tr("UI_INVENTORY_EGGS"),
+            _session.State.OwnedEggs.Count,
+            -1,
+            UsesEggIcon: true));
 
-        for (var i = 0; i < GameRules.StatIds.Length; i++)
-        {
-            var statId = GameRules.StatIds[i];
-            var count = _session.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0;
-            list.AddChild(CreateInventoryRow(UiFactory.CreateIcon(18 + i), $"{StatPresentationCatalog.NameFor(statId)} Treat", count));
-        }
-
-        var eggAtlas = new AtlasTexture
-        {
-            Atlas = EggTexture,
-            Region = new Rect2(0, 0, EggTexture.GetWidth(), EggTexture.GetHeight())
-        };
-        list.AddChild(CreateInventoryRow(eggAtlas, "Eggs on Island", _session.State.OwnedEggs.Count));
-    }
-
-    private static Control CreateInventoryRow(Texture2D iconTexture, string itemName, int count)
-    {
-        var panel = new PanelContainer { CustomMinimumSize = new Vector2(328, 32) };
-        var style = new StyleBoxFlat { BgColor = Color.FromHtml("#F0D9A8"), BorderColor = Color.FromHtml("#C59670") };
-        style.SetBorderWidthAll(1);
-        style.ContentMarginLeft = style.ContentMarginRight = 7;
-        style.ContentMarginTop = style.ContentMarginBottom = 4;
-        panel.AddThemeStyleboxOverride("panel", style);
-
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 8);
-        panel.AddChild(row);
-        row.AddChild(new TextureRect
-        {
-            Texture = iconTexture,
-            CustomMinimumSize = new Vector2(22, 22),
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        });
-        var name = UiFactory.CreateLabel(itemName, 8);
-        name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        name.VerticalAlignment = VerticalAlignment.Center;
-        row.AddChild(name);
-        var amount = UiFactory.CreateLabel($"x{count}", 9);
-        amount.CustomMinimumSize = new Vector2(42, 20);
-        amount.HorizontalAlignment = HorizontalAlignment.Right;
-        amount.VerticalAlignment = VerticalAlignment.Center;
-        row.AddChild(amount);
-        return panel;
+        var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(380, 292));
+        var screen = new InventoryScreen();
+        screen.Configure(new InventoryScreenState(items));
+        box.AddChild(screen);
     }
 }
