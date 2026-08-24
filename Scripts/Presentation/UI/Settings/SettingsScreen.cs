@@ -1,5 +1,6 @@
 using System;
 using Godot;
+using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Settings;
 
@@ -36,7 +37,7 @@ public partial class SettingsScreen : VBoxContainer
             throw new InvalidOperationException("SettingsScreen must be configured before AddChild.");
 
         AddThemeConstantOverride("separation", 4);
-        SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 
         AddChild(UiFactory.CreateLabel(Tr("UI_SETTINGS_AUDIO"), 9));
         AddChild(BuildVolumeRow());
@@ -66,7 +67,7 @@ public partial class SettingsScreen : VBoxContainer
             Step = 5,
             Value = _state.MasterVolume * 100.0f,
             CustomMinimumSize = new Vector2(220, 22),
-            SizeFlagsHorizontal = SizeFlags.ExpandFill
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
         };
         volume.ValueChanged += value =>
         {
