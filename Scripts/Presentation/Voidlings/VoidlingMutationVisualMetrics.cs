@@ -1,72 +1,114 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace Voidling.Presentation.Voidlings;
 
+public enum AngelHaloPixelTone
+{
+    Back,
+    Gold,
+    Shine
+}
+
+public readonly record struct AngelHaloPixel(Rect2 Rect, AngelHaloPixelTone Tone);
+
 public readonly record struct AngelHaloVisual(
     Vector2 Center,
-    float RadiusX,
-    float RadiusY,
-    float BackWidth,
-    float FrontWidth,
-    float ShineWidth);
+    float CellSize,
+    bool Compact);
 
 /// <summary>
-/// Canonical geometry for Voidling mutation adornments. World actors, challenge sprites and UI
-/// portraits all derive their halo proportions from this one definition so visual style changes
-/// do not need to be repeated in every screen.
+/// Canonical Angel-mutation presentation. Garden actors, races and UI portraits all consume this
+/// exact pixel layout so changing the halo style in one place changes it everywhere.
 /// </summary>
 public static class VoidlingMutationVisualMetrics
 {
     private const float ReferenceScale = 0.62f;
-    private const float ReferenceHaloCenterY = -29.0f;
-    private const float ReferenceRadiusX = 8.8f;
-    private const float ReferenceRadiusY = 2.8f;
-    private const float ReferenceBackWidth = 1.5f;
-    private const float ReferenceFrontWidth = 2.0f;
-    private const float ReferenceShineWidth = 0.9f;
 
-    public static AngelHaloVisual ForGroundedSprite(float spriteScale)
+    // This is the deliberately pixelated perspective halo that replaced the older smooth ellipse.
+    // Keep the pattern here rather than recreating circles/arcs in individual screens.
+    private static readonly string[] AdultPattern =
     {
-        var ratio = Mathf.Max(0.05f, spriteScale / ReferenceScale);
-        return new AngelHaloVisual(
-            new Vector2(0, ReferenceHaloCenterY * ratio),
-            ReferenceRadiusX * ratio,
-            ReferenceRadiusY * ratio,
-            Mathf.Max(0.8f, ReferenceBackWidth * ratio),
-            Mathf.Max(1.0f, ReferenceFrontWidth * ratio),
-            Mathf.Max(0.7f, ReferenceShineWidth * ratio));
-    }
+        "  #####  ",
+        "##     ##",
+        "#       #",
+        "##     ##",
+        "  #####  "
+    };
+
+    private static readonly string[] CompactPattern =
+    {
+        " ### ",
+        "#   #",
+        " ### "
+    };
+
+    public static readonly Color BackColor = Color.FromHtml("#C99B37");
+    public static readonly Color GoldColor = Color.FromHtml("#F1CE55");
+    public static readonly Color ShineColor = Color.FromHtml("#FFF2A8");
 
     public static AngelHaloVisual ForSpriteTarget(float spriteScale)
     {
-        var grounded = ForGroundedSprite(spriteScale);
-        var spriteCenterY = VoidlingGroundVisualMetrics.SpriteCenterYOffset(spriteScale);
-        return grounded with { Center = grounded.Center - new Vector2(0, spriteCenterY) };
+        var ratio = Mathf.Max(0.25f, spriteScale / ReferenceScale);
+        var compact = spriteScale < 0.5f;
+
+        // MutationAdornment2D follows the sprite center, so this is intentionally target-local.
+        // The adult value matches the smaller pixel halo that previously sat above garden heads.
+        var localCenterY = compact ? -8.0f : -17.0f * ratio;
+        return new AngelHaloVisual(new Vector2(0, localCenterY), 1.0f, compact);
     }
 
     public static AngelHaloVisual ForPortrait(float nominalSpritePixels, Vector2 controlSize)
     {
-        // 48px is the source frame size. Tie halo dimensions to the intended sprite display size,
-        // not to a card/button that may stretch the TextureRect horizontally.
         var spriteScale = Mathf.Max(0.20f, nominalSpritePixels / 48.0f);
-        var target = ForSpriteTarget(spriteScale);
-        return target with
-        {
-            Center = new Vector2(controlSize.X * 0.5f, controlSize.Y * 0.5f + target.Center.Y)
-        };
+        var compact = nominalSpritePixels < 28.0f;
+        var localCenterY = compact ? -8.0f : -17.0f * Mathf.Max(0.65f, spriteScale / ReferenceScale);
+
+        // UI cards can render larger than world sprites, but keep whole-pixel cells so the halo
+        // remains crisp instead of turning into the smooth/vector version the project replaced.
+        var cellSize = Mathf.Max(1.0f, Mathf.Round(nominalSpritePixels / 48.0f));
+        return new AngelHaloVisual(
+            new Vector2(controlSize.X * 0.5f, controlSize.Y * 0.5f + localCenterY),
+            cellSize,
+            compact);
     }
 
-    public static Vector2[] BuildEllipse(AngelHaloVisual halo, int points = 32)
+    public static IReadOnlyList<AngelHaloPixel> BuildPixels(AngelHaloVisual halo)
     {
-        var ellipse = new Vector2[points];
-        for (var i = 0; i < points; i++)
+        var pattern = halo.Compact ? CompactPattern : AdultPattern;
+        var pixels = new List<AngelHaloPixel>(32);
+        var width = pattern[0].Length;
+        var height = pattern.Length;
+        var origin = halo.Center - new Vector2(
+            (width - 1) * halo.CellSize * 0.5f,
+            (height - 1) * halo.CellSize * 0.5f);
+
+        for (var y = 0; y < height; y++)
         {
-            var angle = Mathf.Tau * i / points;
-            ellipse[i] = halo.Center + new Vector2(
-                Mathf.Cos(angle) * halo.RadiusX,
-                Mathf.Sin(angle) * halo.RadiusY);
+            for (var x = 0; x < pattern[y].Length; x++)
+            {
+                if (pattern[y][x] != '#')
+                    continue;
+
+                var tone = y < height / 2
+                    ? AngelHaloPixelTone.Back
+                    : y == height / 2
+                        ? AngelHaloPixelTone.Gold
+                        : AngelHaloPixelTone.Shine;
+                pixels.Add(new AngelHaloPixel(
+                    new Rect2(origin + new Vector2(x, y) * halo.CellSize, Vector2.One * halo.CellSize),
+                    tone));
+            }
         }
 
-        return ellipse;
+        return pixels;
     }
+
+    public static Color ColorFor(AngelHaloPixelTone tone)
+        => tone switch
+        {
+            AngelHaloPixelTone.Back => BackColor,
+            AngelHaloPixelTone.Shine => ShineColor,
+            _ => GoldColor
+        };
 }
