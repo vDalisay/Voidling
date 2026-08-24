@@ -273,6 +273,17 @@ public static class MultiplayerProtocol
     }
 
     private static byte[] Encode<T>(string messageType, PlatformUser sender, T payload)
+        => EncodeMessage(messageType, sender, payload);
+
+    private static bool TryDecode<T>(
+        ReadOnlySpan<byte> bytes,
+        PlatformUserId transportSender,
+        string expectedMessageType,
+        out Guid messageId,
+        out T? payload)
+        => TryDecodeMessage(bytes, transportSender, expectedMessageType, out messageId, out payload);
+
+    internal static byte[] EncodeMessage<T>(string messageType, PlatformUser sender, T payload)
     {
         ArgumentNullException.ThrowIfNull(sender);
         ArgumentException.ThrowIfNullOrWhiteSpace(messageType);
@@ -288,7 +299,7 @@ public static class MultiplayerProtocol
         return JsonSerializer.SerializeToUtf8Bytes(envelope);
     }
 
-    private static bool TryDecode<T>(
+    internal static bool TryDecodeMessage<T>(
         ReadOnlySpan<byte> bytes,
         PlatformUserId transportSender,
         string expectedMessageType,
