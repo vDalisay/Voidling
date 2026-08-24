@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using Voidling.Application.Breeding;
 using Voidling.Application.Multiplayer;
@@ -39,6 +40,7 @@ public partial class GameBootstrap : Node
         GameRules.Configure(rules);
 
         ComposeOptionalMultiplayer();
+        ComposeMultiplayerProbeIfRequested();
 
         var session = new GameSession
         {
@@ -75,6 +77,33 @@ public partial class GameBootstrap : Node
 
         // This is informational, never fatal. Single-player must remain fully functional offline.
         GD.Print(multiplayer.UnavailableReason ?? "Steam multiplayer unavailable; continuing in single-player mode.");
+    }
+
+    private void ComposeMultiplayerProbeIfRequested()
+    {
+        if (_multiplayerConnection == null)
+            return;
+
+        var args = OS.GetCmdlineArgs();
+        var requested = false;
+        foreach (var arg in args)
+        {
+            if (!arg.StartsWith("--voidling-mp-", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            requested = true;
+            break;
+        }
+
+        if (!requested)
+            return;
+
+        var probe = new MultiplayerConnectivityProbe
+        {
+            Name = nameof(MultiplayerConnectivityProbe)
+        };
+        probe.Configure(_multiplayerConnection, args);
+        AddChild(probe);
     }
 
     private static GameBalanceRules LoadBalanceRules()
