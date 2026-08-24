@@ -48,6 +48,6 @@ public partial class GameSession
         if (string.IsNullOrEmpty(statId))
             return statId;
 
-        return string.Concat(char.ToUpperInvariant(statId[0]), statId.AsSpan(1));
+        return char.ToUpperInvariant(statId[0]) + statId[1..];
     }
 }
