@@ -45,6 +45,8 @@ public partial class GameSession
             return false;
         }
 
+        var parentAName = NameFor(parentAId);
+        var parentBName = NameFor(parentBId);
         var result = _breeding!.Execute(
             State,
             parentAId,
@@ -61,6 +63,7 @@ public partial class GameSession
             ? $" Egg carries level {result.ChildBurden} inbreeding risk ({result.HatchFailurePercent}%)."
             : "";
         SaveAndNotify($"Breeding produced an egg.{warning}");
+        RaiseGardenEvent($"{parentAName} and {parentBName} produced a new egg.");
         return true;
     }
 }
