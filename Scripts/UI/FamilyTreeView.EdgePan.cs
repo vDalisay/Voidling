@@ -7,9 +7,11 @@ public partial class FamilyTreeView
     private const float TreeEdgePanMargin = 12.0f;
     private const float TreeEdgePanSpeed = 120.0f;
 
+    public bool EdgePanningEnabled { get; set; } = true;
+
     public override void _Process(double delta)
     {
-        if (_panning || GameSession.Instance == null || !GameSession.Instance.State.EdgePanning)
+        if (_panning || !EdgePanningEnabled)
             return;
 
         var mouse = GetLocalMousePosition();
