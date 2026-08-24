@@ -29,8 +29,8 @@ public sealed record DetailsScreenState(
     Color TintColor,
     bool HasAngelMutation,
     int OtherMutationCount,
-    string ColorAlleleA,
-    string ColorAlleleB,
+    int ColorAlleleA,
+    int ColorAlleleB,
     int ExpressedColorIndex,
     IReadOnlyList<DetailsStatViewState> Stats,
     IReadOnlyList<DetailsRareTraitViewState> RareTraits);
