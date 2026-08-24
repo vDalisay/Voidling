@@ -23,5 +23,15 @@ UI_SETTINGS_EDGE_PAN_OFF,Edge Pan: OFF
 UI_SETTINGS_EDGE_PAN_TOOLTIP,Move the cursor to an edge to pan the garden or family tree.
 UI_SETTINGS_HINT,ESC opens/closes this menu from the garden.
 UI_SHOP_TITLE,SPROUT MARKET
+UI_SHOP_WELCOME,Pick something from the stall
+UI_SHOP_WALLET,SPROUTS  {0}
+UI_SHOP_TREATS_TITLE,TRAINING TREATS
+UI_SHOP_TREATS_SUBTITLE,One treat is consumed when you train a stat.
+UI_SHOP_EGGS_TITLE,MYSTERY EGGS
+UI_SHOP_EGGS_SUBTITLE,Each egg already carries its own hidden DNA.
+UI_SHOP_OWNED,OWNED {0}
+UI_SHOP_BUY,BUY {0}
+UI_SHOP_MYSTERY_EGG,MYSTERY EGG {0}
+UI_SHOP_HIDDEN_DNA,Hidden DNA
 UI_RACE_PICKER_TITLE,CHOOSE A RACER
 UI_RACE_START,Start Race
