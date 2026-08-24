@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Racing;
 
 namespace VoidlingGame;
 
@@ -10,93 +10,42 @@ public partial class MainController : Node
 {
     private void ShowRacePicker()
     {
-        var owned = _session.State.Voidlings.ToList();
-        var box = OpenModal("CHOOSE A RACER", new Vector2(552, 310));
+        var owned = _session.State.Voidlings.ToArray();
+        var selectedId = owned.Any(v => v.Id == _selectedId)
+            ? _selectedId
+            : owned.FirstOrDefault()?.Id ?? string.Empty;
 
-        if (owned.Count == 0)
+        var viewState = owned.Select(CreateRacePickerView).ToArray();
+        var box = OpenModal(Tr("UI_RACE_PICKER_TITLE"), new Vector2(552, 310));
+        var screen = new RacePickerScreen();
+        screen.Configure(new RacePickerScreenState(viewState, selectedId));
+        screen.RaceRequested += creatureId =>
         {
-            box.AddChild(UiFactory.CreateLabel("No Voidlings are currently on the farm.", 9));
-            return;
-        }
+            var selected = _session.FindVoidling(creatureId);
+            if (selected == null)
+                return;
 
-        var chosen = owned.FirstOrDefault(v => v.Id == _selectedId) ?? owned[0];
-        box.AddChild(UiFactory.CreateLabel("Choose one Voidling. All other racers are generated CPU opponents.", 7));
-
-        var scroll = new ScrollContainer
-        {
-            CustomMinimumSize = new Vector2(510, 90),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            VerticalScrollMode = ScrollContainer.ScrollMode.Disabled
-        };
-        var cards = new HBoxContainer();
-        cards.AddThemeConstantOverride("separation", 7);
-        scroll.AddChild(cards);
-        box.AddChild(scroll);
-
-        var previewRow = new HBoxContainer();
-        previewRow.AddThemeConstantOverride("separation", 12);
-        var previewPortrait = UiFactory.CreatePortrait(chosen, new Vector2(72, 72));
-        previewRow.AddChild(previewPortrait);
-        var previewText = new VBoxContainer();
-        previewText.AddThemeConstantOverride("separation", 2);
-        var previewName = UiFactory.CreateTitle(chosen.Name);
-        var previewStats = UiFactory.CreateLabel("", 7);
-        previewText.AddChild(previewName);
-        previewText.AddChild(previewStats);
-        previewRow.AddChild(previewText);
-        box.AddChild(previewRow);
-
-        var cardButtons = new Dictionary<string, Button>(StringComparer.Ordinal);
-
-        void UpdatePreview(VoidlingData candidate)
-        {
-            chosen = candidate;
-            UiFactory.SetPortraitData(previewPortrait, candidate);
-            previewName.Text = candidate.Name;
-            previewStats.Text = string.Join("   ", GameRules.StatIds.Select(stat =>
-                $"{StatPresentationCatalog.NameFor(stat)} {GameRules.GradeName(GameRules.GetGene(candidate, stat).ExpressedValue)} {Mathf.RoundToInt(GameRules.EffectiveStat(candidate, stat))}"));
-
-            foreach (var pair in cardButtons)
-                pair.Value.ButtonPressed = pair.Key == candidate.Id;
-        }
-
-        foreach (var creature in owned)
-        {
-            var entry = new VBoxContainer { CustomMinimumSize = new Vector2(84, 78) };
-            entry.AddThemeConstantOverride("separation", 1);
-
-            var card = UiFactory.CreateButton("");
-            card.CustomMinimumSize = new Vector2(80, 58);
-            card.ToggleMode = true;
-            card.KeepPressedOutside = true;
-            cardButtons[creature.Id] = card;
-
-            var portrait = UiFactory.CreatePortrait(creature, new Vector2(48, 48));
-            portrait.Position = new Vector2(16, 4);
-            portrait.Size = new Vector2(48, 48);
-            card.AddChild(portrait);
-
-            var captured = creature;
-            card.Pressed += () => UpdatePreview(captured);
-            entry.AddChild(card);
-
-            var name = UiFactory.CreateLabel(creature.Name, 6);
-            name.HorizontalAlignment = HorizontalAlignment.Center;
-            name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-            entry.AddChild(name);
-            cards.AddChild(entry);
-        }
-
-        UpdatePreview(chosen);
-
-        var start = UiFactory.CreateButton("Start Race");
-        start.CustomMinimumSize = new Vector2(170, 26);
-        start.Pressed += () =>
-        {
             CloseModal();
-            StartRace(chosen);
+            StartRace(selected);
         };
-        box.AddChild(start);
+        box.AddChild(screen);
+    }
+
+    private static RacePickerVoidlingViewState CreateRacePickerView(VoidlingData creature)
+    {
+        var hasAngel = GameRules.HasMutation(creature, GameRules.AngelMutationId);
+        var otherMutations = creature.RareTraits?.Count(trait =>
+            !string.Equals(trait.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
+        var statSummary = string.Join("   ", GameRules.StatIds.Select(stat =>
+            $"{StatPresentationCatalog.NameFor(stat)} {GameRules.GradeName(GameRules.GetGene(creature, stat).ExpressedValue)} {Mathf.RoundToInt(GameRules.EffectiveStat(creature, stat))}"));
+
+        return new RacePickerVoidlingViewState(
+            creature.Id,
+            creature.Name,
+            GameRules.TintColor(creature.TintHex),
+            hasAngel,
+            otherMutations,
+            statSummary);
     }
 
     private void ShowDetails()
