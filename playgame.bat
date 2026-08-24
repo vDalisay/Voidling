@@ -26,7 +26,8 @@ echo Godot: %GODOT_EXE%
 echo.
 
 rem A direct command-line game launch does not provide the editor's normal import pass.
-rem Import first so a clean clone has CSV translations and any other generated resources.
+rem Import first so a clean clone has all generated texture/scene resources available.
+rem Localization itself uses a committed gettext .po file and does not rely on a generated path.
 "%GODOT_EXE%" --headless --path "%CD%" --import
 set "IMPORT_EXIT=%ERRORLEVEL%"
 if not "%IMPORT_EXIT%"=="0" (
