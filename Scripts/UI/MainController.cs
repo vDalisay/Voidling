@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.Racing;
 
 namespace VoidlingGame;
 
@@ -23,7 +24,7 @@ public partial class MainController : Node
     private Label _toastLabel = null!;
     private float _toastSeconds;
     private string _selectedId = "";
-    private RaceController? _race;
+    private RaceScreen? _race;
 
     public override void _Ready()
     {
@@ -206,20 +207,34 @@ public partial class MainController : Node
 
     private void StartRace(VoidlingData selected)
     {
+        var entry = GameSession.Instance.CreateRaceEntryFor(selected.Id);
+        var autoFinish = GameSession.Instance.State.AutoFinishRaces;
+
         _garden.SetGameplayActive(false);
         _garden.Visible = false;
         _uiRoot.Visible = false;
 
-        _race = new RaceController();
-        AddChild(_race);
-        _race.ReturnRequested += EndRace;
-        _race.Setup(selected);
+        var race = new RaceScreen();
+        race.Configure(entry, autoFinish);
+        race.RaceCompleted += OnRaceCompleted;
+        race.ReturnRequested += EndRace;
+        _race = race;
+        AddChild(race);
+    }
+
+    private void OnRaceCompleted(int placement)
+    {
+        GameSession.Instance.ApplyRacePlacementReward(placement);
     }
 
     private void EndRace()
     {
         if (_race != null && GodotObject.IsInstanceValid(_race))
+        {
+            _race.RaceCompleted -= OnRaceCompleted;
+            _race.ReturnRequested -= EndRace;
             _race.QueueFree();
+        }
         _race = null;
 
         _garden.Visible = true;
