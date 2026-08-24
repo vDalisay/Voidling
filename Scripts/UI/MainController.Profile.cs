@@ -214,9 +214,23 @@ public partial class MainController : Node
             -1,
             UsesEggIcon: true));
 
+        var failedEggs = _session.State.OwnedEggs
+            .Where(egg => egg.State == EggState.Failed)
+            .Select((egg, index) => new FailedEggViewState(
+                egg.Id,
+                string.Format(Tr("UI_INVENTORY_FAILED_EGG"), index + 1)))
+            .ToList();
+
         var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(380, 292));
         var screen = new InventoryScreen();
-        screen.Configure(new InventoryScreenState(items));
+        screen.Configure(new InventoryScreenState(items, failedEggs));
+        screen.DiscardFailedEggRequested += eggId =>
+        {
+            _session.DiscardFailedEgg(eggId);
+            // Reopen on the next idle frame: the current signal emitter belongs to the modal
+            // subtree and ModalHost intentionally defers freeing that subtree until dispatch ends.
+            CallDeferred(nameof(ShowInventory));
+        };
         box.AddChild(screen);
     }
 }
