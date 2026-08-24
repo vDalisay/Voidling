@@ -45,4 +45,6 @@ UI_BREED_CLEAN_OUTCROSS,Clean outcross • inherited burden falls to level {0}.
 UI_BREED_UNRELATED_BURDEN,Unrelated pairing • inherited burden remains level {0}.
 UI_BREED_UNRELATED_CLEAN,Unrelated pairing • no inbreeding penalty.
 UI_RACE_PICKER_TITLE,CHOOSE A RACER
+UI_RACE_PICKER_EMPTY,No Voidlings are currently on the farm.
+UI_RACE_PICKER_HINT,Choose one Voidling. All other racers are generated CPU opponents.
 UI_RACE_START,Start Race
