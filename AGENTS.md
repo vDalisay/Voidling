@@ -69,6 +69,7 @@ Infrastructure (Godot filesystem, audio, Resources, localization adapters)
 - Use signals/events for local scene reactions; avoid a global event bus.
 - Player-facing text must use localization keys unless it is user-generated content.
 - `Scripts/Presentation/UI/Settings/SettingsScreen.cs` is the current reference screen pattern.
+- Voidling presentation primitives are shared across contexts. In particular, mutation/halo geometry comes from `VoidlingMutationVisualMetrics`, world mutations render through `MutationAdornment2D`, portrait mutations render through `HaloBadge`, and ground/shadow proportions come from `VoidlingGroundVisualMetrics`. Do not recreate challenge-, family-tree-, menu-, or garden-specific copies of these visuals.
 
 ### Infrastructure
 
