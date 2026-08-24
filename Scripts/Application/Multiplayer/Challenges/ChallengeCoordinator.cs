@@ -152,8 +152,33 @@ public sealed class ChallengeCoordinator
     }
 
     /// <summary>
+    /// Host-only seam used by a mode coordinator after it has collected and validated all
+    /// participant-specific immutable inputs but before its final start-payload handshake.
+    /// </summary>
+    public ChallengeOperationResult MarkChallengeReady(string challengeId)
+    {
+        if (!_connection.IsLocalHost || _connection.LocalUser == null)
+            return ChallengeOperationResult.Failed("Only the connected Garden host can mark a challenge ready.");
+        if (!_challenges.TryGetValue(challengeId, out var current) ||
+            current.Phase is not (ChallengePhase.Offered or ChallengePhase.Forming) ||
+            current.Participants.Length < 2)
+        {
+            return ChallengeOperationResult.Failed("Challenge is not ready to enter the ready phase.");
+        }
+        if (current.Participants.Any(user => !_connection.IsLobbyMember(user)))
+            return ChallengeOperationResult.Failed("Every challenge participant must still be in the connected Garden.");
+
+        PublishHostState(current with
+        {
+            Phase = ChallengePhase.Ready,
+            StartPayload = Array.Empty<byte>()
+        });
+        return ChallengeOperationResult.Succeeded(challengeId);
+    }
+
+    /// <summary>
     /// Starts a mode after its caller has built immutable mode-specific start data. Multiplayer race
-    /// synchronization will add a payload-hash acknowledgement before invoking this boundary.
+    /// synchronization adds a payload-hash acknowledgement before invoking this boundary.
     /// </summary>
     public ChallengeOperationResult StartChallenge(
         string challengeId,
@@ -181,6 +206,25 @@ public sealed class ChallengeCoordinator
             return ChallengeOperationResult.Failed("Could not send the challenge start request.");
         }
 
+        return ChallengeOperationResult.Succeeded(challengeId);
+    }
+
+    /// <summary>
+    /// Host-only terminal transition used after a mode has resolved its canonical result. Mode
+    /// reward application remains a separate local use case and is not performed here.
+    /// </summary>
+    public ChallengeOperationResult CompleteChallenge(string challengeId)
+    {
+        if (!_connection.IsLocalHost)
+            return ChallengeOperationResult.Failed("Only the connected Garden host can complete a challenge.");
+        if (!_challenges.TryGetValue(challengeId, out var current) || current.Phase != ChallengePhase.Running)
+            return ChallengeOperationResult.Failed("Only a running challenge can be completed.");
+
+        PublishHostState(current with
+        {
+            Phase = ChallengePhase.Completed,
+            StartPayload = Array.Empty<byte>()
+        });
         return ChallengeOperationResult.Succeeded(challengeId);
     }
 
@@ -288,6 +332,7 @@ public sealed class ChallengeCoordinator
         int maxParticipants)
     {
         var lobby = _connection.CurrentLobby;
+        PruneTerminalChallenges();
         if (!_connection.IsLocalHost ||
             lobby == null ||
             lobby.LobbyId != lobbyId ||
@@ -295,7 +340,7 @@ public sealed class ChallengeCoordinator
             !ChallengeValidation.IsValidChallengeId(challengeId) ||
             !Enum.IsDefined(kind) ||
             maxParticipants is < 2 or > ChallengeValidation.MaxParticipants ||
-            _challenges.Count >= ChallengeValidation.MaxChallengesPerLobby ||
+            ActiveChallengeCount() >= ChallengeValidation.MaxChallengesPerLobby ||
             _challenges.ContainsKey(challengeId) ||
             HasActiveChallenge(creatorId))
         {
@@ -345,7 +390,7 @@ public sealed class ChallengeCoordinator
             return;
         }
 
-        if (sender == current.CreatorId || current.Phase == ChallengePhase.Running)
+        if (sender == current.CreatorId || current.Phase is ChallengePhase.Ready or ChallengePhase.Running)
         {
             PublishHostState(Cancelled(current));
             return;
@@ -420,6 +465,7 @@ public sealed class ChallengeCoordinator
             return;
         }
 
+        PruneTerminalChallenges();
         var snapshots = _challenges.Values
             .OrderBy(snapshot => snapshot.ChallengeId, StringComparer.Ordinal)
             .ToArray();
@@ -502,14 +548,13 @@ public sealed class ChallengeCoordinator
             foreach (var snapshot in active)
             {
                 var cancelled = Cancelled(snapshot);
-                _challenges[cancelled.ChallengeId] = cancelled;
-                ChallengeChanged?.Invoke(cancelled);
-            }
-
-            if (_connection.IsLocalHost)
-            {
-                foreach (var snapshot in active.Select(Cancelled))
-                    PublishHostState(snapshot);
+                if (_connection.IsLocalHost)
+                    PublishHostState(cancelled);
+                else
+                {
+                    _challenges[cancelled.ChallengeId] = cancelled;
+                    ChallengeChanged?.Invoke(cancelled);
+                }
             }
         }
 
@@ -522,7 +567,9 @@ public sealed class ChallengeCoordinator
 
                 var creatorPresent = _connection.IsLobbyMember(snapshot.CreatorId);
                 var remaining = snapshot.Participants.Where(_connection.IsLobbyMember).ToArray();
-                if (!creatorPresent || snapshot.Phase == ChallengePhase.Running && remaining.Length != snapshot.Participants.Length)
+                if (!creatorPresent ||
+                    snapshot.Phase is ChallengePhase.Ready or ChallengePhase.Running &&
+                    remaining.Length != snapshot.Participants.Length)
                 {
                     PublishHostState(Cancelled(snapshot));
                     continue;
@@ -583,10 +630,25 @@ public sealed class ChallengeCoordinator
         return (local, lobby, snapshot, null);
     }
 
+    private int ActiveChallengeCount()
+        => _challenges.Values.Count(snapshot =>
+            snapshot.Phase is not (ChallengePhase.Completed or ChallengePhase.Cancelled));
+
     private bool HasActiveChallenge(PlatformUserId userId)
         => _challenges.Values.Any(snapshot =>
             snapshot.Contains(userId) &&
             snapshot.Phase is not (ChallengePhase.Completed or ChallengePhase.Cancelled));
+
+    private void PruneTerminalChallenges()
+    {
+        foreach (var challengeId in _challenges
+                     .Where(pair => pair.Value.Phase is ChallengePhase.Completed or ChallengePhase.Cancelled)
+                     .Select(pair => pair.Key)
+                     .ToArray())
+        {
+            _challenges.Remove(challengeId);
+        }
+    }
 
     private bool IsPacketFromCurrentHost(PlatformUserId sender)
         => _connection.CurrentLobby?.OwnerId == sender;
