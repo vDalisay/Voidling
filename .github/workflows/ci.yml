@@ -33,7 +33,7 @@ jobs:
       - name: Restore tests
         run: dotnet restore Tests/Voidling.Tests.csproj
 
-      - name: Build
+      - name: Build release
         run: dotnet build Voidling.csproj --configuration Release --no-restore
 
       - name: Enforce inward architecture boundaries
@@ -54,5 +54,32 @@ jobs:
       - name: Domain and application tests
         run: dotnet test Tests/Voidling.Tests.csproj --configuration Release --no-restore
 
-      - name: Parse project and scenes
-        run: godot --headless --path . --editor --quit-after 12
+      # Godot's editor-side C# integration loads the Debug assembly. Build it before the
+      # import pass so custom Resources/autoloads can be resolved on a completely clean clone.
+      - name: Build debug for Godot editor
+        run: dotnet build Voidling.csproj --configuration Debug --no-restore
+
+      # --import waits until asset imports finish. This is required for CSV translations and
+      # other source assets; --quit-after is frame-based and previously let CI exit mid-scan.
+      - name: Import Godot resources
+        run: godot --headless --path . --import
+
+      - name: Verify localization import
+        shell: bash
+        run: |
+          if [ ! -f Localization/strings.en.translation ]; then
+            echo 'Godot did not generate Localization/strings.en.translation from strings.csv.'
+            exit 1
+          fi
+
+      # Start the actual main scene after imports. Godot can return zero for some editor scan
+      # errors, so inspect the runtime log as well as the process exit code.
+      - name: Runtime smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 20s godot --headless --path . --quit-after 30 2>&1 | tee godot-runtime.log
+          if grep -E '^(ERROR|SCRIPT ERROR):' godot-runtime.log; then
+            echo 'Godot runtime emitted an error.'
+            exit 1
+          fi
