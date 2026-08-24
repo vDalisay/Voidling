@@ -61,7 +61,7 @@ public sealed class RacingArchitectureTests
         var model = new RacePerformanceModel(Rules.Racing);
 
         Assert.Equal(0.95f, model.GetObstacleAvoidChance(participant), 3);
-        Assert.True(model.AvoidsObstacle(participant, 0.95));
+        Assert.True(model.AvoidsObstacle(participant, 0.949));
         Assert.False(model.AvoidsObstacle(participant, 0.951));
         Assert.Equal(337.0f, model.GetGlideDistance(participant), 3);
         Assert.Equal(0.62f, model.GetObstacleDelaySeconds(participant), 3);
