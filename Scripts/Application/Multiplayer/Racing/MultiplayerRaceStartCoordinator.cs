@@ -331,17 +331,41 @@ public sealed class MultiplayerRaceStartCoordinator
         }
 
         var computedHash = MultiplayerRaceStartCodec.ComputeHash(startBytes);
-        if (!string.Equals(startHash, computedHash, StringComparison.Ordinal) ||
-            !MultiplayerRaceStartCodec.TryDecode(startBytes, out var start, out var error) ||
-            !string.Equals(start.ChallengeId, challengeId, StringComparison.Ordinal) ||
-            !ParticipantSetsMatch(challenge.Participants, start.Entrants) ||
-            !_entryFactory.TryResolve(start, out var resolved, out error))
+        if (!string.Equals(startHash, computedHash, StringComparison.Ordinal))
+        {
+            SendAckToHost(challengeId, startHash, false, "Race start payload hash did not match its proposal.");
+            return;
+        }
+
+        if (!MultiplayerRaceStartCodec.TryDecode(startBytes, out var start, out var validationError))
         {
             SendAckToHost(
                 challengeId,
                 startHash,
                 false,
-                error ?? "Race start payload failed local validation.");
+                validationError ?? "Race start payload could not be decoded.");
+            return;
+        }
+
+        if (!string.Equals(start.ChallengeId, challengeId, StringComparison.Ordinal))
+        {
+            SendAckToHost(challengeId, startHash, false, "Race start payload belongs to a different challenge.");
+            return;
+        }
+
+        if (!ParticipantSetsMatch(challenge.Participants, start.Entrants))
+        {
+            SendAckToHost(challengeId, startHash, false, "Race start participants differ from the challenge participants.");
+            return;
+        }
+
+        if (!_entryFactory.TryResolve(start, out var resolved, out validationError))
+        {
+            SendAckToHost(
+                challengeId,
+                startHash,
+                false,
+                validationError ?? "Race start payload does not match this game build.");
             return;
         }
 
@@ -415,7 +439,7 @@ public sealed class MultiplayerRaceStartCoordinator
             return;
 
         if (_connection.IsLocalHost &&
-            snapshot.Phase is ChallengePhase.Offered or ChallengePhase.Forming &&
+            (snapshot.Phase is ChallengePhase.Offered or ChallengePhase.Forming) &&
             _hosted.TryGetValue(snapshot.ChallengeId, out var preparation))
         {
             var participants = snapshot.Participants.ToHashSet();
