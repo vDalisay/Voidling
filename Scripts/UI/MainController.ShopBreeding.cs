@@ -1,5 +1,8 @@
+using System;
 using System.Linq;
 using Godot;
+using Voidling.Application.Breeding;
+using Voidling.Presentation.UI.Breeding;
 using Voidling.Presentation.UI.Shop;
 
 namespace VoidlingGame;
@@ -21,7 +24,7 @@ public partial class MainController : Node
         var eggs = state.StoreEggs
             .Select((egg, index) => new ShopEggViewState(
                 EggId: egg.Id,
-                TintHex: egg.TintHex,
+                TintColor: GameRules.TintColor(egg.TintHex),
                 Number: index + 1,
                 Price: GameRules.StoreEggPrice))
             .ToArray();
@@ -46,77 +49,96 @@ public partial class MainController : Node
 
     private void ShowBreeding()
     {
-        var adults = GameSession.Instance.State.Voidlings.Where(v => v.Stage == LifeStage.Adult).ToList();
-        var box = OpenModal("BREEDING NEST", new Vector2(440, 270));
-        if (adults.Count < 2)
+        var adults = GameSession.Instance.State.Voidlings
+            .Where(v => v.Stage == LifeStage.Adult)
+            .ToArray();
+
+        var parentViews = adults.Select(CreateBreedingParentView).ToArray();
+        var initialPreview = parentViews.Length >= 2
+            ? CreateBreedingPreviewView(GameSession.Instance.GetBreedingPreviewData(parentViews[0].Id, parentViews[1].Id))
+            : new BreedingPreviewViewState(Tr("UI_BREED_NEED_TWO_ADULTS"), false);
+
+        var box = OpenModal(Tr("UI_BREED_TITLE"), new Vector2(440, 270));
+        var screen = new BreedingScreen();
+        screen.Configure(new BreedingScreenState(parentViews, initialPreview));
+        screen.PairChanged += (parentAId, parentBId) =>
         {
-            box.AddChild(UiFactory.CreateLabel("You need two adult Voidlings.", 10));
-            return;
-        }
-
-        var parentA = new OptionButton();
-        var parentB = new OptionButton();
-        StyleOption(parentA);
-        StyleOption(parentB);
-        foreach (var adult in adults)
+            var preview = GameSession.Instance.GetBreedingPreviewData(parentAId, parentBId);
+            screen.SetPreview(CreateBreedingPreviewView(preview));
+        };
+        screen.BreedRequested += (parentAId, parentBId) =>
         {
-            parentA.AddItem(adult.Name);
-            parentB.AddItem(adult.Name);
-        }
-        parentA.Selected = 0;
-        parentB.Selected = 1;
-
-        var selectors = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-        selectors.AddThemeConstantOverride("separation", 12);
-        var left = CreateBreedingSelector(adults[0], parentA);
-        var right = CreateBreedingSelector(adults[1], parentB);
-        selectors.AddChild(left.Container);
-        selectors.AddChild(UiFactory.CreateLabel("+", 14));
-        selectors.AddChild(right.Container);
-        box.AddChild(selectors);
-
-        var preview = UiFactory.CreateLabel("", 7);
-        preview.CustomMinimumSize = new Vector2(390, 36);
-        preview.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        box.AddChild(preview);
-
-        void UpdatePreview()
-        {
-            UiFactory.SetPortraitData(left.Portrait, adults[parentA.Selected]);
-            UiFactory.SetPortraitData(right.Portrait, adults[parentB.Selected]);
-            preview.Text = GameSession.Instance.GetBreedingPreview(adults[parentA.Selected].Id, adults[parentB.Selected].Id);
-        }
-
-        parentA.ItemSelected += _ => UpdatePreview();
-        parentB.ItemSelected += _ => UpdatePreview();
-        UpdatePreview();
-
-        var breed = UiFactory.CreateButton("Breed");
-        breed.CustomMinimumSize = new Vector2(120, 26);
-        breed.Pressed += () =>
-        {
-            var a = adults[parentA.Selected];
-            var b = adults[parentB.Selected];
-            if (a.Id == b.Id || a.Stage != LifeStage.Adult || b.Stage != LifeStage.Adult ||
-                a.BreedCooldownSeconds > 0.0f || b.BreedCooldownSeconds > 0.0f)
+            var preview = GameSession.Instance.GetBreedingPreviewData(parentAId, parentBId);
+            if (!preview.CanBreed)
             {
-                preview.Text = GameSession.Instance.GetBreedingPreview(a.Id, b.Id);
+                screen.SetPreview(CreateBreedingPreviewView(preview));
+                return;
+            }
+
+            var parentA = GameSession.Instance.FindVoidling(parentAId);
+            var parentB = GameSession.Instance.FindVoidling(parentBId);
+            if (parentA == null || parentB == null)
+            {
+                screen.SetPreview(new BreedingPreviewViewState(Tr("UI_BREED_CHOOSE_TWO"), false));
                 return;
             }
 
             CloseModal();
-            _garden.PlayBreedingAnimation(a.Id, b.Id, eggPosition => GameSession.Instance.TryBreed(a.Id, b.Id, eggPosition));
+            _garden.PlayBreedingAnimation(
+                parentA.Id,
+                parentB.Id,
+                eggPosition => GameSession.Instance.TryBreed(parentA.Id, parentB.Id, eggPosition));
         };
-        box.AddChild(breed);
+        box.AddChild(screen);
     }
 
-    private static (VBoxContainer Container, TextureRect Portrait) CreateBreedingSelector(VoidlingData data, OptionButton option)
+    private static BreedingParentViewState CreateBreedingParentView(VoidlingData data)
     {
-        var column = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-        column.AddThemeConstantOverride("separation", 3);
-        var portrait = UiFactory.CreatePortrait(data, new Vector2(70, 70));
-        column.AddChild(portrait);
-        column.AddChild(option);
-        return (column, portrait);
+        var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
+        var otherMutations = data.RareTraits?.Count(trait =>
+            !string.Equals(trait.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
+
+        return new BreedingParentViewState(
+            Id: data.Id,
+            Name: data.Name,
+            TintColor: GameRules.TintColor(data.TintHex),
+            HasAngelMutation: hasAngel,
+            OtherMutationCount: otherMutations);
+    }
+
+    private BreedingPreviewViewState CreateBreedingPreviewView(BreedingPreview preview)
+    {
+        string text;
+        if (!preview.CanBreed)
+        {
+            text = preview.Failure switch
+            {
+                BreedingFailure.SameParent => Tr("UI_BREED_DIFFERENT_PARENTS"),
+                BreedingFailure.ParentNotAdult => Tr("UI_BREED_ADULTS_ONLY"),
+                BreedingFailure.ParentOnCooldown => Tr("UI_BREED_COOLDOWN"),
+                _ => Tr("UI_BREED_CHOOSE_TWO")
+            };
+        }
+        else if (preview.Related)
+        {
+            text = string.Format(
+                Tr("UI_BREED_RELATED"),
+                preview.ChildBurden,
+                preview.HatchFailurePercent);
+        }
+        else if (preview.IsCleanOutcross)
+        {
+            text = string.Format(Tr("UI_BREED_CLEAN_OUTCROSS"), preview.ChildBurden);
+        }
+        else if (preview.ChildBurden > 0)
+        {
+            text = string.Format(Tr("UI_BREED_UNRELATED_BURDEN"), preview.ChildBurden);
+        }
+        else
+        {
+            text = Tr("UI_BREED_UNRELATED_CLEAN");
+        }
+
+        return new BreedingPreviewViewState(text, preview.CanBreed);
     }
 }
