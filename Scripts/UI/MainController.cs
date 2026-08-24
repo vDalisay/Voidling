@@ -87,17 +87,17 @@ public partial class MainController : Node
         row.AddThemeConstantOverride("separation", 4);
         panel.AddChild(row);
 
-        _coinsLabel = UiFactory.CreateLabel("Sprouts: 0", 9);
+        _coinsLabel = UiFactory.CreateLabel(string.Format(Tr("UI_TOP_SPROUTS"), 0), 9);
         _coinsLabel.CustomMinimumSize = new Vector2(84, 22);
         row.AddChild(_coinsLabel);
 
-        AddTopButton(row, "Shop", ShowShop, 0, 57);
-        AddTopButton(row, "Inventory", ShowInventory, 3, 68);
-        AddTopButton(row, "Breed", ShowBreeding, 6, 57);
-        AddTopButton(row, "Race", ShowRacePicker, 12, 57);
-        AddTopButton(row, "Settings", ShowSettingsExtended, -1, 67);
-        AddTopButton(row, "Center", _garden.ResetCamera, -1, 57);
-        AddTopButton(row, "Reset", ShowResetConfirm, -1, 54);
+        AddTopButton(row, Tr("UI_TOP_SHOP"), ShowShop, 0, 57);
+        AddTopButton(row, Tr("UI_TOP_INVENTORY"), ShowInventory, 3, 68);
+        AddTopButton(row, Tr("UI_TOP_BREED"), ShowBreeding, 6, 57);
+        AddTopButton(row, Tr("UI_TOP_RACE"), ShowRacePicker, 12, 57);
+        AddTopButton(row, Tr("UI_TOP_SETTINGS"), ShowSettingsExtended, -1, 67);
+        AddTopButton(row, Tr("UI_TOP_CENTER"), _garden.ResetCamera, -1, 57);
+        AddTopButton(row, Tr("UI_TOP_RESET"), ShowResetConfirm, -1, 54);
     }
 
     private static void AddTopButton(HBoxContainer row, string text, Action action, int iconIndex, float width)
@@ -124,7 +124,7 @@ public partial class MainController : Node
 
     private void RefreshUi()
     {
-        _coinsLabel.Text = $"Sprouts: {GameSession.Instance.State.Coins}";
+        _coinsLabel.Text = string.Format(Tr("UI_TOP_SPROUTS"), GameSession.Instance.State.Coins);
 
         if (_selectedId.Length > 0 && GameSession.Instance.FindVoidling(_selectedId) == null)
             _selectedId = "";
