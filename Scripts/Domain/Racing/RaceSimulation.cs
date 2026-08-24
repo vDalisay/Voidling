@@ -51,7 +51,7 @@ public sealed class RaceSimulation
 
     private sealed class ParticipantState
     {
-        public RaceParticipantSnapshot Participant { get; init; }
+        public RaceParticipantSnapshot Participant { get; init; } = null!;
         public Random Random { get; init; } = null!;
         public float X { get; set; }
         public int NextObstacleIndex { get; set; }
