@@ -85,17 +85,20 @@ Standalone Presentation components now include:
 - `SettingsScreen`;
 - `ShopScreen`;
 - `BreedingScreen`;
+- `RacePickerScreen`;
+- `InventoryScreen`;
+- `DetailsScreen` for Stats/DNA/Visual tabs;
 - `ModalHost` for overlay/window lifetime;
 - `RaceScreen`, a Godot-only shell over the pure `RaceSimulation`;
 - `StatPresentationCatalog` for player-facing stat labels/colors.
 
-These components do not reach through the `GameRules` compatibility facade; CI enforces that boundary for `Scripts/Presentation/**`.
+These components receive presentation-ready snapshots and emit intent where interaction is needed. They do not reach through `GameSession` or the `GameRules` compatibility facade; CI enforces that boundary for `Scripts/Presentation/**`.
 
 `RaceScreen` receives an immutable `RaceEntry`, maps simulation snapshots/events to sprites/camera/HUD/minimap/podium, sends cheer through `RaceSimulation.TryCheer`, and uses the simulator's fast-forward path. VFX has a separate non-authoritative RNG, so particle timing can no longer perturb race outcomes.
 
 The legacy result-owning `Scripts/Race/RaceController*.cs` implementation has been removed.
 
-The root `MainController` still coordinates legacy UI partials, but it receives/resolves the composed `GameSession` once rather than using global static access. Modal lifetime is delegated to `ModalHost`.
+The root `MainController` still coordinates navigation and legacy HUD/family-tree/goodbye flows, but it receives/resolves the composed `GameSession` once rather than using global static access. Modal lifetime is delegated to `ModalHost`.
 
 `GardenController` likewise holds one explicit session reference. `FamilyTreeView` receives edge-panning as view state rather than querying global settings.
 
@@ -105,12 +108,15 @@ Stat display names/colors have moved out of `GameRules` into `StatPresentationCa
 
 Godot's native translation pipeline is registered through `Localization/strings.csv`.
 
-Migrated representative UI includes:
+Migrated representative UI now includes:
 
 - global top navigation/currency label;
 - Settings;
 - Shop;
-- Breeding and breeding validation/risk text.
+- Breeding and breeding validation/risk text;
+- Race Picker;
+- Inventory;
+- Details Stats/DNA/Visual tabs and explanatory labels.
 
 Use semantic keys (`UI_*`) for new player-facing presentation text. User-created Voidling names remain literal.
 
@@ -165,9 +171,9 @@ Do not add new deterministic formulas or presentation catalogs to `GameRules`. M
 
 ### `MainController`
 
-The root object is still a legacy UI/navigation coordinator and several screens (race picker, Details, Inventory, family tree/goodbye/reset flows) are still implemented in partial files.
+The root object is now primarily navigation, persistent garden HUD coordination, race handoff and a few legacy modal flows. Settings, Shop, Breeding, Race Picker, Inventory and Details no longer own their rendering inside the controller.
 
-Its dependency pattern is explicit and modal lifetime is owned by `ModalHost`. Continue extracting screens when they are substantially modified rather than performing a visual rewrite solely to eliminate partial classes.
+Family Tree, goodbye/reset confirmation and the persistent selected-Voidling HUD remain legacy code. Extract them when those features are next substantially modified rather than performing a visual rewrite solely for symmetry.
 
 ### Garden
 
@@ -206,15 +212,15 @@ There is one result-authoritative simulator. Animation, camera and VFX edits can
 
 ### Phase F — UI decomposition/localization foundation
 
-The reference foundation is in place:
+Completed to the intended foundation level:
 
 - shared `ModalHost`;
-- Settings, Shop and Breeding standalone screens;
+- standalone Settings, Shop, Breeding, Race Picker, Inventory and Details screens;
 - localization CSV/project registration and clean-clone import verification;
 - Presentation boundary enforcement;
 - stat presentation catalog separated from gameplay rules.
 
-Phase F does **not** require every legacy panel to be rewritten before feature work can continue. Future screens should follow these reference components.
+Phase F deliberately does **not** require every legacy panel to be rewritten before feature work can continue. Future screens should follow these reference components.
 
 ### Phase G — active designer Resources
 
@@ -226,8 +232,8 @@ Do not create speculative Resource classes for roadmap systems before those syst
 
 These are incremental follow-ups, not reasons to rewrite stable demo code:
 
-1. When Race Picker, Details/Inventory, Family Tree or another legacy modal is next substantially changed, move it into a standalone Presentation component using immutable view state + intent events.
-2. Move remaining presentation-only tint/mutation formatting out of `GameRules` as related screens migrate; do not duplicate domain identity/rules in Presentation.
+1. When Family Tree, the persistent selected-Voidling HUD, goodbye/reset flows or another legacy UI area is next substantially changed, move it behind presentation-ready view state + intent events.
+2. Move remaining presentation-only tint/mutation formatting out of `GameRules` as related legacy callers migrate; do not duplicate domain identity/rules in Presentation.
 3. Introduce additional Godot Resources only when the next roadmap feature has concrete designer-authored content/tuning that consumes them.
 4. Add ADRs for durable architecture decisions when a decision first needs history/trade-off context; do not create ceremonial ADRs for obvious local refactors.
 
