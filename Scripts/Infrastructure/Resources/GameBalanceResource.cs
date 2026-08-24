@@ -102,9 +102,9 @@ public partial class GameBalanceResource : Resource
         {
             Genetics = defaults.Genetics with
             {
-                HigherAlleleExpressionChance = Clamp01(HigherAlleleExpressionChance),
-                RareFounderTraitChance = Clamp01(RareFounderTraitChance),
-                RareTraitTransmissionChance = Clamp01(RareTraitTransmissionChance),
+                HigherAlleleExpressionChance = Probability(HigherAlleleExpressionChance),
+                RareFounderTraitChance = Probability(RareFounderTraitChance),
+                RareTraitTransmissionChance = Probability(RareTraitTransmissionChance),
                 RelatedAncestorDepth = Math.Max(1, RelatedAncestorDepth)
             },
             Breeding = defaults.Breeding with
@@ -146,7 +146,7 @@ public partial class GameBalanceResource : Resource
                 FailedGlideSwimBaseSpeed = NonNegative(FailedGlideSwimBaseSpeed),
                 FailedGlideSwimSpeedScale = NonNegative(FailedGlideSwimSpeedScale),
                 FailedGlideSwimExtraDrain = NonNegative(FailedGlideSwimExtraDrain),
-                LowStaminaThreshold = Clamp01(LowStaminaThreshold),
+                LowStaminaThreshold = UnitInterval(LowStaminaThreshold),
                 LowStaminaSpeedMultiplier = NonNegative(LowStaminaSpeedMultiplier),
                 ExhaustedSpeedMultiplier = NonNegative(ExhaustedSpeedMultiplier),
                 CheerDurationSeconds = NonNegative(CheerDurationSeconds),
@@ -154,9 +154,9 @@ public partial class GameBalanceResource : Resource
                 CheerSpeedMultiplier = NonNegative(CheerSpeedMultiplier),
                 GlideBaseDistance = NonNegative(GlideBaseDistance),
                 GlideDistancePerFlyPoint = NonNegative(GlideDistancePerFlyPoint),
-                ObstacleAvoidBaseChance = Clamp01(ObstacleAvoidBaseChance),
+                ObstacleAvoidBaseChance = UnitInterval(ObstacleAvoidBaseChance),
                 ObstacleAvoidRunScale = NonNegative(ObstacleAvoidRunScale),
-                ObstacleAvoidMaxChance = Clamp01(ObstacleAvoidMaxChance),
+                ObstacleAvoidMaxChance = UnitInterval(ObstacleAvoidMaxChance),
                 ObstacleBaseDelaySeconds = NonNegative(ObstacleBaseDelaySeconds),
                 ObstacleLowRunDelaySeconds = NonNegative(ObstacleLowRunDelaySeconds),
                 ObstacleRollbackDistance = NonNegative(ObstacleRollbackDistance)
@@ -165,5 +165,6 @@ public partial class GameBalanceResource : Resource
     }
 
     private static float NonNegative(float value) => Math.Max(0.0f, value);
-    private static double Clamp01(float value) => Math.Clamp((double)value, 0.0, 1.0);
+    private static float UnitInterval(float value) => Math.Clamp(value, 0.0f, 1.0f);
+    private static double Probability(float value) => Math.Clamp((double)value, 0.0, 1.0);
 }
