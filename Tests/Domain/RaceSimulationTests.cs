@@ -97,8 +97,8 @@ public sealed class RaceSimulationTests
 
         Assert.NotNull(first);
         Assert.NotNull(second);
-        Assert.Equal(1, first.Value.Placement);
-        Assert.Equal(2, second.Value.Placement);
+        Assert.Equal(1, first!.Placement);
+        Assert.Equal(2, second!.Placement);
         Assert.True(simulation.IsComplete);
         Assert.Equal(
             new[] { participants[1].CreatureId, participants[0].CreatureId },
