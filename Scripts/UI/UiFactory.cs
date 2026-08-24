@@ -92,6 +92,27 @@ public static class UiFactory
 
     public static TextureRect CreatePortrait(VoidlingData data, Vector2 minimumSize)
     {
+        var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
+        var otherTraits = data.RareTraits?.Count(t =>
+            !string.Equals(t.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
+
+        return CreatePortrait(
+            GameRules.TintColor(data.TintHex),
+            hasAngel,
+            otherTraits,
+            minimumSize);
+    }
+
+    /// <summary>
+    /// Presentation-friendly portrait overload for migrated screens. It accepts display-ready
+    /// values instead of a mutable VoidlingData reference so view state can remain a snapshot.
+    /// </summary>
+    public static TextureRect CreatePortrait(
+        Color tintColor,
+        bool hasAngelMutation,
+        int otherMutationCount,
+        Vector2 minimumSize)
+    {
         var atlas = new AtlasTexture
         {
             Atlas = CharacterTexture,
@@ -106,13 +127,30 @@ public static class UiFactory
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
-        SetPortraitData(portrait, data);
+        SetPortraitData(portrait, tintColor, hasAngelMutation, otherMutationCount);
         return portrait;
     }
 
     public static void SetPortraitData(TextureRect portrait, VoidlingData data)
     {
-        portrait.SelfModulate = GameRules.TintColor(data.TintHex);
+        var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
+        var otherTraits = data.RareTraits?.Count(t =>
+            !string.Equals(t.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
+
+        SetPortraitData(
+            portrait,
+            GameRules.TintColor(data.TintHex),
+            hasAngel,
+            otherTraits);
+    }
+
+    public static void SetPortraitData(
+        TextureRect portrait,
+        Color tintColor,
+        bool hasAngelMutation,
+        int otherMutationCount)
+    {
+        portrait.SelfModulate = tintColor;
 
         // Reused preview portraits must remove the previous creature's mutation layer
         // immediately. QueueFree left the old halo visible for another frame and made
@@ -126,20 +164,16 @@ public static class UiFactory
         if (oldHalo != null && GodotObject.IsInstanceValid(oldHalo))
             oldHalo.Free();
 
-        if (data.RareTraits == null || data.RareTraits.Count == 0)
+        if (!hasAngelMutation && otherMutationCount <= 0)
             return;
-
-        var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
-        var otherTraits = data.RareTraits.Count(t =>
-            !string.Equals(t.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase));
 
         var badge = new HaloBadge
         {
             Name = "__mutation_badge",
             MouseFilter = Control.MouseFilterEnum.Ignore,
             ZIndex = 5,
-            ShowAngel = hasAngel,
-            SparkleCount = otherTraits
+            ShowAngel = hasAngelMutation,
+            SparkleCount = Math.Max(0, otherMutationCount)
         };
         badge.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         portrait.AddChild(badge);
