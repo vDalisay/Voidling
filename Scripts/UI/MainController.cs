@@ -18,7 +18,6 @@ public partial class MainController : Node
     private ModalHost _modalHost = null!;
     private Label _coinsLabel = null!;
     private PanelContainer? _detailsPanel;
-    private PanelContainer _gardenLogPanel = null!;
     private GardenEventLog _gardenEventLog = null!;
     private Label _toastLabel = null!;
     private float _toastSeconds;
@@ -132,13 +131,14 @@ public partial class MainController : Node
 
     private void BuildGardenEventLog()
     {
-        _gardenLogPanel = UiFactory.CreatePanel(new Vector2(390, 82));
-        _gardenLogPanel.Position = new Vector2(10, 267);
-        _gardenLogPanel.Size = new Vector2(390, 82);
-        _uiRoot.AddChild(_gardenLogPanel);
-
-        _gardenEventLog = new GardenEventLog();
-        _gardenLogPanel.AddChild(_gardenEventLog);
+        _gardenEventLog = new GardenEventLog
+        {
+            Position = new Vector2(12, 276),
+            Size = new Vector2(388, 72),
+            CustomMinimumSize = new Vector2(388, 72),
+            ZIndex = 6
+        };
+        _uiRoot.AddChild(_gardenEventLog);
     }
 
     private void RefreshUi()
@@ -151,8 +151,8 @@ public partial class MainController : Node
         _garden.Select(_selectedId);
         RebuildDetailsPanel();
 
-        if (_gardenLogPanel != null && GodotObject.IsInstanceValid(_gardenLogPanel))
-            _gardenLogPanel.Visible = !_modalHost.IsOpen;
+        if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))
+            _gardenEventLog.Visible = !_modalHost.IsOpen;
 
         if (_modalHost.IsOpen)
             HideGardenHudPanels();
@@ -170,8 +170,8 @@ public partial class MainController : Node
     {
         if (_detailsPanel != null && GodotObject.IsInstanceValid(_detailsPanel))
             _detailsPanel.Visible = false;
-        if (_gardenLogPanel != null && GodotObject.IsInstanceValid(_gardenLogPanel))
-            _gardenLogPanel.Visible = false;
+        if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))
+            _gardenEventLog.Visible = false;
     }
 
     private void CloseModal() => CloseModal(true);
