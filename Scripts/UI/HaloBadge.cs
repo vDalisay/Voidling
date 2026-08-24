@@ -1,4 +1,5 @@
 using Godot;
+using Voidling.Presentation.Voidlings;
 
 namespace VoidlingGame;
 
@@ -6,6 +7,7 @@ public partial class HaloBadge : Control
 {
     public bool ShowAngel { get; set; }
     public int SparkleCount { get; set; }
+    public float NominalSpritePixels { get; set; } = 48.0f;
 
     public override void _Process(double delta)
     {
@@ -24,47 +26,31 @@ public partial class HaloBadge : Control
 
     private void DrawHalo()
     {
-        var center = new Vector2(Size.X * 0.5f, Mathf.Max(5.0f, Size.Y * 0.14f));
-        var radiusX = Mathf.Clamp(Size.X * 0.18f, 4.5f, 14.0f);
-        var radiusY = Mathf.Clamp(radiusX * 0.28f, 1.4f, 4.2f);
-        const int points = 32;
+        var halo = VoidlingMutationVisualMetrics.ForPortrait(NominalSpritePixels, Size);
+        var ellipse = VoidlingMutationVisualMetrics.BuildEllipse(halo);
+        var half = ellipse.Length / 2;
 
-        var ellipse = new Vector2[points];
-        for (var i = 0; i < points; i++)
-        {
-            var angle = Mathf.Tau * i / points;
-            ellipse[i] = center + new Vector2(Mathf.Cos(angle) * radiusX, Mathf.Sin(angle) * radiusY);
-        }
-
-        var back = Color.FromHtml("#B98C32");
-        var gold = Color.FromHtml("#F1CE55");
-        var shine = Color.FromHtml("#FFF2A8");
-
-        for (var i = points / 2; i < points; i++)
-            DrawLine(ellipse[i], ellipse[(i + 1) % points], back, 1.8f, true);
-
-        // The lower/front half is brighter, making the halo read as a tilted ellipse
-        // facing the viewer rather than a flat ring above the character.
-        for (var i = 0; i < points / 2; i++)
-            DrawLine(ellipse[i], ellipse[i + 1], gold, 2.5f, true);
-
+        for (var i = half; i < ellipse.Length; i++)
+            DrawLine(ellipse[i], ellipse[(i + 1) % ellipse.Length], Color.FromHtml("#B98C32"), halo.BackWidth, true);
+        for (var i = 0; i < half; i++)
+            DrawLine(ellipse[i], ellipse[i + 1], Color.FromHtml("#F1CE55"), halo.FrontWidth, true);
         for (var i = 2; i < 7; i++)
-            DrawLine(ellipse[i], ellipse[i + 1], shine, 1.05f, true);
+            DrawLine(ellipse[i], ellipse[i + 1], Color.FromHtml("#FFF2A8"), halo.ShineWidth, true);
     }
 
     private void DrawSparkles()
     {
+        var spriteScale = Mathf.Max(0.20f, NominalSpritePixels / 48.0f);
+        var ratio = Mathf.Max(0.25f, spriteScale / 0.62f);
         var time = (float)Time.GetTicksMsec() / 420.0f;
         var count = Mathf.Clamp(SparkleCount + 1, 2, 4);
         for (var i = 0; i < count; i++)
         {
             var angle = time + i * Mathf.Tau / count;
-            var radiusX = Mathf.Max(10.0f, Size.X * 0.25f);
-            var radiusY = Mathf.Max(8.0f, Size.Y * 0.19f);
-            var p = new Vector2(Size.X * 0.5f, Size.Y * 0.48f) +
-                    new Vector2(Mathf.Cos(angle) * radiusX, Mathf.Sin(angle) * radiusY);
+            var p = new Vector2(Size.X * 0.5f, Size.Y * 0.5f - 5.0f * ratio) +
+                    new Vector2(Mathf.Cos(angle) * 15.0f * ratio, Mathf.Sin(angle) * 11.0f * ratio);
             var pulse = 1.0f + Mathf.Sin(time * 2.2f + i) * 0.25f;
-            DrawCircle(p, 1.2f * pulse, Color.FromHtml("#FFF7B7"));
+            DrawCircle(p, 1.2f * ratio * pulse, Color.FromHtml("#FFF7B7"));
         }
     }
 }
