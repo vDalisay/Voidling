@@ -1,3 +1,4 @@
+using System;
 using Voidling.Application.Training;
 
 namespace VoidlingGame;
@@ -10,7 +11,7 @@ public partial class GameSession
         switch (result.Failure)
         {
             case TrainingFailure.None:
-                SaveAndNotify($"Bought a {GameRules.StatDisplayNames[statId]} treat.");
+                SaveAndNotify($"Bought a {DisplayStatId(statId)} treat.");
                 break;
             case TrainingFailure.NotEnoughCurrency:
                 ToastRequested?.Invoke("Not enough sprouts.");
@@ -29,7 +30,7 @@ public partial class GameSession
         var failure = _training!.ValidateTrainingItem(State, creatureId, statId);
         if (failure == TrainingFailure.NoItemOwned)
         {
-            ToastRequested?.Invoke($"Buy a {GameRules.StatDisplayNames[statId]} treat first.");
+            ToastRequested?.Invoke($"Buy a {DisplayStatId(statId)} treat first.");
             return;
         }
         if (failure != TrainingFailure.None)
@@ -39,6 +40,14 @@ public partial class GameSession
         if (!result.Succeeded)
             return;
 
-        SaveAndNotify($"{creature.Name} gained +{result.Gain} {GameRules.StatDisplayNames[statId]} training.");
+        SaveAndNotify($"{creature.Name} gained +{result.Gain} {DisplayStatId(statId)} training.");
+    }
+
+    private static string DisplayStatId(string statId)
+    {
+        if (string.IsNullOrEmpty(statId))
+            return statId;
+
+        return string.Concat(char.ToUpperInvariant(statId[0]), statId.AsSpan(1));
     }
 }
