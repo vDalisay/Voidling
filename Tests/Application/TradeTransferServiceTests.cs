@@ -13,6 +13,7 @@ namespace Voidling.Tests.Application;
 
 public sealed class TradeTransferServiceTests
 {
+    private const ulong LobbyId = 77;
     private static readonly GameBalanceRules Rules = GameBalanceRules.DemoDefaults;
 
     [Fact]
@@ -52,11 +53,12 @@ public sealed class TradeTransferServiceTests
         var outgoing = new[] { new TradeAssetReference(TradeAssetKind.Voidling, local.Id) };
         var incoming = CreateRemoteVoidlingBundle("remote", 22UL);
 
-        var result = service.Prepare(state, tradeId, 999UL, "terms-hash", outgoing, incoming);
+        var result = service.Prepare(state, tradeId, LobbyId, 999UL, "terms-hash", outgoing, incoming);
 
         Assert.True(result.Success);
         Assert.Contains(state.Voidlings, creature => creature.Id == local.Id);
-        Assert.Single(state.PendingTradeJournal);
+        var journal = Assert.Single(state.PendingTradeJournal);
+        Assert.Equal(LobbyId, journal.LobbyId);
         Assert.True(service.IsAssetLocked(state, outgoing[0]));
 
         // The journal is ordinary local save data and survives JSON persistence without Steam.
@@ -64,6 +66,7 @@ public sealed class TradeTransferServiceTests
         Assert.NotNull(restored);
         Assert.Single(restored!.PendingTradeJournal);
         Assert.Equal(tradeId, restored.PendingTradeJournal[0].TradeId);
+        Assert.Equal(LobbyId, restored.PendingTradeJournal[0].LobbyId);
     }
 
     [Fact]
@@ -79,6 +82,7 @@ public sealed class TradeTransferServiceTests
         Assert.True(service.Prepare(
             state,
             tradeId,
+            LobbyId,
             999UL,
             "terms-hash",
             outgoing,
@@ -90,6 +94,33 @@ public sealed class TradeTransferServiceTests
         Assert.Empty(state.PendingTradeJournal);
         Assert.Contains(state.Voidlings, creature => creature.Id == local.Id);
         Assert.False(service.IsAssetLocked(state, outgoing[0]));
+    }
+
+    [Fact]
+    public void AbortPreparedForLobby_LeavesOtherLobbyJournalIntact()
+    {
+        var state = new GameStateData();
+        state.PendingTradeJournal.Add(new PendingTradeJournalEntry(
+            Guid.NewGuid().ToString("N"),
+            LobbyId,
+            10,
+            "one",
+            Array.Empty<TradeAssetReference>(),
+            TradeTransferBundle.Empty));
+        state.PendingTradeJournal.Add(new PendingTradeJournalEntry(
+            Guid.NewGuid().ToString("N"),
+            88,
+            11,
+            "two",
+            Array.Empty<TradeAssetReference>(),
+            TradeTransferBundle.Empty));
+        var service = new TradeTransferService(Rules);
+
+        var removed = service.AbortPreparedForLobby(state, LobbyId);
+
+        Assert.Equal(1, removed);
+        var remaining = Assert.Single(state.PendingTradeJournal);
+        Assert.Equal(88UL, remaining.LobbyId);
     }
 
     [Fact]
@@ -105,7 +136,7 @@ public sealed class TradeTransferServiceTests
         var outgoing = new[] { new TradeAssetReference(TradeAssetKind.Voidling, local.Id) };
         var incoming = CreateRemoteVoidlingBundle("remote", 22UL, "remote-parent", "");
 
-        Assert.True(service.Prepare(state, tradeId, 999UL, "terms-hash", outgoing, incoming).Success);
+        Assert.True(service.Prepare(state, tradeId, LobbyId, 999UL, "terms-hash", outgoing, incoming).Success);
 
         var committed = service.CommitPrepared(state, tradeId);
 
@@ -161,6 +192,7 @@ public sealed class TradeTransferServiceTests
         var prepared = service.Prepare(
             state,
             Guid.NewGuid().ToString("N"),
+            LobbyId,
             999UL,
             "terms-hash",
             new[] { new TradeAssetReference(TradeAssetKind.Voidling, local.Id) },
