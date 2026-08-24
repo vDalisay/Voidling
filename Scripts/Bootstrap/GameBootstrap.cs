@@ -1,5 +1,6 @@
 using Godot;
 using Voidling.Application.Breeding;
+using Voidling.Application.Multiplayer;
 using Voidling.Application.Persistence;
 using Voidling.Application.Racing;
 using Voidling.Application.Roster;
@@ -9,6 +10,7 @@ using Voidling.Application.Simulation;
 using Voidling.Application.Training;
 using Voidling.Domain.Rules;
 using Voidling.Infrastructure.Audio;
+using Voidling.Infrastructure.Multiplayer;
 using Voidling.Infrastructure.Persistence;
 using Voidling.Infrastructure.Resources;
 using VoidlingGame;
@@ -24,6 +26,10 @@ public partial class GameBootstrap : Node
     private const string SavePath = "user://voidling_mvp_save.json";
     private const string BalancePath = "res://Resources/Balance/demo_balance.tres";
 
+    // Kept private: Bootstrap owns lifetime/composition, but it is not a service locator.
+    // Future multiplayer presentation should receive this dependency explicitly when composed.
+    private MultiplayerConnectionService? _multiplayerConnection;
+
     public override void _Ready()
     {
         var rules = LoadBalanceRules();
@@ -31,6 +37,8 @@ public partial class GameBootstrap : Node
         // Transitional presentation code still reads the GameRules facade. Configure it with
         // the exact same immutable rules used below so there is only one effective ruleset.
         GameRules.Configure(rules);
+
+        ComposeOptionalMultiplayer();
 
         var session = new GameSession
         {
@@ -51,6 +59,22 @@ public partial class GameBootstrap : Node
         session.ConfigureRacing(new RaceEntryFactory(rules));
 
         AddChild(session);
+    }
+
+    private void ComposeOptionalMultiplayer()
+    {
+        var multiplayer = OptionalMultiplayerComposer.Create();
+        _multiplayerConnection = multiplayer.Connection;
+
+        if (multiplayer.RuntimeNode != null)
+        {
+            AddChild(multiplayer.RuntimeNode);
+            GD.Print($"Steam multiplayer available for {_multiplayerConnection.LocalUser?.DisplayName ?? "local user"}.");
+            return;
+        }
+
+        // This is informational, never fatal. Single-player must remain fully functional offline.
+        GD.Print(multiplayer.UnavailableReason ?? "Steam multiplayer unavailable; continuing in single-player mode.");
     }
 
     private static GameBalanceRules LoadBalanceRules()
