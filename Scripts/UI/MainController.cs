@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using Godot;
 using Voidling.Presentation.Racing;
 using Voidling.Presentation.UI.Common;
@@ -11,9 +9,6 @@ public partial class MainController : Node
 {
     private const float ScreenWidth = 640.0f;
     private const float ScreenHeight = 360.0f;
-
-    private static readonly Texture2D EggTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
 
     private GameSession _session = null!;
     private GardenController _garden = null!;
