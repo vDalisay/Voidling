@@ -27,6 +27,11 @@ public partial class GameBootstrap : Node
     public override void _Ready()
     {
         var rules = LoadBalanceRules();
+
+        // Transitional presentation code still reads the GameRules facade. Configure it with
+        // the exact same immutable rules used below so there is only one effective ruleset.
+        GameRules.Configure(rules);
+
         var session = new GameSession
         {
             Name = nameof(GameSession)
