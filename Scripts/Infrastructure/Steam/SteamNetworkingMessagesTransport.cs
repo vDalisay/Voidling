@@ -70,8 +70,10 @@ internal sealed class SteamNetworkingMessagesTransport : IMultiplayerTransport
             return;
 
         PollChannel(NetworkChannel.Session);
+        PollChannel(NetworkChannel.Zone);
         PollChannel(NetworkChannel.Challenge);
         PollChannel(NetworkChannel.Trade);
+        PollChannel(NetworkChannel.GardenTransient);
     }
 
     public void Close(PlatformUserId peer)
