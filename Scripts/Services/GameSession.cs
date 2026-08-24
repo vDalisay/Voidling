@@ -23,6 +23,7 @@ public partial class GameSession : Node
 {
     public event Action? StateChanged;
     public event Action<string>? ToastRequested;
+    public event Action<string>? GardenEventRaised;
 
     public GameStateData State { get; private set; } = new();
 
@@ -94,14 +95,26 @@ public partial class GameSession : Node
             switch (simulationEvent)
             {
                 case CreatureBecameAdultEvent adult:
-                    ToastRequested?.Invoke($"{adult.Name} grew into an adult.");
+                {
+                    var message = $"{adult.Name} grew into an adult.";
+                    ToastRequested?.Invoke(message);
+                    RaiseGardenEvent(message);
                     break;
+                }
                 case CreatureHatchedEvent hatched:
-                    ToastRequested?.Invoke($"{hatched.Name} hatched.");
+                {
+                    var message = $"An egg hatched and {hatched.Name} was born!";
+                    ToastRequested?.Invoke(message);
+                    RaiseGardenEvent(message);
                     break;
+                }
                 case EggFailedEvent:
-                    ToastRequested?.Invoke("An egg failed to hatch.");
+                {
+                    const string message = "An egg failed to hatch.";
+                    ToastRequested?.Invoke(message);
+                    RaiseGardenEvent(message);
                     break;
+                }
             }
         }
 
@@ -117,6 +130,7 @@ public partial class GameSession : Node
         State = CreateFreshState();
         ApplyAudioSettings();
         SaveAndNotify("Demo save reset.");
+        RaiseGardenEvent("The garden was reset.");
     }
 
     private void LoadOrCreate()
@@ -285,6 +299,9 @@ public partial class GameSession : Node
         StateChanged?.Invoke();
         ToastRequested?.Invoke(toast);
     }
+
+    private void RaiseGardenEvent(string message)
+        => GardenEventRaised?.Invoke(message);
 
     private void Save()
     {
