@@ -35,6 +35,7 @@ public sealed record TradeTransferBundle(
 /// </summary>
 public sealed record PendingTradeJournalEntry(
     string TradeId,
+    ulong LobbyId,
     ulong CounterpartyPlatformUserId,
     string TermsHash,
     TradeAssetReference[] OutgoingAssets,
