@@ -11,7 +11,7 @@ public partial class MainController : Node
 {
     private void ShowShop()
     {
-        var state = GameSession.Instance.State;
+        var state = _session.State;
         var trainingItems = GameRules.StatIds
             .Select(statId => new ShopTrainingItemViewState(
                 StatId: statId,
@@ -36,12 +36,12 @@ public partial class MainController : Node
         screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs));
         screen.TrainingItemPurchaseRequested += statId =>
         {
-            GameSession.Instance.BuyTrainingItem(statId);
+            _session.BuyTrainingItem(statId);
             ShowShop();
         };
         screen.EggPurchaseRequested += eggId =>
         {
-            GameSession.Instance.BuyStoreEgg(eggId);
+            _session.BuyStoreEgg(eggId);
             ShowShop();
         };
         box.AddChild(screen);
@@ -49,13 +49,13 @@ public partial class MainController : Node
 
     private void ShowBreeding()
     {
-        var adults = GameSession.Instance.State.Voidlings
+        var adults = _session.State.Voidlings
             .Where(v => v.Stage == LifeStage.Adult)
             .ToArray();
 
         var parentViews = adults.Select(CreateBreedingParentView).ToArray();
         var initialPreview = parentViews.Length >= 2
-            ? CreateBreedingPreviewView(GameSession.Instance.GetBreedingPreviewData(parentViews[0].Id, parentViews[1].Id))
+            ? CreateBreedingPreviewView(_session.GetBreedingPreviewData(parentViews[0].Id, parentViews[1].Id))
             : new BreedingPreviewViewState(Tr("UI_BREED_NEED_TWO_ADULTS"), false);
 
         var box = OpenModal(Tr("UI_BREED_TITLE"), new Vector2(440, 270));
@@ -63,20 +63,20 @@ public partial class MainController : Node
         screen.Configure(new BreedingScreenState(parentViews, initialPreview));
         screen.PairChanged += (parentAId, parentBId) =>
         {
-            var preview = GameSession.Instance.GetBreedingPreviewData(parentAId, parentBId);
+            var preview = _session.GetBreedingPreviewData(parentAId, parentBId);
             screen.SetPreview(CreateBreedingPreviewView(preview));
         };
         screen.BreedRequested += (parentAId, parentBId) =>
         {
-            var preview = GameSession.Instance.GetBreedingPreviewData(parentAId, parentBId);
+            var preview = _session.GetBreedingPreviewData(parentAId, parentBId);
             if (!preview.CanBreed)
             {
                 screen.SetPreview(CreateBreedingPreviewView(preview));
                 return;
             }
 
-            var parentA = GameSession.Instance.FindVoidling(parentAId);
-            var parentB = GameSession.Instance.FindVoidling(parentBId);
+            var parentA = _session.FindVoidling(parentAId);
+            var parentB = _session.FindVoidling(parentBId);
             if (parentA == null || parentB == null)
             {
                 screen.SetPreview(new BreedingPreviewViewState(Tr("UI_BREED_CHOOSE_TWO"), false));
@@ -87,7 +87,7 @@ public partial class MainController : Node
             _garden.PlayBreedingAnimation(
                 parentA.Id,
                 parentB.Id,
-                eggPosition => GameSession.Instance.TryBreed(parentA.Id, parentB.Id, eggPosition));
+                eggPosition => _session.TryBreed(parentA.Id, parentB.Id, eggPosition));
         };
         box.AddChild(screen);
     }
