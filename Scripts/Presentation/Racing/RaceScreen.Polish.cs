@@ -97,6 +97,10 @@ public partial class RaceScreen
         foreach (var polygon in GetChildren().OfType<Polygon2D>().Where(polygon =>
                      polygon.ZIndex == 4 && ColorsClose(polygon.Color, oldRampColor)).ToList())
         {
+            // Hide the legacy lane-band ramp immediately before deferred deletion. The polish
+            // driver runs before the first rendered race frame, so the player only ever sees the
+            // single depth-spanning ramp below rather than one frame containing all four bands.
+            polygon.Visible = false;
             polygon.QueueFree();
         }
 
