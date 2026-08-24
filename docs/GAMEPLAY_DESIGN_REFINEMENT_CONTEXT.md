@@ -1,171 +1,117 @@
 # Voidling Gameplay & System Design Refinement Context
 
-**Status:** Living product-design context from the gameplay requirements interview  
-**Purpose:** Expand the existing implementation plan with player-facing gameplay intent, system behavior, progression goals, and unresolved design decisions.  
-**Companion document:** `docs/GENETICS_BREEDING_HATCHING_RACING_IMPLEMENTATION_PLAN.md`  
-**Primary design references:** Sonic Adventure 2 Battle Chao Garden / Chao World Extended-style depth, plus Digimon Championship DS-style passive training and modular Garden ideas, adapted into original Voidling systems and content.
+**Status:** Living player-facing product/design specification  
+**Purpose:** Refine the technical implementation plan with concrete gameplay intent, progression rules, player information, UX expectations, and MVP priorities.  
+**Companion:** `docs/GENETICS_BREEDING_HATCHING_RACING_IMPLEMENTATION_PLAN.md`  
+**Primary references:** Sonic Adventure 2 Battle Chao Garden / Chao World Extended for creature raising, genetics, lifecycle and racing; Digimon Championship DS for modular Garden/passive-training concepts. All final content, naming, art, tuning and implementation remain original to Voidling.
 
-> This document intentionally stays at the gameplay and requirements level. It should guide later implementation decisions without prescribing C# architecture, persistence formats, or engine structure unless a technical constraint is necessary to preserve the intended player experience.
+> This document is the source of truth for player-facing intent established during the design interview. The technical implementation plan remains the source of truth for architecture where it does not conflict with these requirements.
 
 ---
 
-## Design interview progress
+## Interview progress
 
-The refinement interview is being conducted one gameplay/design area at a time. The normal target is **20 primary questions plus 5 follow-up questions** based on ambiguities discovered in the answers.
+The normal refinement format is **20 primary questions plus 5 follow-up questions** generated from ambiguity in the answers.
 
-| Interview section | Status |
+| Section | Status |
 |---|---|
-| 1. Core fantasy & gameplay loop | Complete: 20 + 5 follow-ups |
-| 2. Genetics & inherited potential | Complete: 20 + 5 follow-ups |
-| 3. Appearance & rare bloodlines | Partial: 5 primary questions answered; deeper pass still required |
-| 4. Personality, preferences & individuality | Complete: 20 + 5 follow-ups |
-| 5. Garden & environment | Complete: 20 + 5 follow-ups |
-| 6. Progression, unlocks & long-term play | Complete: 20 + 5 follow-ups |
-| 7. Races, cups & competition | Complete: 20 + 5 follow-ups |
-| 8. Raising, training, stats & care | Complete: 20 + 5 follow-ups |
-| 9. Economy & rewards | Complete: 20 + 5 follow-ups |
+| 1. Core fantasy & gameplay loop | Complete |
+| 2. Genetics & inherited potential | Complete |
+| 3. Appearance & rare bloodlines | **Partial — only 5 primary questions completed** |
+| 4. Personality, preferences & individuality | Complete |
+| 5. Garden & environment | Complete |
+| 6. Progression, unlocks & long-term play | Complete |
+| 7. Races, cups & competition | Complete |
+| 8. Raising, training, stats & care | Complete |
+| 9. Economy & rewards | Complete |
+| 10. Session flow, tutorial & Garden event log | Complete |
+| 11. UI, information & feedback | Complete |
+| 12. MVP scope, priorities & technical readiness | Complete |
 
-A dedicated deep-dive on breeding itself, lineage/inbreeding, eggs/hatching, lifecycle/evolution/reincarnation, and the unfinished appearance section is still required. Some requirements for those systems are already established because they came up naturally in other sections.
+The appearance section still needs its full 20 + 5 pass. Breeding, lineage/inbreeding, eggs/hatching, lifecycle/reincarnation, exact Garden-module design and exact race/economy tuning also still benefit from dedicated deep dives even though many requirements are already fixed below.
 
 ---
 
 # 1. Core fantasy & gameplay loop
 
-## 1.1 Target experience
+## 1.1 Core fantasy
 
-Voidling should evoke the core appeal of **SA2 Chao Garden / Chao World Extended** rather than functioning primarily as a traditional active-action game.
+Voidling should capture the appeal of a **Chao Garden-style creature-raising game** built around three equally important pillars:
 
-The game has three major pillars:
+1. raising/caring for Voidlings;
+2. breeding Voidlings;
+3. racing Voidlings.
 
-1. **Raising / caring for Voidlings**
-2. **Breeding Voidlings**
-3. **Racing Voidlings**
+Breeding should carry slightly more strategic weight because it is the long-term mechanism for improving bloodlines and pursuing collection goals.
 
-All three matter, but **breeding should carry slightly more strategic weight**.
+## 1.2 Self-directed projects
 
-The player should choose their own long-term project. Valid goals include:
+Players should invent their own projects rather than follow one universal objective. Examples include:
 
-- breeding an all-S-rank Voidling;
-- discovering every color or color combination;
-- producing specific appearance + stat combinations;
-- producing a Voidling capable of dominating the race ladder;
-- building prestigious bloodlines;
-- pursuing rare mutations;
-- obtaining a long-term immortal/trophy transformation comparable in role to a Chaos Chao.
+- breed an all-S-rank Voidling;
+- discover every color or color combination;
+- combine a favorite appearance with S-rank potential;
+- build a race specialist or all-round champion;
+- create prestigious bloodlines;
+- pursue mutations and extremely rare appearances;
+- produce a late-game immortal/trophy Voidling.
 
-The game is therefore **open-ended**. Finishing one project creates room for another rather than ending the game.
+The game is **open-ended**. Completing one goal should naturally create another.
 
-## 1.2 Idle-first structure
+## 1.3 Idle-first structure
 
-Voidling is intended to be a **cozy idle game that can stay open while the player is doing something else on the computer**.
+Voidling is a cozy desktop idle game intended to remain open while the player is doing something else.
 
-The player can occasionally:
+The player can intermittently:
 
-- check an egg timer;
-- feed or interact with a Voidling;
-- manage a breeding project;
-- change a passive-training setup;
-- enter a race;
-- inspect progression;
-- buy something from the shop;
-- then return attention to another task.
+- inspect Voidlings;
+- feed/train them;
+- change passive-training zones;
+- breed;
+- check eggs and timers;
+- enter races;
+- buy from the shop;
+- rearrange the Garden;
+- then return attention elsewhere.
 
-Visible timers are desirable because they make background progress feel productive rather than demanding.
+Mechanical idle progress currently happens **while the game is open**, not while closed.
 
-**Current timing rule:** mechanical progression such as incubation, breeding cooldowns, passive training, and idle income should progress while the game is open. Closing the game should not silently provide the same mechanical progress for now.
+## 1.4 Breeding as progression
 
-## 1.3 Starting state and early breeding access
+Breeding is not merely optional side content. Later CPU racers should eventually become strong enough that players with weak starting genetics need improved bloodlines to keep progressing.
 
-Breeding should not require an artificial feature unlock.
-
-The player starts with **one Voidling**, so breeding is naturally unavailable until the player acquires and raises another eligible Voidling.
-
-## 1.4 Breeding as a progression requirement
-
-Breeding is not intended to be optional side content.
-
-Later CPU racers should eventually exceed what weak starting genetics can reliably defeat. The player is expected to improve their bloodline to continue progressing through increasingly difficult races.
-
-The intended relationship is:
+Intended high-level loop:
 
 ```text
-Raise → race → earn rewards/unlocks → improve breeding project → raise stronger offspring → tackle harder races
+Raise → race → earn rewards/unlocks → breed toward a goal → raise offspring → tackle harder content
 ```
 
-## 1.5 Breeding is deliberate, never autonomous
+## 1.5 Deliberate player-controlled breeding
 
-Voidlings must never randomly mate in the Garden.
+Breeding must never happen autonomously.
 
-Current intended flow:
+- exactly two parents;
+- both must be adults;
+- no friendship requirement;
+- selected through the breeding menu;
+- player confirms the pairing;
+- breeding should have a pleasant animation/presentation;
+- egg is created immediately;
+- parents receive a cooldown of roughly a few hours.
 
-- open the breeding menu;
-- select exactly two parents;
-- both parents must be adults;
-- no friendship/relationship requirement is needed;
-- confirm pairing;
-- play a pleasant breeding animation/presentation;
-- create the egg immediately;
-- apply a breeding cooldown to the parents.
+## 1.6 Long-term trophy form
 
-A carefully planned lineage must never be altered by autonomous mating.
+A difficult Chaos-Chao-like endgame achievement is desirable without copying the exact source requirements.
 
-## 1.6 Breeding information and uncertainty
+The trophy Voidling should:
 
-The intended information model is close to Chao World Extended:
-
-- current stat profile is visible;
-- both breeding/DNA profiles are visible;
-- relevant inherited colors can be inspected;
-- exact offspring probabilities are not shown;
-- there is no perfect offspring prediction screen;
-- the exact child remains uncertain until generated.
-
-The player should have enough information to make deliberate decisions without removing discovery and luck.
-
-## 1.7 Breeding cooldown
-
-Voidlings can breed repeatedly during their eligible adult life, but each breeding should trigger a cooldown of **roughly a few hours**.
-
-Exact duration remains a balance value.
-
-## 1.8 Eggs and incubation
-
-Breeding produces an egg immediately; the waiting period is the incubation period.
-
-Current intended behavior:
-
-- multiple eggs may exist simultaneously;
-- starting egg capacity is small;
-- capacity can be upgraded;
-- eggs have visible countdown timers;
-- when ready, the player clicks/interacts with the egg to hatch it;
-- eggs do not need to auto-hatch the moment the timer reaches zero.
-
-## 1.9 Incubation acceleration
-
-Items can accelerate incubation.
-
-Possible tiers:
-
-- ordinary items remove part of the remaining time;
-- a very expensive item can remove the remaining time completely.
-
-The full-skip item should be uncommon in a rotating shop rather than permanently available. Other acquisition routes can be added later.
-
-## 1.10 Late-game trophy Voidling
-
-Voidling should eventually support a difficult permanent transformation that fills a similar gameplay role to a **Chaos Chao** without copying its exact requirements or content.
-
-Desired properties:
-
-- requires a long multi-lifecycle project;
-- represents a major prestige achievement;
-- becomes immortal/permanent;
-- retains its resulting appearance/color permanently;
-- can no longer breed;
-- can still race;
-- does not gain arbitrary race strength merely for being a trophy form;
-- may participate in special late-game races intended for endgame creatures.
+- require long-term/multi-lifecycle effort;
+- become permanent/immortal;
+- retain its final appearance/color;
+- no longer be able to breed;
+- still be able to race;
+- remain only as strong as its actual stats;
+- be eligible for special late-game races.
 
 Exact transformation requirements remain unresolved.
 
@@ -173,253 +119,170 @@ Exact transformation requirements remain unresolved.
 
 # 2. Genetics & inherited potential
 
-## 2.1 Two visible breeding DNA profiles
+## 2.1 Two visible DNA profiles
 
-Each Voidling has **two visible DNA/breeding profiles** defining what it can pass to offspring.
+Every Voidling has two visible breeding/DNA profiles. These are the normal source of inheritable stat potential and may differ from the Voidling's current trained stats.
 
-These can differ from the creature's current trained stats.
+There should be **no secret third normal-stat inheritance layer**.
 
-There should be **no secret third normal-stat inheritance layer** beyond the two visible profiles. Normal inherited stat outcomes must come from the selected parents' DNA unless an explicit mutation rule applies.
+## 2.2 Parent-only normal inheritance
 
-## 2.2 Parent-only normal inheritance for now
+For now, normal inherited stat outcomes come from the two selected parents only.
 
-Normal inherited stat values should come from the **two selected parents only**.
+Grandparents/deeper ancestors matter for lineage/inbreeding but should not independently reintroduce normal stat values in v1.
 
-Grandparents/deeper ancestors remain relevant for family-tree and inbreeding logic, but should not independently reintroduce ordinary stat values in v1.
+## 2.3 Random but understandable inheritance
 
-## 2.3 Randomness must remain genetically understandable
+Breeding outcomes remain random, but they must make sense from parental DNA.
 
-Inheritance should be random inside plausible parental bounds.
+The player can inspect both DNA profiles but should **not** receive an exact offspring probability calculator.
 
-The player should be able to inspect the parents and understand what kinds of outcomes are possible, while still not knowing the exact child or exact probability distribution.
+## 2.4 Rare +1 rank breakthrough
 
-## 2.4 Rare +1-rank improvement
+A child may very rarely exceed the expected parental rank by **one rank**.
 
-A very low-probability child improvement is desirable.
+Example: B-level parental potential may rarely yield A.
 
-Example:
+Constraints:
 
-- parents carry B-level potential;
-- the child may rarely obtain an A result.
+- maximum normal breakthrough is +1 rank;
+- weak E-level parents cannot suddenly produce S from nowhere;
+- chance should be genuinely low;
+- no item or direct mechanic guarantees/manipulates this chance for now.
 
-Rules:
+## 2.5 Stat ranks and growth ceilings
 
-- exceptional improvement is at most **+1 rank**;
-- very weak parents must not randomly produce an S result from nowhere;
-- the event should feel lucky and uncommon;
-- the player should not have an item or toggle that guarantees/manipulates this chance for now.
-
-## 2.5 Stat ranks and caps
-
-Current rank language:
+Current rank scale:
 
 ```text
 E → D → C → B → A → S
 ```
 
-S is highest for now.
+The rank defines the stat's growth ceiling. S is highest for now.
 
-The rank determines the maximum amount of growth a stat can contain. A higher rank therefore represents higher developmental potential.
+Rank itself should not be freely increased through ordinary training. Higher potential comes through breeding and major lifecycle progression such as adulthood/evolution or reincarnation.
 
-## 2.6 Equal DNA weighting initially
+## 2.6 Luck remains important
 
-The two stat DNA profiles are equally valid inheritance sources for now.
+Even expert breeders should not be able to fully eliminate luck. Skill comes from choosing parents, understanding DNA, managing generations and deciding which offspring to continue with.
 
-Do not assume a universal dominant/recessive stat hierarchy in v1. Trait-specific dominance may be explored later.
+## 2.7 Hard consequences
 
-## 2.7 Luck remains part of breeding mastery
+Bad breeding/training choices may be permanent. The game does not need a universal repair/reset feature.
 
-Breeding knowledge should improve decision quality, not eliminate luck.
+The final escape hatch is **Goodbye**: send away unwanted Voidlings and start a new line.
 
-Skill comes from:
+## 2.8 Inbreeding consequence for now
 
-- parent selection;
-- reading DNA profiles;
-- managing generations;
-- keeping/discarding offspring strategically;
-- patiently repeating a project.
+For now, inbreeding directly affects **hatch-failure risk only**.
 
-There should be no guaranteed perfect-child button.
+Do not initially add diseases, deformities, stat degradation or personality penalties.
 
-## 2.8 Hard consequences and abandoning a line
+The risk percentage should be visible through family-tree/lineage presentation. The existing implementation-plan burden ladder remains the baseline until changed by a dedicated lineage pass.
 
-The genetics system is allowed to be unforgiving.
+## 2.9 Stats can affect ambient behavior
 
-Bad breeding decisions do not need a universal repair mechanic. The reset route is the **Goodbye** action:
+Stats can subtly influence autonomous Garden behavior. A strong Swim Voidling may choose water more often, for example.
 
-- send away unwanted Voidlings;
-- abandon the line;
-- acquire a new Voidling;
-- begin again.
+This does not need an explicit tooltip; players can discover it through observation.
 
-## 2.9 Inbreeding consequence for now
+## 2.10 Stat-driven morphology
 
-For now, inbreeding should directly affect **hatch failure risk only**.
-
-Do not initially add stat degradation, diseases, deformities, or personality penalties.
-
-The risk percentage should be visible to the player, and the family tree should communicate relatedness/history.
-
-The existing implementation plan's burden ladder remains the baseline unless later design work changes it.
-
-## 2.10 Stats can subtly influence Garden behavior
-
-Stats may influence autonomous actions.
-
-Example: a high-Swim Voidling may choose to swim more often.
-
-The game does not need to explicitly explain these behavioral tendencies. Observation and discovery are preferable.
-
-## 2.11 Stat-driven appearance development
-
-Appearance can gradually reflect how the Voidling is raised.
-
-Example: training heavily toward Swim can gradually introduce Swim-associated morphology.
-
-This is a consequence of development:
+Appearance may gradually reflect how a Voidling is raised, similar in spirit to Chao development.
 
 ```text
-stats / development → appearance
+stat development → appearance change
 ```
 
-not a free power bonus from appearance.
-
-## 2.12 Open-ended genetic goals
-
-There is no single genetic completion state. Players may continue pursuing:
-
-- all colors;
-- all colors with S-rank goals;
-- specialized race builds;
-- perfect all-rounders;
-- rare mutations;
-- prestige lines;
-- trophy transformations.
+The visual change itself is not a bonus source; it reflects the underlying development.
 
 ---
 
 # 3. Appearance & rare bloodlines
 
-> **Interview status:** Partial. Only five primary questions were completed before the interview moved on. Treat this as confirmed direction, not a complete specification.
+> **Incomplete interview section.** The following direction is confirmed, but detailed inheritance still requires the remaining questions.
 
-## 3.1 Appearance is a real breeding objective
+## 3.1 Appearance is a major breeding goal
 
-Appearance supports both collecting and deliberate breeding strategy.
+Players may deliberately breed for:
 
-Players may breed for:
-
-- undiscovered colors;
-- color combinations;
+- missing colors;
+- new color combinations;
 - every visual type in every color;
-- appearance + stat combinations.
+- desired appearance + desired stats;
+- rare mutations;
+- prestige/trophy forms.
 
-## 3.2 Mythically rare appearances should exist
+## 3.2 Extremely rare looks
 
-Some visual outcomes should be extremely rare and prestigious.
+Some appearances should be genuinely mythic/prestigious. Players can grind toward them, but success still depends on patience and luck.
 
-They should remain realistically grindable through patience and breeding effort, but success can still depend heavily on luck.
+There is no universal pity system for the rarest outcomes.
 
-## 3.3 No pity system for top rarity
+## 3.3 Rare appearance can represent a special state
 
-The rarest appearance goals do not need a guaranteed pity mechanic. They are intended to require work and luck.
+A rare look may have gameplay meaning when it represents a lifecycle state such as the immortal/trophy form. Its special rules may include immortality and inability to breed, but it should not receive arbitrary hidden race power simply because it is rare.
 
-## 3.4 Special appearance can represent a gameplay state
+## 3.4 Still unresolved
 
-A rare appearance can have gameplay meaning when it represents a special state such as the late-game immortal/trophy transformation.
-
-That state can change lifecycle/breeding rules, but should not grant arbitrary hidden race bonuses just because it looks rare.
-
-## 3.5 Existing cross-system appearance decisions
-
-- discovering colors is a long-term goal;
-- stat specialization can gradually alter morphology;
-- stat-driven morphology is cosmetic feedback from development;
-- trophy Voidlings retain their final appearance permanently.
-
-### Still unresolved
+A future full appearance pass must define:
 
 - ordinary color inheritance;
-- patterns;
-- shiny/special-coat behavior;
+- pattern rules;
+- shiny/special coats;
 - mutation rates;
 - rare-trait transmission depth;
-- collection encyclopedia behavior;
-- undiscovered-combination hints;
-- stacking rare traits;
-- exact prestige transformation requirements.
+- discovery/collection encyclopedia behavior;
+- whether undiscovered combinations are hinted;
+- stacking of rare traits;
+- exact trophy-form appearance rules.
 
 ---
 
 # 4. Personality, preferences & individuality
 
-## 4.1 Primary purpose: atmosphere
+## 4.1 Purpose: atmosphere and attachment
 
-Personality initially exists mostly to make Voidlings feel like individuals.
+Personality initially exists mainly to make Voidlings feel like individuals. It should support charm, cozy observation and emotional attachment rather than become a major optimization layer.
 
-Its main role is:
+Personality should not affect racing in v1.
 
-- charm;
-- cozy observation;
-- idle animation variety;
-- emotional attachment.
+## 4.2 Core personality vs treatment
 
-It should not be a major optimization system in v1.
+Voidlings can have a relatively stable core personality while player treatment influences current demeanor.
 
-## 4.2 No race effect initially
+Positive actions:
 
-Personality should not affect racing in the initial version.
+- petting;
+- feeding;
+- gentle handling.
 
-## 4.3 Core personality vs treatment-driven demeanor
+Negative actions:
 
-A relatively stable core personality can coexist with treatment-driven behavior.
+- throwing;
+- repeated mistreatment.
 
-Positive treatment includes petting, feeding, and gentle handling.
+Later positive treatment can repair some negative demeanor, but should not rewrite the underlying core personality.
 
-Negative treatment includes throwing or repeatedly treating the Voidling badly.
+## 4.3 Feedback without exposing formulas
 
-Later positive treatment can repair some negative demeanor, but should not rewrite the fundamental core personality.
+A Voidling should visibly react when it dislikes something—angry expression, icon, animation, etc.—without showing messages such as `Happiness -3`.
 
-## 4.4 Difficult behavior should primarily come from mistreatment
+## 4.4 Profile flavor text
 
-Newborn Voidlings should not commonly be assigned severe negative personalities at random.
+A short sentence in the profile can describe observable personality/demeanor. It may change over time and should be cozy/flavorful rather than clinical.
 
-Angry/difficult behavior is more appropriate as a response to how the player treats them.
-
-## 4.5 Immediate expressive feedback, hidden long-term consequence
-
-When a Voidling dislikes an action, show a reaction such as:
-
-- angry face;
-- angry icon;
-- unhappy animation.
-
-Do not display a mechanical message explaining the exact personality/happiness consequence.
-
-## 4.6 Profile flavor text
-
-Instead of a detailed personality matrix, the profile can contain a short flavor sentence reflecting current observable demeanor.
-
-The sentence may change over time and can be playful/cozy rather than clinical.
-
-## 4.7 Personality rarity
-
-Some personality styles may be rarer than others.
-
-Rare personality behavior should remain cosmetic/behavioral initially.
-
-## 4.8 Favorite food
+## 4.5 Favorite food
 
 Each Voidling may have a favorite food.
 
-The player discovers it through trial and error. Once discovered, it is recorded in the profile/DNA information.
+- discovered by trial and error;
+- once discovered, recorded in the profile/DNA information;
+- favorite food grants slightly better stat gain.
 
-Favorite food gives slightly more stat gain than ordinary food.
+## 4.6 No relationship simulation initially
 
-## 4.9 No friendship/rivalry system initially
-
-Voidlings can interact with each other through small ambient animations, but there is no need for relationship meters in v1.
-
-Interactions can be mostly random while loosely matching personality.
+Voidlings may interact through ambient animations, loosely matching personality, but no friendship/rivalry meters are required in v1.
 
 ---
 
@@ -427,787 +290,687 @@ Interactions can be mostly random while loosely matching personality.
 
 ## 5.1 Garden role
 
-The Garden is both:
+The Garden is both a management space and a personalized cozy desktop environment.
 
-- a functional management space;
-- a customized cozy environment.
+Target feeling: **calm + anticipation**. It should be pleasant to leave open without constantly demanding attention.
 
-Its target feeling is **rest + anticipation**: quiet enough to leave open beside another activity, but alive enough that the player occasionally looks over to see what is happening.
+## 5.2 Modular grid/zone concept
 
-## 5.2 Modular Garden inspired by Digimon Championship DS
+Use a Digimon Championship DS-inspired modular Garden system.
 
-The current direction is one overall Garden built from predetermined modular grid/hex-like sections.
+- one overall Garden;
+- predetermined grid/hex-like modules;
+- player chooses which modules to buy/unlock;
+- player chooses placement and upgrades;
+- module choice determines visual themes and may affect passive stat training.
 
-The player chooses:
+Exact geometry/rates remain unresolved.
 
-- which modules to buy/unlock;
-- which modules to place;
-- how to combine them;
-- which modules to upgrade.
+## 5.3 No routine cleaning chores
 
-Modules can define visual theme and can also have explicit passive-training/stat effects.
+Cleaning/waste-management is not a required core mechanic.
 
-Exact geometry and stat effects remain unresolved.
+## 5.4 Hard Voidling capacity
 
-## 5.3 Progressive module acquisition
+The Garden has a hard population limit. Exact capacity is unresolved.
 
-Garden modules are purchased/unlocked over time rather than all being available immediately.
+When full, show a direct message that one Voidling must leave before another can be added.
 
-## 5.4 No cleaning/upkeep chores
+## 5.5 Free roaming and decorations
 
-Do not require routine cleaning, waste removal, or similar maintenance chores in the initial design.
+Voidlings roam available Garden areas freely.
 
-## 5.5 Hard Voidling capacity
+Decorations:
 
-The Garden has a hard Voidling limit.
+- freely placeable;
+- may have a practical performance/readability cap;
+- can trigger autonomous or player-triggered flavor animations;
+- decorative interactions do not provide meaningful stat bonuses.
 
-Exact capacity is unresolved.
+Functional training modules are separate from decorations.
 
-When full, show a clear message such as:
+## 5.6 Real-world presentation
 
-> The Garden is full. To add a new Voidling, one must leave first.
+The Garden visually follows the player's real local time and real-world seasons.
 
-## 5.6 Free roaming
+- open at night → Garden appears at night;
+- seasonal visuals follow season;
+- later seasonal animations such as snow/leaves may be added;
+- these seasonal effects are initially cosmetic.
 
-Voidlings can roam available Garden areas freely instead of being permanently assigned to a single habitat.
+## 5.7 Closing the game
 
-## 5.7 Decoration placement
+Closing the game should not create mechanical neglect punishment.
 
-Decorations should be freely placeable rather than restricted to fixed slots.
+Open-game time drives current progression; closed time does not silently grant the same progress and should not damage the Voidlings either.
 
-A practical decoration cap may exist for readability/performance.
+## 5.8 Quiet audio direction
 
-## 5.8 Decoration interactions are flavor-only
+No continuous idle music is required. The game should remain quiet in the background, with sound effects for active interactions.
 
-Decorations can support autonomous and player-triggered animations/interactions, but these should not themselves provide meaningful stat advantages.
+## 5.9 Timers are desirable
 
-This is separate from functional Garden training modules.
-
-## 5.9 Real-world day/night presentation
-
-The Garden follows the player's real local time. Opening the game at night should show night.
-
-The real-time presentation is part of the game's identity and should not be optional by default.
-
-## 5.10 Real-world seasons
-
-Season visuals follow real-world seasons.
-
-Initially this is primarily cosmetic. Later, seasonal idle animations may be added, such as playing in snow or autumn leaves.
-
-## 5.11 Closing the game should not mechanically punish the player
-
-Long absence while the game is closed should not reduce stats or cause mechanical neglect penalties.
-
-A flavor reaction on return may imply the Voidlings noticed the absence, but it must not create loss.
-
-## 5.12 Audio direction
-
-The baseline idle Garden should be quiet.
-
-Current preference:
-
-- no continuous Garden music while idling;
-- no need for constant ambience;
-- clear SFX for clicks, picking up, placing, and other direct interactions.
-
-## 5.13 Cozy and lively, not attention-hungry
-
-The Garden can feel alive without becoming visually frantic or distracting.
-
-## 5.14 Visible timers are desirable
-
-Egg timers and similar countdowns are useful because they create anticipation and a sense of background productivity.
+Visible countdowns such as egg incubation are useful because they create a feeling of productivity and anticipation without demanding constant input.
 
 ---
 
 # 6. Progression, unlocks & long-term play
 
-## 6.1 Progression comes from multiple connected systems
+## 6.1 Connected progression
 
-Progression should come from a combination of:
+Progress comes from a combination of:
 
-- earning and spending money;
-- hatching/acquiring Voidlings;
-- breeding stronger or rarer lines;
-- raising stats;
-- winning races/cups;
-- unlocking Garden content;
-- earning cosmetic and prestige rewards.
-
-No single progression currency should replace the creature-raising loop.
-
-## 6.2 Money remains useful but is not the only endgame goal
-
-Money should remain useful into later play, but it is acceptable for a highly progressed player to care less about ordinary utility purchases.
-
-Long-term spending can include:
-
-- cosmetics;
-- rare shop inventory;
-- eggs;
+- money;
+- acquiring/hatching Voidlings;
+- breeding;
+- stat raising;
+- races/cups;
 - Garden modules/upgrades;
-- convenience items.
+- cosmetics/prestige.
 
-Cosmetics are a valid long-term use for excess money, but the economy should not feel designed solely around draining currency.
+## 6.2 Grind is intentional
 
-## 6.3 Eggs remain meaningful purchases
+Major goals should require time, repetition and planning. Progress may stall temporarily because of money, genetics or luck; this is acceptable in an idle game.
 
-Egg buying may eventually become routine, but eggs should remain relatively expensive.
-
-The economy must account for players who leave the game open for many hours per day and therefore accumulate substantial idle income.
-
-## 6.4 Progress can intentionally stall
-
-It is acceptable for progression to pause when the player lacks money, suitable genetics, or luck.
-
-The game is designed around sometimes leaving it open and allowing background progress to accumulate rather than guaranteeing constant rapid advancement.
-
-## 6.5 Grind is intentional
-
-Long-term goals are supposed to take meaningful time and repetition.
-
-The game should not flatten every objective into a short guaranteed unlock path.
-
-## 6.6 Daily rhythm without a prescribed daily playstyle
-
-The game should support daily engagement, but the player should still choose their own project.
-
-Daily structure may include:
-
-- login chains;
-- daily missions;
-- rotating inventory;
-- checking eggs/timers;
-- occasional special opportunities.
+## 6.3 Daily rhythm
 
 The game should reward both:
 
-- brief frequent check-ins;
-- keeping the game open for long periods.
+- frequent check-ins;
+- long open-game idle sessions.
 
-## 6.7 Shop structure
+Daily structure can include login chains, daily missions, shop rotations and occasional special opportunities, but the player's overall project remains self-directed.
 
-The shop should combine predictable baseline access with rotating rarity.
+## 6.4 Shop structure
 
-Current direction:
+- core/basic items are always available;
+- rarer items rotate;
+- egg inventory follows a predictable slot structure while exact eggs vary;
+- rare convenience items such as a full incubation skip can appear infrequently;
+- approximately hourly rotation is a working idea, not yet a locked tuning value.
 
-- core/basic items remain consistently available;
-- rare items rotate;
-- egg inventory follows a reasonably predictable format, while exact eggs can vary;
-- an exact permanent egg-slot count is not yet locked;
-- rare convenience items such as full incubation skips should appear infrequently.
+## 6.5 Endless progression
 
-The user suggested an approximately hourly rotation as a working direction, not a final tuning requirement.
+No universal end state. Players continue inventing goals across stats, collections, racing, cosmetics, Garden expansion and prestige lines.
 
-## 6.8 Endless self-directed progression
+## 6.6 Unlocks should feel earned
 
-There is no final universal completion objective.
-
-The player creates goals such as:
-
-- perfect stats;
-- rare colors;
-- complete collections;
-- stronger race builds;
-- cup completion;
-- trophy Voidlings;
-- Garden customization;
-- prestige bloodlines.
-
-## 6.9 No pity system for rare outcomes
-
-Rare genetic/cosmetic outcomes can remain genuinely rare. The player is expected to grind and rely partly on luck.
-
-## 6.10 Single-player first, multiplayer later
-
-The current core is single-player.
-
-Later multiplayer ambitions include:
-
-- racing other players;
-- potentially player trading once multiplayer exists;
-- local/global competitive comparison and leaderboards.
-
-These are later-phase systems and should not complicate the initial economy unnecessarily.
-
-## 6.11 Economy should be tightly understandable
-
-The economy should be deliberately balanced rather than intentionally messy or opaque.
-
-Players should be able to understand how they earn and spend currency.
-
-## 6.12 Mistakes can have consequences
-
-Progression decisions can be irreversible. The game does not need to protect the player from every poor purchase, stat choice, or breeding decision.
-
-## 6.13 Progress should be visible
-
-Where progression is numeric, use clear UI such as bars and numbers rather than hiding all advancement behind flavor.
-
-## 6.14 Cosmetics are valid rewards
-
-Cosmetic rewards should exist independently of power progression.
-
-## 6.15 Seasonal events
-
-Seasonal events are desirable.
-
-They may include:
-
-- seasonal cosmetics;
-- login calendars;
-- temporary reward structures;
-- other event content.
-
-For now there is no requirement that seasonal events alter core genetics/race balance.
-
-## 6.16 Unlocks should feel earned
-
-Unlocks should primarily feel like **rewards for progress**, not arbitrary surprises.
-
-## 6.17 Progression fantasy
-
-The core feeling should be:
+The central progression feeling is:
 
 > I worked toward this and earned it.
 
-The game can contain luck, but long-term success should still feel connected to sustained effort and planning.
+Luck can matter, but sustained effort should remain visible in success.
+
+## 6.7 Seasonal events
+
+Seasonal events are desirable and may include cosmetics, login calendars and temporary rewards.
 
 ---
 
 # 7. Races, cups & competition
 
-## 7.1 Stats determine performance; randomness creates tension
+## 7.1 Stats first, randomness for tension
 
-Race performance should primarily come from the Voidling's stats.
+Race outcomes should primarily reflect raised stats. Random events exist to keep races exciting rather than erase preparation.
 
-Randomness exists to keep races exciting rather than to override progression.
+The reference example is a small chance to fall while running, creating only time loss.
 
-The clearest example discussed is a small random chance to **fall while running**, causing lost time.
+A provisional example mentioned was roughly a 0.5% fall check every ~3 seconds; treat that strictly as a tuning placeholder.
 
-A provisional example given during the interview was checking approximately every 3 seconds with around a 0.5% fall chance. Treat those exact numbers as tuning placeholders, not locked balance constants.
+## 7.2 Racing drives progression
 
-## 7.2 Falling is simple time loss
+Races should be encouraged through meaningful rewards/unlocks. Winning higher cups may unlock new content, medals or progression gates.
 
-For now, falling does not need to affect morale, personality, or long-term state.
+## 7.3 Standard races vs cups
 
-It simply costs race time.
+- ordinary races generally available;
+- major/special championship cups can be time/rotation limited;
+- future multiplayer may include daily races.
 
-## 7.3 Racing should be encouraged through progression
+## 7.4 Cheer/stamina mechanic
 
-Racing is not mandatory every minute, but it should unlock meaningful content.
+Keep the existing Chao-Garden-like Cheer mechanic:
 
-Examples:
+- stamina drains naturally;
+- Cheer spends additional stamina;
+- empty stamina slows the Voidling;
+- Cheer is a timing/resource decision.
 
-- winning a certain cup tier unlocks new content;
-- medals/trophies similar in role to Chao Garden race medals;
-- advanced progression can require cup victories.
+No additional complexity is required here for now.
 
-## 7.4 Standard races vs special championships
+## 7.5 Repeatable races
 
-Current direction:
+No general race-attempt limit is required.
 
-- ordinary races remain generally available;
-- certain championship cups can appear only at specific times/rotations;
-- future multiplayer may include a daily multiplayer race.
+## 7.6 Race length and course complexity
 
-## 7.5 Existing cheer/stamina interaction remains
+Race duration can vary. Higher cups may be longer and contain more obstacles/segments.
 
-The current race interaction already includes a **Cheer** button similar in role to Chao Garden.
+## 7.7 Cup NPC identity
 
-Current intended behavior:
+Normal races may use randomized opponents.
 
-- stamina drains naturally during a race;
-- cheering consumes additional stamina;
-- if stamina reaches zero, the Voidling runs more slowly;
-- using Cheer is therefore a timing/resource decision;
-- its impact depends on the Voidling and race situation.
+Each cup should instead have a stable recognizable NPC cast with names and small personalities/flavor. A cup's cast remains the same inside that cup; different cups can have different casts.
 
-This interaction is already sufficiently specified for now and does not need extra mechanics added simply for complexity.
+## 7.8 Financial stakes
 
-## 7.6 Casual races and serious cups should feel different
+Major cups may charge an entry fee. Losing can therefore hurt lightly.
 
-There should be a recognizable distinction between ordinary/casual racing and major cup/championship content.
+Race rewards should not become the best way to farm money, because idle income is the main currency engine.
 
-## 7.7 Rewards should favor winning
+Current preferred reward direction:
 
-Racing should not become an easy grind source where repeated losses still generate large rewards.
+- entry fee creates stakes;
+- prize value is primarily item/medal/trophy/unlock;
+- exact refund behavior is unresolved because both winner-only refund and placement-based partial refund were discussed.
 
-Major rewards belong primarily to winning.
+## 7.9 Race feeling
 
-## 7.8 No general race-attempt limit
+Racing should feel like watching a horse race involving a creature the player personally invested in:
 
-Players should be able to race repeatedly.
+- preparation matters;
+- small random incidents keep it tense;
+- winning feels like validation of breeding/training.
 
-A proposed cooldown for major cups was explicitly reconsidered and should **not** be assumed for now.
-
-## 7.9 Race length can vary
-
-Race duration does not need one global limit.
-
-Higher cups can be longer and contain more obstacles/segments.
-
-## 7.10 Stat influence does not need explicit live explanation
-
-Stats should clearly matter to the relevant race segments, but the race UI does not need to continuously display formulas explaining why every action succeeded.
-
-The presentation can remain close to the observational feel of Chao Garden.
-
-## 7.11 Training and racing are equally important
-
-Training creates capability; racing validates and rewards it. Neither should become irrelevant to the other.
-
-## 7.12 Races may be somewhat chaotic
-
-A little chaos, stumbling, and uncertainty is desirable. The race should feel exciting rather than like a deterministic spreadsheet animation.
-
-## 7.13 Failure can hurt lightly
-
-Failure may cost something, particularly in major cups.
-
-The clearest example is losing an entry fee when entering a significant cup and failing to win.
-
-The penalty should sting enough to create stakes without feeling cruel.
-
-## 7.14 Cups are mechanically functional, but NPCs have identity
-
-Cups do not need elaborate story campaigns.
-
-However, each cup should have a recognizable fixed NPC cast with:
-
-- names;
-- small personality/flavor;
-- consistent presence within that cup.
-
-Normal races can use more randomized opponents.
-
-Different cups can have different casts.
-
-## 7.15 Race strength comes from raising choices
-
-A Voidling excels based on how its stats were bred and raised. There is no separate universal racer archetype that overrides stat development.
-
-## 7.16 Race rewards should not replace idle income
-
-Racing can return money, but it should not become the primary currency farming method because that would undermine the idle economy.
-
-The current preferred major-cup reward model is:
-
-- entry fee creates financial stakes;
-- winning can refund the entry fee;
-- the meaningful profit is an item, medal, trophy, unlock, or other progression reward.
-
-A later economy answer also suggested placement-based partial entry-fee returns. This needs one explicit final decision in a later refinement pass rather than being silently implemented either way.
-
-## 7.17 Leaderboards later
-
-When multiplayer/competitive infrastructure exists, both local and global leaderboards are desirable.
-
-## 7.18 Desired race feeling
-
-Racing should feel like:
-
-- a payoff for stats the player deliberately raised;
-- tense even when the player prepared well;
-- slightly like watching a horse race where the player has invested in the competitor;
-- exciting because small chance events can still change the moment-to-moment outcome.
-
-## 7.19 Chance can create large swings, but not arbitrary daily unfairness
-
-Chance is acceptable in races, and later clarification explicitly allowed occasional strongly positive or negative race outcomes caused by chance.
-
-This should not mean every progression system is equally random. Daily rewards, for example, should remain fair and predictable.
+Later multiplayer can add local/global leaderboards and player competition.
 
 ---
 
 # 8. Raising, training, stats & care
 
-## 8.1 Active + passive training
+## 8.1 Active and passive training
 
-Stat growth should use a combination of:
+Use both:
 
-- **active training/feeding/items**;
-- **passive Garden training zones/modules** inspired by Digimon Championship DS.
+- active feeding/items;
+- passive Garden training zones/modules.
 
-Active training should always be faster/more effective than passive training.
+Active training is always faster/more effective than passive training.
 
-Passive training exists so a player can leave a Voidling progressing while the game stays open.
+Passive zone training continues gradually until the player removes/stops the Voidling.
 
-## 8.2 Passive training continues until stopped
+## 8.2 Open-game passive progression
 
-A Voidling placed into a passive-training zone should gradually gain progress until the player manually stops/removes it.
+Passive training happens only while the game is open under the current idle model.
 
-It is not a fixed one-shot timer session by default.
+There is no arbitrary daily training cap. Practical limits are money, items, time and the rank-defined stat ceiling.
 
-Passive training does not continue while the game is closed under the current idle model.
+## 8.3 Rank-based stat caps
 
-## 8.3 Growth speed is limited mainly by resources and time
+The rank E-S is the hard growth ceiling for each stat. An A-rank stat caps below an S-rank stat.
 
-There is no need for a separate arbitrary daily training cap.
+Normal training cannot exceed the ceiling.
 
-Practical constraints include:
+Rank improvement should happen through major lifecycle/genetic systems, including breeding, adulthood/evolution and reincarnation rather than ordinary consumables.
 
-- available money/items;
-- player time;
-- passive elapsed open-game time;
-- the stat's rank-based maximum.
+## 8.4 Food and Stamina
 
-## 8.4 Rank determines maximum stat capacity
+Food should support Stamina growth in a Chao-Garden-like role. Favorite food gives slightly better gain.
 
-The stat rank acts as the hard growth cap, similar in role to Chao Garden.
+## 8.5 Strategic training items
 
-A Voidling with an A-rank stat has a lower maximum potential than one with S rank.
+Stats do not universally oppose each other, but specific powerful items may:
 
-Normal training cannot simply push beyond that rank-defined ceiling.
+- give a large boost to one stat;
+- subtract from another stat.
 
-## 8.5 Rank improvement comes from major lifecycle/genetic events
+This creates deliberate item-level tradeoffs.
 
-The rank itself should not be freely increased through ordinary training items.
+## 8.6 Item/stat information should be understandable
 
-Current intended routes to improving rank/potential include:
+Players should be able to see numeric stat information similar in spirit to Chao Garden. Training effects should be understandable enough for deliberate min-maxing rather than fully hidden.
 
-- growing from child to adult/evolution;
-- reincarnation-related progression;
-- breeding better genetics.
+## 8.7 Irreversible choices
 
-Exact rules remain subject to the lifecycle deep dive.
+If a player invests in the wrong stat or uses an item with a drawback, there is no required refund/reset. Both small and large mistakes may be permanent for that Voidling.
 
-## 8.6 Food and Stamina
+## 8.8 Immediate active training
 
-Feeding should fill the Chao Garden-like role of supporting Stamina development.
+Using an active item applies its effect immediately. Passive zones are the slow idle alternative.
 
-Favorite food provides slightly more benefit than ordinary food.
+## 8.9 Hidden happiness and care consequence
 
-Cleaning is not required as a care mechanic.
+Care has a major lifecycle effect through a completely hidden happiness value.
 
-## 8.7 Some training items may trade one stat for another
+Working concept:
 
-Stats do not inherently need a universal tradeoff such as "Power always reduces Run."
-
-However, specific powerful items may intentionally:
-
-- grant a large increase to one stat;
-- remove/reduce progress from another stat.
-
-This creates item-level strategic tradeoffs without forcing every stat pair into opposition.
-
-## 8.8 Training/item effects should be understandable
-
-The player should have enough information to make deliberate item choices.
-
-The user explicitly clarified that training/item information should be **insightful/visible rather than completely hidden**, using Chao Garden-style numeric stat presentation as the reference.
-
-Exact presentation of per-item values can still remain stylistically simple rather than becoming a probability spreadsheet.
-
-## 8.9 Min-maxing is supported
-
-Players should be allowed to deliberately optimize stats and builds.
-
-## 8.10 Small daily activities are acceptable, but goals remain self-directed
-
-The game can offer small things to do each day, but it should not dictate one mandatory daily routine.
-
-Players decide whether today's focus is breeding, training, racing, collecting, Garden expansion, or simply idling.
-
-## 8.11 Mood is not a stat-growth modifier initially
-
-Mood/personality can remain cosmetic for stat growth in the initial version.
-
-## 8.12 Training progress does not continue while closed
-
-Passive training follows the same open-game idle rule as the rest of the current design.
-
-## 8.13 Training choices can be irreversible
-
-If the player invests in the wrong stat or uses an item with an unwanted tradeoff, there does not need to be a reset/refund mechanic.
-
-Both small and large mistakes may have permanent consequences for that Voidling.
-
-## 8.14 Active item training is immediate
-
-Using an active stat item/food should apply its effect immediately.
-
-Passive zone training is the slow time-based alternative.
-
-## 8.15 No punishment for simply not training
-
-A Voidling does not lose stats or suffer simply because the player did not train it recently.
-
-## 8.16 Minimal tutorial, then discovery
-
-The game should provide a small introductory tutorial and then allow the player to discover deeper optimization themselves.
-
-## 8.17 Desired training feeling
-
-Training should make the player feel:
-
-> I am making visible progress toward a build or goal I chose.
-
-## 8.18 Hidden happiness and lifecycle care consequence
-
-Care does have one important non-stat consequence: lifecycle outcome.
-
-Current concept:
-
-- hidden `Happiness` range approximately 0-100;
+- approximate range 0-100;
 - starts at 0;
-- gains points from positive actions such as petting and feeding;
-- loses points from negative treatment such as throwing the Voidling;
-- can lose points from very long periods without attention while the game is actively running;
-- the value is **completely hidden** from the player;
-- the player reads happiness through behavior/feedback instead of a meter.
+- positive treatment such as petting/feeding raises it;
+- throwing/mistreatment lowers it;
+- very long periods without attention while the game is actively running may lower it;
+- no visible happiness meter.
 
-If the Voidling reaches the relevant lifecycle endpoint without being happy enough, it may **die instead of reincarnating**, comparable in role to Chao Garden's care consequence.
+At lifecycle end, insufficient happiness may cause death instead of reincarnation.
 
-Exact thresholds, decay rates, and reincarnation rules remain unresolved until the lifecycle section is refined.
+Exact values/thresholds remain unresolved.
 
 ---
 
 # 9. Economy & rewards
 
-## 9.1 Primary money source: slow open-game idle income
+## 9.1 Main income source
 
-The Garden should generate currency slowly over time while the game is open.
+The Garden slowly generates money while the game is open, approximately as a passive per-minute stream.
 
-The baseline model is a small amount **per minute** rather than requiring the Voidling to perform a specific money-making animation.
+There is no daily earning cap.
 
-The player should be told clearly that keeping the game open generates income; idle earning is an intended mechanic, not a hidden exploit.
+## 9.2 Possible active-computer-use bonus
 
-## 9.2 Possible active-presence bonus requires refinement
+A possible idea was earning somewhat more when the player is actively using their computer—for example typing—than when fully unattended.
 
-The interview suggested that the player might earn somewhat more while they are actively doing something on the computer—for example typing on the keyboard—than when the machine is simply unattended.
+This is **not implementation-ready** and requires privacy/platform/UX evaluation. The stable requirement is simply that open-game idle time earns currency.
 
-This idea is **not yet implementation-ready**. It needs a later UX/privacy/platform feasibility discussion before being treated as a hard requirement.
+## 9.3 Eggshell sales
 
-The stable requirement is only that open-game idle time earns money.
+After an egg hatches, its shell can be sold once. Rare egg shells can be more valuable.
 
-## 9.3 Eggshells are sellable hatch rewards
+## 9.4 Daily login chain
 
-After an egg hatches, its shell can be sold once, similar in role to Chao Garden.
+Daily login chains are desirable and upcoming rewards should be visible/predictable.
 
-Rare eggs can produce more valuable shells.
-
-This is a one-time post-hatch value source, not a repeatable shell farm from the same egg.
-
-## 9.4 Daily login chains
-
-Daily login chains are desirable.
-
-The player should be able to see upcoming rewards in the chain rather than receiving fully opaque random rewards.
-
-Daily login rewards should be comparatively fair and predictable.
+Daily rewards should be fair rather than wildly randomized.
 
 ## 9.5 Daily missions
 
-Daily missions are desired.
+Daily missions are desired. Most can be short, while occasional longer objectives are acceptable.
 
-Most can be achievable in a normal session, while some longer daily objectives are acceptable occasionally.
+## 9.6 Currency rules
 
-The exact mission catalog and completion window remain unresolved.
+- one currency for now;
+- no wallet cap;
+- fixed item prices;
+- no simulated inflation;
+- no loans/debt;
+- no generic random cash jackpot layer.
 
-## 9.6 Rare drops can be genuinely rare
+## 9.7 Cosmetics and spending
 
-Some rewards may have genuinely low drop/appearance rates. No universal pity system is required.
+Cosmetics may cost money and remain useful late-game purchases, but should exist because customization is enjoyable rather than purely as a currency sink.
 
-## 9.7 No maximum wallet
+Players choose whether to save for expensive goals or make frequent small purchases.
 
-There is no need for a hard cap on how much currency the player can save.
+## 9.8 Race money
 
-## 9.8 Prices are fixed
+Entering major races/cups can lose money.
 
-Normal item prices should be fixed rather than dynamically fluctuating with inflation or market simulation.
+Exact refund behavior remains unresolved:
 
-The **inventory** may rotate; the price of a given item should remain understandable and stable unless deliberately rebalanced by a game update.
+1. winner gets entry fee back; or
+2. partial refund depends on placement, with no consolation for the bottom placement.
 
-## 9.9 Cosmetics are optional purchases, not merely an anti-inflation sink
+Daily rewards should remain predictable even though races, rare genetics and rotating shop opportunities may swing strongly positive or negative through chance.
 
-Cosmetics can cost money and provide an ongoing spending option, but they should exist because customization is enjoyable, not solely because the game needs to delete currency from the economy.
+## 9.9 Multiplayer trading later
 
-## 9.10 Spending style is player-defined
-
-The game should support both:
-
-- saving for expensive purchases;
-- making frequent smaller purchases.
-
-The player chooses the strategy based on their current project.
-
-## 9.11 No daily earning cap
-
-If the player keeps the game open for a very long time, idle earnings can continue accumulating.
-
-The economy should be balanced with this behavior in mind rather than stopping income after an arbitrary daily limit.
-
-## 9.12 Trading can come with multiplayer
-
-For now the economy is single-player.
-
-Once multiplayer exists, player-to-player trading may be added.
-
-Do not build the initial economy around a speculative player market before multiplayer exists.
-
-## 9.13 No inflation system for now
-
-The game does not need simulated inflation/anti-inflation mechanics in the initial design.
-
-## 9.14 No random money jackpot layer
-
-There is no current need for a generic random chance to suddenly receive bonus money during normal idle earning.
-
-Randomness is better attached to systems where it creates meaningful excitement, such as race incidents, genetic outcomes, or rotating rare inventory.
-
-## 9.15 Session reward is primarily the login structure
-
-There does not need to be a separate arbitrary "played a session" payout if daily login already fulfills that role.
-
-## 9.16 Race entry creates financial stakes
-
-Money can be lost by entering races/cups and failing to achieve the required placement/win condition.
-
-Racing should not be the primary currency grind, but financial stakes make major cups more exciting.
-
-The exact refund curve still needs a final decision because two related ideas emerged:
-
-1. **winner-focused model:** winner gets entry fee back; main profit is item/medal/unlock;
-2. **placement model:** some entry fee is returned based on finish position, with last place receiving no consolation.
-
-Do not hard-code one until this is explicitly resolved.
-
-## 9.17 One currency for now
-
-Use one main currency initially.
-
-No premium/secondary currency is currently required.
-
-## 9.18 No loans/advances
-
-Players cannot borrow money or go into debt to buy items/enter races.
-
-## 9.19 Economy should be immediately understandable
-
-The basic economy should be simple enough that the player quickly understands:
-
-- how idle income works;
-- what things cost;
-- what can be sold;
-- how races can lose/refund entry money;
-- when the shop rotates.
-
-Complexity should come from deciding what to spend on, not deciphering hidden currency rules.
-
-## 9.20 Time is a resource
-
-Time is part of the economy because money, passive training, incubation, cooldowns, and rotations all use open-game elapsed time.
-
-This supports the idle-game fantasy of making progress while the game sits beside another activity.
-
-## 9.21 Fun over rigid fairness, but not arbitrary unfairness
-
-When forced to prioritize, the design should favor **fun** over sterile mathematical fairness.
-
-However, this does not mean every system should feel unfair.
-
-Current distinction:
-
-- **daily login rewards:** fair and predictable;
-- **races:** chance can create unusually positive or negative outcomes;
-- **shop:** rotating availability can create lucky/unlucky timing;
-- **rare genetics/cosmetics:** luck is expected;
-- ordinary economy rules should remain understandable.
+Player trading may be added when multiplayer exists. The initial economy remains single-player and should not be designed around a speculative player market.
 
 ---
 
-# Cross-system requirements currently established
+# 10. Session flow, tutorial & Garden event log
 
-Treat the following as product-level constraints until explicitly revised:
+## 10.1 Desired engagement
 
-1. **Breeding is deliberate and player-initiated.** No autonomous mating.
-2. **Two visible DNA profiles are the normal inheritance source.** No secret third normal-stat layer.
-3. **Exact offspring outcomes remain uncertain.** No perfect prediction calculator in normal gameplay.
-4. **Luck always remains part of breeding.** Better parent selection improves possibilities but does not guarantee the result.
-5. **Breeding supports performance and collection goals.** All-S stats, rare colors, and prestige lines are equally legitimate projects.
-6. **Later racing should require better bloodlines.** Genetics must matter to progression.
-7. **The game is idle-first but currently not offline-progress-first.** Mechanical progress occurs while open.
-8. **The Garden follows real-world local time and seasons visually.**
-9. **The Garden stays cozy and low-demand.** No cleaning chores or closed-game neglect punishment.
-10. **Personality exists mainly for atmosphere in v1.** It should not complicate race optimization yet.
-11. **Care still matters through hidden happiness.** Poor care can eventually prevent reincarnation and lead to death.
-12. **Rare achievements remain genuinely rare.** No universal pity system.
-13. **A permanent late-game trophy form is desirable.** It can race, cannot breed, and gains no free race strength beyond its stats.
-14. **Players can abandon bad lines using Goodbye.** The design does not guarantee reversible genetics/training.
-15. **Active training is faster than passive training.** Passive zone training is an open-game idle layer.
-16. **Stat rank sets the growth ceiling.** Normal training cannot bypass it.
-17. **Races primarily reward preparation/stats but retain small chance events for tension.**
-18. **Major cups can carry entry-fee stakes.** Racing should not replace idle income as the best money farm.
-19. **The basic economy uses one currency, fixed prices, slow open-game idle income, and no earning cap.**
-20. **Daily rewards should be predictable, while races/shop/rare genetics may contain stronger chance swings.**
-21. **Progression is intentionally grindy and self-directed.** The player should feel they worked toward major outcomes.
+The desired core loop should feel **compelling/"addictive" in the positive game-design sense**: the player continually has another personally chosen goal to work toward.
+
+The recurring pull comes from:
+
+- hatching new Voidlings;
+- strengthening existing Voidlings;
+- breeding toward better stats/looks;
+- spending time with individual Voidlings;
+- setting self-directed collection/racing/breeding goals.
+
+## 10.2 Emotional and mechanical attachment
+
+The player's bond with a Voidling should be both:
+
+- **mechanical:** stats, breeding value, race history, lifecycle;
+- **emotional:** time spent caring for and observing that individual.
+
+Time spent in the Garden is meaningful even when the player is not optimizing something.
+
+## 10.3 Idle time still feels active
+
+Quiet periods should arise naturally rather than being forced as explicit downtime.
+
+Even when the player is not clicking:
+
+- money is accumulating;
+- passive training may be progressing;
+- egg/cooldown timers may be moving;
+- Voidlings continue ambient behavior.
+
+The player therefore feels that something is happening without active input.
+
+## 10.4 Garden event log
+
+The Garden should contain a scrollable event/chat-style log for important session events.
+
+Important events include:
+
+- egg created through breeding;
+- egg becomes ready/hatches;
+- Voidling finishes a meaningful training event;
+- Voidling is in a dangerously poor state / nearing lifecycle failure;
+- Voidling dies;
+- Voidling enters a cocoon before reincarnation/death;
+- occasional positive flavor events such as a Voidling being especially happy.
+
+The cocoon's presentation/color can help communicate whether the lifecycle event is heading toward reincarnation or death, similar in spirit to Chao Garden.
+
+## 10.5 Log behavior
+
+- scrolling history;
+- session-based history is sufficient;
+- no player-authored notes;
+- no forced session-summary popup;
+- player can simply scroll backward;
+- target maximum history: **300 log sentences/messages** before older entries fall out.
+
+The log may use light flavor text, but its primary job is to tell the player what happened in the Garden while their attention was elsewhere.
+
+## 10.6 Tutorial
+
+The tutorial should:
+
+- start automatically on the first launch;
+- be skippable;
+- remain relatively basic;
+- show each major screen once;
+- combine text, visual highlighting and guided click-through interaction;
+- teach the minimum needed to navigate the game, then allow discovery.
+
+The game should not rely on a large permanent hint/tutorial system after that.
+
+---
+
+# 11. UI, information & feedback
+
+## 11.1 Always-visible Garden information
+
+The desktop Garden should keep the essential interface visible:
+
+- Voidlings/world view;
+- current money;
+- Garden event log;
+- the necessary navigation/actions around the Garden and grid system.
+
+Visibility customization may be added, but the baseline uses a stable fixed layout rather than freely movable panels.
+
+## 11.2 Desktop-first
+
+Mobile is not a current priority. The interface is designed for desktop first.
+
+It must scale automatically across desktop resolutions.
+
+## 11.3 Visual direction
+
+UI should feel:
+
+- cozy;
+- pastel-colored;
+- moderately playful;
+- clearly readable.
+
+When character and readability conflict, **readability wins**.
+
+Panels should be visually bounded/defined rather than heavily transparent floating overlays.
+
+## 11.4 Notifications
+
+Important lifecycle/egg events should normally appear in the Garden log rather than as disruptive pop-up windows.
+
+## 11.5 Accessibility
+
+Accessibility/colorblind support is desired, but can arrive after the earliest prototype rather than blocking initial internal playability.
+
+## 11.6 Audio feedback
+
+Use both visual feedback and sound effects.
+
+No continuous music is required for the idle experience.
+
+Desired volume controls:
+
+- master volume;
+- sound-effect volume;
+- UI sound volume.
+
+A dedicated mute hotkey is not required.
+
+## 11.7 Input remapping
+
+Keyboard controls should eventually be remappable, but full remapping can be a full-release feature rather than an MVP blocker.
+
+## 11.8 Game continues running
+
+Opening menus/settings should not imply that the world has stopped. The idle simulation is generally expected to continue running.
+
+There is no requirement for a separate prominent in-game real-world clock; the player's computer already provides the time.
+
+---
+
+# 12. MVP scope, priorities & technical readiness
+
+## 12.1 MVP identity
+
+The first internally playable version must already feel recognizably like the intended Chao-Garden-inspired experience rather than a disconnected collection of technical prototypes.
+
+The MVP should include the core loop of:
+
+- acquiring/buying eggs;
+- hatching;
+- raising/training;
+- breeding;
+- Garden/grid passive training;
+- racing;
+- shop purchases;
+- lifecycle/reincarnation;
+- economy/save/settings support.
+
+## 12.2 Breeding is MVP-critical
+
+Breeding cannot be postponed to a later version. It is one of the central pillars and should work in the first meaningful internal build.
+
+## 12.3 Reincarnation is MVP-critical
+
+Reincarnation should also be present and **meaningfully implemented**, not just represented by a placeholder button/state.
+
+The tutorial is more expendable than reincarnation if schedule pressure appears.
+
+## 12.4 Tutorial quality can be modest
+
+The first tutorial can be functional rather than highly polished. Full multiplayer is also later, although its technical foundation cannot be ignored.
+
+## 12.5 Shop MVP
+
+A simple working shop is enough initially. It must support the real economy loop, eggs and stat-improving items, but does not need every future shop feature.
+
+## 12.6 Training must be real
+
+Training in the MVP must actually alter stats and therefore meaningfully affect race performance. Passive training zones must be functional rather than decorative placeholders.
+
+## 12.7 Economy
+
+The MVP economy should be **roughly balanced enough to play**, with later manual fine-tuning expected.
+
+## 12.8 Autosave
+
+The game should always autosave.
+
+Desired approach combines:
+
+- frequent/continuous background persistence where safe;
+- explicit save points/checkpoints after meaningful mutations;
+- a small saving indicator when appropriate.
+
+The player should not need to manage manual saves for normal play.
+
+## 12.9 Multiplayer technical foundation
+
+Full multiplayer can arrive later, but the MVP should prove that the chosen architecture can support it.
+
+Current requirement:
+
+- use Steamworks as the intended platform/network ecosystem;
+- research what is free/common/recommended for Steam idle games and small multiplayer experiences;
+- establish the architecture with multiplayer expansion in mind;
+- perform at least a **simple real connection test** rather than leaving multiplayer entirely theoretical.
+
+The exact Steamworks networking/lobby architecture is still a research task and should not be guessed in implementation planning.
+
+## 12.10 Open-ended MVP
+
+The MVP does not need a final victory screen or hard completion condition. The game remains open-ended.
+
+## 12.11 Art strategy
+
+Use the asset packs already owned/selected as the initial visual style. They can be progressively replaced with custom assets later.
+
+## 12.12 Optimization priority
+
+For early internal builds:
+
+**playability > optimization**.
+
+Optimize later once the gameplay systems are proven, while avoiding architectural decisions that obviously make future optimization impossible.
+
+## 12.13 Achievements
+
+Achievements are desirable but schedule-flexible and may come later.
+
+## 12.14 Balance telemetry/debug logging
+
+The MVP should log data useful for race/stat balancing, especially:
+
+- creature stats;
+- speeds reached;
+- race outcomes;
+- win rates correlated with stats/builds;
+- enough information to understand whether progression/racing curves are behaving as intended.
+
+This is primarily internal balancing instrumentation, not player-facing analytics.
+
+## 12.15 Testing audience
+
+Initial builds are for **internal testing first**, not external public testers.
+
+## 12.16 Settings
+
+A minimal settings screen belongs in the MVP, including the core audio/settings controls defined above.
+
+## 12.17 Error handling
+
+Basic user-friendly error handling is preferred where practical rather than exposing raw failures everywhere.
+
+## 12.18 No in-game roadmap
+
+Do not show a development roadmap inside the game.
+
+## 12.19 No hard MVP date
+
+There is no fixed release date requirement for the MVP at this stage.
+
+## 12.20 Real race system, not a fake result screen
+
+The MVP must exercise the actual race system and produce real race outcomes from the intended stats/simulation. A temporary fake "roll a winner" or result-only mock is not sufficient as the final MVP validation of racing.
+
+---
+
+# Cross-system requirements
+
+Treat these as product-level constraints until explicitly revised:
+
+1. Breeding is always player-initiated; no autonomous mating.
+2. Two visible DNA profiles define normal inherited stat potential.
+3. Normal offspring outcomes remain uncertain; no exact player-facing probability calculator.
+4. Luck remains part of breeding and rare appearance progression.
+5. Breeding supports both performance and collection goals.
+6. Later race progression should require stronger bloodlines.
+7. Mechanical idle progress currently occurs while the game is open, not while closed.
+8. The Garden should remain cozy, quiet and low-demand.
+9. Garden presentation follows real-world local day/night and seasons.
+10. Personality is primarily atmospheric in v1.
+11. Hidden happiness makes care meaningful and can affect death vs reincarnation.
+12. Rank determines a stat's growth ceiling.
+13. Active training is faster than passive zone training.
+14. Training and breeding choices may be irreversible.
+15. Rare results do not require pity systems.
+16. A permanent immortal/trophy Voidling is a desired late-game goal; it can race but cannot breed.
+17. Race outcomes primarily reflect stats, with small/random incidents preserving tension.
+18. Major cups can carry financial stakes but should not replace idle income as the best money source.
+19. Economy starts with one currency, fixed prices and uncapped open-game idle income.
+20. Daily rewards should be predictable; race/shop/genetic outcomes may contain stronger chance swings.
+21. The player should feel that long-term rewards were earned through time and planning.
+22. Important background Garden events should be recoverable through the 300-message session log.
+23. UI is desktop-first, pastel/cozy, fixed-layout and readability-first.
+24. The world generally keeps running while menus are open.
+25. MVP must contain the real raise → breed → hatch → train → race → lifecycle loop.
+26. Autosave is the default persistence model.
+27. Multiplayer is later content, but Steamworks connectivity/architecture must be proven early enough to avoid a dead-end design.
 
 ---
 
 # Explicitly unresolved / pending design work
 
-Do **not** silently decide these during implementation:
+Do **not** silently decide the following during implementation:
 
+- full remaining Appearance & Rare Bloodlines interview;
+- exact ordinary color/pattern/shiny inheritance;
+- exact rare mutation and rare-trait transmission rules;
 - exact breeding cooldown duration;
-- exact egg capacity and upgrade tiers;
-- exact incubation durations and acceleration values;
-- exact shop rotation interval and fixed egg/item slot counts;
-- exact requirements for the immortal/trophy transformation;
-- exact stat caps per E/D/C/B/A/S rank;
-- exact lifecycle rules for rank promotion on adulthood/reincarnation;
-- exact probability/eligibility for rare +1-rank offspring improvement;
-- complete color/pattern/shiny/mutation inheritance rules;
-- rare-trait generation/transmission limits;
-- appearance encyclopedia/collection tracking;
-- exact Garden Voidling capacity;
-- exact decoration cap;
-- exact Garden module/grid geometry;
-- exact passive-training rates and module stat effects;
-- exact Garden upgrade economy;
-- whether personality receives deeper numerical simulation later;
-- whether personality eventually affects racing;
-- whether inbreeding later gains consequences beyond hatch failure;
-- exact hidden-Happiness thresholds, gains, losses, decay, and reincarnation requirement;
-- exact active item effects, including stat-tradeoff items;
-- exact standard race/cup ladder and unlock map;
-- exact temporary championship schedule;
-- exact running-fall probability and evaluation interval;
-- exact major-cup entry fees;
-- whether cup entry refunds are winner-only or placement-based;
-- exact cup prize/medal/item catalog;
+- exact egg capacity/upgrade tiers;
+- exact incubation duration and acceleration values;
+- exact shop rotation interval and slot counts;
+- exact immortal/trophy transformation requirements;
+- exact numerical caps for E/D/C/B/A/S;
+- exact adulthood/reincarnation rank-promotion rules;
+- exact probability/eligibility for the rare +1-rank offspring result;
+- exact Garden population and decoration caps;
+- exact Garden grid/module geometry, upgrade costs and passive-training rates;
+- exact hidden Happiness gains/losses/decay and reincarnation threshold;
+- exact active training-item catalog and stat tradeoffs;
+- exact race ladder/cup unlock structure;
+- exact championship schedules;
+- exact random-fall chance/interval;
+- exact cup entry fees;
+- **winner-only vs placement-based entry-fee refund model**;
+- exact race prize/medal/item catalog;
 - exact daily mission catalog;
-- exact daily login chain/rewards;
-- exact idle income rate;
-- whether an active-computer-use income bonus should exist at all;
+- exact daily login chain;
+- exact idle-income rate;
+- whether active keyboard/computer use should ever boost idle income;
 - exact eggshell sale values;
-- exact seasonal-event structure;
-- multiplayer race, trading, and leaderboard implementation details.
+- exact seasonal event structure;
+- multiplayer race/trading/leaderboard design;
+- **Steamworks networking/lobby architecture and which free/common Steamworks components should be used**;
+- final accessibility implementation scope;
+- final key-remapping/full-release settings scope.
 
 ---
 
-# Recommended next design interviews
+# Recommended next work
 
-The next refinement work should prioritize:
-
-1. **Return to Appearance & Rare Bloodlines** — complete the unfinished 20 + 5 pass.
-2. **Breeding deep dive** — eligibility, cooldowns, costs, animation, information visibility, repeat-breeding incentives.
-3. **Family tree / lineage / inbreeding** — relatedness depth, warnings, burden visibility, cleansing, failed eggs, prestige lines.
-4. **Eggs / incubation / hatching** — capacity, timers, acceleration, ready-state interaction, failed eggs, hatch presentation.
-5. **Evolution / lifecycle / reincarnation** — age pacing, morphology, death, hidden Happiness requirement, rank changes, trophy transformation.
-6. **Garden training modules** — exact module progression, passive-training behavior, layout rules, upgrades.
-7. **Race ladder & reward resolution** — cups, entry-fee refund model, NPC casts, special championships, prizes, endgame racing.
-8. **Economy tuning pass** — idle rate, egg prices, shells, daily chain, rotating shop, event rewards.
+1. Complete **Appearance & Rare Bloodlines** with the missing primary + follow-up questions.
+2. Deep-dive **Breeding**: cooldown/costs, exact menu flow, repeated-breeding incentives and animation.
+3. Deep-dive **Family tree / inbreeding**: relatedness depth, warning UI, burden visibility, cleansing and failed eggs.
+4. Deep-dive **Eggs/hatching**: capacity, acceleration, failed/non-viable presentation, hatch reveal.
+5. Deep-dive **Lifecycle/reincarnation**: timing, hidden Happiness thresholds, death, rank changes and trophy transformation.
+6. Finalize **Garden modules/passive training**.
+7. Finalize **race ladder, cup rewards and entry-fee refund model**.
+8. Run a dedicated **economy tuning pass**.
+9. Research and document the **Steamworks multiplayer foundation**, then validate it with a simple connection test.
 
 ---
 
-# Usage rule for implementation planning
+# Implementation-planning usage rule
 
-When this document and the technical implementation plan differ in specificity:
+When this document and the technical implementation plan differ:
 
-- use this document as the source of truth for **player-facing intent and gameplay requirements** established by the refinement interview;
-- use the existing implementation plan as the source of truth for **technical architecture** where gameplay intent has not changed;
-- when two interview answers conflict, preserve the conflict as an unresolved design decision rather than choosing silently;
-- do not invent values for unresolved items merely to finish implementation;
-- prefer configurable/data-driven tuning for unresolved numerical values so later refinement does not require structural rewrites.
+- this document wins for **player-facing behavior and product intent**;
+- the technical plan wins for architecture where gameplay intent has not changed;
+- preserve contradictory interview answers as unresolved decisions instead of choosing silently;
+- do not invent exact values merely to finish a ticket;
+- prefer configurable/data-driven tuning for unresolved numbers;
+- architecture should leave room for later multiplayer, expanded cosmetics, additional Garden modules, deeper genetics and larger race content without forcing those systems into the MVP prematurely.
