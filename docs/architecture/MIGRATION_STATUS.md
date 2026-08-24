@@ -90,11 +90,18 @@ Standalone Presentation components now include:
 - `DetailsScreen` for Stats/DNA/Visual tabs;
 - `ModalHost` for overlay/window lifetime;
 - `RaceScreen`, a Godot-only shell over the pure `RaceSimulation`;
-- `StatPresentationCatalog` for player-facing stat labels/colors.
+- `StatPresentationCatalog` for player-facing stat labels/colors;
+- `VoidlingGroundVisualMetrics` for shared sprite-ground pivot/shadow proportions across garden and challenge presentation.
 
 These components receive presentation-ready snapshots and emit intent where interaction is needed. They do not reach through `GameSession` or the `GameRules` compatibility facade; CI enforces that boundary for `Scripts/Presentation/**`.
 
 `RaceScreen` receives an immutable `RaceEntry`, maps simulation snapshots/events to sprites/camera/HUD/minimap/podium, sends cheer through `RaceSimulation.TryCheer`, and uses the simulator's fast-forward path. VFX has a separate non-authoritative RNG, so particle timing can no longer perturb race outcomes.
+
+Garden and race Voidlings now derive their ground pivot and compact ellipse-shadow dimensions from the same shared presentation metrics. Challenge presentation should extend this shared convention rather than inventing a separate footprint system.
+
+Result presentation is also presentation-only: podium pop/tilt animations, confetti and the fourth-place embarrassment drop do not affect simulation state or result RNG.
+
+`ModalHost` uses deferred `QueueFree()` disposal for modal subtrees. This is required because close/navigation can be requested from a button signal owned by the subtree itself; synchronous `Free()` during that signal emission is unsafe in Godot.
 
 The legacy result-owning `Scripts/Race/RaceController*.cs` implementation has been removed.
 
@@ -106,9 +113,11 @@ Stat display names/colors have moved out of `GameRules` into `StatPresentationCa
 
 ### Localization
 
-Godot's native translation pipeline is registered through `Localization/strings.csv`.
+Godot's native translation pipeline is registered through the committed gettext catalog `Localization/en.po`.
 
-Migrated representative UI now includes:
+`project.godot` registers that source file directly. It intentionally does **not** reference an importer-generated `.translation` file: generated translation artifacts may not exist yet when Godot first reads project settings on a clean checkout.
+
+Migrated representative UI includes:
 
 - global top navigation/currency label;
 - Settings;
@@ -116,11 +125,12 @@ Migrated representative UI now includes:
 - Breeding and breeding validation/risk text;
 - Race Picker;
 - Inventory;
-- Details Stats/DNA/Visual tabs and explanatory labels.
+- Details Stats/DNA/Visual tabs and explanatory labels;
+- race result/placement messages introduced by the presentation polish pass.
 
 Use semantic keys (`UI_*`) for new player-facing presentation text. User-created Voidling names remain literal.
 
-The direct Windows launcher performs Godot's import phase before starting the game so a clean clone generates CSV translation resources instead of relying on an existing `.godot` cache.
+The direct Windows launcher still performs a blocking Godot import phase for ordinary imported assets before launch, but localization no longer depends on a generated CSV artifact or pre-existing `.godot` cache.
 
 ### Tests and CI
 
@@ -143,7 +153,7 @@ CI performs:
 5. domain/application tests;
 6. Debug build for Godot editor-side C# integration;
 7. blocking Godot `--import` resource import;
-8. verification that the CSV localization resource was generated;
+8. verification that the committed gettext localization source is registered and no generated translation path is configured;
 9. actual headless main-scene runtime smoke test with runtime errors treated as failures.
 
 CI rejects Godot references in Domain/Application, rejects `GameRules` access from standalone `Scripts/Presentation/**`, and forbids `GameSession.Instance` throughout `Scripts/**`.
@@ -214,11 +224,12 @@ There is one result-authoritative simulator. Animation, camera and VFX edits can
 
 Completed to the intended foundation level:
 
-- shared `ModalHost`;
+- shared `ModalHost` with signal-safe deferred disposal;
 - standalone Settings, Shop, Breeding, Race Picker, Inventory and Details screens;
-- localization CSV/project registration and clean-clone import verification;
+- committed gettext localization/project registration with clean-clone validation;
 - Presentation boundary enforcement;
-- stat presentation catalog separated from gameplay rules.
+- stat presentation catalog separated from gameplay rules;
+- shared Voidling ground/shadow visual metrics across garden and race presentation.
 
 Phase F deliberately does **not** require every legacy panel to be rewritten before feature work can continue. Future screens should follow these reference components.
 
