@@ -46,15 +46,13 @@ jobs:
             fi
           done
 
-          if grep -R -n -E 'GameSession\.Instance|GameRules\.' Scripts/Presentation --include='*.cs'; then
-            echo 'Standalone Presentation components must receive view state and emit intent; do not reach through legacy GameSession/GameRules facades.'
+          if grep -R -n -E 'GameRules\.' Scripts/Presentation --include='*.cs'; then
+            echo 'Standalone Presentation components must receive view state and emit intent; do not reach through the legacy GameRules facade.'
             exit 1
           fi
 
-          locator_uses="$(grep -R -n -E 'GameSession\.Instance' Scripts --include='*.cs' | grep -v '^Scripts/Services/' || true)"
-          if [ -n "$locator_uses" ]; then
-            echo "$locator_uses"
-            echo 'GameSession.Instance is restricted to the transitional Services compatibility surface. Pass/resolve explicit session dependencies elsewhere.'
+          if grep -R -n -E 'GameSession\.Instance' Scripts --include='*.cs'; then
+            echo 'GameSession.Instance is forbidden. Resolve or pass explicit session/use-case dependencies instead of reintroducing a service locator.'
             exit 1
           fi
 
