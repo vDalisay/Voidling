@@ -14,6 +14,7 @@ public enum ChallengePhase
 {
     Offered,
     Forming,
+    Ready,
     Running,
     Completed,
     Cancelled
@@ -49,6 +50,7 @@ public sealed record ChallengeOperationResult(bool Success, string? ChallengeId,
 public static class ChallengeValidation
 {
     public const int MaxParticipants = 4;
+    public const int MaxChallengesPerLobby = 32;
 
     // System.Text.Json base64-encodes byte arrays, so the raw mode payload must remain comfortably
     // below the shared 64 KiB envelope limit after base64 expansion and metadata overhead.
