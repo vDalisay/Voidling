@@ -19,6 +19,7 @@ public partial class GardenController : Node2D
     private readonly Dictionary<string, EggVisual> _eggVisuals = new(StringComparer.Ordinal);
     private readonly Rect2 _wanderBounds = new(new Vector2(72, 76), new Vector2(688, 330));
 
+    private GameSession _session = null!;
     private Node2D _actorsRoot = null!;
     private Node2D _eggsRoot = null!;
     private Camera2D _camera = null!;
@@ -42,20 +43,21 @@ public partial class GardenController : Node2D
 
     public override void _Ready()
     {
+        _session = GetNode<GameSession>("/root/GameBootstrap/GameSession");
         _actorsRoot = GetNode<Node2D>("Actors");
         _eggsRoot = GetNode<Node2D>("Eggs");
         _camera = GetNode<Camera2D>("Camera2D");
         _zoomTarget = _camera.Zoom.X;
 
-        GameSession.Instance.StateChanged += Refresh;
+        _session.StateChanged += Refresh;
         Refresh();
         _initialRefreshComplete = true;
     }
 
     public override void _ExitTree()
     {
-        if (GameSession.Instance != null)
-            GameSession.Instance.StateChanged -= Refresh;
+        if (GodotObject.IsInstanceValid(_session))
+            _session.StateChanged -= Refresh;
         Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
     }
 
@@ -309,7 +311,7 @@ public partial class GardenController : Node2D
 
     private void Refresh()
     {
-        var currentIds = GameSession.Instance.State.Voidlings
+        var currentIds = _session.State.Voidlings
             .Select(v => v.Id)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -326,7 +328,7 @@ public partial class GardenController : Node2D
                 _draggedId = "";
         }
 
-        foreach (var data in GameSession.Instance.State.Voidlings)
+        foreach (var data in _session.State.Voidlings)
         {
             if (_actors.ContainsKey(data.Id))
                 continue;
@@ -351,7 +353,7 @@ public partial class GardenController : Node2D
 
     private void RefreshEggs()
     {
-        var eggsById = GameSession.Instance.State.OwnedEggs.ToDictionary(e => e.Id, StringComparer.Ordinal);
+        var eggsById = _session.State.OwnedEggs.ToDictionary(e => e.Id, StringComparer.Ordinal);
 
         foreach (var staleId in _eggVisuals.Keys.Where(id => !eggsById.ContainsKey(id)).ToArray())
         {
@@ -362,7 +364,7 @@ public partial class GardenController : Node2D
             _eggVisuals.Remove(staleId);
         }
 
-        foreach (var egg in GameSession.Instance.State.OwnedEggs)
+        foreach (var egg in _session.State.OwnedEggs)
         {
             if (!_eggVisuals.TryGetValue(egg.Id, out var visual))
             {
@@ -406,7 +408,7 @@ public partial class GardenController : Node2D
     private void UpdateEggPulse()
     {
         var time = (float)Time.GetTicksMsec() / 1000.0f;
-        foreach (var egg in GameSession.Instance.State.OwnedEggs)
+        foreach (var egg in _session.State.OwnedEggs)
         {
             if (!_eggVisuals.TryGetValue(egg.Id, out var visual))
                 continue;
@@ -459,7 +461,7 @@ public partial class GardenController : Node2D
         actor.Position = ClampToGarden(actor.Position);
         actor.SetPickedUp(false);
         SpawnDust(actor.Position + new Vector2(0, 4));
-        GameSession.Instance.MoveVoidling(creatureId, actor.Position);
+        _session.MoveVoidling(creatureId, actor.Position);
     }
 
     private void SpawnHeartParticle(VoidlingActor actor, float xOffset, double delay)
