@@ -48,3 +48,7 @@ UI_RACE_PICKER_TITLE,CHOOSE A RACER
 UI_RACE_PICKER_EMPTY,No Voidlings are currently on the farm.
 UI_RACE_PICKER_HINT,Choose one Voidling. All other racers are generated CPU opponents.
 UI_RACE_START,Start Race
+UI_INVENTORY_TITLE,INVENTORY
+UI_INVENTORY_SUBTITLE,Items you currently own
+UI_INVENTORY_TREAT,{0} Treat
+UI_INVENTORY_EGGS,Eggs on Island
