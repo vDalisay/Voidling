@@ -32,5 +32,6 @@ public partial class GameSession
             return;
 
         SaveAndNotify("Bought a mystery egg.");
+        RaiseGardenEvent("A mystery egg was placed in the garden.");
     }
 }
