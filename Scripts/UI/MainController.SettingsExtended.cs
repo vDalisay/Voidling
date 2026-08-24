@@ -10,13 +10,13 @@ public partial class MainController
         var box = OpenModal(Tr("UI_SETTINGS_TITLE"), new Vector2(365, 252));
         var screen = new SettingsScreen();
         screen.Configure(new SettingsScreenState(
-            GameSession.Instance.State.MasterVolume,
-            GameSession.Instance.State.EdgePanning,
-            GameSession.Instance.State.AutoFinishRaces));
+            _session.State.MasterVolume,
+            _session.State.EdgePanning,
+            _session.State.AutoFinishRaces));
 
-        screen.MasterVolumeChanged += GameSession.Instance.SetMasterVolume;
-        screen.EdgePanningChanged += GameSession.Instance.SetEdgePanning;
-        screen.AutoFinishRacesChanged += GameSession.Instance.SetAutoFinishRaces;
+        screen.MasterVolumeChanged += _session.SetMasterVolume;
+        screen.EdgePanningChanged += _session.SetEdgePanning;
+        screen.AutoFinishRacesChanged += _session.SetAutoFinishRaces;
         box.AddChild(screen);
     }
 }
