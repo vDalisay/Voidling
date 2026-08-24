@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Voidling.Application.Ports.Multiplayer;
 
 namespace Voidling.Application.Multiplayer.Challenges;
@@ -11,6 +12,8 @@ public static class ChallengeProtocol
     public const string StartCommandType = "challenge.start.command";
     public const string CancelCommandType = "challenge.cancel.command";
     public const string StateType = "challenge.state";
+    public const string SyncRequestType = "challenge.sync.request";
+    public const string SyncStateType = "challenge.sync.state";
 
     private sealed record OfferCommandPayload(
         string ChallengeId,
@@ -21,6 +24,8 @@ public static class ChallengeProtocol
     private sealed record IdPayload(string ChallengeId);
     private sealed record StartCommandPayload(string ChallengeId, byte[] StartPayload);
     private sealed record StatePayload(ChallengeSnapshot Snapshot);
+    private sealed record SyncRequestPayload(ulong LobbyId);
+    private sealed record SyncStatePayload(ulong LobbyId, ChallengeSnapshot[] Challenges);
 
     public static byte[] EncodeOfferCommand(
         PlatformUser sender,
@@ -160,6 +165,75 @@ public static class ChallengeProtocol
         }
 
         snapshot = payload.Snapshot;
+        return true;
+    }
+
+    public static byte[] EncodeSyncRequest(PlatformUser sender, ulong lobbyId)
+        => MultiplayerProtocol.EncodeMessage(
+            SyncRequestType,
+            sender,
+            new SyncRequestPayload(lobbyId));
+
+    public static bool TryDecodeSyncRequest(
+        ReadOnlySpan<byte> bytes,
+        PlatformUserId transportSender,
+        out Guid messageId,
+        out ulong lobbyId)
+    {
+        lobbyId = 0;
+        if (!MultiplayerProtocol.TryDecodeMessage(
+                bytes,
+                transportSender,
+                SyncRequestType,
+                out messageId,
+                out SyncRequestPayload? payload) ||
+            payload == null ||
+            payload.LobbyId == 0)
+        {
+            return false;
+        }
+
+        lobbyId = payload.LobbyId;
+        return true;
+    }
+
+    public static byte[] EncodeSyncState(
+        PlatformUser sender,
+        ulong lobbyId,
+        ChallengeSnapshot[] challenges)
+        => MultiplayerProtocol.EncodeMessage(
+            SyncStateType,
+            sender,
+            new SyncStatePayload(lobbyId, challenges ?? Array.Empty<ChallengeSnapshot>()));
+
+    public static bool TryDecodeSyncState(
+        ReadOnlySpan<byte> bytes,
+        PlatformUserId transportSender,
+        out ulong lobbyId,
+        out ChallengeSnapshot[] challenges)
+    {
+        lobbyId = 0;
+        challenges = Array.Empty<ChallengeSnapshot>();
+        if (!MultiplayerProtocol.TryDecodeMessage(
+                bytes,
+                transportSender,
+                SyncStateType,
+                out _,
+                out SyncStatePayload? payload) ||
+            payload == null ||
+            payload.LobbyId == 0 ||
+            payload.Challenges == null ||
+            payload.Challenges.Length > ChallengeValidation.MaxChallengesPerLobby ||
+            payload.Challenges.Any(snapshot =>
+                !ChallengeValidation.IsValidSnapshot(snapshot) || snapshot.LobbyId != payload.LobbyId) ||
+            payload.Challenges.Select(snapshot => snapshot.ChallengeId).Distinct(StringComparer.Ordinal).Count() !=
+            payload.Challenges.Length)
+        {
+            return false;
+        }
+
+        lobbyId = payload.LobbyId;
+        challenges = payload.Challenges;
         return true;
     }
 
