@@ -33,5 +33,16 @@ UI_SHOP_OWNED,OWNED {0}
 UI_SHOP_BUY,BUY {0}
 UI_SHOP_MYSTERY_EGG,MYSTERY EGG {0}
 UI_SHOP_HIDDEN_DNA,Hidden DNA
+UI_BREED_TITLE,BREEDING NEST
+UI_BREED_NEED_TWO_ADULTS,You need two adult Voidlings.
+UI_BREED_ACTION,Breed
+UI_BREED_CHOOSE_TWO,Choose two adults.
+UI_BREED_DIFFERENT_PARENTS,Choose two different Voidlings.
+UI_BREED_ADULTS_ONLY,Both parents must be adults.
+UI_BREED_COOLDOWN,One parent is still on breeding cooldown.
+UI_BREED_RELATED,Related pairing • inbreeding level {0} • {1}% hatch-failure risk.
+UI_BREED_CLEAN_OUTCROSS,Clean outcross • inherited burden falls to level {0}.
+UI_BREED_UNRELATED_BURDEN,Unrelated pairing • inherited burden remains level {0}.
+UI_BREED_UNRELATED_CLEAN,Unrelated pairing • no inbreeding penalty.
 UI_RACE_PICKER_TITLE,CHOOSE A RACER
 UI_RACE_START,Start Race
