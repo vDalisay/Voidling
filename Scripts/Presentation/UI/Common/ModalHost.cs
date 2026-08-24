@@ -79,8 +79,15 @@ public partial class ModalHost : Control
     {
         foreach (var child in GetChildren())
         {
-            if (child is Node node)
-                node.Free();
+            if (child is CanvasItem canvasItem)
+                canvasItem.Visible = false;
+            if (child is Control control)
+                control.MouseFilter = MouseFilterEnum.Ignore;
+
+            // Modal close is commonly invoked from a Button.Pressed signal owned by this subtree.
+            // Free() would destroy the signal emitter synchronously and Godot explicitly rejects
+            // that. QueueFree() keeps the object alive until signal dispatch has completed.
+            child.QueueFree();
         }
     }
 }
