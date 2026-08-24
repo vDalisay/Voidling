@@ -39,7 +39,7 @@ public sealed class ChallengeCoordinatorTests
     }
 
     [Fact]
-    public void HostOfferJoinAndStart_UsesCanonicalStateAndEnforcesFourPlayerCap()
+    public void HostOfferJoinReadyAndStart_UsesCanonicalStateAndEnforcesFourPlayerCap()
     {
         var host = User(1, "Host");
         var second = User(2, "Second");
@@ -75,6 +75,14 @@ public sealed class ChallengeCoordinatorTests
         Assert.Contains(fourth.Id, snapshot.Participants);
         Assert.DoesNotContain(fifth.Id, snapshot.Participants);
 
+        var directStart = coordinator.StartChallenge(offered.ChallengeId!, new byte[] { 1 });
+        Assert.False(directStart.Success);
+        Assert.Contains("Ready", directStart.Error!, StringComparison.OrdinalIgnoreCase);
+
+        var ready = coordinator.MarkChallengeReady(offered.ChallengeId!);
+        Assert.True(ready.Success, ready.Error);
+        Assert.Equal(ChallengePhase.Ready, Assert.Single(coordinator.Challenges).Phase);
+
         var payload = new byte[] { 7, 8, 9 };
         var started = coordinator.StartChallenge(offered.ChallengeId!, payload);
 
@@ -86,6 +94,12 @@ public sealed class ChallengeCoordinatorTests
             sent.Channel == NetworkChannel.Challenge &&
             ChallengeProtocol.TryDecodeState(sent.Payload.Span, host.Id, out var state) &&
             state.Phase == ChallengePhase.Running);
+
+        var completed = coordinator.CompleteChallenge(offered.ChallengeId!);
+        Assert.True(completed.Success, completed.Error);
+        snapshot = Assert.Single(coordinator.Challenges);
+        Assert.Equal(ChallengePhase.Completed, snapshot.Phase);
+        Assert.Empty(snapshot.StartPayload);
     }
 
     [Fact]
@@ -187,7 +201,7 @@ public sealed class ChallengeCoordinatorTests
             ChallengeKind.Race,
             creator.Id,
             4,
-            ChallengePhase.Forming,
+            ChallengePhase.Ready,
             new[] { creator.Id, client.Id },
             Array.Empty<byte>());
         transport.Emit(new NetworkPacket(
