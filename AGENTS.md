@@ -5,7 +5,8 @@ This file is the repository map for coding agents. Keep it short. Detailed archi
 ## Start here
 
 - Architecture: `ARCHITECTURE.md`
-- Active restructuring plan: `docs/architecture/RESTRUCTURING_PLAN.md`
+- Current architecture migration status: `docs/architecture/MIGRATION_STATUS.md`
+- Architecture research/restructuring plan: `docs/architecture/RESTRUCTURING_PLAN.md`
 - Architecture decisions: `docs/architecture/decisions/`
 - Product implementation plan: `docs/GENETICS_BREEDING_HATCHING_RACING_IMPLEMENTATION_PLAN.md`
 - Demo behavior: `docs/DEMO_MVP.md`
@@ -54,10 +55,11 @@ Infrastructure (Godot filesystem, audio, Resources, localization adapters)
 
 ### Application
 
+- `Scripts/Application/**` must not reference `Godot`.
 - Coordinates domain services and repository ports.
 - Owns use-case sequencing, not rendering.
 - Infrastructure is accessed through narrow interfaces defined inward of the implementation.
-- Do not use service locator patterns.
+- Do not use `GameSession.Instance` or other service-locator patterns.
 
 ### Presentation
 
@@ -66,12 +68,14 @@ Infrastructure (Godot filesystem, audio, Resources, localization adapters)
 - Prefer scene/node composition over inheritance hierarchies.
 - Use signals/events for local scene reactions; avoid a global event bus.
 - Player-facing text must use localization keys unless it is user-generated content.
+- `Scripts/Presentation/UI/Settings/SettingsScreen.cs` is the current reference screen pattern.
 
 ### Infrastructure
 
 - Contains Godot-specific adapters: `FileAccess`, `AudioServer`, Resources, platform APIs.
 - Serialization migrations must preserve existing saves.
 - Never let infrastructure types leak into pure domain APIs.
+- Designer-authored balance Resources are converted to immutable domain rules in Bootstrap.
 
 ## Pattern policy
 
@@ -120,4 +124,5 @@ Existing demo saves are user data. Any schema change must:
 - Prefer small, compilable migrations over a big-bang rewrite.
 - Add characterization tests before moving fragile deterministic rules.
 - Update `ARCHITECTURE.md` or an ADR when a dependency direction or durable design rule changes.
+- Update `docs/architecture/MIGRATION_STATUS.md` when a subsystem crosses a boundary or a new transitional hotspot is introduced.
 - Do not duplicate architecture rules across many docs; link to the source of truth.
