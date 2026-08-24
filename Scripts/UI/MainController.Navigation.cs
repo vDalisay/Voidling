@@ -9,7 +9,7 @@ public partial class MainController : Node
 {
     private void ShowRacePicker()
     {
-        var owned = GameSession.Instance.State.Voidlings.ToList();
+        var owned = _session.State.Voidlings.ToList();
         var box = OpenModal("CHOOSE A RACER", new Vector2(552, 310));
 
         if (owned.Count == 0)
@@ -100,7 +100,7 @@ public partial class MainController : Node
 
     private void ShowDetails()
     {
-        var data = GameSession.Instance.FindVoidling(_selectedId);
+        var data = _session.FindVoidling(_selectedId);
         if (data == null)
             return;
 
@@ -222,7 +222,7 @@ public partial class MainController : Node
             {
                 foreach (var trait in data.RareTraits)
                 {
-                    var founderName = GameSession.Instance.NameFor(trait.FounderCreatureId);
+                    var founderName = _session.NameFor(trait.FounderCreatureId);
                     body.AddChild(UiFactory.CreateLabel(
                         $"Mutation: {trait.TraitId}  • founder {founderName}  • G{trait.GenerationFromFounder}  • {(trait.CanTransmit ? "can pass on" : "terminal")}", 7));
                 }
@@ -330,7 +330,7 @@ public partial class MainController : Node
 
     private void ShowFamilyTree()
     {
-        var data = GameSession.Instance.FindVoidling(_selectedId);
+        var data = _session.FindVoidling(_selectedId);
         if (data == null)
             return;
 
@@ -343,7 +343,7 @@ public partial class MainController : Node
         box.AddChild(content);
 
         var tree = new FamilyTreeView();
-        tree.Build(data.Id, GameSession.Instance.State.Voidlings, GameSession.Instance.State.DepartedVoidlings);
+        tree.Build(data.Id, _session.State.Voidlings, _session.State.DepartedVoidlings);
         content.AddChild(tree);
 
         var inspector = UiFactory.CreatePanel(new Vector2(153, 252));
@@ -356,7 +356,7 @@ public partial class MainController : Node
 
         void ShowMember(string memberId)
         {
-            var member = GameSession.Instance.FindLineageVoidling(memberId);
+            var member = _session.FindLineageVoidling(memberId);
             if (member == null)
                 return;
 
@@ -380,11 +380,11 @@ public partial class MainController : Node
             inspectorBox.AddChild(heading);
 
             var portrait = UiFactory.CreatePortrait(member, new Vector2(60, 60));
-            if (GameSession.Instance.IsDeparted(member.Id))
+            if (_session.IsDeparted(member.Id))
                 portrait.Modulate = new Color(0.55f, 0.55f, 0.55f, 0.72f);
             inspectorBox.AddChild(portrait);
 
-            if (GameSession.Instance.IsDeparted(member.Id))
+            if (_session.IsDeparted(member.Id))
                 inspectorBox.AddChild(UiFactory.CreateLabel("LEFT THE FARM", 6));
 
             foreach (var statId in GameRules.StatIds)
@@ -397,7 +397,7 @@ public partial class MainController : Node
             }
 
             var parentText = member.ParentAId.Length > 0
-                ? $"Parents:\n{GameSession.Instance.NameFor(member.ParentAId)}\n+ {GameSession.Instance.NameFor(member.ParentBId)}"
+                ? $"Parents:\n{_session.NameFor(member.ParentAId)}\n+ {_session.NameFor(member.ParentBId)}"
                 : "Parents:\nFounder / store line";
             var parents = UiFactory.CreateLabel(parentText, 6);
             parents.AutowrapMode = TextServer.AutowrapMode.WordSmart;
@@ -415,7 +415,7 @@ public partial class MainController : Node
 
         var volumeRow = new HBoxContainer();
         volumeRow.AddThemeConstantOverride("separation", 8);
-        var volumeLabel = UiFactory.CreateLabel($"Volume {Mathf.RoundToInt(GameSession.Instance.State.MasterVolume * 100)}%", 7);
+        var volumeLabel = UiFactory.CreateLabel($"Volume {Mathf.RoundToInt(_session.State.MasterVolume * 100)}%", 7);
         volumeLabel.CustomMinimumSize = new Vector2(90, 22);
         volumeRow.AddChild(volumeLabel);
         var volume = new HSlider
@@ -423,27 +423,27 @@ public partial class MainController : Node
             MinValue = 0,
             MaxValue = 100,
             Step = 5,
-            Value = GameSession.Instance.State.MasterVolume * 100,
+            Value = _session.State.MasterVolume * 100,
             CustomMinimumSize = new Vector2(220, 22),
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
         };
         volume.ValueChanged += value =>
         {
-            GameSession.Instance.SetMasterVolume((float)value / 100.0f);
+            _session.SetMasterVolume((float)value / 100.0f);
             volumeLabel.Text = $"Volume {Mathf.RoundToInt((float)value)}%";
         };
         volumeRow.AddChild(volume);
         box.AddChild(volumeRow);
 
         box.AddChild(UiFactory.CreateLabel("Race", 9));
-        var autoFinish = UiFactory.CreateButton(GameSession.Instance.State.AutoFinishRaces ? "Auto Finish: ON" : "Auto Finish: OFF");
+        var autoFinish = UiFactory.CreateButton(_session.State.AutoFinishRaces ? "Auto Finish: ON" : "Auto Finish: OFF");
         autoFinish.ToggleMode = true;
-        autoFinish.ButtonPressed = GameSession.Instance.State.AutoFinishRaces;
+        autoFinish.ButtonPressed = _session.State.AutoFinishRaces;
         autoFinish.CustomMinimumSize = new Vector2(190, 25);
         autoFinish.TooltipText = "Finish once either you finish or every CPU has already finished.";
         autoFinish.Pressed += () =>
         {
-            GameSession.Instance.SetAutoFinishRaces(autoFinish.ButtonPressed);
+            _session.SetAutoFinishRaces(autoFinish.ButtonPressed);
             autoFinish.Text = autoFinish.ButtonPressed ? "Auto Finish: ON" : "Auto Finish: OFF";
         };
         box.AddChild(autoFinish);
@@ -454,7 +454,7 @@ public partial class MainController : Node
 
     private void ShowGoodbyeFirst(string creatureId)
     {
-        var data = GameSession.Instance.FindVoidling(creatureId);
+        var data = _session.FindVoidling(creatureId);
         if (data == null)
             return;
 
@@ -477,7 +477,7 @@ public partial class MainController : Node
 
     private void ShowGoodbyeFinal(string creatureId)
     {
-        var data = GameSession.Instance.FindVoidling(creatureId);
+        var data = _session.FindVoidling(creatureId);
         if (data == null)
         {
             CloseModal();
@@ -501,7 +501,7 @@ public partial class MainController : Node
         goodbye.Pressed += () =>
         {
             CloseModal();
-            if (GameSession.Instance.SayGoodbye(creatureId))
+            if (_session.SayGoodbye(creatureId))
             {
                 _selectedId = "";
                 _garden.ClearSelection();
@@ -531,7 +531,7 @@ public partial class MainController : Node
             CloseModal();
             DeselectVoidling();
             _garden.ResetCamera();
-            GameSession.Instance.ResetDemo();
+            _session.ResetDemo();
         };
         row.AddChild(reset);
         box.AddChild(row);
