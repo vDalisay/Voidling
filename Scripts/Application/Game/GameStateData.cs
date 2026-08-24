@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Voidling.Domain.Breeding;
 using VoidlingGame;
 
 namespace VoidlingGame;
@@ -9,11 +10,12 @@ namespace VoidlingGame;
 /// </summary>
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 4;
+    public int SaveVersion { get; set; } = 5;
     public int Coins { get; set; } = 120;
     public long SeedCounter { get; set; } = 1;
     public List<VoidlingData> Voidlings { get; set; } = new();
     public List<VoidlingData> DepartedVoidlings { get; set; } = new();
+    public List<LineageArchiveEntry> LineageArchive { get; set; } = new();
     public List<EggData> OwnedEggs { get; set; } = new();
     public List<EggData> StoreEggs { get; set; } = new();
     public Dictionary<string, int> TrainingItems { get; set; } = new();
