@@ -2,6 +2,7 @@ using System;
 using Godot;
 using Voidling.Presentation.Racing;
 using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Garden;
 
 namespace VoidlingGame;
 
@@ -17,7 +18,11 @@ public partial class MainController : Node
     private ModalHost _modalHost = null!;
     private Label _coinsLabel = null!;
     private PanelContainer? _detailsPanel;
+    // Transitional field retained only for the old, now-unused RebuildEggsPanel helper in the
+    // Profile partial. The garden HUD no longer creates that panel.
     private PanelContainer? _eggsPanel;
+    private PanelContainer _gardenLogPanel = null!;
+    private GardenEventLog _gardenEventLog = null!;
     private Label _toastLabel = null!;
     private float _toastSeconds;
     private string _selectedId = "";
@@ -38,12 +43,15 @@ public partial class MainController : Node
 
         BuildTopBar();
         BuildToast();
+        BuildGardenEventLog();
 
         _modalHost = new ModalHost { ZIndex = 100 };
         _uiRoot.AddChild(_modalHost);
 
         _session.StateChanged += RefreshUi;
         _session.ToastRequested += ShowToast;
+        _session.GardenEventRaised += AppendGardenEvent;
+        _gardenEventLog.Append(Tr("UI_GARDEN_LOG_STARTED"));
         RefreshUi();
     }
 
@@ -53,6 +61,7 @@ public partial class MainController : Node
         {
             _session.StateChanged -= RefreshUi;
             _session.ToastRequested -= ShowToast;
+            _session.GardenEventRaised -= AppendGardenEvent;
         }
     }
 
@@ -114,7 +123,7 @@ public partial class MainController : Node
     private void BuildToast()
     {
         _toastLabel = UiFactory.CreateLabel("", 9);
-        _toastLabel.Position = new Vector2(18, 330);
+        _toastLabel.Position = new Vector2(18, 244);
         _toastLabel.Size = new Vector2(390, 16);
         _toastLabel.AddThemeColorOverride("font_color", Color.FromHtml("#F9F4D8"));
         _toastLabel.AddThemeColorOverride("font_shadow_color", Color.FromHtml("#465247"));
@@ -122,6 +131,17 @@ public partial class MainController : Node
         _toastLabel.AddThemeConstantOverride("shadow_offset_y", 1);
         _toastLabel.Visible = false;
         _uiRoot.AddChild(_toastLabel);
+    }
+
+    private void BuildGardenEventLog()
+    {
+        _gardenLogPanel = UiFactory.CreatePanel(new Vector2(390, 82));
+        _gardenLogPanel.Position = new Vector2(10, 267);
+        _gardenLogPanel.Size = new Vector2(390, 82);
+        _uiRoot.AddChild(_gardenLogPanel);
+
+        _gardenEventLog = new GardenEventLog();
+        _gardenLogPanel.AddChild(_gardenEventLog);
     }
 
     private void RefreshUi()
@@ -133,7 +153,9 @@ public partial class MainController : Node
 
         _garden.Select(_selectedId);
         RebuildDetailsPanel();
-        RebuildEggsPanel();
+
+        if (_gardenLogPanel != null && GodotObject.IsInstanceValid(_gardenLogPanel))
+            _gardenLogPanel.Visible = !_modalHost.IsOpen;
 
         if (_modalHost.IsOpen)
             HideGardenHudPanels();
@@ -153,6 +175,8 @@ public partial class MainController : Node
             _detailsPanel.Visible = false;
         if (_eggsPanel != null && GodotObject.IsInstanceValid(_eggsPanel))
             _eggsPanel.Visible = false;
+        if (_gardenLogPanel != null && GodotObject.IsInstanceValid(_gardenLogPanel))
+            _gardenLogPanel.Visible = false;
     }
 
     private void CloseModal() => CloseModal(true);
@@ -226,6 +250,9 @@ public partial class MainController : Node
         _toastLabel.Visible = true;
         _toastSeconds = 3.0f;
     }
+
+    private void AppendGardenEvent(string text)
+        => _gardenEventLog.Append(text);
 
     private static void StyleOption(OptionButton option)
     {
