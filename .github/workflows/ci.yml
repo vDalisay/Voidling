@@ -56,8 +56,8 @@ jobs:
             exit 1
           fi
 
-          if grep -n -E 'GameSession\.Instance' Scripts/UI/MainController*.cs; then
-            echo 'MainController has migrated away from the static GameSession locator; keep its session dependency explicit.'
+          if grep -n -E 'GameSession\.Instance' Scripts/UI/MainController*.cs Scripts/Garden/GardenController*.cs; then
+            echo 'MainController/GardenController have migrated away from the static GameSession locator; keep their session dependencies explicit.'
             exit 1
           fi
 
