@@ -56,6 +56,11 @@ jobs:
             exit 1
           fi
 
+          if grep -n -E 'GameSession\.Instance' Scripts/UI/MainController*.cs; then
+            echo 'MainController has migrated away from the static GameSession locator; keep its session dependency explicit.'
+            exit 1
+          fi
+
       - name: Domain and application tests
         run: dotnet test Tests/Voidling.Tests.csproj --configuration Release --no-restore
 
