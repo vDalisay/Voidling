@@ -14,7 +14,7 @@ public readonly record struct ShopTrainingItemViewState(
 
 public readonly record struct ShopEggViewState(
     string EggId,
-    string TintHex,
+    Color TintColor,
     int Number,
     int Price);
 
@@ -26,7 +26,7 @@ public sealed record ShopScreenState(
 /// <summary>
 /// Standalone shop view. It renders a supplied snapshot and emits player purchase intent.
 /// It deliberately has no knowledge of GameSession, Application shop services, persistence,
-/// seed allocation, or save timing.
+/// seed allocation, save timing, or legacy gameplay facades.
 /// </summary>
 public partial class ShopScreen : VBoxContainer
 {
@@ -201,7 +201,7 @@ public partial class ShopScreen : VBoxContainer
         var eggVisual = new TextureRect
         {
             Texture = EggTexture,
-            SelfModulate = GameRules.TintColor(egg.TintHex),
+            SelfModulate = egg.TintColor,
             CustomMinimumSize = new Vector2(34, 34),
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
