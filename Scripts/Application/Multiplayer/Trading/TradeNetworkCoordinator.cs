@@ -333,15 +333,16 @@ public sealed class TradeNetworkCoordinator
         TradeAssetReference[] initiatorAssets)
     {
         var lobby = _connection.CurrentLobby;
+        string? validationError = null;
         if (!_connection.IsLocalHost ||
             lobby == null ||
             lobby.LobbyId != lobbyId ||
             initiatorId == counterpartyId ||
             !_connection.IsLobbyMember(initiatorId) ||
             !_connection.IsLobbyMember(counterpartyId) ||
-            !TradeValidation.IsValidAssetReferences(initiatorAssets, out var error))
+            !TradeValidation.IsValidAssetReferences(initiatorAssets, out validationError))
         {
-            SendAbortToPeer(initiatorId, tradeId, error ?? "Trade offer failed lobby validation.");
+            SendAbortToPeer(initiatorId, tradeId, validationError ?? "Trade offer failed lobby validation.");
             return;
         }
 
@@ -364,14 +365,15 @@ public sealed class TradeNetworkCoordinator
         string tradeId,
         TradeAssetReference[] counterpartyAssets)
     {
+        string? validationError = null;
         if (!_connection.IsLocalHost ||
             !_hostedTrades.TryGetValue(tradeId, out var hosted) ||
             hosted.Status != TradeSessionStatus.Offered ||
             sender != hosted.Offer.CounterpartyId ||
-            !TradeValidation.IsValidAssetReferences(counterpartyAssets, out var error))
+            !TradeValidation.IsValidAssetReferences(counterpartyAssets, out validationError))
         {
             if (_hostedTrades.TryGetValue(tradeId, out var invalidHosted))
-                AbortHostTrade(invalidHosted, error ?? "Trade acceptance failed validation.");
+                AbortHostTrade(invalidHosted, validationError ?? "Trade acceptance failed validation.");
             return;
         }
 
@@ -458,7 +460,8 @@ public sealed class TradeNetworkCoordinator
             !_hostedTrades.TryGetValue(tradeId, out var hosted) ||
             hosted.Terms == null ||
             hosted.TermsHash == null ||
-            hosted.Status != TradeSessionStatus.PersistingPrepare ||
+            (hosted.Status != TradeSessionStatus.PersistingPrepare &&
+             !(hosted.Status == TradeSessionStatus.PreparingBundles && !success)) ||
             !string.Equals(hosted.TermsHash, termsHash, StringComparison.Ordinal) ||
             !TradeValidation.IsParticipant(hosted.Terms, sender))
         {
@@ -467,7 +470,7 @@ public sealed class TradeNetworkCoordinator
 
         if (!success)
         {
-            AbortHostTrade(hosted, error ?? "A player could not persist the prepared trade.");
+            AbortHostTrade(hosted, error ?? "A player could not prepare the trade.");
             return;
         }
 
@@ -578,7 +581,13 @@ public sealed class TradeNetworkCoordinator
         }
 
         var payload = TradeProtocol.EncodeBundlePrepared(local, terms.TradeId, termsHash, bundle);
-        _connection.TrySend(lobby.OwnerId, NetworkChannel.Trade, payload, DeliveryMode.Reliable);
+        if (!_connection.TrySend(lobby.OwnerId, NetworkChannel.Trade, payload, DeliveryMode.Reliable))
+        {
+            SendReadyFailureToHost(
+                terms.TradeId,
+                termsHash,
+                "Could not send the prepared trade bundle to the lobby host.");
+        }
     }
 
     private void HandlePersistRequestFromHost(
@@ -706,13 +715,20 @@ public sealed class TradeNetworkCoordinator
         foreach (var participant in new[] { terms.InitiatorId, terms.CounterpartyId })
         {
             if (participant == host.Id)
+            {
                 HandlePrepareRequestFromHost(terms, hash);
-            else
-                _connection.TrySend(
+                continue;
+            }
+
+            if (!_connection.TrySend(
                     participant,
                     NetworkChannel.Trade,
                     TradeProtocol.EncodePrepareRequest(host, terms, hash),
-                    DeliveryMode.Reliable);
+                    DeliveryMode.Reliable))
+            {
+                AbortHostTrade(hosted, "Could not send trade preparation to a participant.");
+                return;
+            }
         }
     }
 
@@ -722,21 +738,29 @@ public sealed class TradeNetworkCoordinator
         var terms = hosted.Terms!;
         var hash = hosted.TermsHash!;
 
-        DispatchPersistRequest(
-            host,
-            terms.InitiatorId,
-            terms,
-            hash,
-            hosted.CounterpartyBundle!);
-        DispatchPersistRequest(
-            host,
-            terms.CounterpartyId,
-            terms,
-            hash,
-            hosted.InitiatorBundle!);
+        if (!DispatchPersistRequest(
+                host,
+                terms.InitiatorId,
+                terms,
+                hash,
+                hosted.CounterpartyBundle!))
+        {
+            AbortHostTrade(hosted, "Could not send persisted trade preparation to the initiator.");
+            return;
+        }
+
+        if (!DispatchPersistRequest(
+                host,
+                terms.CounterpartyId,
+                terms,
+                hash,
+                hosted.InitiatorBundle!))
+        {
+            AbortHostTrade(hosted, "Could not send persisted trade preparation to the counterparty.");
+        }
     }
 
-    private void DispatchPersistRequest(
+    private bool DispatchPersistRequest(
         PlatformUser host,
         PlatformUserId participant,
         TradeTerms terms,
@@ -744,13 +768,16 @@ public sealed class TradeNetworkCoordinator
         TradeTransferBundle incoming)
     {
         if (participant == host.Id)
+        {
             HandlePersistRequestFromHost(terms, hash, incoming);
-        else
-            _connection.TrySend(
-                participant,
-                NetworkChannel.Trade,
-                TradeProtocol.EncodePersistRequest(host, terms, hash, incoming),
-                DeliveryMode.Reliable);
+            return true;
+        }
+
+        return _connection.TrySend(
+            participant,
+            NetworkChannel.Trade,
+            TradeProtocol.EncodePersistRequest(host, terms, hash, incoming),
+            DeliveryMode.Reliable);
     }
 
     private void DispatchCommit(HostedTrade hosted)
@@ -761,13 +788,24 @@ public sealed class TradeNetworkCoordinator
         foreach (var participant in new[] { terms.InitiatorId, terms.CounterpartyId })
         {
             if (participant == host.Id)
+            {
                 HandleCommitFromHost(terms.TradeId, hash);
-            else
-                _connection.TrySend(
+                continue;
+            }
+
+            if (!_connection.TrySend(
                     participant,
                     NetworkChannel.Trade,
                     TradeProtocol.EncodeCommit(host, terms.TradeId, hash),
-                    DeliveryMode.Reliable);
+                    DeliveryMode.Reliable))
+            {
+                hosted.Status = TradeSessionStatus.Failed;
+                RaiseStatusForLocalParticipant(
+                    hosted,
+                    TradeSessionStatus.Failed,
+                    "Could not send the trade commit to a participant. Manual recovery may be required.");
+                return;
+            }
         }
     }
 
