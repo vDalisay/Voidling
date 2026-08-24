@@ -343,7 +343,10 @@ public partial class MainController : Node
         content.AddThemeConstantOverride("separation", 8);
         box.AddChild(content);
 
-        var tree = new FamilyTreeView();
+        var tree = new FamilyTreeView
+        {
+            EdgePanningEnabled = _session.State.EdgePanning
+        };
         tree.Build(data.Id, _session.State.Voidlings, _session.State.DepartedVoidlings);
         content.AddChild(tree);
 
