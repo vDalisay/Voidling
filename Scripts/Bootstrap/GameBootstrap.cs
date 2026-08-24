@@ -3,6 +3,7 @@ using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
 using Voidling.Application.Multiplayer;
+using Voidling.Application.Multiplayer.Challenges;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Application.Persistence;
 using Voidling.Application.Racing;
@@ -33,6 +34,7 @@ public partial class GameBootstrap : Node
     // Future multiplayer presentation should receive these dependencies explicitly when composed.
     private MultiplayerConnectionService? _multiplayerConnection;
     private ConnectedZoneService? _connectedZone;
+    private ChallengeCoordinator? _challengeCoordinator;
     private TradeNetworkCoordinator? _tradeCoordinator;
 
     public override void _Ready()
@@ -74,6 +76,9 @@ public partial class GameBootstrap : Node
         var multiplayer = OptionalMultiplayerComposer.Create();
         _multiplayerConnection = multiplayer.Connection;
         _connectedZone = multiplayer.ConnectedZone;
+        _challengeCoordinator = multiplayer.Challenges;
+        _challengeCoordinator.ProtocolRejected += reason =>
+            GD.PushWarning($"Rejected multiplayer challenge packet: {reason}");
 
         if (multiplayer.RuntimeNode != null)
         {
