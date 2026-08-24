@@ -3,6 +3,7 @@ using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
 using Voidling.Presentation.UI.Breeding;
+using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Shop;
 
 namespace VoidlingGame;
@@ -15,8 +16,8 @@ public partial class MainController : Node
         var trainingItems = GameRules.StatIds
             .Select(statId => new ShopTrainingItemViewState(
                 StatId: statId,
-                DisplayName: GameRules.StatDisplayNames[statId],
-                IdentityColor: GameRules.StatColor(statId),
+                DisplayName: StatPresentationCatalog.NameFor(statId),
+                IdentityColor: StatPresentationCatalog.ColorFor(statId),
                 Owned: state.TrainingItems.TryGetValue(statId, out var count) ? count : 0,
                 Price: GameRules.TrainingItemPrice))
             .ToArray();
