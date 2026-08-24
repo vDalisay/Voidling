@@ -71,11 +71,13 @@ public partial class MainController : Node
                 GameRules.GradeName(gene.AlleleA),
                 GameRules.GradeName(gene.AlleleB));
         }).ToArray();
-        var rareTraits = data.RareTraits.Select(trait => new DetailsRareTraitViewState(
-            trait.TraitId,
-            _session.NameFor(trait.FounderCreatureId),
-            trait.GenerationFromFounder,
-            trait.CanTransmit)).ToArray();
+        var rareTraits = data.RareTraits?
+            .Select(trait => new DetailsRareTraitViewState(
+                trait.TraitId,
+                _session.NameFor(trait.FounderCreatureId),
+                trait.GenerationFromFounder,
+                trait.CanTransmit))
+            .ToArray() ?? Array.Empty<DetailsRareTraitViewState>();
 
         var state = new DetailsScreenState(
             data.Name,
@@ -178,50 +180,6 @@ public partial class MainController : Node
 
         tree.MemberSelected += ShowMember;
         ShowMember(data.Id);
-    }
-
-    private void ShowSettings()
-    {
-        var box = OpenModal("SETTINGS", new Vector2(365, 215));
-        box.AddChild(UiFactory.CreateLabel("Audio", 9));
-
-        var volumeRow = new HBoxContainer();
-        volumeRow.AddThemeConstantOverride("separation", 8);
-        var volumeLabel = UiFactory.CreateLabel($"Volume {Mathf.RoundToInt(_session.State.MasterVolume * 100)}%", 7);
-        volumeLabel.CustomMinimumSize = new Vector2(90, 22);
-        volumeRow.AddChild(volumeLabel);
-        var volume = new HSlider
-        {
-            MinValue = 0,
-            MaxValue = 100,
-            Step = 5,
-            Value = _session.State.MasterVolume * 100,
-            CustomMinimumSize = new Vector2(220, 22),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
-        };
-        volume.ValueChanged += value =>
-        {
-            _session.SetMasterVolume((float)value / 100.0f);
-            volumeLabel.Text = $"Volume {Mathf.RoundToInt((float)value)}%";
-        };
-        volumeRow.AddChild(volume);
-        box.AddChild(volumeRow);
-
-        box.AddChild(UiFactory.CreateLabel("Race", 9));
-        var autoFinish = UiFactory.CreateButton(_session.State.AutoFinishRaces ? "Auto Finish: ON" : "Auto Finish: OFF");
-        autoFinish.ToggleMode = true;
-        autoFinish.ButtonPressed = _session.State.AutoFinishRaces;
-        autoFinish.CustomMinimumSize = new Vector2(190, 25);
-        autoFinish.TooltipText = "Finish once either you finish or every CPU has already finished.";
-        autoFinish.Pressed += () =>
-        {
-            _session.SetAutoFinishRaces(autoFinish.ButtonPressed);
-            autoFinish.Text = autoFinish.ButtonPressed ? "Auto Finish: ON" : "Auto Finish: OFF";
-        };
-        box.AddChild(autoFinish);
-
-        var hint = UiFactory.CreateLabel("ESC opens/closes this menu from the garden.", 6);
-        box.AddChild(hint);
     }
 
     private void ShowGoodbyeFirst(string creatureId)
