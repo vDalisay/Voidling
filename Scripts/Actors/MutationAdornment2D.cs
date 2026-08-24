@@ -1,13 +1,12 @@
 using System;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.Voidlings;
 
 namespace VoidlingGame;
 
 /// <summary>
-/// World-space mutation presentation that can follow any challenge sprite.
-/// Keeping this independent from a specific minigame makes mutation visuals consistent
-/// whenever an owned Voidling is rendered outside the garden.
+/// Canonical world-space mutation renderer used by the garden and challenge screens.
 /// </summary>
 public partial class MutationAdornment2D : Node2D
 {
@@ -42,50 +41,48 @@ public partial class MutationAdornment2D : Node2D
         }
 
         Position = _target.Position;
-        if (_sparkleCount > 0)
-            QueueRedraw();
+        QueueRedraw();
     }
 
     public override void _Draw()
     {
+        if (_target == null)
+            return;
+
+        var spriteScale = Mathf.Abs(_target.Scale.X);
         if (_showAngel)
-            DrawPerspectiveHalo();
+            DrawPerspectiveHalo(VoidlingMutationVisualMetrics.ForSpriteTarget(spriteScale));
 
         if (_sparkleCount > 0)
-            DrawTraitSparkles();
+            DrawTraitSparkles(spriteScale);
     }
 
-    private void DrawPerspectiveHalo()
+    private void DrawPerspectiveHalo(AngelHaloVisual halo)
     {
-        var center = new Vector2(0, -25.0f);
-        const float rx = 10.0f;
-        const float ry = 3.0f;
-        const int points = 32;
-        var ellipse = new Vector2[points];
-        for (var i = 0; i < points; i++)
-        {
-            var angle = Mathf.Tau * i / points;
-            ellipse[i] = center + new Vector2(Mathf.Cos(angle) * rx, Mathf.Sin(angle) * ry);
-        }
+        var ellipse = VoidlingMutationVisualMetrics.BuildEllipse(halo);
+        var half = ellipse.Length / 2;
 
-        for (var i = points / 2; i < points; i++)
-            DrawLine(ellipse[i], ellipse[(i + 1) % points], Color.FromHtml("#B98C32"), 1.7f, true);
-        for (var i = 0; i < points / 2; i++)
-            DrawLine(ellipse[i], ellipse[i + 1], Color.FromHtml("#F1CE55"), 2.2f, true);
+        for (var i = half; i < ellipse.Length; i++)
+            DrawLine(ellipse[i], ellipse[(i + 1) % ellipse.Length], Color.FromHtml("#B98C32"), halo.BackWidth, true);
+        for (var i = 0; i < half; i++)
+            DrawLine(ellipse[i], ellipse[i + 1], Color.FromHtml("#F1CE55"), halo.FrontWidth, true);
         for (var i = 2; i < 7; i++)
-            DrawLine(ellipse[i], ellipse[i + 1], Color.FromHtml("#FFF2A8"), 1.0f, true);
+            DrawLine(ellipse[i], ellipse[i + 1], Color.FromHtml("#FFF2A8"), halo.ShineWidth, true);
     }
 
-    private void DrawTraitSparkles()
+    private void DrawTraitSparkles(float spriteScale)
     {
+        var ratio = Mathf.Max(0.25f, spriteScale / 0.62f);
         var t = (float)Time.GetTicksMsec() / 340.0f;
         var count = Mathf.Clamp(_sparkleCount + 1, 2, 4);
         for (var i = 0; i < count; i++)
         {
             var angle = t + i * Mathf.Tau / count;
-            var p = new Vector2(Mathf.Cos(angle) * 15.0f, -8.0f + Mathf.Sin(angle) * 11.0f);
+            var p = new Vector2(
+                Mathf.Cos(angle) * 15.0f * ratio,
+                -8.0f * ratio + Mathf.Sin(angle) * 11.0f * ratio);
             var pulse = 1.0f + Mathf.Sin(t * 2.0f + i) * 0.25f;
-            DrawCircle(p, 1.25f * pulse, Color.FromHtml("#FFF7B7"));
+            DrawCircle(p, 1.25f * ratio * pulse, Color.FromHtml("#FFF7B7"));
         }
     }
 }
