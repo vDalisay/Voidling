@@ -92,6 +92,7 @@ public sealed class TradeTransferService
     public TradeLocalOperationResult Prepare(
         GameStateData state,
         string tradeId,
+        ulong lobbyId,
         ulong counterpartyPlatformUserId,
         string termsHash,
         IReadOnlyCollection<TradeAssetReference> outgoingAssets,
@@ -104,6 +105,8 @@ public sealed class TradeTransferService
 
         if (!IsValidTradeId(tradeId))
             return TradeLocalOperationResult.Failed("Trade ID is invalid.");
+        if (lobbyId == 0)
+            return TradeLocalOperationResult.Failed("Trade lobby is invalid.");
         if (counterpartyPlatformUserId == 0)
             return TradeLocalOperationResult.Failed("Trade counterparty is invalid.");
         if (string.IsNullOrWhiteSpace(termsHash) || termsHash.Length > 128)
@@ -118,6 +121,7 @@ public sealed class TradeTransferService
         {
             return IsEquivalentPreparedEntry(
                 existing,
+                lobbyId,
                 counterpartyPlatformUserId,
                 termsHash,
                 outgoingAssets,
@@ -133,6 +137,7 @@ public sealed class TradeTransferService
 
         state.PendingTradeJournal.Add(new PendingTradeJournalEntry(
             tradeId,
+            lobbyId,
             counterpartyPlatformUserId,
             termsHash,
             outgoingAssets.ToArray(),
@@ -208,6 +213,16 @@ public sealed class TradeTransferService
         state.PendingTradeJournal.RemoveAll(entry =>
             string.Equals(entry.TradeId, tradeId, StringComparison.Ordinal));
         return TradeLocalOperationResult.Succeeded;
+    }
+
+    public int AbortPreparedForLobby(GameStateData state, ulong lobbyId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        EnsureTradeCollections(state);
+        if (lobbyId == 0)
+            return 0;
+
+        return state.PendingTradeJournal.RemoveAll(entry => entry.LobbyId == lobbyId);
     }
 
     public bool IsAssetLocked(GameStateData state, TradeAssetReference asset)
@@ -408,12 +423,14 @@ public sealed class TradeTransferService
 
     private static bool IsEquivalentPreparedEntry(
         PendingTradeJournalEntry existing,
+        ulong lobbyId,
         ulong counterpartyPlatformUserId,
         string termsHash,
         IReadOnlyCollection<TradeAssetReference> outgoingAssets,
         TradeTransferBundle incomingBundle)
     {
-        if (existing.CounterpartyPlatformUserId != counterpartyPlatformUserId ||
+        if (existing.LobbyId != lobbyId ||
+            existing.CounterpartyPlatformUserId != counterpartyPlatformUserId ||
             !string.Equals(existing.TermsHash, termsHash, StringComparison.Ordinal) ||
             !existing.OutgoingAssets.SequenceEqual(outgoingAssets))
         {
