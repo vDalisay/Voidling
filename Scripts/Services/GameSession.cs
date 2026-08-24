@@ -21,8 +21,6 @@ namespace VoidlingGame;
 /// </summary>
 public partial class GameSession : Node
 {
-    public static GameSession Instance { get; private set; } = null!;
-
     public event Action? StateChanged;
     public event Action<string>? ToastRequested;
 
@@ -76,7 +74,6 @@ public partial class GameSession : Node
             throw new InvalidOperationException("GameSession must be created by the composition root.");
         }
 
-        Instance = this;
         LoadOrCreate();
         ApplyAudioSettings();
         SetProcess(true);
