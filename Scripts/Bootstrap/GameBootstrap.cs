@@ -48,6 +48,7 @@ public partial class GameBootstrap : Node
             new SettingsUseCase(),
             new VoidlingRosterUseCase(),
             new RaceResultUseCase(rules));
+        session.ConfigureRacing(new RaceEntryFactory(rules));
 
         AddChild(session);
     }
