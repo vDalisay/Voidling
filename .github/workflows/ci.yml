@@ -36,7 +36,7 @@ jobs:
       - name: Build release
         run: dotnet build Voidling.csproj --configuration Release --no-restore
 
-      - name: Enforce inward architecture boundaries
+      - name: Enforce architecture boundaries
         shell: bash
         run: |
           for layer in Scripts/Domain Scripts/Application; do
@@ -48,6 +48,11 @@ jobs:
 
           if grep -R -n -E 'GameSession\.Instance' Scripts/Domain Scripts/Application --include='*.cs'; then
             echo 'Domain/Application must not use the GameSession service locator.'
+            exit 1
+          fi
+
+          if grep -R -n -E 'GameSession\.Instance|GameRules\.' Scripts/Presentation --include='*.cs'; then
+            echo 'Standalone Presentation components must receive view state and emit intent; do not reach through legacy GameSession/GameRules facades.'
             exit 1
           fi
 
