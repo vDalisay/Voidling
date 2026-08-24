@@ -1,6 +1,6 @@
 # Voidling architecture
 
-**Status:** target architecture for incremental migration. Current gameplay remains the compatibility baseline while legacy controllers are moved behind these boundaries.
+**Status:** active architecture for incremental feature development. Current implementation status is tracked in `docs/architecture/MIGRATION_STATUS.md`.
 
 ## Goals
 
@@ -37,67 +37,61 @@ The architecture therefore optimizes for:
                    deterministic rules / simulation / models
 ```
 
-Compile-time dependencies point inward. The Domain knows nothing about Godot. Infrastructure implements narrow ports defined by Application/Domain. The composition root selects concrete implementations.
+Compile-time dependencies point inward. Domain knows nothing about Godot. Infrastructure implements narrow ports defined inward. `GameBootstrap` is the explicit composition root and selects concrete implementations.
 
-We intentionally keep one Godot `.csproj` during this migration. Folder/namespace boundaries provide the architecture first. A separate domain assembly is only justified if boundary violations or test/build performance become a real problem.
+We intentionally keep one Godot `.csproj`. Folder/namespace boundaries plus CI checks provide the architecture. A separate domain assembly is only justified if boundary violations or test/build performance become a demonstrated problem.
 
-## Planned folders and namespaces
+## Current folders and intended growth
 
 ```text
 Scripts/
 ├─ Bootstrap/
-│  └─ GameCompositionRoot.cs
+│  └─ GameBootstrap.cs
 ├─ Domain/
 │  ├─ Creatures/
 │  ├─ Genetics/
 │  ├─ Breeding/
 │  ├─ Hatching/
 │  ├─ Stats/
-│  ├─ Evolution/
-│  ├─ Lifecycle/
 │  ├─ Racing/
-│  ├─ Inventory/
+│  ├─ Rules/
 │  └─ Shared/
 ├─ Application/
 │  ├─ Game/
 │  ├─ Breeding/
-│  ├─ Hatching/
+│  ├─ Persistence/
 │  ├─ Racing/
-│  ├─ Shop/
+│  ├─ Roster/
 │  ├─ Settings/
+│  ├─ Shop/
+│  ├─ Simulation/
+│  ├─ Training/
 │  └─ Ports/
 ├─ Infrastructure/
 │  ├─ Persistence/
 │  ├─ Audio/
-│  ├─ Localization/
 │  └─ Resources/
 ├─ Presentation/
-│  ├─ Garden/
-│  ├─ Voidlings/
 │  ├─ Racing/
-│  ├─ FamilyTree/
+│  ├─ Voidlings/
 │  └─ UI/
-└─ Legacy/ (temporary only if a move cannot be completed safely in one slice)
+├─ Actors/          # transitional garden presentation
+├─ Garden/          # transitional garden coordinator
+├─ Services/        # transitional GameSession lifetime facade
+└─ UI/              # transitional root/navigation UI
 
 Resources/
-├─ Genetics/
-├─ Growth/
-├─ Breeding/
-├─ Hatching/
-├─ Lifecycle/
-├─ Racing/
-└─ Courses/
+└─ Balance/
 
 Localization/
-└─ strings.csv
+└─ en.po
 
 Tests/
 ├─ Domain/
-├─ Application/
-└─ Characterization/
+└─ Application/
 ```
 
-Do not create empty folders or placeholder interfaces just to match this tree. A directory appears when its first real feature is migrated.
+Do not create empty folders or placeholder interfaces just to match a future ideal tree. A directory appears when its first real feature needs it.
 
 ## Layer responsibilities
 
@@ -112,7 +106,7 @@ Good examples:
 - relatedness/inbreeding calculation;
 - stat progression;
 - lifecycle transitions;
-- race participant snapshots and race simulation;
+- race participant snapshots, course data and race simulation;
 - typed rule/config records consumed by those systems.
 
 Forbidden:
@@ -122,22 +116,23 @@ Forbidden:
 - `FileAccess`, `AudioServer`, `TranslationServer`;
 - UI strings/toasts;
 - static mutable singleton state;
-- reading wall-clock time as an implicit dependency.
+- wall-clock/frame time as a hidden deterministic input.
 
 ### Application
 
-Coordinates a user/game use case. It may mutate the current save/runtime model through explicit collaborators.
+Coordinates player/game use cases through explicit inputs and focused collaborators.
 
 Examples:
 
-- buy a training item;
+- buy/use a training item;
 - breed two selected Voidlings;
-- advance incubation/lifecycle by a supplied simulation duration;
-- say goodbye;
-- register a race and award its result;
-- change settings.
+- advance incubation/lifecycle by a supplied duration;
+- say goodbye/rename/move;
+- create an immutable race entry and award its result;
+- change settings;
+- normalize an older save after deserialization.
 
-Application code returns typed results/events. Presentation decides how those results are worded and displayed.
+Application returns typed results/events. Presentation decides how those results are worded and displayed. Application must remain Godot-free.
 
 ### Infrastructure
 
@@ -146,10 +141,9 @@ Godot/platform implementation details:
 - JSON persistence via `Godot.FileAccess`;
 - audio bus application;
 - loading/validating custom Resources;
-- localization locale switching;
 - future Steam/platform services.
 
-Infrastructure does not contain breeding/racing rules.
+Infrastructure does not contain genetics, breeding or race outcome rules.
 
 ### Presentation
 
@@ -162,30 +156,19 @@ Godot Nodes/scenes:
 - VFX and audio triggers;
 - localization presentation.
 
-Presentation may map domain state to colors/sprites/text, but it must not invent domain outcomes.
+Presentation may map immutable/application state to colors/sprites/text, but it must not invent domain outcomes.
 
 ### Bootstrap
 
-The only layer that intentionally sees all concrete layers. It constructs shared services and injects them into the root scene/controllers.
+The one layer that intentionally sees concrete types from every layer. `Scripts/Bootstrap/GameBootstrap.cs` constructs shared services and the configured `GameSession` lifetime facade.
 
-Voidling will use **manual composition first**, not a dependency-injection container. The object graph is currently small and Godot already owns much of the Node lifecycle. If manual wiring becomes genuinely complex later, the decision can be revisited with an ADR.
+Voidling uses **manual composition**, not a dependency-injection container. The object graph remains small and Godot already owns Node lifetime. Revisit only if manual wiring becomes genuinely difficult.
 
 ## Composition over inheritance
 
-Engine inheritance is unavoidable and useful (`Node2D`, `Control`, `Resource`). Game behavior should not form deep class trees.
+Engine inheritance is normal and useful (`Node2D`, `Control`, `Resource`). Game behavior should not form deep class trees.
 
-Prefer:
-
-```text
-VoidlingActor
-├─ AnimatedSprite2D
-├─ SelectionIndicator
-├─ ShadowRenderer
-├─ MutationAdornmentRenderer
-└─ InteractionArea
-```
-
-over:
+Prefer composed presentation responsibilities and shared helpers/components over:
 
 ```text
 BaseCreature
@@ -193,6 +176,8 @@ BaseCreature
     → MutatedInteractiveCreature
       → AngelMutatedInteractiveCreature
 ```
+
+A current example is `VoidlingGroundVisualMetrics`: the garden actor and race presentation use one shared definition for sprite-ground pivot and shadow proportions rather than tuning separate challenge-specific footprints.
 
 Plain C# behaviors can also be composed into a Node when they do not need scene-tree lifecycle.
 
@@ -202,67 +187,52 @@ Patterns are vocabulary, not goals.
 
 ### Factory
 
-Use when creation itself has rules or multiple collaborators. Planned examples:
+Use when creation itself has rules or invariants. Existing examples include:
 
-- `GenomeFactory` / `StoreEggFactory`;
-- `BredEggFactory` or an `EggGenerationService`;
-- `RaceParticipantFactory`;
-- visual actor factory when spawning requires consistent components.
+- `GenomeFactory`;
+- `StoreEggFactory`;
+- `RaceEntryFactory` / `RaceParticipantSnapshotFactory`.
 
-A factory must own meaningful creation invariants. Do not wrap `new Foo()` merely to claim a factory exists.
+Do not wrap `new Foo()` merely to claim a factory exists.
 
 ### Builder
 
-Use only when construction has many optional/ordered pieces:
-
-- authored race course graph;
-- debug/test genome scenarios;
-- complex result/pipeline accumulation.
-
-Do not add builders for ordinary save DTOs.
+Use only when construction has many optional/ordered pieces, for example a future authored race-course graph or complex test scenarios. Do not add builders for ordinary DTOs.
 
 ### Strategy / policy
 
-Use where product rules intentionally vary:
-
-- allele expression policy;
-- mutation policy;
-- race segment behavior;
-- ruleset profiles.
-
-If there is one stable rule, keep it direct until a second implementation exists or is already committed in the product plan.
+Use where product rules intentionally vary, such as future allele-expression policies, mutation policies or race segment behavior. If there is one stable rule, keep it direct until variation is real.
 
 ### State
 
-Use explicit enums and switch logic for simple lifecycle states. Extract a state machine only when transitions/behavior become difficult to reason about. Avoid a node-per-state hierarchy by default.
+Use enums and straightforward transition logic for simple lifecycle states. Extract a state machine only when transition behavior becomes hard to reason about.
 
 ### Observer / signals
 
-Godot signals and C# events are appropriate for local notifications. Keep ownership visible. Avoid a global message bus because it makes dependencies difficult to trace.
+Godot signals and C# events are appropriate for local notifications. Keep ownership visible. Avoid a global message bus because it obscures dependencies.
+
+Nodes being removed from inside their own/descendant signal callbacks must use deferred disposal (`QueueFree`) rather than synchronous `Free`.
 
 ### Components
 
-Use scene/node components for reusable presentation behaviors. Do not introduce a parallel ECS: Godot's node tree already provides compositional structure, and Voidling does not currently have an ECS-scale performance problem.
+Use scene/node components for reusable presentation behavior. Do not introduce a parallel ECS; Godot's node tree already provides composition and the project does not currently have an ECS-scale performance requirement.
 
 ## Domain events vs UI events
 
 Domain/application operations can produce small typed result events, for example:
 
 ```text
-EggCreated
 CreatureHatched
 CreatureBecameAdult
-TrainingApplied
-RaceCompleted
+EggFailed
+RaceParticipantFinished
 ```
 
-These are data describing what happened. They are not a global publish/subscribe framework. The application owner forwards relevant events to presentation.
-
-UI signals such as `Pressed`, `MemberSelected` and `DragStarted` remain local presentation concerns.
+These are data describing what happened, not a global pub/sub framework. UI signals such as `Pressed`, `PairChanged` and `RaceRequested` remain local Presentation concerns.
 
 ## Rules and designer data
 
-Balance values currently concentrated in `GameRules` will migrate into typed rule records such as:
+Balance is represented as immutable typed records such as:
 
 ```text
 GeneticsRules
@@ -274,15 +244,15 @@ RaceRules
 ShopRules
 ```
 
-Godot custom `Resource` assets are the editor-facing authoring format. At startup they are validated and converted into immutable/plain C# rule values used by Domain. This keeps the Inspector useful without making domain algorithms depend on `Resource`.
+Godot custom `Resource` assets are the editor-facing authoring format where designer editing is genuinely needed. Bootstrap validates/converts them to plain domain rules once. Do not expose an Inspector field until gameplay actually consumes that authored value; otherwise two sources of truth are created.
 
-Presentation-only values (colors, fonts, sprite paths) remain presentation catalogs/resources and are not mixed into domain rule objects.
+Presentation-only values (colors, fonts, sprite paths) belong to Presentation catalogs/resources, not Domain rule objects.
 
 ## Persistence
 
-Persistence is a boundary, not part of the simulation.
+Persistence is an external boundary, not part of simulation.
 
-Application depends on:
+Application defines the narrow repository port:
 
 ```csharp
 public interface IGameStateRepository
@@ -292,65 +262,77 @@ public interface IGameStateRepository
 }
 ```
 
-Godot infrastructure implements it with `FileAccess` and JSON.
+Godot Infrastructure implements it with `FileAccess` and JSON.
 
-Migration is explicit:
+Migration flow:
 
 ```text
 serialized save
   → deserialize tolerant DTO
-  → ordered migration pipeline
-  → normalize/validate
+  → deterministic migration/normalization
   → current runtime model
 ```
 
 Rules:
 
-- preserve the existing `user://voidling_mvp_save.json` path during restructuring;
-- never reroll existing genomes/eggs as a side effect of migration;
-- deterministic defaults for newly introduced data;
+- preserve `user://voidling_mvp_save.json` during this restructuring;
+- never reroll existing genomes/eggs as a migration side effect;
+- use deterministic defaults for newly introduced data;
 - preserve lineage and stable IDs;
-- future unknown-content preservation should be preferred over silent deletion when practical.
+- prefer unknown-content preservation over silent deletion when practical.
 
 ## Determinism
 
-Persisted or replay-sensitive random decisions use explicit stable seeds and named substreams.
+Persisted or replay-sensitive random decisions use explicit stable seeds and semantic substreams.
 
-Never use:
+Never use the following as hidden inputs to persisted outcomes:
 
 - `.GetHashCode()`;
 - frame rate;
-- current animation state;
-- current wall-clock time;
-- global sequential RNG consumption
+- animation state;
+- wall-clock time;
+- presentation/VFX RNG;
+- accidental global sequential RNG consumption.
 
-as hidden inputs to a persisted deterministic result.
+The live demo race now follows:
 
-Race simulation eventually follows the same rule: simulation state and seed decide results; presentation only displays/interpolates them.
+```text
+immutable RaceEntry
+  → pure RaceCourse + RaceSimulation
+  → state snapshots / typed events
+  → RaceScreen
+  → sprites / camera / HUD / VFX
+```
+
+`RaceSimulation` is fixed-step and result-authoritative. `RaceScreen` uses separate VFX randomness, so particles/animation cannot change finish order.
 
 ## Localization
 
-Localization is a foundation concern because retro pixel UI has tight layout constraints.
+Localization is a foundation concern because the retro pixel UI has tight layout constraints.
 
-Initial policy:
+Policy:
 
 - stable semantic keys such as `UI_SHOP_TITLE`, not English prose as identifiers;
 - Godot's built-in translation pipeline and `TranslationServer`;
-- start with UTF-8 CSV while the string set is small;
-- switch to/gettext PO when collaboration tooling or string volume makes it worthwhile;
+- committed UTF-8 gettext `.po` files as locale source (`Localization/en.po` today);
+- register source translation files directly in `project.godot`, never importer-generated `.translation` artifacts;
 - use Containers, wrapping and sensible minimum sizes;
-- pseudolocalization is a required UI QA mode before release;
+- pseudolocalization is required UI QA before release;
 - user-generated Voidling names are literal and must not auto-translate;
-- formatted messages keep values as placeholders rather than string-concatenating sentence fragments.
+- formatted messages use placeholders rather than assembling translated sentence fragments.
 
-Do not build a second custom localization framework over Godot.
+A generated CSV `.translation` file was intentionally abandoned because a clean checkout can load project settings before that generated artifact exists, producing missing-resource errors. The committed PO source has no such bootstrap dependency.
+
+Do not build a second localization framework over Godot.
 
 ## UI architecture
 
-The current `MainController` partial class is a transitional monolith. Target shape:
+`MainController` is now primarily a transitional navigation/root coordinator. Standalone screens currently include Settings, Shop, Breeding, Race Picker, Inventory and Details, with `ModalHost` owning modal lifetime.
+
+Target direction as remaining areas are next modified:
 
 ```text
-MainScreen / ModalHost
+MainController / ModalHost
 ├─ TopBar
 ├─ VoidlingInspector
 ├─ ShopScreen
@@ -362,60 +344,62 @@ MainScreen / ModalHost
 └─ SettingsScreen
 ```
 
-Each screen owns its controls and emits user intent. It receives a narrow application facade/use case rather than reaching into `GameSession.Instance`.
+Standalone screens receive presentation-ready state and emit intent; they do not reach through a global session locator. `GameSession.Instance` has been removed and CI forbids its return.
 
-`UiFactory` should shrink toward reusable styling/widget construction. It must not become another controller or service locator.
+`UiFactory` should remain reusable styling/widget construction. It must not become another controller or service locator.
 
 ## Garden architecture
 
-`GardenController` should become the coordinator for a garden scene, with composed responsibilities for:
+`GardenController` coordinates garden presentation:
 
 - camera navigation;
-- creature spawn/visual synchronization;
+- creature visual synchronization;
 - pickup/drop interaction;
 - breeding/hatching presentation;
 - environment/TileMap ownership.
 
-Domain age/incubation/breeding state does not live in the Garden node.
+Domain age/incubation/breeding outcomes do not live in the Garden node. Shared Voidling visual conventions such as ground pivot/shadow metrics belong in reusable Presentation code so challenges and the garden remain visually consistent.
 
 ## Race architecture
 
-The current `RaceController` is explicitly temporary because it mixes simulation and presentation.
-
-Target:
+The old result-owning `RaceController` has been removed. The current architecture is:
 
 ```text
-RaceEntryUseCase
-  → RaceParticipantSnapshot[]
+RaceEntryFactory
+  → immutable RaceEntry / RaceParticipantSnapshot[]
   → RaceSimulation (pure C#)
-      → RaceState / RaceEvents
-          → RacePresentationController (Godot)
-              → sprites / camera / HUD / VFX
+      → RaceParticipantStateSnapshot / RaceEvents
+          → RaceScreen (Godot)
+              → sprites / camera / HUD / minimap / podium / VFX
 ```
 
-Course definitions are data-driven segments. Adding Power sections, route forks or new challenges should add domain course behavior and presentation mappings without expanding one giant controller switch indefinitely.
+Course geometry is represented by pure `RaceCourse`/segment data. Adding Power sections, forks, shortcuts or personality decisions should extend the pure course/simulation model first, then map resulting state/events in Presentation.
 
 ## Testing strategy
 
 Three categories:
 
-1. **Domain tests** — fast deterministic tests for genetics, inbreeding, lifecycle, stats and race simulation.
-2. **Application tests** — use-case sequencing with in-memory repositories/adapters.
-3. **Godot smoke/scene tests** — project loads, scenes parse, critical presentation integration.
+1. **Domain tests** — deterministic genetics, inbreeding, lifecycle/stat/race logic.
+2. **Application tests** — use-case sequencing and aggregate mutation without scenes.
+3. **Godot integration checks** — clean import plus actual main-scene headless runtime smoke.
 
-Characterization tests protect existing demo behavior during refactors before rules are moved.
+Characterization tests protect existing demo behavior during migration.
 
 High-value invariants include:
 
 - one allele inherited from each parent;
 - same seed + same inputs = same genome;
-- adding an unrelated gene does not change old gene outcomes;
+- adding unrelated content does not change old deterministic decisions;
 - mutation transmission uses configured probability and depth;
 - inbreeding burden escalation/cleansing;
 - save/load does not reroll eggs;
-- race sim determinism;
-- animation changes do not change race results.
+- race simulation determinism and frame-chunk independence;
+- presentation/VFX changes do not change race results.
+
+CI also enforces the principal compile-time architecture boundaries and rejects runtime Godot errors during the smoke launch.
 
 ## Current migration status
 
-See `docs/architecture/RESTRUCTURING_PLAN.md`. Until a subsystem is migrated, current `Scripts/Core`, `Scripts/Services`, `Scripts/UI`, `Scripts/Garden` and `Scripts/Race` code is compatibility code. New features should prefer the target layers rather than increasing those monoliths.
+`docs/architecture/MIGRATION_STATUS.md` is the current implementation map. `docs/architecture/RESTRUCTURING_PLAN.md` preserves the research/migration reasoning, while ADRs record durable decisions and later corrections.
+
+Do not infer current implementation state from an older execution-plan checklist when `MIGRATION_STATUS.md` says otherwise.
