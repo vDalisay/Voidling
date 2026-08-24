@@ -103,10 +103,6 @@ public static class UiFactory
             minimumSize);
     }
 
-    /// <summary>
-    /// Presentation-friendly portrait overload for migrated screens. It accepts display-ready
-    /// values instead of a mutable VoidlingData reference so view state can remain a snapshot.
-    /// </summary>
     public static TextureRect CreatePortrait(
         Color tintColor,
         bool hasAngelMutation,
@@ -152,14 +148,10 @@ public static class UiFactory
     {
         portrait.SelfModulate = tintColor;
 
-        // Reused preview portraits must remove the previous creature's mutation layer
-        // immediately. QueueFree left the old halo visible for another frame and made
-        // non-Angel racers appear to inherit the selected racer's halo.
         var oldBadge = portrait.GetNodeOrNull<Control>("__mutation_badge");
         if (oldBadge != null && GodotObject.IsInstanceValid(oldBadge))
             oldBadge.Free();
 
-        // Clean up legacy badge nodes from older UI code as well.
         var oldHalo = portrait.GetNodeOrNull<Control>("__mutation_halo");
         if (oldHalo != null && GodotObject.IsInstanceValid(oldHalo))
             oldHalo.Free();
@@ -167,13 +159,17 @@ public static class UiFactory
         if (!hasAngelMutation && otherMutationCount <= 0)
             return;
 
+        var requestedSpritePixels = Math.Max(
+            16.0f,
+            Math.Min(portrait.CustomMinimumSize.X, portrait.CustomMinimumSize.Y));
         var badge = new HaloBadge
         {
             Name = "__mutation_badge",
             MouseFilter = Control.MouseFilterEnum.Ignore,
             ZIndex = 5,
             ShowAngel = hasAngelMutation,
-            SparkleCount = Math.Max(0, otherMutationCount)
+            SparkleCount = Math.Max(0, otherMutationCount),
+            NominalSpritePixels = requestedSpritePixels
         };
         badge.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         portrait.AddChild(badge);
