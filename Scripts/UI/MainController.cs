@@ -15,6 +15,7 @@ public partial class MainController : Node
     private static readonly Texture2D EggTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
 
+    private GameSession _session = null!;
     private GardenController _garden = null!;
     private CanvasLayer _uiLayer = null!;
     private Control _uiRoot = null!;
@@ -29,6 +30,7 @@ public partial class MainController : Node
 
     public override void _Ready()
     {
+        _session = GetNode<GameSession>("/root/GameBootstrap/GameSession");
         _garden = GetNode<GardenController>("Garden");
         _garden.VoidlingSelected += OnVoidlingSelected;
 
@@ -45,17 +47,17 @@ public partial class MainController : Node
         _modalHost = new ModalHost { ZIndex = 100 };
         _uiRoot.AddChild(_modalHost);
 
-        GameSession.Instance.StateChanged += RefreshUi;
-        GameSession.Instance.ToastRequested += ShowToast;
+        _session.StateChanged += RefreshUi;
+        _session.ToastRequested += ShowToast;
         RefreshUi();
     }
 
     public override void _ExitTree()
     {
-        if (GameSession.Instance != null)
+        if (GodotObject.IsInstanceValid(_session))
         {
-            GameSession.Instance.StateChanged -= RefreshUi;
-            GameSession.Instance.ToastRequested -= ShowToast;
+            _session.StateChanged -= RefreshUi;
+            _session.ToastRequested -= ShowToast;
         }
     }
 
@@ -129,9 +131,9 @@ public partial class MainController : Node
 
     private void RefreshUi()
     {
-        _coinsLabel.Text = string.Format(Tr("UI_TOP_SPROUTS"), GameSession.Instance.State.Coins);
+        _coinsLabel.Text = string.Format(Tr("UI_TOP_SPROUTS"), _session.State.Coins);
 
-        if (_selectedId.Length > 0 && GameSession.Instance.FindVoidling(_selectedId) == null)
+        if (_selectedId.Length > 0 && _session.FindVoidling(_selectedId) == null)
             _selectedId = "";
 
         _garden.Select(_selectedId);
@@ -170,8 +172,8 @@ public partial class MainController : Node
 
     private void StartRace(VoidlingData selected)
     {
-        var entry = GameSession.Instance.CreateRaceEntryFor(selected.Id);
-        var autoFinish = GameSession.Instance.State.AutoFinishRaces;
+        var entry = _session.CreateRaceEntryFor(selected.Id);
+        var autoFinish = _session.State.AutoFinishRaces;
 
         _garden.SetGameplayActive(false);
         _garden.Visible = false;
@@ -187,7 +189,7 @@ public partial class MainController : Node
 
     private void OnRaceCompleted(int placement)
     {
-        GameSession.Instance.ApplyRacePlacementReward(placement);
+        _session.ApplyRacePlacementReward(placement);
     }
 
     private void EndRace()
