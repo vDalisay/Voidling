@@ -1,0 +1,44 @@
+using System;
+using Voidling.Application.Racing;
+
+namespace VoidlingGame;
+
+public partial class GameSession
+{
+    private RaceEntryFactory? _raceEntryFactory;
+
+    public void ConfigureRacing(RaceEntryFactory raceEntryFactory)
+    {
+        if (IsInsideTree())
+            throw new InvalidOperationException("Race dependencies must be configured before GameSession enters the scene tree.");
+
+        _raceEntryFactory = raceEntryFactory ?? throw new ArgumentNullException(nameof(raceEntryFactory));
+    }
+
+    /// <summary>
+    /// Allocates one persistent race seed and snapshots the selected Voidling plus generated CPU
+    /// opponents before presentation starts. The RaceScreen receives no live mutable state.
+    /// </summary>
+    public RaceEntry CreateRaceEntryFor(string selectedCreatureId)
+    {
+        var selected = FindVoidling(selectedCreatureId)
+            ?? throw new InvalidOperationException($"Cannot create race entry for unknown Voidling '{selectedCreatureId}'.");
+        if (_raceEntryFactory == null)
+            throw new InvalidOperationException("RaceEntryFactory was not configured by Bootstrap.");
+
+        return _raceEntryFactory.Create(selected, NextSeed());
+    }
+
+    /// <summary>
+    /// Applies the persistent reward after presentation reports the simulation-owned placement.
+    /// </summary>
+    public int ApplyRacePlacementReward(int placement)
+    {
+        if (_raceResults == null)
+            throw new InvalidOperationException("RaceResultUseCase was not configured by Bootstrap.");
+
+        var result = _raceResults.AwardPlacement(State, placement);
+        SaveAndNotify($"Race reward: +{result.Reward} sprouts.");
+        return result.Reward;
+    }
+}

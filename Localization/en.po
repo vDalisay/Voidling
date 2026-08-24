@@ -1,0 +1,271 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Voidling\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "UI_COMMON_CLOSE"
+msgstr "Close"
+
+msgid "UI_COMMON_CANCEL"
+msgstr "Cancel"
+
+msgid "UI_COMMON_CONTINUE"
+msgstr "Continue"
+
+msgid "UI_TOP_SPROUTS"
+msgstr "Sprouts: {0}"
+
+msgid "UI_TOP_SHOP"
+msgstr "Shop"
+
+msgid "UI_TOP_INVENTORY"
+msgstr "Inventory"
+
+msgid "UI_TOP_BREED"
+msgstr "Breed"
+
+msgid "UI_TOP_RACE"
+msgstr "Race"
+
+msgid "UI_TOP_SETTINGS"
+msgstr "Settings"
+
+msgid "UI_TOP_CENTER"
+msgstr "Center"
+
+msgid "UI_TOP_RESET"
+msgstr "Reset"
+
+msgid "UI_SETTINGS_TITLE"
+msgstr "SETTINGS"
+
+msgid "UI_SETTINGS_AUDIO"
+msgstr "Audio"
+
+msgid "UI_SETTINGS_CAMERA"
+msgstr "Camera"
+
+msgid "UI_SETTINGS_RACE"
+msgstr "Race"
+
+msgid "UI_SETTINGS_VOLUME"
+msgstr "Volume {0}%"
+
+msgid "UI_SETTINGS_AUTO_FINISH_ON"
+msgstr "Auto Finish: ON"
+
+msgid "UI_SETTINGS_AUTO_FINISH_OFF"
+msgstr "Auto Finish: OFF"
+
+msgid "UI_SETTINGS_AUTO_FINISH_TOOLTIP"
+msgstr "Finish once either you finish or every CPU has already finished."
+
+msgid "UI_SETTINGS_EDGE_PAN_ON"
+msgstr "Edge Pan: ON"
+
+msgid "UI_SETTINGS_EDGE_PAN_OFF"
+msgstr "Edge Pan: OFF"
+
+msgid "UI_SETTINGS_EDGE_PAN_TOOLTIP"
+msgstr "Move the cursor to an edge to pan the garden or family tree."
+
+msgid "UI_SETTINGS_HINT"
+msgstr "ESC opens/closes this menu from the garden."
+
+msgid "UI_SHOP_TITLE"
+msgstr "SPROUT MARKET"
+
+msgid "UI_SHOP_WELCOME"
+msgstr "Pick something from the stall"
+
+msgid "UI_SHOP_WALLET"
+msgstr "SPROUTS  {0}"
+
+msgid "UI_SHOP_TREATS_TITLE"
+msgstr "TRAINING TREATS"
+
+msgid "UI_SHOP_TREATS_SUBTITLE"
+msgstr "One treat is consumed when you train a stat."
+
+msgid "UI_SHOP_EGGS_TITLE"
+msgstr "MYSTERY EGGS"
+
+msgid "UI_SHOP_EGGS_SUBTITLE"
+msgstr "Each egg already carries its own hidden DNA."
+
+msgid "UI_SHOP_OWNED"
+msgstr "OWNED {0}"
+
+msgid "UI_SHOP_BUY"
+msgstr "BUY {0}"
+
+msgid "UI_SHOP_MYSTERY_EGG"
+msgstr "MYSTERY EGG {0}"
+
+msgid "UI_SHOP_HIDDEN_DNA"
+msgstr "Hidden DNA"
+
+msgid "UI_BREED_TITLE"
+msgstr "BREEDING NEST"
+
+msgid "UI_BREED_NEED_TWO_ADULTS"
+msgstr "You need two adult Voidlings."
+
+msgid "UI_BREED_ACTION"
+msgstr "Breed"
+
+msgid "UI_BREED_CHOOSE_TWO"
+msgstr "Choose two adults."
+
+msgid "UI_BREED_DIFFERENT_PARENTS"
+msgstr "Choose two different Voidlings."
+
+msgid "UI_BREED_ADULTS_ONLY"
+msgstr "Both parents must be adults."
+
+msgid "UI_BREED_COOLDOWN"
+msgstr "One parent is still on breeding cooldown."
+
+msgid "UI_BREED_RELATED"
+msgstr "Related pairing • inbreeding level {0} • {1}% hatch-failure risk."
+
+msgid "UI_BREED_CLEAN_OUTCROSS"
+msgstr "Clean outcross • inherited burden falls to level {0}."
+
+msgid "UI_BREED_UNRELATED_BURDEN"
+msgstr "Unrelated pairing • inherited burden remains level {0}."
+
+msgid "UI_BREED_UNRELATED_CLEAN"
+msgstr "Unrelated pairing • no inbreeding penalty."
+
+msgid "UI_RACE_PICKER_TITLE"
+msgstr "CHOOSE A RACER"
+
+msgid "UI_RACE_PICKER_EMPTY"
+msgstr "No Voidlings are currently on the farm."
+
+msgid "UI_RACE_PICKER_HINT"
+msgstr "Choose one Voidling. All other racers are generated CPU opponents."
+
+msgid "UI_RACE_START"
+msgstr "Start Race"
+
+msgid "UI_INVENTORY_TITLE"
+msgstr "INVENTORY"
+
+msgid "UI_INVENTORY_SUBTITLE"
+msgstr "Items you currently own"
+
+msgid "UI_INVENTORY_TREAT"
+msgstr "{0} Treat"
+
+msgid "UI_INVENTORY_EGGS"
+msgstr "Eggs on Island"
+
+msgid "UI_INVENTORY_FAILED_EGGS"
+msgstr "FAILED EGGS"
+
+msgid "UI_INVENTORY_FAILED_EGG"
+msgstr "Failed Egg {0}"
+
+msgid "UI_INVENTORY_DISCARD"
+msgstr "Discard"
+
+msgid "UI_DETAILS_STATS"
+msgstr "Stats"
+
+msgid "UI_DETAILS_DNA"
+msgstr "DNA"
+
+msgid "UI_DETAILS_VISUAL"
+msgstr "Visual"
+
+msgid "UI_DETAILS_ADULT"
+msgstr "ADULT"
+
+msgid "UI_DETAILS_CHILD"
+msgstr "CHILD"
+
+msgid "UI_DETAILS_STATS_HINT"
+msgstr "Rank controls potential; level/progress reflects training."
+
+msgid "UI_DETAILS_GENERATION"
+msgstr "Generation {0}"
+
+msgid "UI_DETAILS_INBREEDING"
+msgstr "Inbreeding burden: {0}"
+
+msgid "UI_DETAILS_DNA_HINT"
+msgstr "DNA1 and DNA2 are the two inherited ability genes."
+
+msgid "UI_DETAILS_COLOR_DNA"
+msgstr "Color DNA1 #{0}    DNA2 #{1}"
+
+msgid "UI_DETAILS_CURRENT_APPEARANCE"
+msgstr "CURRENT APPEARANCE"
+
+msgid "UI_DETAILS_SHOWN_COLOR"
+msgstr "Shown color DNA: #{0}"
+
+msgid "UI_DETAILS_COLOR_PAIR"
+msgstr "Color DNA: #{0} / #{1}"
+
+msgid "UI_DETAILS_NO_MUTATION"
+msgstr "Mutation: none"
+
+msgid "UI_DETAILS_MUTATION_TRANSMIT"
+msgstr "Mutation: {0}  • founder {1}  • G{2}  • can pass on"
+
+msgid "UI_DETAILS_MUTATION_TERMINAL"
+msgstr "Mutation: {0}  • founder {1}  • G{2}  • terminal"
+
+msgid "UI_RACE_TITLE"
+msgstr "SPROUT RUN"
+
+msgid "UI_RACE_SECTION_RUN"
+msgstr "RUN"
+
+msgid "UI_RACE_SECTION_SWIM"
+msgstr "SWIM"
+
+msgid "UI_RACE_SECTION_GLIDE"
+msgstr "GLIDE"
+
+msgid "UI_RACE_SECTION_GLIDE_SWIM"
+msgstr "GLIDE / SWIM"
+
+msgid "UI_RACE_SECTION_TAKEOFF"
+msgstr "TAKEOFF"
+
+msgid "UI_RACE_CHEER"
+msgstr "CHEER!"
+
+msgid "UI_RACE_CHEERING"
+msgstr "CHEERING!"
+
+msgid "UI_RACE_STAMINA"
+msgstr "STAMINA {0} / {1}"
+
+msgid "UI_RACE_RESULT_WIN"
+msgstr "Congratulations!"
+
+msgid "UI_RACE_RESULT_LAST"
+msgstr "Better luck next time..."
+
+msgid "UI_RACE_RESULT_COMPLETE"
+msgstr "Race complete!"
+
+msgid "UI_RACE_RESULT_PLACE"
+msgstr "You placed #{0}"
+
+msgid "UI_RACE_RETURN"
+msgstr "Return to Garden"
+
+msgid "UI_GARDEN_LOG_TITLE"
+msgstr "GARDEN LOG"
+
+msgid "UI_GARDEN_LOG_STARTED"
+msgstr "Garden session started."

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GameBalanceResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Infrastructure/Resources/GameBalanceResource.cs" id="1_balance"]
+
+[resource]
+script = ExtResource("1_balance")
+HigherAlleleExpressionChance = 0.7
+RareFounderTraitChance = 0.0005
+RareTraitTransmissionChance = 0.1
+RelatedAncestorDepth = 3
+BreedCooldownSeconds = 8.0
+EggIncubationSeconds = 22.0
+TrainingPointsPerLevel = 12
+MaxStatLevel = 99
+MaxTrainingPoints = 120
+ChildToAdultSeconds = 45.0
+StoreEggPrice = 30
+TrainingItemPrice = 8

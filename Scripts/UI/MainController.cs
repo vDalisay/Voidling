@@ -1,7 +1,8 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using Godot;
+using Voidling.Presentation.Racing;
+using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Garden;
 
 namespace VoidlingGame;
 
@@ -10,23 +11,22 @@ public partial class MainController : Node
     private const float ScreenWidth = 640.0f;
     private const float ScreenHeight = 360.0f;
 
-    private static readonly Texture2D EggTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
-
+    private GameSession _session = null!;
     private GardenController _garden = null!;
     private CanvasLayer _uiLayer = null!;
     private Control _uiRoot = null!;
+    private ModalHost _modalHost = null!;
     private Label _coinsLabel = null!;
     private PanelContainer? _detailsPanel;
-    private PanelContainer? _eggsPanel;
-    private Control? _modal;
+    private GardenEventLog _gardenEventLog = null!;
     private Label _toastLabel = null!;
     private float _toastSeconds;
     private string _selectedId = "";
-    private RaceController? _race;
+    private RaceScreen? _race;
 
     public override void _Ready()
     {
+        _session = GetNode<GameSession>("/root/GameBootstrap/GameSession");
         _garden = GetNode<GardenController>("Garden");
         _garden.VoidlingSelected += OnVoidlingSelected;
 
@@ -39,18 +39,25 @@ public partial class MainController : Node
 
         BuildTopBar();
         BuildToast();
+        BuildGardenEventLog();
 
-        GameSession.Instance.StateChanged += RefreshUi;
-        GameSession.Instance.ToastRequested += ShowToast;
+        _modalHost = new ModalHost { ZIndex = 100 };
+        _uiRoot.AddChild(_modalHost);
+
+        _session.StateChanged += RefreshUi;
+        _session.ToastRequested += ShowToast;
+        _session.GardenEventRaised += AppendGardenEvent;
+        _gardenEventLog.Append(Tr("UI_GARDEN_LOG_STARTED"));
         RefreshUi();
     }
 
     public override void _ExitTree()
     {
-        if (GameSession.Instance != null)
+        if (GodotObject.IsInstanceValid(_session))
         {
-            GameSession.Instance.StateChanged -= RefreshUi;
-            GameSession.Instance.ToastRequested -= ShowToast;
+            _session.StateChanged -= RefreshUi;
+            _session.ToastRequested -= ShowToast;
+            _session.GardenEventRaised -= AppendGardenEvent;
         }
     }
 
@@ -69,7 +76,7 @@ public partial class MainController : Node
         if (_race != null || !inputEvent.IsActionPressed("ui_cancel"))
             return;
 
-        if (_modal != null)
+        if (_modalHost.IsOpen)
             CloseModal();
         else
             ShowSettingsExtended();
@@ -87,17 +94,17 @@ public partial class MainController : Node
         row.AddThemeConstantOverride("separation", 4);
         panel.AddChild(row);
 
-        _coinsLabel = UiFactory.CreateLabel("Sprouts: 0", 9);
+        _coinsLabel = UiFactory.CreateLabel(string.Format(Tr("UI_TOP_SPROUTS"), 0), 9);
         _coinsLabel.CustomMinimumSize = new Vector2(84, 22);
         row.AddChild(_coinsLabel);
 
-        AddTopButton(row, "Shop", ShowShop, 0, 57);
-        AddTopButton(row, "Inventory", ShowInventory, 3, 68);
-        AddTopButton(row, "Breed", ShowBreeding, 6, 57);
-        AddTopButton(row, "Race", ShowRacePicker, 12, 57);
-        AddTopButton(row, "Settings", ShowSettingsExtended, -1, 67);
-        AddTopButton(row, "Center", _garden.ResetCamera, -1, 57);
-        AddTopButton(row, "Reset", ShowResetConfirm, -1, 54);
+        AddTopButton(row, Tr("UI_TOP_SHOP"), ShowShop, 0, 57);
+        AddTopButton(row, Tr("UI_TOP_INVENTORY"), ShowInventory, 3, 68);
+        AddTopButton(row, Tr("UI_TOP_BREED"), ShowBreeding, 6, 57);
+        AddTopButton(row, Tr("UI_TOP_RACE"), ShowRacePicker, 12, 57);
+        AddTopButton(row, Tr("UI_TOP_SETTINGS"), ShowSettingsExtended, -1, 67);
+        AddTopButton(row, Tr("UI_TOP_CENTER"), _garden.ResetCamera, -1, 57);
+        AddTopButton(row, Tr("UI_TOP_RESET"), ShowResetConfirm, -1, 54);
     }
 
     private static void AddTopButton(HBoxContainer row, string text, Action action, int iconIndex, float width)
@@ -112,7 +119,7 @@ public partial class MainController : Node
     private void BuildToast()
     {
         _toastLabel = UiFactory.CreateLabel("", 9);
-        _toastLabel.Position = new Vector2(18, 330);
+        _toastLabel.Position = new Vector2(18, 244);
         _toastLabel.Size = new Vector2(390, 16);
         _toastLabel.AddThemeColorOverride("font_color", Color.FromHtml("#F9F4D8"));
         _toastLabel.AddThemeColorOverride("font_shadow_color", Color.FromHtml("#465247"));
@@ -122,83 +129,56 @@ public partial class MainController : Node
         _uiRoot.AddChild(_toastLabel);
     }
 
+    private void BuildGardenEventLog()
+    {
+        _gardenEventLog = new GardenEventLog
+        {
+            Position = new Vector2(12, 276),
+            Size = new Vector2(388, 72),
+            CustomMinimumSize = new Vector2(388, 72),
+            ZIndex = 6
+        };
+        _uiRoot.AddChild(_gardenEventLog);
+    }
+
     private void RefreshUi()
     {
-        _coinsLabel.Text = $"Sprouts: {GameSession.Instance.State.Coins}";
+        _coinsLabel.Text = string.Format(Tr("UI_TOP_SPROUTS"), _session.State.Coins);
 
-        if (_selectedId.Length > 0 && GameSession.Instance.FindVoidling(_selectedId) == null)
+        if (_selectedId.Length > 0 && _session.FindVoidling(_selectedId) == null)
             _selectedId = "";
 
         _garden.Select(_selectedId);
         RebuildDetailsPanel();
-        RebuildEggsPanel();
 
-        if (_modal != null)
+        if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))
+            _gardenEventLog.Visible = !_modalHost.IsOpen;
+
+        if (_modalHost.IsOpen)
             HideGardenHudPanels();
     }
 
     private VBoxContainer OpenModal(string title, Vector2 size)
     {
-        CloseModal(false);
+        if (_modalHost.IsOpen)
+            CloseModal(false);
         HideGardenHudPanels();
-
-        var overlay = new Control
-        {
-            MouseFilter = Control.MouseFilterEnum.Stop,
-            Position = Vector2.Zero,
-            Size = new Vector2(ScreenWidth, ScreenHeight)
-        };
-        _uiRoot.AddChild(overlay);
-        _modal = overlay;
-
-        var shade = new ColorRect
-        {
-            Color = new Color(0.16f, 0.24f, 0.20f, 0.48f),
-            Position = Vector2.Zero,
-            Size = new Vector2(ScreenWidth, ScreenHeight),
-            MouseFilter = Control.MouseFilterEnum.Stop
-        };
-        overlay.AddChild(shade);
-
-        var panel = UiFactory.CreatePanel(size);
-        panel.Position = new Vector2((ScreenWidth - size.X) * 0.5f, (ScreenHeight - size.Y) * 0.5f);
-        panel.Size = size;
-        overlay.AddChild(panel);
-
-        var box = new VBoxContainer();
-        box.AddThemeConstantOverride("separation", 7);
-        panel.AddChild(box);
-
-        var heading = new HBoxContainer();
-        heading.AddThemeConstantOverride("separation", 7);
-        var titleLabel = UiFactory.CreateTitle(title);
-        titleLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        titleLabel.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-        heading.AddChild(titleLabel);
-        var close = UiFactory.CreateButton("X");
-        close.CustomMinimumSize = new Vector2(30, 23);
-        close.Pressed += CloseModal;
-        heading.AddChild(close);
-        box.AddChild(heading);
-
-        return box;
+        return _modalHost.Open(title, size, CloseModal);
     }
 
     private void HideGardenHudPanels()
     {
         if (_detailsPanel != null && GodotObject.IsInstanceValid(_detailsPanel))
             _detailsPanel.Visible = false;
-        if (_eggsPanel != null && GodotObject.IsInstanceValid(_eggsPanel))
-            _eggsPanel.Visible = false;
+        if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))
+            _gardenEventLog.Visible = false;
     }
 
     private void CloseModal() => CloseModal(true);
 
     private void CloseModal(bool restoreGardenHud)
     {
-        if (_modal != null && GodotObject.IsInstanceValid(_modal))
-            _modal.QueueFree();
-        _modal = null;
+        _modalHost.Close();
 
         if (restoreGardenHud && _race == null && _uiRoot != null && _uiRoot.Visible)
             RefreshUi();
@@ -206,20 +186,34 @@ public partial class MainController : Node
 
     private void StartRace(VoidlingData selected)
     {
+        var entry = _session.CreateRaceEntryFor(selected.Id);
+        var autoFinish = _session.State.AutoFinishRaces;
+
         _garden.SetGameplayActive(false);
         _garden.Visible = false;
         _uiRoot.Visible = false;
 
-        _race = new RaceController();
-        AddChild(_race);
-        _race.ReturnRequested += EndRace;
-        _race.Setup(selected);
+        var race = new RaceScreen();
+        race.Configure(entry, autoFinish);
+        race.RaceCompleted += OnRaceCompleted;
+        race.ReturnRequested += EndRace;
+        _race = race;
+        AddChild(race);
+    }
+
+    private void OnRaceCompleted(int placement)
+    {
+        _session.ApplyRacePlacementReward(placement);
     }
 
     private void EndRace()
     {
         if (_race != null && GodotObject.IsInstanceValid(_race))
+        {
+            _race.RaceCompleted -= OnRaceCompleted;
+            _race.ReturnRequested -= EndRace;
             _race.QueueFree();
+        }
         _race = null;
 
         _garden.Visible = true;
@@ -251,6 +245,9 @@ public partial class MainController : Node
         _toastLabel.Visible = true;
         _toastSeconds = 3.0f;
     }
+
+    private void AppendGardenEvent(string text)
+        => _gardenEventLog.Append(text);
 
     private static void StyleOption(OptionButton option)
     {

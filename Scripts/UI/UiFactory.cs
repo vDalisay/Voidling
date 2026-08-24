@@ -92,6 +92,23 @@ public static class UiFactory
 
     public static TextureRect CreatePortrait(VoidlingData data, Vector2 minimumSize)
     {
+        var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
+        var otherTraits = data.RareTraits?.Count(t =>
+            !string.Equals(t.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
+
+        return CreatePortrait(
+            GameRules.TintColor(data.TintHex),
+            hasAngel,
+            otherTraits,
+            minimumSize);
+    }
+
+    public static TextureRect CreatePortrait(
+        Color tintColor,
+        bool hasAngelMutation,
+        int otherMutationCount,
+        Vector2 minimumSize)
+    {
         var atlas = new AtlasTexture
         {
             Atlas = CharacterTexture,
@@ -106,40 +123,53 @@ public static class UiFactory
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
-        SetPortraitData(portrait, data);
+        SetPortraitData(portrait, tintColor, hasAngelMutation, otherMutationCount);
         return portrait;
     }
 
     public static void SetPortraitData(TextureRect portrait, VoidlingData data)
     {
-        portrait.SelfModulate = GameRules.TintColor(data.TintHex);
+        var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
+        var otherTraits = data.RareTraits?.Count(t =>
+            !string.Equals(t.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
 
-        // Reused preview portraits must remove the previous creature's mutation layer
-        // immediately. QueueFree left the old halo visible for another frame and made
-        // non-Angel racers appear to inherit the selected racer's halo.
+        SetPortraitData(
+            portrait,
+            GameRules.TintColor(data.TintHex),
+            hasAngel,
+            otherTraits);
+    }
+
+    public static void SetPortraitData(
+        TextureRect portrait,
+        Color tintColor,
+        bool hasAngelMutation,
+        int otherMutationCount)
+    {
+        portrait.SelfModulate = tintColor;
+
         var oldBadge = portrait.GetNodeOrNull<Control>("__mutation_badge");
         if (oldBadge != null && GodotObject.IsInstanceValid(oldBadge))
             oldBadge.Free();
 
-        // Clean up legacy badge nodes from older UI code as well.
         var oldHalo = portrait.GetNodeOrNull<Control>("__mutation_halo");
         if (oldHalo != null && GodotObject.IsInstanceValid(oldHalo))
             oldHalo.Free();
 
-        if (data.RareTraits == null || data.RareTraits.Count == 0)
+        if (!hasAngelMutation && otherMutationCount <= 0)
             return;
 
-        var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
-        var otherTraits = data.RareTraits.Count(t =>
-            !string.Equals(t.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase));
-
+        var requestedSpritePixels = Math.Max(
+            16.0f,
+            Math.Min(portrait.CustomMinimumSize.X, portrait.CustomMinimumSize.Y));
         var badge = new HaloBadge
         {
             Name = "__mutation_badge",
             MouseFilter = Control.MouseFilterEnum.Ignore,
             ZIndex = 5,
-            ShowAngel = hasAngel,
-            SparkleCount = otherTraits
+            ShowAngel = hasAngelMutation,
+            SparkleCount = Math.Max(0, otherMutationCount),
+            NominalSpritePixels = requestedSpritePixels
         };
         badge.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         portrait.AddChild(badge);

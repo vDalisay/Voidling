@@ -1,7 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Inventory;
 
 namespace VoidlingGame;
 
@@ -13,7 +14,7 @@ public partial class MainController : Node
             _detailsPanel.QueueFree();
         _detailsPanel = null;
 
-        var data = GameSession.Instance.FindVoidling(_selectedId);
+        var data = _session.FindVoidling(_selectedId);
         if (data == null)
             return;
 
@@ -79,7 +80,7 @@ public partial class MainController : Node
         box.AddChild(details);
 
         var parentText = data.ParentAId.Length > 0
-            ? $"Parents: {GameSession.Instance.NameFor(data.ParentAId)} + {GameSession.Instance.NameFor(data.ParentBId)}"
+            ? $"Parents: {_session.NameFor(data.ParentAId)} + {_session.NameFor(data.ParentBId)}"
             : "Parents: starter/store line";
         var parents = UiFactory.CreateLabel(parentText, 6);
         parents.AutowrapMode = TextServer.AutowrapMode.WordSmart;
@@ -128,7 +129,7 @@ public partial class MainController : Node
                 return;
             committed = true;
 
-            if (!GameSession.Instance.RenameVoidling(data.Id, edit.Text))
+            if (!_session.RenameVoidling(data.Id, edit.Text))
             {
                 edit.QueueFree();
                 if (GodotObject.IsInstanceValid(nameButton))
@@ -152,11 +153,11 @@ public partial class MainController : Node
         var gene = GameRules.GetGene(data, statId);
         var effective = (int)Math.Round(GameRules.EffectiveStat(data, statId));
         var level = GameRules.StatLevel(data, statId);
-        var count = GameSession.Instance.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0;
-        var color = GameRules.StatColor(statId);
+        var count = _session.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0;
+        var color = StatPresentationCatalog.ColorFor(statId);
 
         var label = UiFactory.CreateLabel(
-            $"{GameRules.StatDisplayNames[statId].ToUpperInvariant(),-7} {GameRules.GradeName(gene.ExpressedValue)}  LV{level:00}  {effective:00}", 7);
+            $"{StatPresentationCatalog.NameFor(statId).ToUpperInvariant(),-7} {GameRules.GradeName(gene.ExpressedValue)}  LV{level:00}  {effective:00}", 7);
         label.CustomMinimumSize = new Vector2(142, 17);
         label.AddThemeColorOverride("font_color", color);
         label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
@@ -169,7 +170,7 @@ public partial class MainController : Node
         UiFactory.ApplyPixelFont(use, 6);
         use.Disabled = count <= 0;
         var capturedStat = statId;
-        use.Pressed += () => GameSession.Instance.UseTrainingItem(_selectedId, capturedStat);
+        use.Pressed += () => _session.UseTrainingItem(_selectedId, capturedStat);
         row.AddChild(use);
         container.AddChild(row);
 
@@ -189,7 +190,7 @@ public partial class MainController : Node
             CustomMinimumSize = size
         };
         var background = new StyleBoxFlat { BgColor = Color.FromHtml("#6D6658") };
-        var fill = new StyleBoxFlat { BgColor = GameRules.StatColor(statId) };
+        var fill = new StyleBoxFlat { BgColor = StatPresentationCatalog.ColorFor(statId) };
         background.CornerRadiusTopLeft = background.CornerRadiusTopRight = 1;
         background.CornerRadiusBottomLeft = background.CornerRadiusBottomRight = 1;
         fill.CornerRadiusTopLeft = fill.CornerRadiusTopRight = 1;
@@ -199,104 +200,37 @@ public partial class MainController : Node
         return bar;
     }
 
-    private void RebuildEggsPanel()
-    {
-        if (_eggsPanel != null && GodotObject.IsInstanceValid(_eggsPanel))
-            _eggsPanel.QueueFree();
-
-        _eggsPanel = UiFactory.CreatePanel(new Vector2(386, 54));
-        _eggsPanel.Position = new Vector2(10, 294);
-        _eggsPanel.Size = new Vector2(386, 54);
-        _uiRoot.AddChild(_eggsPanel);
-
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 8);
-        _eggsPanel.AddChild(row);
-
-        var eggs = GameSession.Instance.State.OwnedEggs;
-        var text = new VBoxContainer { CustomMinimumSize = new Vector2(292, 32) };
-        text.AddChild(UiFactory.CreateLabel($"Eggs on island: {eggs.Count}", 8));
-        if (eggs.Count == 0)
-            text.AddChild(UiFactory.CreateLabel("Buy or breed an egg to place it in the garden.", 6));
-        else
-        {
-            var summaries = eggs.Take(5).Select(egg => egg.State == EggState.Failed
-                ? "FAILED"
-                : $"{Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds))}s");
-            text.AddChild(UiFactory.CreateLabel(string.Join("  •  ", summaries), 6));
-        }
-        row.AddChild(text);
-
-        var failed = eggs.FirstOrDefault(e => e.State == EggState.Failed);
-        if (failed != null)
-        {
-            var discard = UiFactory.CreateButton("Discard");
-            discard.CustomMinimumSize = new Vector2(66, 22);
-            UiFactory.ApplyPixelFont(discard, 7);
-            discard.Pressed += () => GameSession.Instance.DiscardFailedEgg(failed.Id);
-            row.AddChild(discard);
-        }
-    }
-
     private void ShowInventory()
     {
-        var box = OpenModal("INVENTORY", new Vector2(380, 292));
-        box.AddChild(UiFactory.CreateLabel("Items you currently own", 9));
-        var scroll = new ScrollContainer
+        var items = GameRules.StatIds
+            .Select((statId, index) => new InventoryItemViewState(
+                string.Format(Tr("UI_INVENTORY_TREAT"), StatPresentationCatalog.NameFor(statId)),
+                _session.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0,
+                18 + index))
+            .ToList();
+        items.Add(new InventoryItemViewState(
+            Tr("UI_INVENTORY_EGGS"),
+            _session.State.OwnedEggs.Count,
+            -1,
+            UsesEggIcon: true));
+
+        var failedEggs = _session.State.OwnedEggs
+            .Where(egg => egg.State == EggState.Failed)
+            .Select((egg, index) => new FailedEggViewState(
+                egg.Id,
+                string.Format(Tr("UI_INVENTORY_FAILED_EGG"), index + 1)))
+            .ToList();
+
+        var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(380, 292));
+        var screen = new InventoryScreen();
+        screen.Configure(new InventoryScreenState(items, failedEggs));
+        screen.DiscardFailedEggRequested += eggId =>
         {
-            CustomMinimumSize = new Vector2(340, 198),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill
+            _session.DiscardFailedEgg(eggId);
+            // Reopen on the next idle frame: the current signal emitter belongs to the modal
+            // subtree and ModalHost intentionally defers freeing that subtree until dispatch ends.
+            CallDeferred(nameof(ShowInventory));
         };
-        box.AddChild(scroll);
-        var list = new VBoxContainer();
-        list.AddThemeConstantOverride("separation", 5);
-        scroll.AddChild(list);
-
-        for (var i = 0; i < GameRules.StatIds.Length; i++)
-        {
-            var statId = GameRules.StatIds[i];
-            var count = GameSession.Instance.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0;
-            list.AddChild(CreateInventoryRow(UiFactory.CreateIcon(18 + i), $"{GameRules.StatDisplayNames[statId]} Treat", count));
-        }
-
-        var eggAtlas = new AtlasTexture
-        {
-            Atlas = EggTexture,
-            Region = new Rect2(0, 0, EggTexture.GetWidth(), EggTexture.GetHeight())
-        };
-        list.AddChild(CreateInventoryRow(eggAtlas, "Eggs on Island", GameSession.Instance.State.OwnedEggs.Count));
-    }
-
-    private static Control CreateInventoryRow(Texture2D iconTexture, string itemName, int count)
-    {
-        var panel = new PanelContainer { CustomMinimumSize = new Vector2(328, 32) };
-        var style = new StyleBoxFlat { BgColor = Color.FromHtml("#F0D9A8"), BorderColor = Color.FromHtml("#C59670") };
-        style.SetBorderWidthAll(1);
-        style.ContentMarginLeft = style.ContentMarginRight = 7;
-        style.ContentMarginTop = style.ContentMarginBottom = 4;
-        panel.AddThemeStyleboxOverride("panel", style);
-
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 8);
-        panel.AddChild(row);
-        row.AddChild(new TextureRect
-        {
-            Texture = iconTexture,
-            CustomMinimumSize = new Vector2(22, 22),
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        });
-        var name = UiFactory.CreateLabel(itemName, 8);
-        name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        name.VerticalAlignment = VerticalAlignment.Center;
-        row.AddChild(name);
-        var amount = UiFactory.CreateLabel($"x{count}", 9);
-        amount.CustomMinimumSize = new Vector2(42, 20);
-        amount.HorizontalAlignment = HorizontalAlignment.Right;
-        amount.VerticalAlignment = VerticalAlignment.Center;
-        row.AddChild(amount);
-        return panel;
+        box.AddChild(screen);
     }
 }

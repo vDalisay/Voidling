@@ -3,7 +3,7 @@
 ; since the parameters that go here are not all obvious.
 ;
 ; Format:
-;   [section] ; section goes between []
+;   [section] ; section between []
 ;   param=value ; assign values to parameters
 
 config_version=5
@@ -17,7 +17,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-GameSession="*res://Scripts/Services/GameSession.cs"
+GameBootstrap="*res://Scripts/Bootstrap/GameBootstrap.cs"
 
 [display]
 
@@ -31,6 +31,10 @@ window/handheld/orientation=1
 [dotnet]
 
 project/assembly_name="Voidling"
+
+[internationalization]
+
+locale/translations=PackedStringArray("res://Localization/en.po")
 
 [physics]
 

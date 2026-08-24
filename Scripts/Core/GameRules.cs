@@ -1,46 +1,36 @@
 using System;
-using System.Collections.Generic;
 using Godot;
+using Voidling.Domain.Rules;
+using Voidling.Domain.Stats;
 
 namespace VoidlingGame;
 
+/// <summary>
+/// Legacy compatibility facade. Gameplay formulas are moving into typed Domain rules/services.
+/// Bootstrap configures this facade with the same immutable rules used by Application so legacy
+/// callers cannot drift from designer-authored balance during the incremental migration.
+/// Presentation labels/colors have moved to Presentation catalogs and must not be added here.
+/// </summary>
 public static class GameRules
 {
-    public const int StoreEggPrice = 30;
-    public const int TrainingItemPrice = 8;
-    public const float EggIncubationSeconds = 22.0f;
-    public const float ChildToAdultSeconds = 45.0f;
-    public const float BreedCooldownSeconds = 8.0f;
-    public const double HigherAlleleExpressionChance = 0.70;
-    public const double RareFounderTraitChance = 0.0005;
-    public const double RareTraitTransmissionChance = 0.10;
-    public const int RelatedAncestorDepth = 3;
-    public const int TrainingPointsPerLevel = 12;
-    public const int MaxStatLevel = 99;
     public const string AngelMutationId = "Angel";
 
+    private static GameBalanceRules _balance = GameBalanceRules.DemoDefaults;
+    private static StatCalculator _stats = new(_balance.Stats);
+
+    public static int StoreEggPrice => _balance.Shop.StoreEggPrice;
+    public static int TrainingItemPrice => _balance.Shop.TrainingItemPrice;
+    public static float EggIncubationSeconds => _balance.Hatching.IncubationSeconds;
+    public static float ChildToAdultSeconds => _balance.Lifecycle.ChildToAdultSeconds;
+    public static float BreedCooldownSeconds => _balance.Breeding.CooldownSeconds;
+    public static double HigherAlleleExpressionChance => _balance.Genetics.HigherAlleleExpressionChance;
+    public static double RareFounderTraitChance => _balance.Genetics.RareFounderTraitChance;
+    public static double RareTraitTransmissionChance => _balance.Genetics.RareTraitTransmissionChance;
+    public static int RelatedAncestorDepth => _balance.Genetics.RelatedAncestorDepth;
+    public static int TrainingPointsPerLevel => _balance.Stats.TrainingPointsPerLevel;
+    public static int MaxStatLevel => _balance.Stats.MaxLevel;
+
     public static readonly string[] StatIds = { "run", "swim", "fly", "power", "stamina" };
-
-    public static readonly IReadOnlyDictionary<string, string> StatDisplayNames =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["run"] = "Run",
-            ["swim"] = "Swim",
-            ["fly"] = "Fly",
-            ["power"] = "Power",
-            ["stamina"] = "Stamina"
-        };
-
-    // Chao-inspired stat identity colors used consistently in the farm UI, DNA view and race HUD.
-    public static readonly IReadOnlyDictionary<string, Color> StatColors =
-        new Dictionary<string, Color>(StringComparer.Ordinal)
-        {
-            ["run"] = Color.FromHtml("#78C96A"),
-            ["swim"] = Color.FromHtml("#F2D45C"),
-            ["fly"] = Color.FromHtml("#B47AE5"),
-            ["power"] = Color.FromHtml("#E7655A"),
-            ["stamina"] = Color.FromHtml("#F7F3E7")
-        };
 
     public static readonly string[] PaletteHex =
     {
@@ -58,6 +48,12 @@ public static class GameRules
 
     public static readonly string[] RareTraitIds = { "Lustrous", "Prismatic", "Aurora" };
 
+    public static void Configure(GameBalanceRules balance)
+    {
+        _balance = balance ?? throw new ArgumentNullException(nameof(balance));
+        _stats = new StatCalculator(_balance.Stats);
+    }
+
     public static string GradeName(int grade) => Math.Clamp(grade, 0, 5) switch
     {
         0 => "E",
@@ -68,40 +64,28 @@ public static class GameRules
         _ => "S"
     };
 
-    public static int HatchFailurePercent(int burdenLevel) => Math.Clamp(burdenLevel, 0, 4) switch
+    public static int HatchFailurePercent(int burdenLevel)
     {
-        0 => 0,
-        1 => 20,
-        2 => 50,
-        3 => 80,
-        _ => 100
-    };
+        var values = _balance.Breeding.HatchFailurePercentByBurden;
+        if (values.Count == 0)
+            return 0;
+        return values[Math.Clamp(burdenLevel, 0, values.Count - 1)];
+    }
 
     public static int GetTrainingPoints(VoidlingData data, string statId)
-        => data.TrainingPoints.TryGetValue(statId, out var points) ? points : 0;
+        => _stats.GetTrainingPoints(data, statId);
 
     public static int StatLevel(VoidlingData data, string statId)
-        => Math.Clamp(1 + GetTrainingPoints(data, statId) / TrainingPointsPerLevel, 1, MaxStatLevel);
+        => _stats.GetLevel(data, statId);
 
     public static float StatLevelProgress(VoidlingData data, string statId)
-    {
-        if (StatLevel(data, statId) >= MaxStatLevel)
-            return 1.0f;
-        return (GetTrainingPoints(data, statId) % TrainingPointsPerLevel) / (float)TrainingPointsPerLevel;
-    }
+        => _stats.GetLevelProgress(data, statId);
 
     public static GenePairData GetGene(VoidlingData data, string statId)
-        => data.Genome.AbilityGenes.TryGetValue(statId, out var gene) ? gene : new GenePairData();
+        => StatCalculator.GetGene(data, statId);
 
     public static float EffectiveStat(VoidlingData data, string statId)
-    {
-        var grade = GetGene(data, statId).ExpressedValue;
-        var training = GetTrainingPoints(data, statId);
-        return Math.Clamp(12.0f + grade * 13.0f + training * 0.55f, 0.0f, 100.0f);
-    }
-
-    public static Color StatColor(string statId)
-        => StatColors.TryGetValue(statId, out var color) ? color : Colors.White;
+        => _stats.GetEffectiveStat(data, statId);
 
     public static bool HasMutation(VoidlingData data, string mutationId)
         => data.RareTraits.Exists(t => string.Equals(t.TraitId, mutationId, StringComparison.OrdinalIgnoreCase));

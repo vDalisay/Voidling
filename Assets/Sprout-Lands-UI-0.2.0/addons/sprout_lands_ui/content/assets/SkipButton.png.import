@@ -3,21 +3,23 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bukliuuijok1x"
-path="res://.godot/imported/SkipButton.png-07aacee07d670629f71e6a92eb9bb519.ctex"
+path="res://.godot/imported/SkipButton.png-5e5c0f700763fc58d417f94bdc47ab32.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://addons/sprout_lands_ui/content/assets/SkipButton.png"
-dest_files=["res://.godot/imported/SkipButton.png-07aacee07d670629f71e6a92eb9bb519.ctex"]
+source_file="res://Assets/Sprout-Lands-UI-0.2.0/addons/sprout_lands_ui/content/assets/SkipButton.png"
+dest_files=["res://.godot/imported/SkipButton.png-5e5c0f700763fc58d417f94bdc47ab32.ctex"]
 
 [params]
 
 compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
+compress/uastc_level=0
+compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
@@ -25,6 +27,10 @@ mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
+process/channel_remap/red=0
+process/channel_remap/green=1
+process/channel_remap/blue=2
+process/channel_remap/alpha=3
 process/fix_alpha_border=true
 process/premult_alpha=false
 process/normal_map_invert_y=false

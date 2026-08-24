@@ -4,7 +4,9 @@ public partial class GameSession
 {
     public void SetEdgePanning(bool enabled)
     {
-        State.EdgePanning = enabled;
+        if (!_settings!.SetEdgePanning(State, enabled))
+            return;
+
         Save();
         StateChanged?.Invoke();
     }

@@ -9,7 +9,7 @@ public partial class GardenController
 
     public override void _PhysicsProcess(double delta)
     {
-        if (!_inputEnabled || !GameSession.Instance.State.EdgePanning || _camera == null || !_camera.Enabled)
+        if (!_inputEnabled || !_session.State.EdgePanning || _camera == null || !_camera.Enabled)
             return;
 
         // Do not move the camera while a creature interaction or explicit drag owns LMB.

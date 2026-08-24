@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/demo-mvp
+      - architecture/futureproof-foundation
   pull_request:
 
 jobs:
@@ -26,11 +27,67 @@ jobs:
           version: 4.6.0
           use-dotnet: true
 
-      - name: Restore
-        run: dotnet restore
+      - name: Restore game
+        run: dotnet restore Voidling.csproj
 
-      - name: Build
-        run: dotnet build --configuration Release --no-restore
+      - name: Restore tests
+        run: dotnet restore Tests/Voidling.Tests.csproj
 
-      - name: Parse project and scenes
-        run: godot --headless --path . --editor --quit-after 12
+      - name: Build release
+        run: dotnet build Voidling.csproj --configuration Release --no-restore
+
+      - name: Enforce architecture boundaries
+        shell: bash
+        run: |
+          for layer in Scripts/Domain Scripts/Application; do
+            if grep -R -n -E 'using[[:space:]]+Godot|Godot\.' "$layer" --include='*.cs'; then
+              echo "$layer must remain free of Godot dependencies."
+              exit 1
+            fi
+          done
+
+          if grep -R -n -E 'GameRules\.' Scripts/Presentation --include='*.cs'; then
+            echo 'Standalone Presentation components must receive view state and emit intent; do not reach through the legacy GameRules facade.'
+            exit 1
+          fi
+
+          if grep -R -n -E 'GameSession\.Instance' Scripts --include='*.cs'; then
+            echo 'GameSession.Instance is forbidden. Resolve or pass explicit session/use-case dependencies instead of reintroducing a service locator.'
+            exit 1
+          fi
+
+      - name: Domain and application tests
+        run: dotnet test Tests/Voidling.Tests.csproj --configuration Release --no-restore
+
+      # Godot's editor-side C# integration loads the Debug assembly. Build it before the
+      # import pass so custom Resources/autoloads can be resolved on a completely clean clone.
+      - name: Build debug for Godot editor
+        run: dotnet build Voidling.csproj --configuration Debug --no-restore
+
+      # --import waits until source assets are imported. --quit-after is frame-based and can
+      # let CI exit mid-scan, so keep this blocking pass even though localization is now a
+      # directly loadable committed gettext file rather than a generated CSV artifact.
+      - name: Import Godot resources
+        run: godot --headless --path . --import
+
+      - name: Verify localization source
+        shell: bash
+        run: |
+          test -f Localization/en.po
+          grep -q 'res://Localization/en.po' project.godot
+          if grep -q 'strings\.en\.translation' project.godot; then
+            echo 'project.godot must not reference a generated translation artifact.'
+            exit 1
+          fi
+
+      # Start the actual main scene after imports. Godot can return zero for some editor scan
+      # errors, so inspect the runtime log as well as the process exit code.
+      - name: Runtime smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 20s godot --headless --path . --quit-after 30 2>&1 | tee godot-runtime.log
+          if grep -E '^(ERROR|SCRIPT ERROR):' godot-runtime.log; then
+            echo 'Godot runtime emitted an error.'
+            exit 1
+          fi

@@ -1,6 +1,6 @@
 using System;
-using System.Linq;
 using Godot;
+using Voidling.Presentation.Voidlings;
 
 namespace VoidlingGame;
 
@@ -20,8 +20,6 @@ public partial class VoidlingActor : Node2D
     private float _nextTargetSeconds;
     private float _walkSpeed;
     private bool _selected;
-    private bool _rareSparkle;
-    private bool _angelMutation;
     private bool _interactionLocked;
     private bool _pickedUp;
     private float _baseScale;
@@ -33,14 +31,10 @@ public partial class VoidlingActor : Node2D
         _wanderBounds = wanderBounds;
         Position = startPosition;
         _walkSpeed = data.Stage == LifeStage.Adult ? 20.0f : 17.0f;
-        _rareSparkle = data.RareTraits.Any(t => !string.Equals(t.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase));
-        _angelMutation = GameRules.HasMutation(data, GameRules.AngelMutationId);
         _rng.Seed = StableSeed(data.Id);
 
         _baseScale = data.Stage == LifeStage.Adult ? 0.62f : 0.31f;
-        // The source frames are 48px tall with the visible feet ending 8px below
-        // the frame center. Put those feet on the actor's world-space ground pivot.
-        _baseSpriteY = -8.0f * _baseScale;
+        _baseSpriteY = VoidlingGroundVisualMetrics.SpriteCenterYOffset(_baseScale);
 
         _sprite = new AnimatedSprite2D
         {
@@ -52,6 +46,10 @@ public partial class VoidlingActor : Node2D
         };
         AddChild(_sprite);
         _sprite.Play("walk_down");
+
+        var mutationAdornment = new MutationAdornment2D();
+        mutationAdornment.Setup(data, _sprite);
+        AddChild(mutationAdornment);
 
         var hitSize = data.Stage == LifeStage.Adult ? new Vector2(23, 27) : new Vector2(14, 16);
         var area = new Area2D { InputPickable = true };
@@ -70,7 +68,7 @@ public partial class VoidlingActor : Node2D
 
     public override void _Process(double delta)
     {
-        if (_selected || _rareSparkle)
+        if (_selected)
             QueueRedraw();
 
         if (_sprite == null || _interactionLocked || _pickedUp)
@@ -177,10 +175,13 @@ public partial class VoidlingActor : Node2D
     public override void _Draw()
     {
         var shadowAlpha = _pickedUp ? 0.26f : 0.20f;
-        var shadowWidth = _baseScale < 0.5f ? 2.8f : 5.2f;
+        var shadowRadii = VoidlingGroundVisualMetrics.ShadowRadii(_baseScale);
         if (_pickedUp)
-            shadowWidth *= 1.08f;
-        DrawEllipse(new Vector2(0, 0.8f), new Vector2(shadowWidth, _baseScale < 0.5f ? 1.1f : 1.8f), new Color(0.20f, 0.24f, 0.20f, shadowAlpha));
+            shadowRadii.X *= 1.08f;
+        DrawEllipse(
+            new Vector2(0, VoidlingGroundVisualMetrics.ShadowCenterYOffset),
+            shadowRadii,
+            new Color(0.20f, 0.24f, 0.20f, shadowAlpha));
 
         if (_selected)
         {
@@ -192,43 +193,6 @@ public partial class VoidlingActor : Node2D
             color.A = 0.70f + pulse * 0.25f;
             DrawArc(Vector2.Zero, radius, 0.0f, Mathf.Tau, 24, color, 1.0f, false);
         }
-
-        if (_rareSparkle)
-        {
-            var t = (float)Time.GetTicksMsec() / 350.0f;
-            for (var i = 0; i < 3; i++)
-            {
-                var angle = t + i * Mathf.Tau / 3.0f;
-                var radius = _baseScale < 0.5f ? 9.0f : 15.0f;
-                var p = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius + new Vector2(0, _baseSpriteY);
-                DrawCircle(p, 1.2f, Color.FromHtml("#FFF7B7"));
-            }
-        }
-
-        if (_angelMutation)
-            DrawAngelHalo();
-    }
-
-    private void DrawAngelHalo()
-    {
-        var child = _baseScale < 0.5f;
-        var center = new Vector2(0, child ? -15.0f : -29.0f);
-        var radiusX = child ? 5.2f : 8.8f;
-        var radiusY = child ? 1.7f : 2.8f;
-        const int points = 32;
-        var ellipse = new Vector2[points];
-        for (var i = 0; i < points; i++)
-        {
-            var angle = Mathf.Tau * i / points;
-            ellipse[i] = center + new Vector2(Mathf.Cos(angle) * radiusX, Mathf.Sin(angle) * radiusY);
-        }
-
-        for (var i = points / 2; i < points; i++)
-            DrawLine(ellipse[i], ellipse[(i + 1) % points], Color.FromHtml("#B98C32"), child ? 1.1f : 1.5f, true);
-        for (var i = 0; i < points / 2; i++)
-            DrawLine(ellipse[i], ellipse[i + 1], Color.FromHtml("#F1CE55"), child ? 1.4f : 2.0f, true);
-        for (var i = 2; i < 7; i++)
-            DrawLine(ellipse[i], ellipse[i + 1], Color.FromHtml("#FFF2A8"), 0.9f, true);
     }
 
     private void RefreshMovementState()
