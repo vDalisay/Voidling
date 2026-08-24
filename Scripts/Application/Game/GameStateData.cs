@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
 using VoidlingGame;
 
@@ -10,7 +11,7 @@ namespace VoidlingGame;
 /// </summary>
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 5;
+    public int SaveVersion { get; set; } = 6;
     public int Coins { get; set; } = 120;
     public long SeedCounter { get; set; } = 1;
     public List<VoidlingData> Voidlings { get; set; } = new();
@@ -19,6 +20,11 @@ public sealed class GameStateData
     public List<EggData> OwnedEggs { get; set; } = new();
     public List<EggData> StoreEggs { get; set; } = new();
     public Dictionary<string, int> TrainingItems { get; set; } = new();
+
+    // Multiplayer transaction durability. These remain harmless empty collections for players who
+    // never use multiplayer and do not make Steam/network access part of save loading.
+    public List<PendingTradeJournalEntry> PendingTradeJournal { get; set; } = new();
+    public List<string> AppliedTradeIds { get; set; } = new();
 
     // Settings remain in the existing save payload during migration for compatibility.
     public float MasterVolume { get; set; } = 1.0f;
