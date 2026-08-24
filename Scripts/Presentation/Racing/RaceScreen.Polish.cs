@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Godot;
 using Voidling.Presentation.Voidlings;
+using VoidlingGame;
 
 namespace Voidling.Presentation.Racing;
 
@@ -13,9 +14,10 @@ public partial class RaceScreen
 
     public override void _EnterTree()
     {
-        AddChild(new RaceScreenPolishDriver(this)
+        AddChild(new RaceScreenPolishDriver
         {
-            Name = "PresentationPolishDriver"
+            Name = "PresentationPolishDriver",
+            OwnerScreen = this
         });
     }
 
@@ -275,13 +277,8 @@ public partial class RaceScreen
 
 internal sealed partial class RaceScreenPolishDriver : Node
 {
-    private readonly RaceScreen _owner;
-
-    public RaceScreenPolishDriver(RaceScreen owner)
-    {
-        _owner = owner;
-    }
+    public RaceScreen OwnerScreen { get; init; } = null!;
 
     public override void _Process(double delta)
-        => _owner.ApplyPostRaceScreenPresentationFrame();
+        => OwnerScreen.ApplyPostRaceScreenPresentationFrame();
 }
