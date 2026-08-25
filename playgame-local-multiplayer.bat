@@ -6,7 +6,7 @@ cd /d "%~dp0"
 echo.
 echo ========================================
 echo   Voidling - Local Multiplayer
- echo ========================================
+echo ========================================
 echo Development-only ENet/LAN launcher.
 echo.
 echo IMPORTANT: If you run two instances on one PC, give each instance a DIFFERENT save profile.
@@ -38,10 +38,15 @@ set "PORT=27181"
 set /p "PORT=UDP port [27181]: "
 if not defined PORT set "PORT=27181"
 
+set "BUILD_CHOICE=Y"
+set /p "BUILD_CHOICE=Build before launch? [Y/n]: "
+set "BUILD_FLAG="
+if /I "%BUILD_CHOICE%"=="N" set "BUILD_FLAG=--no-build"
+
 echo.
 echo Starting LAN host "%PLAYER_NAME%" on UDP %PORT% using save profile "%PROFILE%"...
 echo.
-call "%~dp0playgame.bat" "--voidling-lan-host" "--voidling-lan-name=%PLAYER_NAME%" "--voidling-dev-profile=%PROFILE%" "--voidling-lan-port=%PORT%"
+call "%~dp0playgame.bat" %BUILD_FLAG% "--voidling-lan-host" "--voidling-lan-name=%PLAYER_NAME%" "--voidling-dev-profile=%PROFILE%" "--voidling-lan-port=%PORT%"
 goto finish
 
 :join
@@ -61,10 +66,15 @@ set "PORT=27181"
 set /p "PORT=UDP port [27181]: "
 if not defined PORT set "PORT=27181"
 
+set "BUILD_CHOICE=N"
+set /p "BUILD_CHOICE=Build before launch? [y/N]: "
+set "BUILD_FLAG=--no-build"
+if /I "%BUILD_CHOICE%"=="Y" set "BUILD_FLAG="
+
 echo.
 echo Joining %HOST_IP%:%PORT% as "%PLAYER_NAME%" using save profile "%PROFILE%"...
 echo.
-call "%~dp0playgame.bat" "--voidling-lan-join=%HOST_IP%" "--voidling-lan-name=%PLAYER_NAME%" "--voidling-dev-profile=%PROFILE%" "--voidling-lan-port=%PORT%"
+call "%~dp0playgame.bat" %BUILD_FLAG% "--voidling-lan-join=%HOST_IP%" "--voidling-lan-name=%PLAYER_NAME%" "--voidling-dev-profile=%PROFILE%" "--voidling-lan-port=%PORT%"
 goto finish
 
 :finish
