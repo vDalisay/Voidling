@@ -60,6 +60,49 @@ public sealed class LeaderboardProjectionServiceTests
     }
 
     [Fact]
+    public async Task DailyRaceUploadUsesVersionedAscendingMillisecondsBoardAndKeepBest()
+    {
+        var fake = new FakeLeaderboardService();
+        var projection = new LeaderboardProjectionService(fake);
+
+        var result = await projection.UploadDailyRaceTimeAsync("2026-08-25", 1, 42_123);
+
+        Assert.True(result.Success, result.Error);
+        var upload = Assert.Single(fake.Uploads);
+        Assert.Equal("voidling_daily_2026-08-25_v1", upload.Definition.Name);
+        Assert.Equal(LeaderboardSortDirection.Ascending, upload.Definition.SortDirection);
+        Assert.Equal(LeaderboardDisplayFormat.Milliseconds, upload.Definition.DisplayFormat);
+        Assert.Equal(42_123, upload.Score);
+        Assert.True(upload.KeepBest);
+    }
+
+    [Fact]
+    public async Task DailyRaceFriendsDownloadUsesSameVersionedBoard()
+    {
+        var fake = new FakeLeaderboardService();
+        var projection = new LeaderboardProjectionService(fake);
+
+        var result = await projection.DownloadFriendDailyRaceAsync("2026-08-25", 1);
+
+        Assert.True(result.Success, result.Error);
+        var definition = Assert.Single(fake.Downloads);
+        Assert.Equal("voidling_daily_2026-08-25_v1", definition.Name);
+        Assert.Equal(LeaderboardDisplayFormat.Milliseconds, definition.DisplayFormat);
+    }
+
+    [Fact]
+    public async Task InvalidDailyTimeIsRejectedBeforePlatformCall()
+    {
+        var fake = new FakeLeaderboardService();
+        var projection = new LeaderboardProjectionService(fake);
+
+        var result = await projection.UploadDailyRaceTimeAsync("2026-08-25", 1, 0);
+
+        Assert.False(result.Success);
+        Assert.Empty(fake.Uploads);
+    }
+
+    [Fact]
     public void CourseAndDailyBoardNamesAreVersionedAndUseMilliseconds()
     {
         var course = LeaderboardProjectionService.CourseBestTime("GardenSprint", 3);
