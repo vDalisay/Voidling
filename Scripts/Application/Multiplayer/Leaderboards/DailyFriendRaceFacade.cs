@@ -170,17 +170,22 @@ public sealed class DailyFriendRaceFacade
             null);
     }
 
-    public Task<LeaderboardOperationResult> ProjectTodayAsync(
-        DateTimeOffset utcNow,
+    public Task<LeaderboardOperationResult> ProjectAsync(
+        string dailyKey,
         CancellationToken cancellationToken = default)
     {
-        var dailyKey = DailyFriendRaceService.GetDailyKey(utcNow.ToUniversalTime());
+        if (string.IsNullOrWhiteSpace(dailyKey))
+        {
+            return Task.FromResult(LeaderboardOperationResult.Failed(
+                "Daily race key is required for leaderboard projection."));
+        }
+
         var attempt = _stateProvider().DailyRaceAttempts.FirstOrDefault(value =>
             string.Equals(value.DailyKey, dailyKey, StringComparison.Ordinal));
         if (attempt == null || attempt.State != DailyRaceAttemptState.Completed)
         {
             return Task.FromResult(LeaderboardOperationResult.Failed(
-                "Today's daily race has no completed local result to project."));
+                "The requested daily race has no completed local result to project."));
         }
 
         return _coordinator.ProjectCompletedAttemptAsync(attempt, cancellationToken);
