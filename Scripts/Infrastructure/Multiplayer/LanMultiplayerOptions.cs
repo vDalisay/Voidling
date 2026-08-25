@@ -112,8 +112,8 @@ public sealed record LanMultiplayerOptions(
         if (profile == null || !IsSafeProfile(profile))
             return defaultPath;
 
-        var dot = defaultPath.LastIndexOf('.', StringComparison.Ordinal);
-        return dot > defaultPath.LastIndexOf('/', StringComparison.Ordinal)
+        var dot = defaultPath.LastIndexOf('.');
+        return dot > defaultPath.LastIndexOf('/')
             ? defaultPath[..dot] + "_" + profile + defaultPath[dot..]
             : defaultPath + "_" + profile;
     }
