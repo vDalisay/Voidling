@@ -232,12 +232,38 @@ public partial class VoidlingActor : Node2D
 
     private void OnInputEvent(Node viewport, InputEvent inputEvent, long shapeIndex)
     {
-        if (inputEvent is InputEventMouseButton mouse &&
-            mouse.ButtonIndex == MouseButton.Left && mouse.Pressed)
+        if (!_interactive ||
+            inputEvent is not InputEventMouseButton mouse ||
+            mouse.ButtonIndex != MouseButton.Left)
         {
-            Clicked?.Invoke(CreatureId);
-            GetViewport().SetInputAsHandled();
+            return;
         }
+
+        var garden = FindGardenController();
+        if (mouse.Pressed)
+        {
+            garden?.BeginVoidlingPointerInteraction(CreatureId);
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (garden != null)
+            garden.EndVoidlingPointerInteraction(CreatureId);
+        else
+            Clicked?.Invoke(CreatureId);
+        GetViewport().SetInputAsHandled();
+    }
+
+    private GardenController? FindGardenController()
+    {
+        Node? current = GetParent();
+        while (current != null)
+        {
+            if (current is GardenController garden)
+                return garden;
+            current = current.GetParent();
+        }
+        return null;
     }
 
     private void DrawEllipse(Vector2 center, Vector2 radii, Color color, int points = 20)
