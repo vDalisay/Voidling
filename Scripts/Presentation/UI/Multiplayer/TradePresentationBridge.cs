@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using Voidling.Application.Multiplayer.Trading;
 
@@ -12,6 +14,9 @@ public partial class TradePresentationBridge : Node
 {
     private TradeFacade? _durableFacade;
     private TradeNegotiationFacade? _negotiationFacade;
+    private readonly HashSet<string> _announcedInviteIds = new(StringComparer.Ordinal);
+    private string _lastStateSignature = string.Empty;
+    private string _lastActivatedNegotiation = string.Empty;
 
     public event Action<TradeLobbyViewState>? StateChanged;
     public event Action<TradeInviteView>? IncomingInviteReceived;
@@ -50,6 +55,19 @@ public partial class TradePresentationBridge : Node
         AddChild(probe);
     }
 
+    public override void _Process(double delta)
+    {
+        if (_negotiationFacade == null)
+            return;
+
+        // Host-authoritative coordinators update their canonical dictionary before dispatching the
+        // same snapshot back to a host-local participant. The coordinator's revision guard can
+        // therefore suppress a host-local callback even though Current already contains the new
+        // state. Reconcile here as a presentation safety net so invites and accepted rooms can never
+        // exist silently until the user manually reopens the Trades screen.
+        PublishState(_negotiationFacade.Current);
+    }
+
     public TradeNegotiationOperationResult Invite(string partnerKey)
         => RequireNegotiation().Invite(partnerKey);
 
@@ -81,16 +99,77 @@ public partial class TradePresentationBridge : Node
     }
 
     private void HandleStateChanged(TradeLobbyViewState state)
-        => StateChanged?.Invoke(state);
+        => PublishState(state);
 
     private void HandleIncomingInvite(TradeInviteView invite)
-        => IncomingInviteReceived?.Invoke(invite);
+    {
+        if (_announcedInviteIds.Add(invite.NegotiationId))
+            IncomingInviteReceived?.Invoke(invite);
+    }
 
     private void HandleNegotiationActivated(TradeNegotiationView negotiation)
-        => NegotiationActivated?.Invoke(negotiation);
+        => PublishNegotiationActivated(negotiation);
 
     private void HandleLocalTradeCommitted(TradeCommittedView trade)
         => LocalTradeCommitted?.Invoke(trade);
+
+    private void PublishState(TradeLobbyViewState state)
+    {
+        foreach (var invite in state.IncomingInvites)
+        {
+            if (_announcedInviteIds.Add(invite.NegotiationId))
+                IncomingInviteReceived?.Invoke(invite);
+        }
+
+        var active = state.ActiveNegotiation;
+        if (active != null && active.Phase == TradeNegotiationPhase.Negotiating)
+            PublishNegotiationActivated(active);
+        else if (active == null)
+            _lastActivatedNegotiation = string.Empty;
+
+        var signature = BuildStateSignature(state);
+        if (string.Equals(signature, _lastStateSignature, StringComparison.Ordinal))
+            return;
+
+        _lastStateSignature = signature;
+        StateChanged?.Invoke(state);
+    }
+
+    private void PublishNegotiationActivated(TradeNegotiationView negotiation)
+    {
+        var marker = $"{negotiation.NegotiationId}:{(int)negotiation.Phase}";
+        if (string.Equals(marker, _lastActivatedNegotiation, StringComparison.Ordinal))
+            return;
+
+        _lastActivatedNegotiation = marker;
+        NegotiationActivated?.Invoke(negotiation);
+    }
+
+    private static string BuildStateSignature(TradeLobbyViewState state)
+    {
+        var active = state.ActiveNegotiation;
+        var activeSignature = active == null
+            ? "-"
+            : string.Join(':',
+                active.NegotiationId,
+                ((int)active.Phase).ToString(),
+                active.LocalOffer?.AssetId ?? string.Empty,
+                active.RemoteOffer?.AssetId ?? active.RemoteOfferAssetId ?? string.Empty,
+                active.LocalAccepted ? "1" : "0",
+                active.RemoteAccepted ? "1" : "0",
+                active.Message ?? string.Empty);
+
+        return string.Join('|',
+            state.Availability.IsAvailable ? "1" : "0",
+            state.Availability.Reason ?? string.Empty,
+            state.IsConnected ? "1" : "0",
+            state.CanInvite ? "1" : "0",
+            state.WaitingForPlayer ?? string.Empty,
+            string.Join(',', state.Partners.Select(value => value.Key)),
+            string.Join(',', state.IncomingInvites.Select(value => value.NegotiationId)),
+            string.Join(',', state.LocalVoidlings.Select(value => value.AssetId)),
+            activeSignature);
+    }
 
     private TradeNegotiationFacade RequireNegotiation()
         => _negotiationFacade ?? throw new InvalidOperationException("Trade presentation bridge is not configured.");
