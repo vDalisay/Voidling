@@ -318,6 +318,9 @@ msgstr "Leave Garden"
 msgid "UI_ONLINE_FRIEND_BOARDS"
 msgstr "Friend Boards"
 
+msgid "UI_ONLINE_DAILY_RACE"
+msgstr "Daily Race"
+
 msgid "UI_ONLINE_SHARE_TITLE"
 msgstr "Shared Voidling"
 
@@ -374,3 +377,36 @@ msgstr "Could not load friend scores: {0}"
 
 msgid "UI_LEADERBOARD_WINS_SCORE"
 msgstr "{0} wins"
+
+msgid "UI_DAILY_TITLE"
+msgstr "DAILY FRIEND RACE"
+
+msgid "UI_DAILY_DATE"
+msgstr "UTC challenge • {0}"
+
+msgid "UI_DAILY_PICK_HINT"
+msgstr "Pick today's Voidling. Its race snapshot is locked as soon as the attempt starts."
+
+msgid "UI_DAILY_ONCE_PER_DAY"
+msgstr "One attempt per UTC day. The race itself works offline; Steam only shares the saved result with friends."
+
+msgid "UI_DAILY_RESUME_HINT"
+msgstr "Today's attempt is already locked to {0}."
+
+msgid "UI_DAILY_RESUME_SAME"
+msgstr "Resume recreates the exact same Voidling snapshot, CPU field and deterministic seed."
+
+msgid "UI_DAILY_RESUME"
+msgstr "Resume Daily Race"
+
+msgid "UI_DAILY_COMPLETE"
+msgstr "Complete • {0} • {1}"
+
+msgid "UI_DAILY_SAVED_OFFLINE"
+msgstr "Result is saved locally. Steam friend-board projection is currently unavailable."
+
+msgid "UI_DAILY_INVALID"
+msgstr "Today's saved daily attempt cannot be used: {0}"
+
+msgid "UI_DAILY_START_FAILED"
+msgstr "Could not start the daily race: {0}"
