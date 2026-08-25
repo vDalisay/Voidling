@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
 using VoidlingGame;
@@ -11,7 +12,7 @@ namespace VoidlingGame;
 /// </summary>
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 7;
+    public int SaveVersion { get; set; } = 8;
     public int Coins { get; set; } = 120;
     public long SeedCounter { get; set; } = 1;
     public List<VoidlingData> Voidlings { get; set; } = new();
@@ -30,6 +31,10 @@ public sealed class GameStateData
     // of this data and can be rebuilt/retried if Steam is unavailable.
     public int MultiplayerWins { get; set; }
     public List<string> AppliedMultiplayerRaceIds { get; set; } = new();
+
+    // The daily race is also local-first. Starting an attempt is persisted before the race begins;
+    // Steam receives only a completed time for the friends leaderboard when available.
+    public List<DailyRaceAttemptData> DailyRaceAttempts { get; set; } = new();
 
     // Settings remain in the existing save payload during migration for compatibility.
     public float MasterVolume { get; set; } = 1.0f;
