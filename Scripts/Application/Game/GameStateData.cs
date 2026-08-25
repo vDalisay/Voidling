@@ -11,7 +11,7 @@ namespace VoidlingGame;
 /// </summary>
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 6;
+    public int SaveVersion { get; set; } = 7;
     public int Coins { get; set; } = 120;
     public long SeedCounter { get; set; } = 1;
     public List<VoidlingData> Voidlings { get; set; } = new();
@@ -25,6 +25,11 @@ public sealed class GameStateData
     // never use multiplayer and do not make Steam/network access part of save loading.
     public List<PendingTradeJournalEntry> PendingTradeJournal { get; set; } = new();
     public List<string> AppliedTradeIds { get; set; } = new();
+
+    // Local multiplayer progress is authoritative locally. Steam leaderboards are only a projection
+    // of this data and can be rebuilt/retried if Steam is unavailable.
+    public int MultiplayerWins { get; set; }
+    public List<string> AppliedMultiplayerRaceIds { get; set; } = new();
 
     // Settings remain in the existing save payload during migration for compatibility.
     public float MasterVolume { get; set; } = 1.0f;
