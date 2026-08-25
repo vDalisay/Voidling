@@ -96,7 +96,8 @@ public sealed class ChallengeFacade
             .Select(challenge =>
             {
                 var localParticipating = challenge.Contains(local.Id);
-                var participants = (challenge.Participants ?? Array.Empty<PlatformUserId>())
+                var participantIds = challenge.Participants ?? Array.Empty<PlatformUserId>();
+                var participants = participantIds
                     .Select(userId => new ChallengeParticipantView(
                         DisplayNameFor(userId, names),
                         IsLocal: userId == local.Id,
@@ -107,7 +108,7 @@ public sealed class ChallengeFacade
                 var canJoin = joinablePhase &&
                               !localParticipating &&
                               !localActive &&
-                              challenge.Participants.Length < challenge.MaxParticipants;
+                              participantIds.Length < challenge.MaxParticipants;
                 var canLeave = localParticipating &&
                                challenge.Phase is not (ChallengePhase.Completed or ChallengePhase.Cancelled);
                 var canCancel = challenge.Phase is not (ChallengePhase.Completed or ChallengePhase.Cancelled) &&
