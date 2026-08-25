@@ -9,5 +9,6 @@ internal partial class RaceScreenPolishDriver : Node
     public override void _Process(double delta)
     {
         OwnerScreen.ApplyPostRaceScreenPresentationFrame();
+        OwnerScreen.ApplyCustomVoidlingResultPortraits();
     }
 }
