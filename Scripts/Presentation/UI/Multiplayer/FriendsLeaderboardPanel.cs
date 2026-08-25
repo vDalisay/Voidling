@@ -21,6 +21,7 @@ public partial class FriendsLeaderboardPanel : VBoxContainer
 {
     public event Action? MultiplayerWinsRequested;
     public event Action? TodayDailyRequested;
+    public event Action? CourseBestRequested;
 
     private FriendsLeaderboardPanelState? _state;
     private bool _ready;
@@ -60,19 +61,25 @@ public partial class FriendsLeaderboardPanel : VBoxContainer
 
         var state = _state!;
         var tabs = new HBoxContainer();
-        tabs.AddThemeConstantOverride("separation", 6);
+        tabs.AddThemeConstantOverride("separation", 5);
 
         var wins = UiFactory.CreateButton(Tr("UI_LEADERBOARD_WINS"));
-        wins.CustomMinimumSize = new Vector2(154, 25);
+        wins.CustomMinimumSize = new Vector2(128, 25);
         wins.Disabled = !state.Available || state.Loading;
         wins.Pressed += () => MultiplayerWinsRequested?.Invoke();
         tabs.AddChild(wins);
 
         var daily = UiFactory.CreateButton(Tr("UI_LEADERBOARD_DAILY"));
-        daily.CustomMinimumSize = new Vector2(154, 25);
+        daily.CustomMinimumSize = new Vector2(128, 25);
         daily.Disabled = !state.Available || state.Loading;
         daily.Pressed += () => TodayDailyRequested?.Invoke();
         tabs.AddChild(daily);
+
+        var course = UiFactory.CreateButton(Tr("UI_LEADERBOARD_COURSE"));
+        course.CustomMinimumSize = new Vector2(128, 25);
+        course.Disabled = !state.Available || state.Loading;
+        course.Pressed += () => CourseBestRequested?.Invoke();
+        tabs.AddChild(course);
         AddChild(tabs);
 
         if (!state.Available)
@@ -84,9 +91,16 @@ public partial class FriendsLeaderboardPanel : VBoxContainer
             return;
         }
 
-        var heading = state.Kind == FriendsLeaderboardKind.DailyRace
-            ? string.Format(Tr("UI_LEADERBOARD_DAILY_CONTEXT"), state.ContextLabel)
-            : Tr("UI_LEADERBOARD_WINS_CONTEXT");
+        var heading = state.Kind switch
+        {
+            FriendsLeaderboardKind.DailyRace => string.Format(
+                Tr("UI_LEADERBOARD_DAILY_CONTEXT"),
+                state.ContextLabel),
+            FriendsLeaderboardKind.CourseBestTime => string.Format(
+                Tr("UI_LEADERBOARD_COURSE_CONTEXT"),
+                state.ContextLabel),
+            _ => Tr("UI_LEADERBOARD_WINS_CONTEXT")
+        };
         AddChild(UiFactory.CreateLabel(heading, 8));
 
         if (state.Loading)
