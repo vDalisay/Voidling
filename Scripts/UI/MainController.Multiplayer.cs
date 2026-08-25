@@ -37,6 +37,7 @@ public partial class MainController
         panel.InviteRequested += _connectedZoneBridge.OpenInviteOverlay;
         panel.LeaveRequested += LeaveConnectedZone;
         panel.FriendsLeaderboardRequested += ShowFriendsLeaderboards;
+        panel.DailyRaceRequested += ShowDailyRace;
         panel.ShareSelectedRequested += ShareSelectedVoidling;
         panel.RemoveSelectedRequested += RemoveSelectedSharedVoidling;
         _connectedZonePanel = panel;
