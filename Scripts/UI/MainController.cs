@@ -34,6 +34,7 @@ public partial class MainController : Node
         _garden = GetNode<GardenController>("Garden");
         _garden.VoidlingSelected += OnVoidlingSelected;
         _connectedZoneBridge.StateChanged += OnConnectedZoneStateChanged;
+        ComposeConnectedZoneGardenPresentation();
 
         _uiLayer = new CanvasLayer { Layer = 10 };
         AddChild(_uiLayer);
