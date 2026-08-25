@@ -203,7 +203,9 @@ public sealed class TradeOfferPreviewCoordinator
 
     private void HandleNegotiationChanged(TradeNegotiationState state)
     {
-        if (state.Phase == TradeNegotiationPhase.Negotiating)
+        // Keep both slot previews visible while the existing two-phase transfer finalizes so the
+        // trading room does not blank out between mutual confirmation and the exchange animation.
+        if (state.Phase is TradeNegotiationPhase.Negotiating or TradeNegotiationPhase.Finalizing)
             return;
 
         var removed = _previews.Remove((state.NegotiationId, state.InitiatorId));
