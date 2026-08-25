@@ -38,6 +38,7 @@ public partial class GameBootstrap : Node
     private ChallengeCoordinator? _challengeCoordinator;
     private MultiplayerRaceStartCoordinator? _multiplayerRaceStarts;
     private MultiplayerRaceLockstepCoordinator? _multiplayerRaceLockstep;
+    private MultiplayerRaceResultCoordinator? _multiplayerRaceResults;
     private TradeNetworkCoordinator? _tradeCoordinator;
 
     public override void _Ready()
@@ -71,6 +72,7 @@ public partial class GameBootstrap : Node
 
         AddChild(session);
         ComposeTrading(rules, stateRepository, session);
+        ComposeMultiplayerRaceResults(rules, stateRepository, session);
         ComposeMultiplayerProbeIfRequested(session);
     }
 
@@ -143,6 +145,92 @@ public partial class GameBootstrap : Node
         _tradeCoordinator.LocalStateChanged += session.NotifyExternallyPersistedStateChanged;
         _tradeCoordinator.ProtocolRejected += reason =>
             GD.PushWarning($"Rejected multiplayer trade packet: {reason}");
+    }
+
+    private void ComposeMultiplayerRaceResults(
+        GameBalanceRules rules,
+        GodotJsonGameStateRepository stateRepository,
+        GameSession session)
+    {
+        if (_multiplayerConnection == null ||
+            _challengeCoordinator == null ||
+            _multiplayerRaceStarts == null ||
+            _multiplayerRaceLockstep == null)
+        {
+            return;
+        }
+
+        var rewards = new MultiplayerRaceResultUseCase(rules);
+        _multiplayerRaceResults = new MultiplayerRaceResultCoordinator(
+            _multiplayerConnection,
+            _challengeCoordinator,
+            _multiplayerRaceLockstep);
+        _multiplayerRaceResults.ProtocolRejected += reason =>
+            GD.PushWarning($"Rejected multiplayer race result packet: {reason}");
+        _multiplayerRaceResults.ResultHandshakeIssue += (challengeId, reason) =>
+            GD.PushWarning($"Multiplayer race {challengeId} result handshake issue: {reason}");
+        _multiplayerRaceResults.ChecksumMismatch += mismatch =>
+            GD.PushWarning(
+                $"Multiplayer race {mismatch.ChallengeId} final checksum mismatch: " +
+                $"host tick/checksum={mismatch.HostTick}/{mismatch.HostChecksum}, " +
+                $"local={mismatch.LocalTick}/{mismatch.LocalChecksum}");
+
+        // This handler is registered after the lockstep attachment handler above, so the exact race
+        // session always exists before result coordination attaches to the same resolved start data.
+        _multiplayerRaceStarts.RaceReadyToLaunch += race =>
+        {
+            if (!_multiplayerRaceResults.AttachRace(race, out var error))
+            {
+                GD.PushWarning(
+                    $"Multiplayer race {race.Start.ChallengeId} could not attach result coordination: " +
+                    (error ?? "unknown error"));
+            }
+        };
+
+        _multiplayerRaceResults.ValidatedResultReady += result =>
+        {
+            var local = _multiplayerConnection.LocalUser;
+            if (local == null)
+            {
+                GD.PushWarning($"Could not apply multiplayer race {result.ChallengeId}: local identity is unavailable.");
+                return;
+            }
+
+            // Keep a small rollback snapshot. If persistence fails after the use case mutates the
+            // in-memory aggregate, restore it so a later duplicate result can retry instead of being
+            // suppressed by an applied-ID that never reached disk.
+            var previousCoins = session.State.Coins;
+            var previousWins = session.State.MultiplayerWins;
+            var previousAppliedRaceIds = session.State.AppliedMultiplayerRaceIds.ToList();
+            var applied = rewards.Apply(session.State, local.Id, result);
+            if (!applied.Success)
+            {
+                GD.PushWarning(
+                    $"Could not apply multiplayer race {result.ChallengeId}: " +
+                    (applied.Error ?? "unknown result validation failure"));
+                return;
+            }
+            if (applied.AlreadyApplied)
+                return;
+
+            try
+            {
+                stateRepository.Save(session.State);
+                session.NotifyExternallyPersistedStateChanged();
+                GD.Print(
+                    $"Applied multiplayer race {result.ChallengeId}: place {applied.Place}, " +
+                    $"reward {applied.CoinReward}, multiplayer wins {applied.MultiplayerWins}.");
+            }
+            catch (Exception exception)
+            {
+                session.State.Coins = previousCoins;
+                session.State.MultiplayerWins = previousWins;
+                session.State.AppliedMultiplayerRaceIds = previousAppliedRaceIds;
+                GD.PushWarning(
+                    $"Could not persist multiplayer race {result.ChallengeId}; local reward was rolled back: " +
+                    exception.Message);
+            }
+        };
     }
 
     private static void RecoverInterruptedTradePrepares(
