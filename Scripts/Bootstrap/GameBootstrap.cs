@@ -428,7 +428,7 @@ public partial class GameBootstrap : Node
         if (_multiplayerConnection == null || _connectedZone == null)
             return;
 
-        var args = OS.GetCmdlineArgs();
+        var args = OS.GetCmdlineUserArgs();
         var requested = false;
         foreach (var arg in args)
         {

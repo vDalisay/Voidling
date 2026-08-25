@@ -22,7 +22,7 @@ public sealed class GodotJsonGameStateRepository : IGameStateRepository
         // Normal launches have no profile flag and therefore keep the exact existing save path.
         _savePath = LanMultiplayerOptions.ResolveDevelopmentSavePath(
             savePath,
-            OS.GetCmdlineArgs());
+            OS.GetCmdlineUserArgs());
         _jsonOptions = new JsonSerializerOptions { WriteIndented = true };
     }
 

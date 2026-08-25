@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "dgSpecHash": "OXGDaxxf+vZbPiN/DnSrH4+38g2KbGDN9ZsM4jdl8DxddyNlCYC3f8xJZHCJpU8qjoy3mx9yhVXR3ZPuhiNeFw==",
+  "success": false,
+  "projectFilePath": "C:\\Users\\Home\\Documents\\Voidling\\Tests\\Voidling.Tests.csproj",
+  "expectedPackageFiles": [],
+  "logs": [
+    {
+      "code": "NU1301",
+      "level": "Error",
+      "message": "Unable to load the service index for source https://api.nuget.org/v3/index.json.",
+      "libraryId": "Microsoft.NET.Test.Sdk"
+    }
+  ]
+}

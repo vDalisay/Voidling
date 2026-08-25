@@ -27,7 +27,7 @@ public static class OptionalMultiplayerComposer
 {
     public static OptionalMultiplayerComposition Create()
     {
-        var args = OS.GetCmdlineArgs();
+        var args = OS.GetCmdlineUserArgs();
         if (LanMultiplayerOptions.IsLanRequested(args))
         {
             if (!LanMultiplayerOptions.TryParse(args, out var lanOptions, out var lanError) || lanOptions == null)
