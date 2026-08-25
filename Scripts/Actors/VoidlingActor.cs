@@ -14,6 +14,8 @@ public partial class VoidlingActor : Node2D
         "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
     private static readonly Texture2D PipTexture = GD.Load<Texture2D>(
         "res://Assets/Voidlings/Pip/dark_voidling.png");
+    private static readonly Texture2D MallowTexture = GD.Load<Texture2D>(
+        "res://Assets/Voidlings/Mallow/dark_voidling.png");
 
     private readonly RandomNumberGenerator _rng = new();
     private AnimatedSprite2D _sprite = null!;
@@ -36,19 +38,25 @@ public partial class VoidlingActor : Node2D
         _walkSpeed = data.Stage == LifeStage.Adult ? 20.0f : 17.0f;
         _rng.Seed = StableSeed(data.Id);
 
-        var usesPipVisual = string.Equals(data.Name, "Pip", StringComparison.OrdinalIgnoreCase);
+        var customTexture = string.Equals(data.Name, "Pip", StringComparison.OrdinalIgnoreCase)
+            ? PipTexture
+            : string.Equals(data.Name, "Mallow", StringComparison.OrdinalIgnoreCase)
+                ? MallowTexture
+                : null;
+        var usesCustomVisual = customTexture != null;
+
         _baseScale = data.Stage == LifeStage.Adult ? 0.62f : 0.31f;
-        _baseVisualScale = usesPipVisual
+        _baseVisualScale = usesCustomVisual
             ? (data.Stage == LifeStage.Adult ? 1.0f : 0.5f)
             : _baseScale;
         _baseSpriteY = VoidlingGroundVisualMetrics.SpriteCenterYOffset(_baseScale);
 
         _sprite = new AnimatedSprite2D
         {
-            SpriteFrames = usesPipVisual ? BuildStaticSpriteFrames(PipTexture) : BuildSpriteFrames(),
+            SpriteFrames = usesCustomVisual ? BuildStaticSpriteFrames(customTexture!) : BuildSpriteFrames(),
             Scale = Vector2.One * _baseVisualScale,
             Position = new Vector2(0, _baseSpriteY),
-            Modulate = usesPipVisual ? Colors.White : GameRules.TintColor(data.TintHex),
+            Modulate = usesCustomVisual ? Colors.White : GameRules.TintColor(data.TintHex),
             ZIndex = 2
         };
         AddChild(_sprite);
