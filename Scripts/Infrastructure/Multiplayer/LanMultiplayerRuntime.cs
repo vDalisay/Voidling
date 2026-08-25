@@ -13,14 +13,15 @@ namespace Voidling.Infrastructure.Multiplayer;
 
 /// <summary>
 /// Development-only ENet transport/lobby used to exercise the real multiplayer Application stack
-/// without Steam. It deliberately implements the same narrow ports as the Steam adapters.
+/// without Steam. It implements the same narrow ports as the Steam adapters.
 ///
-/// Topology is host-relayed: ENet clients connect only to peer 1. Application packets carry their
-/// intended target in a small LAN envelope; the host validates the ENet sender and forwards the
-/// unchanged application payload. Remote save/gameplay state is never owned here.
+/// ENet clients physically connect only to the host. Application messages carry an intended target
+/// in a small LAN envelope, allowing the host to relay client-to-client traffic while preserving
+/// the sender/channel contract seen by Application code.
 /// </summary>
 public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILobbyService, IMultiplayerTransport
 {
+    private const int ServerPeerId = 1;
     private const int MaxMembers = 16;
     private const int ApplicationChannelCount = 5;
     private const int ControlChannel = 0;
@@ -45,7 +46,9 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
     public LobbySnapshot? CurrentLobby => _currentLobby;
 
     public event Action<LobbySnapshot>? LobbyChanged;
+#pragma warning disable CS0067 // LAN has no invite/deep-link source; interface parity is intentional.
     public event Action<LobbyJoinRequest>? JoinRequested;
+#pragma warning restore CS0067
     public event Action<NetworkPacket>? PacketReceived;
     public event Action<PlatformUserId>? PeerSessionFailed;
 
@@ -68,23 +71,15 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             throw new InvalidOperationException("LAN runtime must be configured before AddChild.");
 
         SetProcess(true);
-        if (_options.Mode == LanMultiplayerMode.Host)
-        {
-            if (!StartHost(_maxMembers, out var error))
-                FailRuntime(error ?? "Could not start LAN host.");
-        }
-        else
-        {
-            if (!StartClient(out var error))
-                FailRuntime(error ?? "Could not start LAN client.");
-        }
+        var started = _options.Mode == LanMultiplayerMode.Host
+            ? StartHost(_maxMembers, out var error)
+            : StartClient(out error);
+        if (!started)
+            FailRuntime(error ?? "Could not start LAN test transport.");
     }
 
-    public override void _Process(double delta)
-        => Poll();
-
-    public override void _ExitTree()
-        => Shutdown();
+    public override void _Process(double delta) => Poll();
+    public override void _ExitTree() => Shutdown();
 
     public Task<LobbyOperationResult> CreateFriendsLobbyAsync(
         int maxMembers,
@@ -100,10 +95,9 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             return Task.FromResult(LobbyOperationResult.Succeeded(_currentLobby));
 
         _maxMembers = maxMembers;
-        if (!StartHost(maxMembers, out var error) || _currentLobby == null)
-            return Task.FromResult(LobbyOperationResult.Failed(error ?? "Could not create LAN connected Garden."));
-
-        return Task.FromResult(LobbyOperationResult.Succeeded(_currentLobby));
+        return StartHost(maxMembers, out var error) && _currentLobby != null
+            ? Task.FromResult(LobbyOperationResult.Succeeded(_currentLobby))
+            : Task.FromResult(LobbyOperationResult.Failed(error ?? "Could not create LAN connected Garden."));
     }
 
     public Task<LobbyOperationResult> JoinAsync(
@@ -116,18 +110,13 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             return Task.FromResult(LobbyOperationResult.Failed("This process was launched as a LAN host, not a LAN client."));
         if (_currentLobby != null)
             return Task.FromResult(LobbyOperationResult.Succeeded(_currentLobby));
-
         if (!_started && !StartClient(out var error))
             return Task.FromResult(LobbyOperationResult.Failed(error ?? "Could not start LAN client."));
 
         _joinCompletion ??= new TaskCompletionSource<LobbyOperationResult>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         if (cancellationToken.CanBeCanceled)
-        {
-            cancellationToken.Register(() =>
-                _joinCompletion?.TrySetCanceled(cancellationToken));
-        }
-
+            cancellationToken.Register(() => _joinCompletion?.TrySetCanceled(cancellationToken));
         return _joinCompletion.Task;
     }
 
@@ -142,7 +131,6 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
     {
         if (_options == null)
             return;
-
         GD.Print(
             $"LAN test transport has no invite overlay. Join with --voidling-lan-join=<host-ip> " +
             $"--voidling-lan-port={_options.Port}.");
@@ -169,18 +157,13 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
 
         var target = (int)peer.Value;
         var source = checked((int)_localUser.Id.Value);
-        var frame = LanWireCodec.EncodeData(source, target, channel, payload.Span);
+        var frame = LanWireCodec.EncodeData(source, target, channel, delivery, payload.Span);
 
-        if (source == MultiplayerPeer.TargetPeerServer)
+        if (source == ServerPeerId)
             return SendRaw(target, ToPhysicalChannel(channel), frame, delivery);
 
-        // ENet clients have one physical connection to peer 1. The host relays the application
-        // frame to its final target while preserving the original application sender ID.
-        return SendRaw(
-            MultiplayerPeer.TargetPeerServer,
-            ToPhysicalChannel(channel),
-            frame,
-            delivery);
+        // Clients have only one physical ENet connection. The host relays this frame onward.
+        return SendRaw(ServerPeerId, ToPhysicalChannel(channel), frame, delivery);
     }
 
     public void Poll()
@@ -189,8 +172,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         if (!_started || peer == null)
             return;
 
-        var before = peer.GetConnectionStatus();
-        if (before == MultiplayerPeer.ConnectionStatus.Disconnected)
+        if (peer.GetConnectionStatus() == MultiplayerPeer.ConnectionStatus.Disconnected)
         {
             if (_options?.Mode == LanMultiplayerMode.Join && _currentLobby == null)
                 HandleClientConnectionFailure("LAN host disconnected or connection could not be established.");
@@ -206,8 +188,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             _connectStartedAt > 0 &&
             Time.GetTicksMsec() - _connectStartedAt > ConnectTimeoutMilliseconds)
         {
-            HandleClientConnectionFailure(
-                $"Timed out connecting to {_options.Address}:{_options.Port}.");
+            HandleClientConnectionFailure($"Timed out connecting to {_options.Address}:{_options.Port}.");
         }
     }
 
@@ -219,9 +200,9 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         var id = (int)peer.Value;
         try
         {
-            if (_options?.Mode == LanMultiplayerMode.Host && id != MultiplayerPeer.TargetPeerServer)
+            if (_options?.Mode == LanMultiplayerMode.Host && id != ServerPeerId)
                 _peer.DisconnectPeer(id);
-            else if (_options?.Mode == LanMultiplayerMode.Join && id == MultiplayerPeer.TargetPeerServer)
+            else if (_options?.Mode == LanMultiplayerMode.Join && id == ServerPeerId)
                 _peer.Close();
         }
         catch (Exception exception)
@@ -242,10 +223,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         }
 
         var peer = CreatePeer();
-        var result = peer.CreateServer(
-            _options.Port,
-            Math.Max(1, maxMembers - 1),
-            ApplicationChannelCount);
+        var result = peer.CreateServer(_options.Port, Math.Max(1, maxMembers - 1), ApplicationChannelCount);
         if (result != Error.Ok)
         {
             DetachAndDispose(peer);
@@ -256,11 +234,9 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         _peer = peer;
         _started = true;
         _maxMembers = maxMembers;
-        _localUser = new PlatformUser(
-            new PlatformUserId(MultiplayerPeer.TargetPeerServer),
-            _options.DisplayName);
+        _localUser = new PlatformUser(new PlatformUserId(ServerPeerId), _options.DisplayName);
         _memberNames.Clear();
-        _memberNames[MultiplayerPeer.TargetPeerServer] = _options.DisplayName;
+        _memberNames[ServerPeerId] = _options.DisplayName;
         RebuildHostLobby(broadcastRoster: false);
         GD.Print(
             $"Voidling LAN host ready on UDP {_options.Port} as '{_options.DisplayName}'. " +
@@ -280,10 +256,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         }
 
         var peer = CreatePeer();
-        var result = peer.CreateClient(
-            _options.Address,
-            _options.Port,
-            ApplicationChannelCount);
+        var result = peer.CreateClient(_options.Address, _options.Port, ApplicationChannelCount);
         if (result != Error.Ok)
         {
             DetachAndDispose(peer);
@@ -295,8 +268,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         _started = true;
         _connectStartedAt = Time.GetTicksMsec();
         _memberNames.Clear();
-        GD.Print(
-            $"Voidling LAN client connecting to {_options.Address}:{_options.Port} as '{_options.DisplayName}'.");
+        GD.Print($"Voidling LAN client connecting to {_options.Address}:{_options.Port} as '{_options.DisplayName}'.");
         return true;
     }
 
@@ -314,17 +286,17 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             return;
 
         var peerId = (int)peerIdValue;
-        if (_options.Mode == LanMultiplayerMode.Host)
-        {
-            if (_memberNames.Count >= _maxMembers)
-            {
-                _peer?.DisconnectPeer(peerId);
-                return;
-            }
+        if (_options.Mode != LanMultiplayerMode.Host)
+            return;
 
-            _memberNames[peerId] = $"LAN Player {peerId}";
-            RebuildHostLobby(broadcastRoster: true);
+        if (_memberNames.Count >= _maxMembers)
+        {
+            _peer?.DisconnectPeer(peerId);
+            return;
         }
+
+        _memberNames[peerId] = $"LAN Player {peerId}";
+        RebuildHostLobby(broadcastRoster: true);
     }
 
     private void OnPeerDisconnected(long peerIdValue)
@@ -342,7 +314,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             return;
         }
 
-        if (peerId == MultiplayerPeer.TargetPeerServer)
+        if (peerId == ServerPeerId)
             HandleClientConnectionFailure("LAN host disconnected.");
     }
 
@@ -354,14 +326,12 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             return;
 
         var uniqueId = _peer.GetUniqueId();
-        if (uniqueId <= MultiplayerPeer.TargetPeerServer)
+        if (uniqueId <= ServerPeerId)
             return;
 
-        _localUser = new PlatformUser(
-            new PlatformUserId((ulong)uniqueId),
-            _options.DisplayName);
+        _localUser = new PlatformUser(new PlatformUserId((ulong)uniqueId), _options.DisplayName);
         SendRaw(
-            MultiplayerPeer.TargetPeerServer,
+            ServerPeerId,
             ControlChannel,
             LanWireCodec.EncodeName(uniqueId, _options.DisplayName),
             DeliveryMode.Reliable);
@@ -397,7 +367,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             LanWireCodec.TryDecodeName(packet, out var claimedPeerId, out var displayName))
         {
             if (actualSenderPeerId != claimedPeerId ||
-                actualSenderPeerId <= MultiplayerPeer.TargetPeerServer ||
+                actualSenderPeerId <= ServerPeerId ||
                 !_memberNames.ContainsKey(actualSenderPeerId))
             {
                 return;
@@ -409,7 +379,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         }
 
         if (_options.Mode == LanMultiplayerMode.Join &&
-            actualSenderPeerId == MultiplayerPeer.TargetPeerServer &&
+            actualSenderPeerId == ServerPeerId &&
             LanWireCodec.TryDecodeRoster(packet, out var roster))
         {
             ApplyClientRoster(roster);
@@ -429,12 +399,14 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
 
         if (_options.Mode == LanMultiplayerMode.Host)
         {
-            if (frame.SourcePeerId != actualSenderPeerId || !IsLobbyMember(actualSenderPeerId))
+            if (frame.SourcePeerId != actualSenderPeerId ||
+                !IsLobbyMember(actualSenderPeerId) ||
+                !IsLobbyMember(frame.TargetPeerId))
+            {
                 return;
-            if (!IsLobbyMember(frame.TargetPeerId))
-                return;
+            }
 
-            if (frame.TargetPeerId == MultiplayerPeer.TargetPeerServer)
+            if (frame.TargetPeerId == ServerPeerId)
             {
                 PacketReceived?.Invoke(new NetworkPacket(
                     new PlatformUserId((ulong)frame.SourcePeerId),
@@ -443,15 +415,11 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
                 return;
             }
 
-            SendRaw(
-                frame.TargetPeerId,
-                ToPhysicalChannel(frame.Channel),
-                packet,
-                frame.Delivery);
+            SendRaw(frame.TargetPeerId, ToPhysicalChannel(frame.Channel), packet, frame.Delivery);
             return;
         }
 
-        if (actualSenderPeerId != MultiplayerPeer.TargetPeerServer ||
+        if (actualSenderPeerId != ServerPeerId ||
             _localUser == null ||
             frame.TargetPeerId != (int)_localUser.Id.Value ||
             !IsLobbyMember(frame.SourcePeerId))
@@ -465,11 +433,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             frame.Payload));
     }
 
-    private bool SendRaw(
-        int targetPeerId,
-        int physicalChannel,
-        byte[] payload,
-        DeliveryMode delivery)
+    private bool SendRaw(int targetPeerId, int physicalChannel, byte[] payload, DeliveryMode delivery)
     {
         if (_peer == null ||
             payload.Length == 0 ||
@@ -511,11 +475,11 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             .OrderBy(pair => pair.Key)
             .Select(pair => new LobbyMember(
                 new PlatformUser(new PlatformUserId((ulong)pair.Key), pair.Value),
-                pair.Key == MultiplayerPeer.TargetPeerServer))
+                pair.Key == ServerPeerId))
             .ToArray();
         _currentLobby = new LobbySnapshot(
             (ulong)_options.Port,
-            new PlatformUserId(MultiplayerPeer.TargetPeerServer),
+            new PlatformUserId(ServerPeerId),
             members);
         LobbyChanged?.Invoke(_currentLobby);
 
@@ -526,9 +490,8 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         foreach (var member in members)
         {
             var id = (int)member.User.Id.Value;
-            if (id == MultiplayerPeer.TargetPeerServer)
-                continue;
-            SendRaw(id, ControlChannel, payload, DeliveryMode.Reliable);
+            if (id != ServerPeerId)
+                SendRaw(id, ControlChannel, payload, DeliveryMode.Reliable);
         }
     }
 
@@ -539,22 +502,26 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         if (members.Count == 0 ||
             members.Count > MaxMembers ||
             !members.Any(member => member.User.Id == _localUser.Id) ||
-            !members.Any(member => member.User.Id.Value == MultiplayerPeer.TargetPeerServer && member.IsOwner))
+            !members.Any(member => member.User.Id.Value == ServerPeerId && member.IsOwner))
         {
             return;
         }
 
-        _memberNames.Clear();
+        var parsedNames = new Dictionary<int, string>();
         foreach (var member in members)
         {
             if (member.User.Id.Value is 0 or > int.MaxValue)
                 return;
-            _memberNames[(int)member.User.Id.Value] = member.User.DisplayName;
+            parsedNames[(int)member.User.Id.Value] = member.User.DisplayName;
         }
+
+        _memberNames.Clear();
+        foreach (var pair in parsedNames)
+            _memberNames[pair.Key] = pair.Value;
 
         _currentLobby = new LobbySnapshot(
             (ulong)_options.Port,
-            new PlatformUserId(MultiplayerPeer.TargetPeerServer),
+            new PlatformUserId(ServerPeerId),
             members.ToArray());
         LobbyChanged?.Invoke(_currentLobby);
         _joinCompletion?.TrySetResult(LobbyOperationResult.Succeeded(_currentLobby));
@@ -584,8 +551,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
     private void FailRuntime(string reason)
     {
         Shutdown();
-        _availability = MultiplayerAvailability.Unavailable(
-            reason + " Single-player remains available.");
+        _availability = MultiplayerAvailability.Unavailable(reason + " Single-player remains available.");
         GD.PushWarning(_availability.Reason);
     }
 
@@ -606,7 +572,6 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
     {
         if (peer == null)
             return;
-
         try
         {
             peer.Close();
@@ -615,7 +580,6 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         {
             // Best-effort development transport cleanup.
         }
-
         peer.Dispose();
     }
 
@@ -631,7 +595,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
 
     private static class LanWireCodec
     {
-        private const uint Magic = 0x4E414C56; // "VLAN" in little-endian bytes.
+        private const uint Magic = 0x4E414C56;
         private const byte Version = 1;
         private const byte KindName = 1;
         private const byte KindRoster = 2;
@@ -649,10 +613,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             return stream.ToArray();
         }
 
-        public static bool TryDecodeName(
-            ReadOnlySpan<byte> bytes,
-            out int peerId,
-            out string displayName)
+        public static bool TryDecodeName(ReadOnlySpan<byte> bytes, out int peerId, out string displayName)
         {
             peerId = 0;
             displayName = string.Empty;
@@ -662,9 +623,9 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
                 if (reader == null)
                     return false;
                 peerId = reader.ReadInt32();
-                if (!TryReadString(reader, out displayName))
-                    return false;
-                return peerId > MultiplayerPeer.TargetPeerServer && displayName.Length is > 0 and <= 40;
+                return TryReadString(reader, out displayName) &&
+                       peerId > ServerPeerId &&
+                       displayName.Length is > 0 and <= 40;
             }
             catch
             {
@@ -688,9 +649,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             return stream.ToArray();
         }
 
-        public static bool TryDecodeRoster(
-            ReadOnlySpan<byte> bytes,
-            out IReadOnlyList<LobbyMember> members)
+        public static bool TryDecodeRoster(ReadOnlySpan<byte> bytes, out IReadOnlyList<LobbyMember> members)
         {
             members = Array.Empty<LobbyMember>();
             try
@@ -716,7 +675,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
                 }
 
                 if (parsed.Count(member => member.IsOwner) != 1 ||
-                    parsed.Single(member => member.IsOwner).User.Id.Value != MultiplayerPeer.TargetPeerServer)
+                    parsed.Single(member => member.IsOwner).User.Id.Value != ServerPeerId)
                 {
                     return false;
                 }
@@ -734,6 +693,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             int sourcePeerId,
             int targetPeerId,
             NetworkChannel channel,
+            DeliveryMode delivery,
             ReadOnlySpan<byte> payload)
         {
             using var stream = new MemoryStream(payload.Length + 32);
@@ -742,7 +702,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             writer.Write(sourcePeerId);
             writer.Write(targetPeerId);
             writer.Write((byte)channel);
-            writer.Write((byte)DeliveryMode.Reliable); // overwritten by receiver from wire field below.
+            writer.Write((byte)delivery);
             writer.Write(payload.Length);
             writer.Write(payload);
             writer.Flush();
@@ -799,17 +759,19 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             if (bytes.Length < 6 || bytes.Length > MaxWireBytes)
                 return null;
 
-            var stream = new MemoryStream(bytes.ToArray(), writable: false);
-            var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: false);
-            if (reader.ReadUInt32() != Magic ||
-                reader.ReadByte() != Version ||
-                reader.ReadByte() != expectedKind)
+            var reader = new BinaryReader(
+                new MemoryStream(bytes.ToArray(), writable: false),
+                Encoding.UTF8,
+                leaveOpen: false);
+            if (reader.ReadUInt32() == Magic &&
+                reader.ReadByte() == Version &&
+                reader.ReadByte() == expectedKind)
             {
-                reader.Dispose();
-                return null;
+                return reader;
             }
 
-            return reader;
+            reader.Dispose();
+            return null;
         }
 
         private static void WriteString(BinaryWriter writer, string value)
@@ -825,8 +787,11 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         {
             value = string.Empty;
             var length = reader.ReadUInt16();
-            if (length is < 1 or > MaxNameBytes || reader.BaseStream.Length - reader.BaseStream.Position < length)
+            if (length is < 1 or > MaxNameBytes ||
+                reader.BaseStream.Length - reader.BaseStream.Position < length)
+            {
                 return false;
+            }
 
             var bytes = reader.ReadBytes(length);
             if (bytes.Length != length)
