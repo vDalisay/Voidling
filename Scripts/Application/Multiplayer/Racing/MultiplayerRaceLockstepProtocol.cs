@@ -7,9 +7,12 @@ namespace Voidling.Application.Multiplayer.Racing;
 
 public static class MultiplayerRaceLockstepProtocol
 {
-    public const string CheerRequestType = "race.cheer.request";
-    public const string ScheduledCommandType = "race.command.scheduled";
-    public const string ChecksumType = "race.checksum";
+    // Keep lockstep traffic outside the generic race.* start-handshake namespace. Both coordinators
+    // observe NetworkChannel.Challenge, so a distinct prefix prevents valid lockstep packets from
+    // being misreported as malformed race-start traffic by the start coordinator.
+    public const string CheerRequestType = "lockstep.race.cheer.request";
+    public const string ScheduledCommandType = "lockstep.race.command.scheduled";
+    public const string ChecksumType = "lockstep.race.checksum";
 
     private sealed record CheerRequestPayload(string ChallengeId, long InputSequence);
     private sealed record ScheduledCommandPayload(ScheduledRaceCommand Command);
