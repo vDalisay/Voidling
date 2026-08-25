@@ -10,13 +10,6 @@ public partial class VoidlingActor : Node2D
 
     public string CreatureId { get; private set; } = "";
 
-    private static readonly Texture2D CharacterTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
-    private static readonly Texture2D PipTexture = GD.Load<Texture2D>(
-        "res://Assets/Voidlings/Pip/dark_voidling.png");
-    private static readonly Texture2D MallowTexture = GD.Load<Texture2D>(
-        "res://Assets/Voidlings/Mallow/dark_voidling.png");
-
     private readonly RandomNumberGenerator _rng = new();
     private AnimatedSprite2D _sprite = null!;
     private Rect2 _wanderBounds;
@@ -26,6 +19,7 @@ public partial class VoidlingActor : Node2D
     private bool _selected;
     private bool _interactionLocked;
     private bool _pickedUp;
+    private bool _usesPipWalk;
     private float _baseScale;
     private float _baseVisualScale;
     private float _baseSpriteY;
@@ -38,26 +32,20 @@ public partial class VoidlingActor : Node2D
         _walkSpeed = data.Stage == LifeStage.Adult ? 20.0f : 17.0f;
         _rng.Seed = StableSeed(data.Id);
 
-        var customTexture = string.Equals(data.Name, "Pip", StringComparison.OrdinalIgnoreCase)
-            ? PipTexture
-            : string.Equals(data.Name, "Mallow", StringComparison.OrdinalIgnoreCase)
-                ? MallowTexture
-                : null;
-        var usesCustomVisual = customTexture != null;
-
-        _baseScale = data.Stage == LifeStage.Adult ? 0.62f : 0.31f;
-        // The custom 32x32 cat sprites have a much denser silhouette than the legacy sheet.
-        // Render them at half the normal presentation scale so their perceived size matches
-        // the smaller garden Voidlings more closely.
-        _baseVisualScale = usesCustomVisual ? _baseScale * 0.5f : _baseScale;
+        var isAdult = data.Stage == LifeStage.Adult;
+        _usesPipWalk = VoidlingVisualCatalog.IsPip(data.Name);
+        _baseScale = isAdult
+            ? VoidlingVisualCatalog.LegacyAdultScale
+            : VoidlingVisualCatalog.LegacyChildScale;
+        _baseVisualScale = VoidlingVisualCatalog.WorldScale(data.Name, isAdult);
         _baseSpriteY = VoidlingGroundVisualMetrics.SpriteCenterYOffset(_baseScale);
 
         _sprite = new AnimatedSprite2D
         {
-            SpriteFrames = usesCustomVisual ? BuildStaticSpriteFrames(customTexture!) : BuildSpriteFrames(),
+            SpriteFrames = VoidlingVisualCatalog.BuildWorldFrames(data.Name),
             Scale = Vector2.One * _baseVisualScale,
             Position = new Vector2(0, _baseSpriteY),
-            Modulate = usesCustomVisual ? Colors.White : GameRules.TintColor(data.TintHex),
+            Modulate = VoidlingVisualCatalog.Modulate(data.Name, GameRules.TintColor(data.TintHex)),
             ZIndex = 2
         };
         AddChild(_sprite);
@@ -242,6 +230,14 @@ public partial class VoidlingActor : Node2D
         else
             animation = direction.Y < 0.0f ? "walk_up" : "walk_down";
 
+        if (_usesPipWalk)
+        {
+            if (direction.X < -0.05f)
+                _sprite.FlipH = true;
+            else if (direction.X > 0.05f)
+                _sprite.FlipH = false;
+        }
+
         if (_sprite.Animation != animation)
             _sprite.Play(animation);
     }
@@ -278,52 +274,5 @@ public partial class VoidlingActor : Node2D
             hash *= prime;
         }
         return hash;
-    }
-
-    private static SpriteFrames BuildSpriteFrames()
-    {
-        var frames = new SpriteFrames();
-        frames.RemoveAnimation("default");
-        AddDirection(frames, "walk_down", 0);
-        AddDirection(frames, "walk_up", 1);
-        AddDirection(frames, "walk_left", 2);
-        AddDirection(frames, "walk_right", 3);
-        return frames;
-    }
-
-    private static SpriteFrames BuildStaticSpriteFrames(Texture2D texture)
-    {
-        var frames = new SpriteFrames();
-        frames.RemoveAnimation("default");
-        AddStaticDirection(frames, "walk_down", texture);
-        AddStaticDirection(frames, "walk_up", texture);
-        AddStaticDirection(frames, "walk_left", texture);
-        AddStaticDirection(frames, "walk_right", texture);
-        return frames;
-    }
-
-    private static void AddDirection(SpriteFrames frames, string name, int row)
-    {
-        frames.AddAnimation(name);
-        frames.SetAnimationLoop(name, true);
-        frames.SetAnimationSpeed(name, 6.0);
-
-        for (var column = 0; column < 4; column++)
-        {
-            var atlas = new AtlasTexture
-            {
-                Atlas = CharacterTexture,
-                Region = new Rect2(column * 48, row * 48, 48, 48)
-            };
-            frames.AddFrame(name, atlas);
-        }
-    }
-
-    private static void AddStaticDirection(SpriteFrames frames, string name, Texture2D texture)
-    {
-        frames.AddAnimation(name);
-        frames.SetAnimationLoop(name, true);
-        frames.SetAnimationSpeed(name, 1.0);
-        frames.AddFrame(name, texture);
     }
 }
