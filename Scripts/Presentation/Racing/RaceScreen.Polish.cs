@@ -22,6 +22,10 @@ public partial class RaceScreen
             Name = "PresentationPolishDriver",
             OwnerScreen = this
         });
+
+        // RaceScreen is split across partial files, so lifecycle overrides must live in one place.
+        // Defer until after _Ready has created entrant visuals, then replace Pip/Mallow placeholders.
+        CallDeferred(MethodName.ApplyCustomVoidlingRaceVisuals);
     }
 
     internal void ApplyPostRaceScreenPresentationFrame()
@@ -97,9 +101,6 @@ public partial class RaceScreen
         foreach (var polygon in GetChildren().OfType<Polygon2D>().Where(polygon =>
                      polygon.ZIndex == 4 && ColorsClose(polygon.Color, oldRampColor)).ToList())
         {
-            // Hide the legacy lane-band ramp immediately before deferred deletion. The polish
-            // driver runs before the first rendered race frame, so the player only ever sees the
-            // single depth-spanning ramp below rather than one frame containing all four bands.
             polygon.Visible = false;
             polygon.QueueFree();
         }
@@ -223,8 +224,6 @@ public partial class RaceScreen
         if (portraits.Count < 4 || podiums.Count < 3 || puddle == null)
             return;
 
-        // Existing creation order along X is second, first, third, fourth. Keep entrant/place
-        // identity intact and only place each portrait's feet directly on its award surface.
         for (var i = 0; i < 3; i++)
         {
             var surface = podiums[i];
@@ -407,12 +406,4 @@ public partial class RaceScreen
 
         return null;
     }
-}
-
-internal sealed partial class RaceScreenPolishDriver : Node
-{
-    public RaceScreen OwnerScreen { get; init; } = null!;
-
-    public override void _Process(double delta)
-        => OwnerScreen.ApplyPostRaceScreenPresentationFrame();
 }
