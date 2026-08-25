@@ -58,6 +58,18 @@ public sealed class TradeNegotiationFacade
     public TradeNegotiationFacade(
         MultiplayerConnectionService connection,
         TradeNegotiationCoordinator negotiation,
+        Func<GameStateData> stateProvider)
+        : this(
+            connection,
+            negotiation,
+            new TradeOfferPreviewCoordinator(connection, negotiation),
+            stateProvider)
+    {
+    }
+
+    public TradeNegotiationFacade(
+        MultiplayerConnectionService connection,
+        TradeNegotiationCoordinator negotiation,
         TradeOfferPreviewCoordinator previews,
         Func<GameStateData> stateProvider)
     {
