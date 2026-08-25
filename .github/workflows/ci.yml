@@ -92,6 +92,23 @@ jobs:
             exit 1
           fi
 
+      # Exercise the actual player-facing trade room controls. This regression gate is intentionally
+      # presentation-only: it toggles a real Voidling card and presses the real Accept/Cancel buttons,
+      # proving the panel emits the selected asset ID instead of merely appearing selected visually.
+      - name: Trade panel interaction smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 20s godot --headless --path . -- --voidling-trade-panel-smoke 2>&1 | tee trade-panel-smoke.log
+          if ! grep -q 'TRADE_PANEL_SMOKE_SUCCESS' trade-panel-smoke.log; then
+            echo 'Trade panel did not emit the expected selection/accept/cancel intents.'
+            exit 1
+          fi
+          if grep -E '^(ERROR|SCRIPT ERROR):' trade-panel-smoke.log; then
+            echo 'Trade panel smoke emitted a Godot error.'
+            exit 1
+          fi
+
       # Exercise the real development ENet adapter with two independent game processes. Both
       # processes must form one LAN lobby and exchange the same typed Application Hello packet
       # used by Steam before the command-line probe exits successfully.
