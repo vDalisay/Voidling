@@ -222,6 +222,15 @@ public partial class MainController : Node
     private void OnRaceCompleted(int placement)
     {
         _session.ApplyRacePlacementReward(placement);
+
+        // Steam is only a best-time projection. The local race reward is already persisted above,
+        // and leaderboard failure cannot invalidate or roll back that single-player result.
+        if (_race != null &&
+            GodotObject.IsInstanceValid(_race) &&
+            _race.TryGetPlayerFinishMilliseconds(out var finishedMilliseconds))
+        {
+            ProjectSinglePlayerCourseBestTime(finishedMilliseconds);
+        }
     }
 
     private void EndRace()
