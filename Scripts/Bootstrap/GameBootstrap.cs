@@ -155,7 +155,14 @@ public partial class GameBootstrap : Node
         if (multiplayer.RuntimeNode != null)
         {
             AddChild(multiplayer.RuntimeNode);
-            GD.Print($"Steam multiplayer available for {_multiplayerConnection.LocalUser?.DisplayName ?? "local user"}.");
+            if (multiplayer.SteamAvailable)
+            {
+                GD.Print($"Steam multiplayer available for {_multiplayerConnection.LocalUser?.DisplayName ?? "local user"}.");
+            }
+            else if (multiplayer.RuntimeNode is LanMultiplayerRuntime)
+            {
+                GD.Print("Development LAN multiplayer transport enabled. Steam is intentionally bypassed for this launch.");
+            }
             return;
         }
 
@@ -425,8 +432,11 @@ public partial class GameBootstrap : Node
         var requested = false;
         foreach (var arg in args)
         {
-            if (!arg.StartsWith("--voidling-mp-", StringComparison.OrdinalIgnoreCase))
+            if (!arg.StartsWith("--voidling-mp-", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(arg, "--voidling-lan-smoke", StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             requested = true;
             break;
