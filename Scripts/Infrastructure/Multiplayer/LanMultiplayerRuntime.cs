@@ -26,6 +26,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
     private const int ApplicationChannelCount = 5;
     private const int ControlChannel = 0;
     private const int ApplicationChannelOffset = 1;
+    private const int PhysicalChannelCount = ApplicationChannelOffset + ApplicationChannelCount;
     private const int ConnectTimeoutMilliseconds = 10_000;
     private const int MaxWireBytes = MultiplayerProtocol.MaxPacketBytes + 256;
 
@@ -223,7 +224,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         }
 
         var peer = CreatePeer();
-        var result = peer.CreateServer(_options.Port, Math.Max(1, maxMembers - 1), ApplicationChannelCount);
+        var result = peer.CreateServer(_options.Port, Math.Max(1, maxMembers - 1), PhysicalChannelCount);
         if (result != Error.Ok)
         {
             DetachAndDispose(peer);
@@ -256,7 +257,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         }
 
         var peer = CreatePeer();
-        var result = peer.CreateClient(_options.Address, _options.Port, ApplicationChannelCount);
+        var result = peer.CreateClient(_options.Address, _options.Port, PhysicalChannelCount);
         if (result != Error.Ok)
         {
             DetachAndDispose(peer);
@@ -438,7 +439,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         if (_peer == null ||
             payload.Length == 0 ||
             payload.Length > MaxWireBytes ||
-            physicalChannel is < 0 or > ApplicationChannelCount)
+            physicalChannel is < 0 or >= PhysicalChannelCount)
         {
             return false;
         }
