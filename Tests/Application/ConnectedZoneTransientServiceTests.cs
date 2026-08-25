@@ -44,6 +44,42 @@ public sealed class ConnectedZoneTransientServiceTests
     }
 
     [Fact]
+    public void LocalTransformPublicationIsCoalescedToConfiguredLowFrequency()
+    {
+        var host = User(1, "Host");
+        var remote = User(2, "Remote");
+        var transport = new FakeTransport();
+        var connection = Connection(host, Lobby(host, host, remote), transport);
+        var zone = new ConnectedZoneService(connection);
+        var clock = new ManualTimeProvider();
+        var transient = new ConnectedZoneTransientService(
+            connection,
+            zone,
+            clock,
+            TimeSpan.FromMilliseconds(100));
+        var state = StateWith(Voidling("local", "Local"));
+        Assert.True(zone.PublishOwnedVoidling(state, "local", 0, 0).Success);
+        transport.Sent.Clear();
+
+        Assert.True(transient.PublishOwnedTransform("local", 1, 1, 1, "walk").Success);
+        clock.Advance(TimeSpan.FromMilliseconds(50));
+        Assert.True(transient.PublishOwnedTransform("local", 2, 2, 1, "walk").Success);
+        Assert.Single(transport.Sent);
+        clock.Advance(TimeSpan.FromMilliseconds(50));
+        Assert.True(transient.PublishOwnedTransform("local", 3, 3, 1, "walk").Success);
+
+        Assert.Equal(2, transport.Sent.Count);
+        Assert.True(ConnectedZoneTransientProtocol.TryDecodeTransform(
+            transport.Sent[1].Payload.Span,
+            host.Id,
+            out _,
+            out var latest));
+        Assert.Equal(2, latest.Sequence);
+        Assert.Equal(3, latest.ZoneX);
+        Assert.Equal(3, latest.ZoneY);
+    }
+
+    [Fact]
     public void RemoteTransformMustMatchTransportOwnerAndPublishedVoidling()
     {
         var host = User(1, "Host");
@@ -209,6 +245,14 @@ public sealed class ConnectedZoneTransientServiceTests
             77,
             owner.Id,
             members.Select(user => new LobbyMember(user, user.Id == owner.Id)).ToArray());
+
+    private sealed class ManualTimeProvider : TimeProvider
+    {
+        private long _timestamp;
+        public override long TimestampFrequency => 1_000;
+        public override long GetTimestamp() => _timestamp;
+        public void Advance(TimeSpan amount) => _timestamp += (long)amount.TotalMilliseconds;
+    }
 
     private sealed class FakeIdentity : IPlatformIdentityService
     {
