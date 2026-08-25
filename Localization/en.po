@@ -30,6 +30,9 @@ msgstr "Breed"
 msgid "UI_TOP_RACE"
 msgstr "Race"
 
+msgid "UI_TOP_ONLINE"
+msgstr "Online"
+
 msgid "UI_TOP_SETTINGS"
 msgstr "Settings"
 
@@ -269,3 +272,72 @@ msgstr "GARDEN LOG"
 
 msgid "UI_GARDEN_LOG_STARTED"
 msgstr "Garden session started."
+
+msgid "UI_ONLINE_TITLE"
+msgstr "CONNECTED GARDEN"
+
+msgid "UI_ONLINE_UNAVAILABLE"
+msgstr "Online Garden unavailable"
+
+msgid "UI_ONLINE_OFFLINE_SAFE"
+msgstr "Your local Garden and save remain fully available."
+
+msgid "UI_ONLINE_READY"
+msgstr "Create a friends-only Garden, accept a Steam invite, or join by lobby ID."
+
+msgid "UI_ONLINE_CREATE"
+msgstr "Create Friends Garden"
+
+msgid "UI_ONLINE_LOBBY_ID_PLACEHOLDER"
+msgstr "Steam lobby ID"
+
+msgid "UI_ONLINE_JOIN"
+msgstr "Join"
+
+msgid "UI_ONLINE_JOIN_HINT"
+msgstr "Steam invites are the normal path; lobby ID is a fallback/testing option."
+
+msgid "UI_ONLINE_CONNECTED"
+msgstr "Connected • Lobby {0}"
+
+msgid "UI_ONLINE_MEMBERS"
+msgstr "Members"
+
+msgid "UI_ONLINE_MEMBER_HOST"
+msgstr "(host)"
+
+msgid "UI_ONLINE_MEMBER_YOU"
+msgstr "(you)"
+
+msgid "UI_ONLINE_INVITE"
+msgstr "Invite Friends"
+
+msgid "UI_ONLINE_LEAVE"
+msgstr "Leave Garden"
+
+msgid "UI_ONLINE_SHARE_TITLE"
+msgstr "Shared Voidling"
+
+msgid "UI_ONLINE_SELECT_VOIDLING"
+msgstr "Select a Voidling in your Garden to share it."
+
+msgid "UI_ONLINE_SELECTED_VOIDLING"
+msgstr "Selected: {0}"
+
+msgid "UI_ONLINE_SHARE_VOIDLING"
+msgstr "Share Selected"
+
+msgid "UI_ONLINE_REMOVE_VOIDLING"
+msgstr "Stop Sharing"
+
+msgid "UI_ONLINE_CREATE_FAILED"
+msgstr "Could not create the connected Garden: {0}"
+
+msgid "UI_ONLINE_JOIN_FAILED"
+msgstr "Could not join the connected Garden: {0}"
+
+msgid "UI_ONLINE_SHARE_FAILED"
+msgstr "Could not share the selected Voidling: {0}"
+
+msgid "UI_ONLINE_REMOVE_FAILED"
+msgstr "Could not stop sharing the selected Voidling: {0}"
