@@ -52,6 +52,7 @@ public partial class MainController : Node
 
         _modalHost = new ModalHost { ZIndex = 100 };
         _uiRoot.AddChild(_modalHost);
+        ComposeTradePresentation();
 
         _session.StateChanged += RefreshUi;
         _session.ToastRequested += ShowToast;
@@ -73,6 +74,7 @@ public partial class MainController : Node
             _connectedZoneBridge.StateChanged -= OnConnectedZoneStateChanged;
 
         DetachMultiplayerRacePresentation();
+        DetachTradePresentation();
     }
 
     public override void _Process(double delta)
