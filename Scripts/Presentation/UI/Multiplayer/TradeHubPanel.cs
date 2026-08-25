@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using Godot;
 using Voidling.Application.Multiplayer.Trading;
 using VoidlingGame;
@@ -8,25 +6,26 @@ using VoidlingGame;
 namespace Voidling.Presentation.UI.Multiplayer;
 
 /// <summary>
-/// Connected-Garden trade entry screen. It only assembles partner/asset selections and renders
-/// incoming offers/status; the durable transaction protocol remains entirely below presentation.
+/// Entry lobby for trading. No assets are chosen here: a player invites a connected partner first,
+/// and both move into the shared trading room only after the recipient accepts that invitation.
 /// </summary>
 public partial class TradeHubPanel : VBoxContainer
 {
-    public event Action<string, TradeAssetReference[]>? OfferRequested;
-    public event Action<string>? RespondRequested;
+    public event Action<string>? InviteRequested;
+    public event Action<string>? AcceptInviteRequested;
+    public event Action<string>? DeclineInviteRequested;
 
-    private TradeHubViewState? _state;
+    private TradeLobbyViewState? _state;
     private bool _ready;
 
-    public void Configure(TradeHubViewState state)
+    public void Configure(TradeLobbyViewState state)
     {
         if (IsInsideTree())
             throw new InvalidOperationException("TradeHubPanel must be configured before entering the scene tree.");
         _state = state ?? throw new ArgumentNullException(nameof(state));
     }
 
-    public void Render(TradeHubViewState state)
+    public void Render(TradeLobbyViewState state)
     {
         _state = state ?? throw new ArgumentNullException(nameof(state));
         if (_ready)
@@ -37,7 +36,7 @@ public partial class TradeHubPanel : VBoxContainer
     {
         if (_state == null)
             throw new InvalidOperationException("TradeHubPanel must be configured before AddChild.");
-        AddThemeConstantOverride("separation", 5);
+        AddThemeConstantOverride("separation", 7);
         SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         _ready = true;
         Rebuild();
@@ -58,161 +57,78 @@ public partial class TradeHubPanel : VBoxContainer
             return;
         }
 
-        BuildOfferSection(state);
-        BuildIncomingSection(state);
-        BuildStatusSection(state);
-    }
+        AddChild(UiFactory.CreateLabel(Tr("UI_TRADE_OFFER_TITLE"), 9));
+        AddChild(UiFactory.CreateLabel(Tr("UI_TRADE_INVITE_HINT"), 7));
 
-    private void BuildOfferSection(TradeHubViewState state)
-    {
-        AddChild(UiFactory.CreateLabel(Tr("UI_TRADE_OFFER_TITLE"), 8));
-        if (state.Counterparties.Count == 0)
+        if (state.WaitingForPlayer != null)
+        {
+            AddChild(UiFactory.CreateLabel(
+                string.Format(Tr("UI_TRADE_WAITING_INVITE"), state.WaitingForPlayer),
+                8));
+        }
+        else if (state.Partners.Count == 0)
         {
             AddChild(UiFactory.CreateLabel(Tr("UI_TRADE_NO_PARTNERS"), 7));
-            return;
-        }
-
-        var partnerRow = new HBoxContainer();
-        partnerRow.AddThemeConstantOverride("separation", 6);
-        var partner = new OptionButton
-        {
-            CustomMinimumSize = new Vector2(230, 25),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            FocusMode = Control.FocusModeEnum.None
-        };
-        UiFactory.ApplyPixelFont(partner, 7);
-        UiFactory.ApplyButtonChrome(partner);
-        for (var i = 0; i < state.Counterparties.Count; i++)
-        {
-            var counterparty = state.Counterparties[i];
-            partner.AddItem(counterparty.DisplayName, i);
-            partner.SetItemMetadata(i, counterparty.Key);
-        }
-        partnerRow.AddChild(partner);
-        AddChild(partnerRow);
-
-        var selectedAssets = new List<TradeAssetReference>();
-        var scroll = new ScrollContainer
-        {
-            CustomMinimumSize = new Vector2(500, 90),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            VerticalScrollMode = ScrollContainer.ScrollMode.Disabled
-        };
-        var assets = new HBoxContainer();
-        assets.AddThemeConstantOverride("separation", 7);
-        scroll.AddChild(assets);
-        AddChild(scroll);
-
-        if (state.LocalAssets.Count == 0)
-        {
-            assets.AddChild(UiFactory.CreateLabel(Tr("UI_TRADE_NO_ASSETS"), 7));
         }
         else
         {
-            foreach (var asset in state.LocalAssets)
+            var row = new HBoxContainer();
+            row.AddThemeConstantOverride("separation", 7);
+
+            var partner = new OptionButton
             {
-                if (asset.Kind == TradeAssetKind.Voidling)
-                {
-                    var voidlingAsset = asset;
-                    assets.AddChild(UiFactory.CreateVoidlingCard(
-                        asset.DisplayName,
-                        UiFactory.ParseTint(asset.TintHex),
-                        asset.HasAngelMutation,
-                        asset.OtherMutationCount,
-                        pressed => ToggleAsset(selectedAssets, voidlingAsset, pressed),
-                        out _));
-                    continue;
-                }
-
-                var check = new CheckBox
-                {
-                    Text = AssetLabel(asset),
-                    FocusMode = Control.FocusModeEnum.None
-                };
-                UiFactory.ApplyPixelFont(check, 7);
-                var eggAsset = asset;
-                check.Toggled += pressed => ToggleAsset(selectedAssets, eggAsset, pressed);
-                assets.AddChild(check);
+                CustomMinimumSize = new Vector2(280, 26),
+                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+                FocusMode = Control.FocusModeEnum.None
+            };
+            UiFactory.ApplyPixelFont(partner, 8);
+            UiFactory.ApplyButtonChrome(partner);
+            for (var i = 0; i < state.Partners.Count; i++)
+            {
+                partner.AddItem(state.Partners[i].DisplayName, i);
+                partner.SetItemMetadata(i, state.Partners[i].Key);
             }
+            row.AddChild(partner);
+
+            var invite = UiFactory.CreateButton(Tr("UI_TRADE_INVITE"));
+            invite.CustomMinimumSize = new Vector2(120, 26);
+            invite.Disabled = !state.CanInvite;
+            invite.Pressed += () =>
+            {
+                if (partner.Selected < 0)
+                    return;
+                var key = partner.GetItemMetadata(partner.Selected).AsString();
+                if (!string.IsNullOrWhiteSpace(key))
+                    InviteRequested?.Invoke(key);
+            };
+            row.AddChild(invite);
+            AddChild(row);
         }
 
-        var offer = UiFactory.CreateButton(Tr("UI_TRADE_SEND_OFFER"));
-        offer.CustomMinimumSize = new Vector2(160, 25);
-        offer.Disabled = !state.CanOffer || state.LocalAssets.Count == 0;
-        offer.Pressed += () =>
-        {
-            var key = partner.GetItemMetadata(partner.Selected).AsString();
-            if (!string.IsNullOrWhiteSpace(key))
-                OfferRequested?.Invoke(key, selectedAssets.ToArray());
-        };
-        AddChild(offer);
-
-        if (!state.CanOffer)
-            AddChild(UiFactory.CreateLabel(Tr("UI_TRADE_ACTIVE_HINT"), 6));
-    }
-
-    private void BuildIncomingSection(TradeHubViewState state)
-    {
-        AddChild(UiFactory.CreateLabel(Tr("UI_TRADE_INCOMING_TITLE"), 8));
-        if (state.IncomingOffers.Count == 0)
-        {
-            AddChild(UiFactory.CreateLabel(Tr("UI_TRADE_INCOMING_EMPTY"), 6));
+        if (state.IncomingInvites.Count == 0)
             return;
-        }
 
-        foreach (var incoming in state.IncomingOffers)
+        AddChild(UiFactory.CreateLabel(Tr("UI_TRADE_INCOMING_TITLE"), 9));
+        foreach (var incoming in state.IncomingInvites)
         {
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 6);
-            var summary = UiFactory.CreateLabel(
-                string.Format(
-                    Tr("UI_TRADE_INCOMING_SUMMARY"),
-                    incoming.InitiatorDisplayName,
-                    incoming.VoidlingCount,
-                    incoming.EggCount),
-                7);
-            summary.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-            row.AddChild(summary);
+            var text = UiFactory.CreateLabel(
+                string.Format(Tr("UI_TRADE_INVITE_FROM"), incoming.FromDisplayName),
+                8);
+            text.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            row.AddChild(text);
 
-            var respond = UiFactory.CreateButton(Tr("UI_TRADE_RESPOND"));
-            respond.CustomMinimumSize = new Vector2(92, 24);
-            respond.Pressed += () => RespondRequested?.Invoke(incoming.TradeId);
-            row.AddChild(respond);
+            var accept = UiFactory.CreateButton(Tr("UI_COMMON_ACCEPT"));
+            accept.CustomMinimumSize = new Vector2(88, 25);
+            accept.Pressed += () => AcceptInviteRequested?.Invoke(incoming.NegotiationId);
+            row.AddChild(accept);
+
+            var decline = UiFactory.CreateButton(Tr("UI_COMMON_CANCEL"));
+            decline.CustomMinimumSize = new Vector2(88, 25);
+            decline.Pressed += () => DeclineInviteRequested?.Invoke(incoming.NegotiationId);
+            row.AddChild(decline);
             AddChild(row);
-        }
-    }
-
-    private void BuildStatusSection(TradeHubViewState state)
-    {
-        if (state.RecentStatuses.Count == 0)
-            return;
-
-        var latest = state.RecentStatuses[0];
-        AddChild(UiFactory.CreateLabel(Tr("UI_TRADE_STATUS_TITLE"), 8));
-        var status = UiFactory.CreateLabel(latest.Message, 6);
-        status.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        AddChild(status);
-    }
-
-    private string AssetLabel(TradeLocalAssetView asset)
-        => asset.Kind == TradeAssetKind.Egg
-            ? string.Format(Tr("UI_TRADE_ASSET_EGG"), asset.DisplayName)
-            : string.Format(Tr("UI_TRADE_ASSET_VOIDLING"), asset.DisplayName);
-
-    private static void ToggleAsset(
-        ICollection<TradeAssetReference> selected,
-        TradeLocalAssetView asset,
-        bool pressed)
-    {
-        var reference = new TradeAssetReference(asset.Kind, asset.AssetId);
-        if (pressed)
-        {
-            if (!selected.Contains(reference))
-                selected.Add(reference);
-        }
-        else
-        {
-            selected.Remove(reference);
         }
     }
 }
