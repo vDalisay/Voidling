@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.Voidlings;
 
 namespace VoidlingGame;
 
@@ -16,9 +17,6 @@ public static class UiFactory
 
     private static readonly Texture2D IconTexture =
         GD.Load<Texture2D>(UiRoot + "Icons/All Icons.png");
-
-    private static readonly Texture2D CharacterTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
 
     private static readonly Font PixelFont = GD.Load<Font>(
         "res://Assets/Sprout Lands - UI Pack - Basic pack/fonts/pixelFont-7-8x14-sproutLands.ttf");
@@ -97,6 +95,7 @@ public static class UiFactory
             !string.Equals(t.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
 
         return CreatePortrait(
+            data.Name,
             GameRules.TintColor(data.TintHex),
             hasAngel,
             otherTraits,
@@ -108,22 +107,24 @@ public static class UiFactory
         bool hasAngelMutation,
         int otherMutationCount,
         Vector2 minimumSize)
-    {
-        var atlas = new AtlasTexture
-        {
-            Atlas = CharacterTexture,
-            Region = new Rect2(0, 0, 48, 48)
-        };
+        => CreatePortrait(string.Empty, tintColor, hasAngelMutation, otherMutationCount, minimumSize);
 
+    public static TextureRect CreatePortrait(
+        string displayName,
+        Color tintColor,
+        bool hasAngelMutation,
+        int otherMutationCount,
+        Vector2 minimumSize)
+    {
         var portrait = new TextureRect
         {
-            Texture = atlas,
+            Texture = VoidlingVisualCatalog.PortraitTexture(displayName),
             CustomMinimumSize = minimumSize,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
-        SetPortraitData(portrait, tintColor, hasAngelMutation, otherMutationCount);
+        SetPortraitData(portrait, displayName, tintColor, hasAngelMutation, otherMutationCount);
         return portrait;
     }
 
@@ -135,6 +136,7 @@ public static class UiFactory
 
         SetPortraitData(
             portrait,
+            data.Name,
             GameRules.TintColor(data.TintHex),
             hasAngel,
             otherTraits);
@@ -145,8 +147,17 @@ public static class UiFactory
         Color tintColor,
         bool hasAngelMutation,
         int otherMutationCount)
+        => SetPortraitData(portrait, string.Empty, tintColor, hasAngelMutation, otherMutationCount);
+
+    public static void SetPortraitData(
+        TextureRect portrait,
+        string displayName,
+        Color tintColor,
+        bool hasAngelMutation,
+        int otherMutationCount)
     {
-        portrait.SelfModulate = tintColor;
+        portrait.Texture = VoidlingVisualCatalog.PortraitTexture(displayName);
+        portrait.SelfModulate = VoidlingVisualCatalog.Modulate(displayName, tintColor);
 
         var oldBadge = portrait.GetNodeOrNull<Control>("__mutation_badge");
         if (oldBadge != null && GodotObject.IsInstanceValid(oldBadge))
