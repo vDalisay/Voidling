@@ -1,6 +1,6 @@
 using System;
 using Godot;
-using VoidlingGame;
+using Voidling.Presentation.UI.Common;
 
 namespace Voidling.Presentation.UI.Multiplayer;
 
@@ -17,18 +17,18 @@ public sealed record TradeExchangeScreenState(
     int OutgoingCount,
     int IncomingCount);
 
-/// <summary>Pixel-art exchange presentation shown only after the durable trade reaches local commit.</summary>
+/// <summary>
+/// Short non-authoritative presentation after a locally persisted multiplayer trade. Ownership has
+/// already changed before this screen appears; animation can therefore be skipped without changing
+/// game state or network behavior.
+/// </summary>
 public partial class TradeExchangeScreen : Control
 {
-    private static readonly Texture2D EggTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
-
     public event Action? ReturnRequested;
 
     private TradeExchangeScreenState? _state;
     private Control? _outgoingVisual;
     private Control? _incomingVisual;
-    private Polygon2D _energy = null!;
     private Label _status = null!;
     private Button _return = null!;
 
@@ -46,47 +46,50 @@ public partial class TradeExchangeScreen : Control
 
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         MouseFilter = MouseFilterEnum.Stop;
-        AddChild(new ColorRect
+
+        var background = new ColorRect
         {
-            Color = Color.FromHtml("#A7D8C7"),
-            Position = Vector2.Zero,
-            Size = new Vector2(640, 360),
-            MouseFilter = MouseFilterEnum.Ignore
-        });
+            Color = Color.FromHtml("#23352F"),
+            MouseFilter = MouseFilterEnum.Stop
+        };
+        background.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        AddChild(background);
 
         var title = UiFactory.CreateTitle(Tr("UI_TRADE_EXCHANGE_TITLE"));
-        title.Position = new Vector2(190, 18);
-        title.Size = new Vector2(260, 26);
+        title.Position = new Vector2(0, 28);
+        title.Size = new Vector2(640, 34);
         title.HorizontalAlignment = HorizontalAlignment.Center;
+        title.AddThemeColorOverride("font_color", Color.FromHtml("#F7E7B2"));
         AddChild(title);
 
-        AddStation(50, string.Format(Tr("UI_TRADE_EXCHANGE_YOURS"), _state.OutgoingCount));
-        AddStation(430, string.Format(Tr("UI_TRADE_EXCHANGE_INCOMING"), _state.IncomingCount));
+        var sub = UiFactory.CreateLabel(
+            string.Format(
+                Tr("UI_TRADE_EXCHANGE_SUMMARY"),
+                _state.OutgoingCount,
+                _state.IncomingCount),
+            8);
+        sub.Position = new Vector2(0, 64);
+        sub.Size = new Vector2(640, 22);
+        sub.HorizontalAlignment = HorizontalAlignment.Center;
+        sub.AddThemeColorOverride("font_color", Color.FromHtml("#D7E2C7"));
+        AddChild(sub);
 
-        var cable = new Line2D
-        {
-            Width = 4,
-            DefaultColor = Color.FromHtml("#6C7F70"),
-            Points = new[] { new Vector2(185, 174), new Vector2(455, 174) },
-            ZIndex = 2
-        };
-        AddChild(cable);
+        var leftLabel = UiFactory.CreateLabel(Tr("UI_TRADE_EXCHANGE_YOU_SENT"), 7);
+        leftLabel.Position = new Vector2(78, 103);
+        leftLabel.Size = new Vector2(190, 18);
+        leftLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        AddChild(leftLabel);
 
-        _energy = new Polygon2D
-        {
-            Polygon = BuildCircle(22, 20),
-            Color = Color.FromHtml("#FFF2A8"),
-            Position = new Vector2(320, 174),
-            Scale = Vector2.Zero,
-            ZIndex = 4
-        };
-        AddChild(_energy);
+        var rightLabel = UiFactory.CreateLabel(Tr("UI_TRADE_EXCHANGE_YOU_RECEIVED"), 7);
+        rightLabel.Position = new Vector2(372, 103);
+        rightLabel.Size = new Vector2(190, 18);
+        rightLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        AddChild(rightLabel);
 
-        // ponytail: show one representative per side; sequence every asset if batch trades become common.
         if (_state.Outgoing != null)
         {
             _outgoingVisual = CreateAssetVisual(_state.Outgoing);
-            _outgoingVisual.Position = new Vector2(106, 124);
+            _outgoingVisual.Position = new Vector2(139, 124);
             _outgoingVisual.PivotOffset = new Vector2(34, 34);
             AddChild(_outgoingVisual);
         }
@@ -112,7 +115,6 @@ public partial class TradeExchangeScreen : Control
         _return.Size = new Vector2(140, 28);
         _return.Pressed += () => ReturnRequested?.Invoke();
         AddChild(_return);
-        _return.GrabFocus();
 
         PlayExchange();
     }
@@ -133,94 +135,71 @@ public partial class TradeExchangeScreen : Control
             if (!IsInsideTree())
                 return;
 
-            _status.Text = Tr("UI_TRADE_EXCHANGE_SENDING");
-            var sent = CreateTween().SetParallel(true);
-            sent.TweenProperty(_outgoingVisual, "position", new Vector2(286, 124), 0.8)
-                .SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.In);
-            sent.TweenProperty(_outgoingVisual, "scale", new Vector2(0.15f, 0.15f), 0.8);
-            sent.TweenProperty(_outgoingVisual, "modulate:a", 0.0f, 0.8);
-            await ToSignal(sent, Tween.SignalName.Finished);
+            var leave = CreateTween().SetParallel(true);
+            leave.TweenProperty(_outgoingVisual, "position:x", -110.0f, 0.62)
+                .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.In);
+            leave.TweenProperty(_outgoingVisual, "modulate:a", 0.0f, 0.42).SetDelay(0.18);
+            await ToSignal(leave, Tween.SignalName.Finished);
             if (!IsInsideTree())
                 return;
         }
 
-        _status.Text = Tr("UI_TRADE_EXCHANGE_LINKING");
-        var flash = CreateTween();
-        flash.TweenProperty(_energy, "scale", Vector2.One, 0.22)
-            .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
-        flash.TweenProperty(_energy, "scale", new Vector2(0.25f, 0.25f), 0.25);
-        await ToSignal(flash, Tween.SignalName.Finished);
+        _status.Text = Tr("UI_TRADE_EXCHANGE_TRAVELLING");
+        await ToSignal(GetTree().CreateTimer(0.55), SceneTreeTimer.SignalName.Timeout);
         if (!IsInsideTree())
             return;
 
-        if (_incomingVisual == null || _state!.Incoming == null)
+        if (_incomingVisual != null)
         {
-            _return.Text = Tr("UI_RACE_RETURN");
-            return;
+            _status.Text = string.Format(
+                Tr("UI_TRADE_EXCHANGE_WELCOME"),
+                _state!.Incoming!.DisplayName);
+            var arrive = CreateTween().SetParallel(true);
+            arrive.TweenProperty(_incomingVisual, "position:x", 433.0f, 0.62)
+                .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+            arrive.TweenProperty(_incomingVisual, "scale", Vector2.One, 0.52)
+                .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+            arrive.TweenProperty(_incomingVisual, "modulate:a", 1.0f, 0.28);
+            await ToSignal(arrive, Tween.SignalName.Finished);
+            if (!IsInsideTree())
+                return;
         }
 
-        _status.Text = string.Format(Tr("UI_TRADE_EXCHANGE_ARRIVED"), _state.Incoming.DisplayName);
-        var arrived = CreateTween().SetParallel(true);
-        arrived.TweenProperty(_incomingVisual, "position", new Vector2(466, 124), 0.9)
-            .SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
-        arrived.TweenProperty(_incomingVisual, "scale", Vector2.One, 0.7)
-            .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
-        arrived.TweenProperty(_incomingVisual, "modulate:a", 1.0f, 0.35);
-        await ToSignal(arrived, Tween.SignalName.Finished);
-        if (!IsInsideTree())
-            return;
-
-        _return.Text = Tr("UI_RACE_RETURN");
-    }
-
-    private void AddStation(float x, string heading)
-    {
-        var panel = UiFactory.CreatePanel(new Vector2(160, 176));
-        panel.Position = new Vector2(x, 76);
-        panel.Size = new Vector2(160, 176);
-        AddChild(panel);
-
-        var label = UiFactory.CreateLabel(heading, 8);
-        label.HorizontalAlignment = HorizontalAlignment.Center;
-        panel.AddChild(label);
+        _status.Text = Tr("UI_TRADE_EXCHANGE_COMPLETE");
+        _return.Text = Tr("UI_COMMON_RETURN");
     }
 
     private static Control CreateAssetVisual(TradeExchangeAssetView asset)
     {
-        if (!asset.IsEgg)
+        var box = new VBoxContainer
         {
-            var portrait = UiFactory.CreatePortrait(
-                ParseTint(asset.TintHex),
+            CustomMinimumSize = new Vector2(68, 116)
+        };
+        box.AddThemeConstantOverride("separation", 4);
+
+        Control visual;
+        if (asset.IsEgg)
+        {
+            var label = UiFactory.CreateLabel("🥚", 32);
+            label.HorizontalAlignment = HorizontalAlignment.Center;
+            label.CustomMinimumSize = new Vector2(68, 68);
+            visual = label;
+        }
+        else
+        {
+            visual = UiFactory.CreatePortrait(
+                UiFactory.ParseTint(asset.TintHex),
                 asset.HasAngelMutation,
                 asset.OtherMutationCount,
                 new Vector2(68, 68));
-            portrait.Size = new Vector2(68, 68);
-            return portrait;
         }
+        box.AddChild(visual);
 
-        return new TextureRect
-        {
-            Texture = EggTexture,
-            Size = new Vector2(68, 68),
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered
-        };
-    }
-
-    private static Color ParseTint(string tintHex)
-    {
-        try { return Color.FromHtml(tintHex); }
-        catch { return Color.FromHtml("#F6F0C9"); }
-    }
-
-    private static Vector2[] BuildCircle(float radius, int points)
-    {
-        var polygon = new Vector2[points];
-        for (var i = 0; i < points; i++)
-        {
-            var angle = Mathf.Tau * i / points;
-            polygon[i] = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
-        }
-        return polygon;
+        var name = UiFactory.CreateLabel(asset.DisplayName, 8);
+        name.HorizontalAlignment = HorizontalAlignment.Center;
+        name.CustomMinimumSize = new Vector2(68, 22);
+        name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        box.AddChild(name);
+        return box;
     }
 }
