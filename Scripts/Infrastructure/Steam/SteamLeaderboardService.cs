@@ -200,7 +200,7 @@ internal sealed class SteamLeaderboardService : ILeaderboardService
         }
     }
 
-    private static IReadOnlyList<LeaderboardEntry> ParseEntries(Godot.Collections.Array entries)
+    private IReadOnlyList<LeaderboardEntry> ParseEntries(Godot.Collections.Array entries)
     {
         var parsed = new List<LeaderboardEntry>(entries.Count);
         foreach (var raw in entries)
@@ -227,11 +227,13 @@ internal sealed class SteamLeaderboardService : ILeaderboardService
                     .ToArray();
             }
 
+            var userId = unchecked((ulong)steamId);
             parsed.Add(new LeaderboardEntry(
-                new PlatformUserId(unchecked((ulong)steamId)),
+                new PlatformUserId(userId),
                 (int)rank,
                 (int)score,
-                details));
+                details,
+                _api.GetFriendPersonaName(userId)));
         }
 
         return parsed
