@@ -34,6 +34,7 @@ public partial class MainController
         panel.JoinRequested += JoinChallenge;
         panel.LeaveRequested += LeaveChallenge;
         panel.CancelRequested += CancelChallenge;
+        panel.RaceSetupRequested += ShowMultiplayerRaceSetup;
         _challengeHubPanel = panel;
         box.AddChild(panel);
     }
