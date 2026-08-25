@@ -280,6 +280,17 @@ public partial class GameBootstrap : Node
             stateRepository,
             _leaderboardProjection);
 
+        var dailyRaceFacade = new DailyFriendRaceFacade(
+            _dailyFriendRace,
+            () => session.State,
+            session.NotifyExternallyPersistedStateChanged);
+        var dailyRaceBridge = new DailyFriendRacePresentationBridge
+        {
+            Name = nameof(DailyFriendRacePresentationBridge)
+        };
+        dailyRaceBridge.Configure(dailyRaceFacade);
+        AddChild(dailyRaceBridge);
+
         // Only retry today's completed board on startup. This keeps Steam work bounded and avoids
         // replaying a history of dynamic leaderboard operations. Local completion remains valid even
         // if this projection never succeeds.
