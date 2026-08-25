@@ -33,10 +33,10 @@ public partial class DailyFriendRacePresentationBridge : Node
     public DailyFriendRaceCompleteResult Complete(string dailyKey, int finishedMilliseconds)
         => RequireFacade().Complete(dailyKey, finishedMilliseconds);
 
-    public Task<LeaderboardOperationResult> ProjectTodayAsync(
-        DateTimeOffset utcNow,
+    public Task<LeaderboardOperationResult> ProjectAsync(
+        string dailyKey,
         CancellationToken cancellationToken = default)
-        => RequireFacade().ProjectTodayAsync(utcNow, cancellationToken);
+        => RequireFacade().ProjectAsync(dailyKey, cancellationToken);
 
     private DailyFriendRaceFacade RequireFacade()
         => _facade ?? throw new InvalidOperationException("Daily race presentation bridge is not configured.");
