@@ -68,3 +68,6 @@ msgstr "ACCEPTED"
 
 msgid "UI_TRADE_CANCELLED"
 msgstr "Trade cancelled."
+
+msgid "UI_TRADE_ENDED"
+msgstr "The trade ended before it was completed."
