@@ -39,6 +39,7 @@ public partial class MainController
         panel.FriendsLeaderboardRequested += ShowFriendsLeaderboards;
         panel.DailyRaceRequested += ShowDailyRace;
         panel.ChallengesRequested += ShowChallenges;
+        panel.TradesRequested += ShowTrades;
         panel.ShareSelectedRequested += ShareSelectedVoidling;
         panel.RemoveSelectedRequested += RemoveSelectedSharedVoidling;
         _connectedZonePanel = panel;
