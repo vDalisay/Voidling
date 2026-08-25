@@ -11,6 +11,7 @@ public sealed record OptionalMultiplayerComposition(
     MultiplayerConnectionService Connection,
     ConnectedZoneService ConnectedZone,
     ChallengeCoordinator Challenges,
+    ILeaderboardService Leaderboards,
     Node? RuntimeNode,
     bool SteamAvailable,
     string? UnavailableReason);
@@ -49,6 +50,7 @@ public static class OptionalMultiplayerComposer
             IPlatformIdentityService identity = new SteamPlatformIdentityService(api);
             ILobbyService lobbies = new SteamLobbyService(api, runtime, identity);
             IMultiplayerTransport transport = new SteamNetworkingMessagesTransport(api, runtime, lobbies);
+            ILeaderboardService leaderboards = new SteamLeaderboardService(api, runtime);
             var connection = new MultiplayerConnectionService(identity, lobbies, transport);
             var connectedZone = new ConnectedZoneService(connection);
             var challenges = new ChallengeCoordinator(connection);
@@ -61,6 +63,7 @@ public static class OptionalMultiplayerComposer
                 connection,
                 connectedZone,
                 challenges,
+                leaderboards,
                 runtime,
                 true,
                 null);
@@ -76,6 +79,7 @@ public static class OptionalMultiplayerComposer
         var identity = new OfflinePlatformIdentityService(reason);
         var lobbies = new OfflineLobbyService(reason);
         var transport = new OfflineMultiplayerTransport(reason);
+        var leaderboards = new OfflineLeaderboardService(reason);
         var connection = new MultiplayerConnectionService(identity, lobbies, transport);
         var connectedZone = new ConnectedZoneService(connection);
         var challenges = new ChallengeCoordinator(connection);
@@ -83,6 +87,7 @@ public static class OptionalMultiplayerComposer
             connection,
             connectedZone,
             challenges,
+            leaderboards,
             null,
             false,
             reason);
