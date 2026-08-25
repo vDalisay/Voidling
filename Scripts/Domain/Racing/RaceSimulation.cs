@@ -64,7 +64,11 @@ public sealed class RaceSimulation
 {
     public const double FixedStepSeconds = 1.0 / 60.0;
     private const float GlideFailureTolerance = 1.0f;
-    private const float ObstacleTriggerLead = 14.0f;
+
+    // RaceScreen intentionally places the visible hurdle 18px ahead of the course marker. Keep the
+    // obstacle event 14px before that visible center so the jump animation peaks at the hurdle,
+    // rather than resolving ~32px before the sprite as it did previously.
+    private const float ObstacleTriggerLead = -4.0f;
 
     private readonly RaceCourse _course;
     private readonly RacePerformanceModel _performance;
