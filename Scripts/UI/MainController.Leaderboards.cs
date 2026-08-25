@@ -6,6 +6,9 @@ namespace VoidlingGame;
 
 public partial class MainController
 {
+    private const string DemoCourseLeaderboardId = "demo";
+    private const int DemoCourseLeaderboardRulesVersion = 1;
+
     private FriendsLeaderboardPanel? _friendsLeaderboardPanel;
     private int _friendsLeaderboardRequestVersion;
 
@@ -24,6 +27,7 @@ public partial class MainController
             string.Empty));
         panel.MultiplayerWinsRequested += LoadFriendMultiplayerWins;
         panel.TodayDailyRequested += LoadTodayDailyFriendRace;
+        panel.CourseBestRequested += LoadFriendDemoCourseBestTime;
         _friendsLeaderboardPanel = panel;
         box.AddChild(panel);
 
@@ -78,6 +82,59 @@ public partial class MainController
         }
 
         DeferredApplyFriendsLeaderboardResult(requestVersion, result);
+    }
+
+    private async void LoadFriendDemoCourseBestTime()
+    {
+        var requestVersion = BeginFriendsLeaderboardRequest(
+            FriendsLeaderboardKind.CourseBestTime,
+            DemoCourseLeaderboardId);
+        if (requestVersion < 0)
+            return;
+
+        FriendsLeaderboardViewResult result;
+        try
+        {
+            result = await _friendsLeaderboardBridge.LoadCourseBestTimeAsync(
+                DemoCourseLeaderboardId,
+                DemoCourseLeaderboardRulesVersion);
+        }
+        catch (Exception exception)
+        {
+            result = FriendsLeaderboardViewResult.Failed(
+                FriendsLeaderboardKind.CourseBestTime,
+                DemoCourseLeaderboardId,
+                exception.Message);
+        }
+
+        DeferredApplyFriendsLeaderboardResult(requestVersion, result);
+    }
+
+    private async void ProjectSinglePlayerCourseBestTime(int finishedMilliseconds)
+    {
+        if (finishedMilliseconds <= 0 || !_friendsLeaderboardBridge.Availability.IsAvailable)
+            return;
+
+        try
+        {
+            var result = await _friendsLeaderboardBridge.UploadCourseBestTimeAsync(
+                DemoCourseLeaderboardId,
+                DemoCourseLeaderboardRulesVersion,
+                finishedMilliseconds);
+            if (!result.Success)
+            {
+                GD.PushWarning(
+                    "Steam course-best leaderboard projection failed: " +
+                    (result.Error ?? "unknown Steam leaderboard error") +
+                    ". The local race result and reward remain valid.");
+            }
+        }
+        catch (Exception exception)
+        {
+            GD.PushWarning(
+                $"Steam course-best leaderboard projection threw: {exception.Message}. " +
+                "The local race result and reward remain valid.");
+        }
     }
 
     private int BeginFriendsLeaderboardRequest(
