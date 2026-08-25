@@ -31,6 +31,7 @@ public partial class ConnectedZonePanel : VBoxContainer
     public event Action? LeaveRequested;
     public event Action? FriendsLeaderboardRequested;
     public event Action? DailyRaceRequested;
+    public event Action? ChallengesRequested;
     public event Action? ShareSelectedRequested;
     public event Action? RemoveSelectedRequested;
 
@@ -138,26 +139,29 @@ public partial class ConnectedZonePanel : VBoxContainer
             AddChild(UiFactory.CreateLabel(text, 7));
         }
 
-        var actions = new HBoxContainer();
-        actions.AddThemeConstantOverride("separation", 6);
+        var sessionActions = new HBoxContainer();
+        sessionActions.AddThemeConstantOverride("separation", 6);
         var invite = UiFactory.CreateButton(Tr("UI_ONLINE_INVITE"));
-        invite.CustomMinimumSize = new Vector2(105, 25);
+        invite.CustomMinimumSize = new Vector2(112, 25);
         invite.Pressed += () => InviteRequested?.Invoke();
-        actions.AddChild(invite);
+        sessionActions.AddChild(invite);
 
-        var daily = BuildDailyRaceButton();
-        daily.CustomMinimumSize = new Vector2(91, 25);
-        actions.AddChild(daily);
-
-        var boards = BuildFriendsBoardButton();
-        boards.CustomMinimumSize = new Vector2(105, 25);
-        actions.AddChild(boards);
+        var challenges = UiFactory.CreateButton(Tr("UI_ONLINE_CHALLENGES"));
+        challenges.CustomMinimumSize = new Vector2(112, 25);
+        challenges.Pressed += () => ChallengesRequested?.Invoke();
+        sessionActions.AddChild(challenges);
 
         var leave = UiFactory.CreateButton(Tr("UI_ONLINE_LEAVE"));
-        leave.CustomMinimumSize = new Vector2(91, 25);
+        leave.CustomMinimumSize = new Vector2(96, 25);
         leave.Pressed += () => LeaveRequested?.Invoke();
-        actions.AddChild(leave);
-        AddChild(actions);
+        sessionActions.AddChild(leave);
+        AddChild(sessionActions);
+
+        var socialActions = new HBoxContainer();
+        socialActions.AddThemeConstantOverride("separation", 6);
+        socialActions.AddChild(BuildDailyRaceButton());
+        socialActions.AddChild(BuildFriendsBoardButton());
+        AddChild(socialActions);
 
         AddChild(UiFactory.CreateLabel(Tr("UI_ONLINE_SHARE_TITLE"), 8));
         if (string.IsNullOrWhiteSpace(state.SelectedVoidlingName))
