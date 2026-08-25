@@ -175,12 +175,17 @@ public sealed class MultiplayerRaceFacade
 
         var local = _connection.LocalUser;
         var finishOrder = session.Simulation.FinishOrder;
+        var finishPlacements = finishOrder
+            .Select((participantId, index) => (participantId, placement: index + 1))
+            .ToDictionary(value => value.participantId, value => value.placement, StringComparer.Ordinal);
         var distance = Math.Max(1.0f, race.Course.EndX - race.Course.StartX);
         var participants = race.Start.Entrants
             .Select(entrant =>
             {
                 var state = session.Simulation.GetState(entrant.Participant.CreatureId);
-                var finishIndex = finishOrder.IndexOf(entrant.Participant.CreatureId);
+                var hasPlacement = finishPlacements.TryGetValue(
+                    entrant.Participant.CreatureId,
+                    out var placement);
                 return new MultiplayerRaceParticipantView(
                     entrant.Participant.CreatureId,
                     entrant.Participant.DisplayName,
@@ -194,7 +199,7 @@ public sealed class MultiplayerRaceFacade
                     state.CheerSeconds,
                     state.Terrain,
                     state.Finished,
-                    finishIndex >= 0 ? finishIndex + 1 : null);
+                    hasPlacement ? placement : null);
             })
             .ToArray();
 
