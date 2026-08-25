@@ -75,7 +75,9 @@ public partial class FriendsLeaderboardPanel : VBoxContainer
         daily.Pressed += () => TodayDailyRequested?.Invoke();
         tabs.AddChild(daily);
 
-        var course = UiFactory.CreateButton(Tr("UI_LEADERBOARD_COURSE"));
+        // English is currently the only authored locale. Keep the course tab readable until the
+        // localization catalog grows rather than displaying a missing translation key at runtime.
+        var course = UiFactory.CreateButton("Course Best");
         course.CustomMinimumSize = new Vector2(128, 25);
         course.Disabled = !state.Available || state.Loading;
         course.Pressed += () => CourseBestRequested?.Invoke();
@@ -96,9 +98,7 @@ public partial class FriendsLeaderboardPanel : VBoxContainer
             FriendsLeaderboardKind.DailyRace => string.Format(
                 Tr("UI_LEADERBOARD_DAILY_CONTEXT"),
                 state.ContextLabel),
-            FriendsLeaderboardKind.CourseBestTime => string.Format(
-                Tr("UI_LEADERBOARD_COURSE_CONTEXT"),
-                state.ContextLabel),
+            FriendsLeaderboardKind.CourseBestTime => $"Course best • {state.ContextLabel}",
             _ => Tr("UI_LEADERBOARD_WINS_CONTEXT")
         };
         AddChild(UiFactory.CreateLabel(heading, 8));
