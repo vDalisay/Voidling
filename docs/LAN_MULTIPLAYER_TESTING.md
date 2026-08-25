@@ -1,0 +1,229 @@
+# LAN Multiplayer Testing
+
+Voidling's production multiplayer transport is Steam/GodotSteam. The LAN mode described here is a **development-only test transport** that uses Godot's ENet peer over UDP while keeping the same multiplayer Application services, protocols, Garden replication, trading, challenges, and deterministic race logic.
+
+The purpose is to validate multiplayer behavior before debugging Steam callbacks, Steam lobbies, Steam Networking Messages, or Steam Datagram Relay.
+
+## What LAN mode tests
+
+LAN mode exercises the real Voidling multiplayer stack above the transport boundary:
+
+- connected Garden membership;
+- reliable shared-Voidling publish/remove replication;
+- transient remote movement updates;
+- Voidling and egg trade protocols and persisted two-phase commit;
+- challenge offers/join/leave/cancel;
+- 2-4 player deterministic race setup;
+- synchronized race-start payload acknowledgement;
+- lockstep Cheer scheduling;
+- deterministic checksums and result consensus;
+- multiplayer race reward persistence.
+
+LAN mode does **not** emulate Steam-specific services:
+
+- Steam friends or presence;
+- Steam invite overlay/deep links;
+- Steam leaderboards;
+- Steam Datagram Relay/NAT traversal;
+- Steam Networking Messages callback/signature behavior.
+
+Those still require the later real two-account GodotSteam validation pass.
+
+## Architecture
+
+LAN mode is selected only when an explicit `--voidling-lan-host` or `--voidling-lan-join=...` argument is supplied.
+
+```text
+Application multiplayer services
+        |
+        +-- IPlatformIdentityService
+        +-- ILobbyService
+        +-- IMultiplayerTransport
+        |
+        +------------+----------------+
+                     |                |
+             LAN development      Production
+                  ENet              Steam
+```
+
+Normal launches do not activate the LAN adapter. If no LAN flags are present, normal Steam detection/fallback behavior remains unchanged.
+
+The LAN topology is host-relayed. Clients physically connect to the ENet host, but application packets retain their logical source, target, channel, and reliable/unreliable delivery mode. The Application layer therefore receives the same packet contract it uses with Steam.
+
+Default UDP port: **27181**.
+
+## Command-line flags
+
+| Flag | Meaning |
+| --- | --- |
+| `--voidling-lan-host` | Start this process as the development LAN host. |
+| `--voidling-lan-join=<address>` | Connect this process to a LAN host, e.g. `127.0.0.1` or `192.168.1.50`. |
+| `--voidling-lan-port=<port>` | Optional UDP port override. Both peers must use the same port. Default `27181`. |
+| `--voidling-lan-name=<name>` | Development display name shown to the other LAN peers. |
+| `--voidling-dev-profile=<profile>` | Use a separate `user://` save for this process. Strongly recommended for same-PC tests. |
+| `--voidling-lan-smoke` | Automated two-peer Hello handshake probe; exits `0` on success or `2` on timeout/failure. |
+
+`playgame.bat` forwards unknown arguments to Godot, so these flags can be supplied directly after the normal optional `--no-build`/`-n` build flag.
+
+## First test: two instances on one Windows PC
+
+### 1. Build once
+
+From the repository root:
+
+```bat
+build.bat
+```
+
+### 2. Start the host
+
+Open a command prompt in the repository root:
+
+```bat
+playgame.bat --no-build --voidling-lan-host --voidling-lan-name=Alice --voidling-dev-profile=A
+```
+
+The host automatically opens the LAN connected-Garden session. You do not need Steam or GodotSteam for this launch.
+
+### 3. Start the client
+
+Open a second command prompt in the same repository root:
+
+```bat
+playgame.bat --no-build --voidling-lan-join=127.0.0.1 --voidling-lan-name=Bob --voidling-dev-profile=B
+```
+
+The two profiles use different save files:
+
+```text
+user://voidling_mvp_save_A.json
+user://voidling_mvp_save_B.json
+```
+
+Do **not** omit the profiles when running both processes on one computer if you intend to test trading or persistent race rewards. Without profiles both processes would point at the normal save file.
+
+### 4. Verify the Connected Garden
+
+Open **Online** in both windows. Verify:
+
+1. both `Alice` and `Bob` appear in the member list;
+2. Alice is shown as host;
+3. Steam Friend Boards are unavailable in LAN mode, without affecting the Garden;
+4. ordinary single-player systems continue functioning in both windows.
+
+### 5. Verify shared Voidlings
+
+On Alice:
+
+1. select a local Voidling;
+2. open **Online**;
+3. choose **Share Selected**;
+4. move/observe the Voidling in the Garden.
+
+On Bob verify:
+
+- the remote Voidling appears;
+- it moves smoothly from transient updates;
+- it is not inserted into Bob's local roster or save;
+- stopping sharing on Alice removes the remote actor on Bob.
+
+Repeat in the opposite direction.
+
+### 6. Verify trading
+
+Use **Online -> Trades**:
+
+1. Alice offers one Voidling or egg to Bob;
+2. Bob sees the incoming offer even if the Trades modal was closed when it arrived;
+3. test decline;
+4. test a gift with no return asset;
+5. test a two-sided trade;
+6. close and reopen each game after a completed trade and verify ownership persisted correctly.
+
+### 7. Verify multiplayer racing
+
+Use **Online -> Challenges**:
+
+1. Alice offers a Race challenge;
+2. Bob joins;
+3. both players open Race Setup and lock a Voidling;
+4. the creator/host starts the race;
+5. verify both clients enter the synchronized race;
+6. use Cheer on both players at different moments;
+7. verify both clients finish with the same ordering;
+8. return to each local Garden;
+9. verify the winner's local multiplayer-win progress persists.
+
+## Automated same-machine socket smoke
+
+The smoke mode uses the same typed `MultiplayerProtocol` Hello message as production Steam networking. Run the host and client in separate terminals after a successful build/import.
+
+Host:
+
+```bat
+playgame.bat --no-build --voidling-lan-host --voidling-lan-name=SmokeHost --voidling-dev-profile=smoke_host --voidling-lan-smoke
+```
+
+Client:
+
+```bat
+playgame.bat --no-build --voidling-lan-join=127.0.0.1 --voidling-lan-name=SmokeClient --voidling-dev-profile=smoke_client --voidling-lan-smoke
+```
+
+Each process should print:
+
+```text
+[multiplayer-probe] LAN_SMOKE_SUCCESS
+```
+
+and exit successfully. The GitHub Actions workflow runs the same two-process handshake headlessly on every PR build.
+
+## Two computers on the same LAN
+
+On the host computer:
+
+```bat
+playgame.bat --no-build --voidling-lan-host --voidling-lan-name=Alice --voidling-dev-profile=A
+```
+
+Find that computer's LAN IPv4 address, for example `192.168.1.50`.
+
+On the second computer:
+
+```bat
+playgame.bat --no-build --voidling-lan-join=192.168.1.50 --voidling-lan-name=Bob --voidling-dev-profile=B
+```
+
+If the connection times out:
+
+- confirm both machines are on the same network;
+- allow Godot/Voidling through the host OS firewall;
+- allow **UDP 27181** on the host, or the custom port supplied with `--voidling-lan-port`;
+- verify the client is using the host's LAN IPv4 address, not a public address.
+
+For a custom port, specify the same value on both processes:
+
+```bat
+--voidling-lan-port=32123
+```
+
+## Expected development limitations
+
+- LAN mode is not advertised or supported as a shipping multiplayer option.
+- Steam leaderboards and Steam friend discovery remain unavailable in LAN mode.
+- The development LAN host is fixed as the session host. If it exits, clients lose the LAN session. Production Steam lobby-owner migration is tested separately with Steam.
+- LAN mode does not attempt internet NAT traversal. It is intended for loopback and local networks only.
+- The casual trust model remains unchanged: this is a consistency test harness, not an anti-cheat system.
+
+## Recommended validation order before merging multiplayer
+
+1. GitHub Actions two-process LAN Hello smoke.
+2. Same-PC Connected Garden sharing/movement.
+3. Same-PC trading, including restart persistence.
+4. Same-PC 2-player deterministic race + Cheer.
+5. Two-PC LAN repetition of the same flows.
+6. Disconnect/error testing on LAN.
+7. Install/pin GodotSteam and repeat the same scenarios with two Steam accounts.
+8. Validate Steam friends/invites/leaderboards/SDR specifically.
+
+The LAN pass is intentionally a transport-independent confidence step. Passing it does not remove the requirement for the final Steam integration pass.
