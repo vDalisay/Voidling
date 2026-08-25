@@ -15,6 +15,7 @@ public partial class MainController
     private TradeExchangeScreen? _tradeExchangeScreen;
     private bool _tradeBridgeSubscribed;
     private string? _openTradeNegotiationId;
+    private string? _scheduledTradeNegotiationId;
 
     private sealed record PendingTradeExchange(
         string NegotiationId,
@@ -50,6 +51,7 @@ public partial class MainController
         }
 
         _openTradeNegotiationId = null;
+        _scheduledTradeNegotiationId = null;
         _tradeNegotiationPanel = null;
         var box = OpenOnlineModal(Tr("UI_TRADE_TITLE"), new Vector2(548, 330), ShowConnectedZone);
         var panel = new TradeHubPanel();
@@ -83,7 +85,10 @@ public partial class MainController
             return;
         }
 
-        // The host-authoritative negotiation state opens the shared room for both participants.
+        // The accepting host can transition synchronously; a non-host receives the host echo shortly
+        // afterwards. Try immediately and keep the state/event fallback below so both participants are
+        // pulled into the same room without clicking Trades again.
+        ScheduleTradeRoomOpen(negotiationId);
         RefreshTradeHub();
     }
 
@@ -97,11 +102,21 @@ public partial class MainController
 
     private void ShowTradeRoom(string negotiationId)
     {
+        _scheduledTradeNegotiationId = null;
         var current = TradeBridge.Current;
         var trade = current.ActiveNegotiation;
         if (trade == null || !string.Equals(trade.NegotiationId, negotiationId, StringComparison.Ordinal))
         {
-            ShowTrades();
+            // A non-host may still be waiting for the authoritative host echo. Do not bounce it out
+            // of the trade flow; NegotiationActivated/StateChanged will schedule another attempt.
+            RefreshTradeHub();
+            return;
+        }
+
+        if (_tradeNegotiationPanel != null && GodotObject.IsInstanceValid(_tradeNegotiationPanel) &&
+            string.Equals(_openTradeNegotiationId, negotiationId, StringComparison.Ordinal))
+        {
+            _tradeNegotiationPanel.Render(current);
             return;
         }
 
@@ -114,7 +129,22 @@ public partial class MainController
         panel.AcceptedChanged += accepted => SetTradeAccepted(negotiationId, accepted);
         panel.CancelRequested += () => CancelTradeNegotiation(negotiationId);
         _tradeNegotiationPanel = panel;
+        _tradeHubPanel = null;
         box.AddChild(panel);
+    }
+
+    private void ScheduleTradeRoomOpen(string negotiationId)
+    {
+        if (string.IsNullOrWhiteSpace(negotiationId) ||
+            string.Equals(_scheduledTradeNegotiationId, negotiationId, StringComparison.Ordinal) ||
+            (_tradeNegotiationPanel != null && GodotObject.IsInstanceValid(_tradeNegotiationPanel) &&
+             string.Equals(_openTradeNegotiationId, negotiationId, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        _scheduledTradeNegotiationId = negotiationId;
+        Callable.From(() => ShowTradeRoom(negotiationId)).CallDeferred();
     }
 
     private void SelectTradeVoidling(string negotiationId, string? assetId)
@@ -142,6 +172,7 @@ public partial class MainController
 
         _pendingTradeExchanges.Remove(negotiationId);
         _openTradeNegotiationId = null;
+        _scheduledTradeNegotiationId = null;
         _tradeNegotiationPanel = null;
         ShowToast(Tr("UI_TRADE_CANCELLED"));
         ShowTrades();
@@ -153,7 +184,15 @@ public partial class MainController
         {
             RememberPendingTrade(state.ActiveNegotiation);
             if (_tradeNegotiationPanel != null && GodotObject.IsInstanceValid(_tradeNegotiationPanel))
+            {
                 _tradeNegotiationPanel.Render(state);
+            }
+            else if (state.ActiveNegotiation.Phase == TradeNegotiationPhase.Negotiating)
+            {
+                // Host-local transitions can already be canonical before a callback reaches the UI.
+                // State reconciliation therefore also owns auto-entry, independently of event order.
+                ScheduleTradeRoomOpen(state.ActiveNegotiation.NegotiationId);
+            }
         }
         else if (_tradeNegotiationPanel != null && GodotObject.IsInstanceValid(_tradeNegotiationPanel))
         {
@@ -191,6 +230,7 @@ public partial class MainController
 
         _pendingTradeExchanges.Remove(negotiationId);
         _openTradeNegotiationId = null;
+        _scheduledTradeNegotiationId = null;
         _tradeNegotiationPanel = null;
         ShowToast(Tr("UI_TRADE_ENDED"));
         ShowTrades();
@@ -209,8 +249,7 @@ public partial class MainController
     private void OnTradeNegotiationActivated(TradeNegotiationView negotiation)
     {
         RememberPendingTrade(negotiation);
-        var negotiationId = negotiation.NegotiationId;
-        Callable.From(() => ShowTradeRoom(negotiationId)).CallDeferred();
+        ScheduleTradeRoomOpen(negotiation.NegotiationId);
     }
 
     private void RememberPendingTrade(TradeNegotiationView negotiation)
@@ -253,6 +292,7 @@ public partial class MainController
 
         _pendingTradeExchanges.Remove(pending.NegotiationId);
         _openTradeNegotiationId = null;
+        _scheduledTradeNegotiationId = null;
         _tradeNegotiationPanel = null;
         _gardenEventLog.Append(string.Format(
             Tr("UI_GARDEN_LOG_TRADE_COMPLETE"),
