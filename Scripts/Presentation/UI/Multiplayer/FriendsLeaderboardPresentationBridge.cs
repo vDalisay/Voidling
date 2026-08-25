@@ -98,6 +98,17 @@ public partial class FriendsLeaderboardPresentationBridge : Node
             result);
     }
 
+    public Task<LeaderboardOperationResult> UploadCourseBestTimeAsync(
+        string stableCourseId,
+        int rulesVersion,
+        int finishedMilliseconds,
+        CancellationToken cancellationToken = default)
+        => RequireProjection().UploadCourseBestTimeAsync(
+            stableCourseId,
+            rulesVersion,
+            finishedMilliseconds,
+            cancellationToken);
+
     private static FriendsLeaderboardViewResult Map(
         FriendsLeaderboardKind kind,
         string contextLabel,
