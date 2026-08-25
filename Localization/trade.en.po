@@ -1,0 +1,70 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Voidling\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "UI_COMMON_ACCEPT"
+msgstr "Accept"
+
+msgid "UI_TRADE_INVITE_HINT"
+msgstr "Invite a player first. You will choose your Voidlings after they enter the trading room."
+
+msgid "UI_TRADE_WAITING_INVITE"
+msgstr "Waiting for {0} to accept your trade invitation..."
+
+msgid "UI_TRADE_INVITE"
+msgstr "Invite to Trade"
+
+msgid "UI_TRADE_INVITE_FROM"
+msgstr "{0} invited you to trade."
+
+msgid "UI_TRADE_INVITE_SENT"
+msgstr "Trade invitation sent."
+
+msgid "UI_TRADE_ROOM_TITLE"
+msgstr "VOIDLING TRADE"
+
+msgid "UI_TRADE_ROOM_CLOSED"
+msgstr "This trade is no longer active."
+
+msgid "UI_TRADE_ROOM_WITH"
+msgstr "Trading with {0}"
+
+msgid "UI_TRADE_CHOOSE_ONE"
+msgstr "Choose one Voidling to place forward."
+
+msgid "UI_TRADE_UNACCEPT"
+msgstr "Undo Accept"
+
+msgid "UI_TRADE_FINALIZING"
+msgstr "Both players accepted. Finalizing safely..."
+
+msgid "UI_TRADE_PARTNER_ACCEPTED"
+msgstr "Your partner accepted. Press Accept when you are ready."
+
+msgid "UI_TRADE_PARTNER_WAITING"
+msgstr "Waiting for both players to accept."
+
+msgid "UI_TRADE_YOUR_OFFER"
+msgstr "YOUR OFFER"
+
+msgid "UI_TRADE_SLOT_EMPTY"
+msgstr "Choose a Voidling below."
+
+msgid "UI_TRADE_THEIR_OFFER"
+msgstr "{0}'s OFFER"
+
+msgid "UI_TRADE_SLOT_WAITING"
+msgstr "Waiting for a Voidling..."
+
+msgid "UI_TRADE_REMOTE_SYNCING"
+msgstr "Partner selected a Voidling. Syncing preview..."
+
+msgid "UI_TRADE_ACCEPTED_MARK"
+msgstr "ACCEPTED"
+
+msgid "UI_TRADE_CANCELLED"
+msgstr "Trade cancelled."
