@@ -182,6 +182,17 @@ public partial class GameBootstrap : Node
         _tradeCoordinator.LocalStateChanged += session.NotifyExternallyPersistedStateChanged;
         _tradeCoordinator.ProtocolRejected += reason =>
             GD.PushWarning($"Rejected multiplayer trade packet: {reason}");
+
+        var tradeFacade = new TradeFacade(
+            _multiplayerConnection,
+            _tradeCoordinator,
+            () => session.State);
+        var tradeBridge = new TradePresentationBridge
+        {
+            Name = nameof(TradePresentationBridge)
+        };
+        tradeBridge.Configure(tradeFacade);
+        AddChild(tradeBridge);
     }
 
     private void ComposeMultiplayerRaceResults(
