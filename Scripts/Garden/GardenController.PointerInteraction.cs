@@ -17,6 +17,11 @@ public partial class GardenController
             return;
         }
 
+        // The oversized ground Area2D can see the same initial LMB press before the
+        // Voidling's Area2D does. Claiming a Voidling gesture must therefore cancel
+        // any floor-pan that was armed by that press. Keep the whole press/hold/release
+        // gesture owned by the Voidling instead of letting the camera inherit it.
+        _cameraDragging = false;
         _pendingGrabId = creatureId;
         _pendingGrabSeconds = 0.0f;
     }
