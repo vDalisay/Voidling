@@ -38,6 +38,7 @@ public partial class MainController
         panel.LeaveRequested += LeaveConnectedZone;
         panel.FriendsLeaderboardRequested += ShowFriendsLeaderboards;
         panel.DailyRaceRequested += ShowDailyRace;
+        panel.ChallengesRequested += ShowChallenges;
         panel.ShareSelectedRequested += ShareSelectedVoidling;
         panel.RemoveSelectedRequested += RemoveSelectedSharedVoidling;
         _connectedZonePanel = panel;
