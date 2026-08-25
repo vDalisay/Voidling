@@ -100,6 +100,15 @@ jobs:
         run: |
           set -u
           rm -f lan-host.log lan-client.log
+          host_pid=''
+
+          cleanup() {
+            if [ -n "$host_pid" ] && kill -0 "$host_pid" 2>/dev/null; then
+              kill "$host_pid" 2>/dev/null || true
+              wait "$host_pid" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
 
           timeout 20s godot --headless --path . -- \
             --voidling-lan-host \
@@ -109,6 +118,7 @@ jobs:
           host_pid=$!
 
           sleep 1
+          set +e
           timeout 20s godot --headless --path . -- \
             --voidling-lan-join=127.0.0.1 \
             --voidling-lan-name=CIClient \
@@ -118,15 +128,25 @@ jobs:
 
           wait "$host_pid"
           host_code=$?
+          set -e
+          host_pid=''
 
           echo '--- LAN host log ---'
-          cat lan-host.log
+          cat lan-host.log || true
           echo '--- LAN client log ---'
-          cat lan-client.log
+          cat lan-client.log || true
+          echo "LAN smoke process exit codes: host=$host_code client=$client_code"
 
           if [ "$host_code" -ne 0 ] || [ "$client_code" -ne 0 ]; then
-            echo "LAN smoke failed: host=$host_code client=$client_code"
+            echo 'LAN smoke process failed.'
             exit 1
           fi
-          grep -q 'LAN_SMOKE_SUCCESS' lan-host.log
-          grep -q 'LAN_SMOKE_SUCCESS' lan-client.log
+
+          if ! grep -q 'LAN_SMOKE_SUCCESS' lan-host.log; then
+            echo 'LAN host never completed the typed Hello handshake.'
+            exit 1
+          fi
+          if ! grep -q 'LAN_SMOKE_SUCCESS' lan-client.log; then
+            echo 'LAN client never completed the typed Hello handshake.'
+            exit 1
+          fi
