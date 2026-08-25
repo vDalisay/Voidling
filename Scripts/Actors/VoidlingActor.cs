@@ -12,6 +12,8 @@ public partial class VoidlingActor : Node2D
 
     private static readonly Texture2D CharacterTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
+    private static readonly Texture2D PipTexture = GD.Load<Texture2D>(
+        "res://Assets/Voidlings/Pip/dark_voidling.png");
 
     private readonly RandomNumberGenerator _rng = new();
     private AnimatedSprite2D _sprite = null!;
@@ -23,6 +25,7 @@ public partial class VoidlingActor : Node2D
     private bool _interactionLocked;
     private bool _pickedUp;
     private float _baseScale;
+    private float _baseVisualScale;
     private float _baseSpriteY;
 
     public void Setup(VoidlingData data, Rect2 wanderBounds, Vector2 startPosition)
@@ -33,15 +36,19 @@ public partial class VoidlingActor : Node2D
         _walkSpeed = data.Stage == LifeStage.Adult ? 20.0f : 17.0f;
         _rng.Seed = StableSeed(data.Id);
 
+        var usesPipVisual = string.Equals(data.Name, "Pip", StringComparison.OrdinalIgnoreCase);
         _baseScale = data.Stage == LifeStage.Adult ? 0.62f : 0.31f;
+        _baseVisualScale = usesPipVisual
+            ? (data.Stage == LifeStage.Adult ? 1.0f : 0.5f)
+            : _baseScale;
         _baseSpriteY = VoidlingGroundVisualMetrics.SpriteCenterYOffset(_baseScale);
 
         _sprite = new AnimatedSprite2D
         {
-            SpriteFrames = BuildSpriteFrames(),
-            Scale = Vector2.One * _baseScale,
+            SpriteFrames = usesPipVisual ? BuildStaticSpriteFrames(PipTexture) : BuildSpriteFrames(),
+            Scale = Vector2.One * _baseVisualScale,
             Position = new Vector2(0, _baseSpriteY),
-            Modulate = GameRules.TintColor(data.TintHex),
+            Modulate = usesPipVisual ? Colors.White : GameRules.TintColor(data.TintHex),
             ZIndex = 2
         };
         AddChild(_sprite);
@@ -129,7 +136,7 @@ public partial class VoidlingActor : Node2D
 
         if (_sprite != null)
         {
-            _sprite.Scale = Vector2.One * (pickedUp ? _baseScale * 1.14f : _baseScale);
+            _sprite.Scale = Vector2.One * (pickedUp ? _baseVisualScale * 1.14f : _baseVisualScale);
             if (pickedUp)
             {
                 _sprite.Position = new Vector2(0, _baseSpriteY - 9.0f);
@@ -275,6 +282,17 @@ public partial class VoidlingActor : Node2D
         return frames;
     }
 
+    private static SpriteFrames BuildStaticSpriteFrames(Texture2D texture)
+    {
+        var frames = new SpriteFrames();
+        frames.RemoveAnimation("default");
+        AddStaticDirection(frames, "walk_down", texture);
+        AddStaticDirection(frames, "walk_up", texture);
+        AddStaticDirection(frames, "walk_left", texture);
+        AddStaticDirection(frames, "walk_right", texture);
+        return frames;
+    }
+
     private static void AddDirection(SpriteFrames frames, string name, int row)
     {
         frames.AddAnimation(name);
@@ -290,5 +308,13 @@ public partial class VoidlingActor : Node2D
             };
             frames.AddFrame(name, atlas);
         }
+    }
+
+    private static void AddStaticDirection(SpriteFrames frames, string name, Texture2D texture)
+    {
+        frames.AddAnimation(name);
+        frames.SetAnimationLoop(name, true);
+        frames.SetAnimationSpeed(name, 1.0);
+        frames.AddFrame(name, texture);
     }
 }
