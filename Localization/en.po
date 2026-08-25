@@ -462,6 +462,9 @@ msgstr "Leave"
 msgid "UI_CHALLENGE_CANCEL"
 msgstr "Cancel"
 
+msgid "UI_CHALLENGE_SETUP_RACE"
+msgstr "Setup Race"
+
 msgid "UI_CHALLENGE_KIND_RACE"
 msgstr "Race"
 
@@ -482,3 +485,63 @@ msgstr "Running"
 
 msgid "UI_CHALLENGE_ACTION_FAILED"
 msgstr "Challenge action failed: {0}"
+
+msgid "UI_MP_RACE_SETUP_TITLE"
+msgstr "MULTIPLAYER RACE SETUP"
+
+msgid "UI_MP_RACE_MISSING"
+msgstr "This multiplayer race is no longer available."
+
+msgid "UI_MP_RACE_PARTICIPANTS"
+msgstr "Participants: {0} / {1}"
+
+msgid "UI_MP_RACE_HANDSHAKE"
+msgstr "Synchronizing race start with every participant..."
+
+msgid "UI_MP_RACE_LAUNCHING"
+msgstr "Race synchronized. Launching..."
+
+msgid "UI_MP_RACE_SELECTION_LOCKED"
+msgstr "Voidling selections are locked for this race."
+
+msgid "UI_MP_RACE_PICK"
+msgstr "Choose the Voidling snapshot you want to race with."
+
+msgid "UI_MP_RACE_LOCK_IN"
+msgstr "Lock In"
+
+msgid "UI_MP_RACE_LOCKED"
+msgstr "Your locked racer: {0}"
+
+msgid "UI_MP_RACE_START"
+msgstr "Start Race"
+
+msgid "UI_MP_RACE_WAIT_SELECTIONS"
+msgstr "Waiting for every participant to lock in a Voidling."
+
+msgid "UI_MP_RACE_NEED_TWO"
+msgstr "At least two participants are required before the race can start."
+
+msgid "UI_MP_RACE_WAIT_HOST"
+msgstr "Your selection is sent. The creator or Garden host starts the race."
+
+msgid "UI_MP_RACE_SELECTION_FAILED"
+msgstr "Could not lock in the selected Voidling: {0}"
+
+msgid "UI_MP_RACE_START_FAILED"
+msgstr "Could not start the multiplayer race: {0}"
+
+msgid "UI_MP_RACE_TITLE"
+msgstr "CONNECTED SPROUT RUN"
+
+msgid "UI_MP_RACE_RUNNING"
+msgstr "Synchronized race in progress"
+
+msgid "UI_MP_RACE_SYNC_ERROR"
+msgstr "Race synchronization stopped."
+
+msgid "UI_MP_RACE_FINISHED"
+msgstr "Finished #{0}"
+
+msgid "UI_MP_RACE_CHEER_FAILED"
+msgstr "Cheer could not be scheduled."
