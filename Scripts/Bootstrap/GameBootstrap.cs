@@ -37,6 +37,7 @@ public partial class GameBootstrap : Node
     private ConnectedZoneService? _connectedZone;
     private ChallengeCoordinator? _challengeCoordinator;
     private MultiplayerRaceStartCoordinator? _multiplayerRaceStarts;
+    private MultiplayerRaceLockstepCoordinator? _multiplayerRaceLockstep;
     private TradeNetworkCoordinator? _tradeCoordinator;
 
     public override void _Ready()
@@ -87,9 +88,30 @@ public partial class GameBootstrap : Node
             _challengeCoordinator,
             rules);
         _multiplayerRaceStarts.ProtocolRejected += reason =>
-            GD.PushWarning($"Rejected multiplayer race packet: {reason}");
+            GD.PushWarning($"Rejected multiplayer race start packet: {reason}");
         _multiplayerRaceStarts.RacePreparationFailed += (challengeId, reason) =>
             GD.PushWarning($"Multiplayer race {challengeId} preparation failed: {reason}");
+
+        _multiplayerRaceLockstep = new MultiplayerRaceLockstepCoordinator(
+            _multiplayerConnection,
+            _challengeCoordinator);
+        _multiplayerRaceLockstep.ProtocolRejected += reason =>
+            GD.PushWarning($"Rejected multiplayer race lockstep packet: {reason}");
+        _multiplayerRaceLockstep.SyncIssue += (challengeId, reason) =>
+            GD.PushWarning($"Multiplayer race {challengeId} sync issue: {reason}");
+        _multiplayerRaceLockstep.DesyncDetected += desync =>
+            GD.PushWarning(
+                $"Multiplayer race {desync.ChallengeId} desync at tick {desync.Tick} with peer " +
+                $"{desync.PeerId.Value}: host={desync.HostChecksum}, peer={desync.PeerChecksum}");
+        _multiplayerRaceStarts.RaceReadyToLaunch += race =>
+        {
+            if (!_multiplayerRaceLockstep.AttachRace(race, out var error))
+            {
+                GD.PushWarning(
+                    $"Multiplayer race {race.Start.ChallengeId} could not attach lockstep: " +
+                    (error ?? "unknown error"));
+            }
+        };
 
         if (multiplayer.RuntimeNode != null)
         {
