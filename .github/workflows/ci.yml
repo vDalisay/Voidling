@@ -150,3 +150,65 @@ jobs:
             echo 'LAN client never completed the typed Hello handshake.'
             exit 1
           fi
+
+      # Run the actual Pokemon-style trade interaction over the same ENet adapter. The probe uses
+      # TradePresentationBridge just like the UI: invite -> accept invite -> choose one Voidling each
+      # -> both Accept -> durable two-phase commit. Both processes must observe the expected local
+      # outgoing/incoming IDs before they exit successfully.
+      - name: LAN multiplayer trade two-process smoke test
+        shell: bash
+        run: |
+          set -u
+          rm -f lan-trade-host.log lan-trade-client.log
+          host_pid=''
+
+          cleanup_trade() {
+            if [ -n "$host_pid" ] && kill -0 "$host_pid" 2>/dev/null; then
+              kill "$host_pid" 2>/dev/null || true
+              wait "$host_pid" 2>/dev/null || true
+            fi
+          }
+          trap cleanup_trade EXIT
+
+          timeout 35s godot --headless --path . -- \
+            --voidling-lan-host \
+            --voidling-lan-port=27182 \
+            --voidling-lan-name=CITradeHost \
+            --voidling-dev-profile=ci_trade_host \
+            --voidling-lan-trade-smoke >lan-trade-host.log 2>&1 &
+          host_pid=$!
+
+          sleep 1
+          set +e
+          timeout 35s godot --headless --path . -- \
+            --voidling-lan-join=127.0.0.1 \
+            --voidling-lan-port=27182 \
+            --voidling-lan-name=CITradeClient \
+            --voidling-dev-profile=ci_trade_client \
+            --voidling-lan-trade-smoke >lan-trade-client.log 2>&1
+          client_code=$?
+
+          wait "$host_pid"
+          host_code=$?
+          set -e
+          host_pid=''
+
+          echo '--- LAN trade host log ---'
+          cat lan-trade-host.log || true
+          echo '--- LAN trade client log ---'
+          cat lan-trade-client.log || true
+          echo "LAN trade process exit codes: host=$host_code client=$client_code"
+
+          if [ "$host_code" -ne 0 ] || [ "$client_code" -ne 0 ]; then
+            echo 'LAN trade smoke process failed.'
+            exit 1
+          fi
+
+          if ! grep -q 'LAN_TRADE_SMOKE_SUCCESS' lan-trade-host.log; then
+            echo 'LAN trade host never completed the negotiated durable exchange.'
+            exit 1
+          fi
+          if ! grep -q 'LAN_TRADE_SMOKE_SUCCESS' lan-trade-client.log; then
+            echo 'LAN trade client never completed the negotiated durable exchange.'
+            exit 1
+          fi
