@@ -10,6 +10,7 @@ namespace Voidling.Infrastructure.Multiplayer;
 public sealed record OptionalMultiplayerComposition(
     MultiplayerConnectionService Connection,
     ConnectedZoneService ConnectedZone,
+    ConnectedZoneTransientService ConnectedZoneTransient,
     ChallengeCoordinator Challenges,
     ILeaderboardService Leaderboards,
     Node? RuntimeNode,
@@ -53,6 +54,7 @@ public static class OptionalMultiplayerComposer
             ILeaderboardService leaderboards = new SteamLeaderboardService(api, runtime);
             var connection = new MultiplayerConnectionService(identity, lobbies, transport);
             var connectedZone = new ConnectedZoneService(connection);
+            var connectedZoneTransient = new ConnectedZoneTransientService(connection, connectedZone);
             var challenges = new ChallengeCoordinator(connection);
             runtime.SetPollAction(connection.Poll);
 
@@ -62,6 +64,7 @@ public static class OptionalMultiplayerComposer
             return new OptionalMultiplayerComposition(
                 connection,
                 connectedZone,
+                connectedZoneTransient,
                 challenges,
                 leaderboards,
                 runtime,
@@ -82,10 +85,12 @@ public static class OptionalMultiplayerComposer
         var leaderboards = new OfflineLeaderboardService(reason);
         var connection = new MultiplayerConnectionService(identity, lobbies, transport);
         var connectedZone = new ConnectedZoneService(connection);
+        var connectedZoneTransient = new ConnectedZoneTransientService(connection, connectedZone);
         var challenges = new ChallengeCoordinator(connection);
         return new OptionalMultiplayerComposition(
             connection,
             connectedZone,
+            connectedZoneTransient,
             challenges,
             leaderboards,
             null,
