@@ -197,6 +197,19 @@ public partial class GameBootstrap : Node
             return;
         }
 
+        var raceFacade = new MultiplayerRaceFacade(
+            _multiplayerConnection,
+            _challengeCoordinator,
+            _multiplayerRaceStarts,
+            _multiplayerRaceLockstep,
+            () => session.State);
+        var raceBridge = new MultiplayerRacePresentationBridge
+        {
+            Name = nameof(MultiplayerRacePresentationBridge)
+        };
+        raceBridge.Configure(raceFacade);
+        AddChild(raceBridge);
+
         var rewards = new MultiplayerRaceResultUseCase(rules);
         _multiplayerRaceResults = new MultiplayerRaceResultCoordinator(
             _multiplayerConnection,
