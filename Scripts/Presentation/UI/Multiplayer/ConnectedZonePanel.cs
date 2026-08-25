@@ -32,6 +32,7 @@ public partial class ConnectedZonePanel : VBoxContainer
     public event Action? FriendsLeaderboardRequested;
     public event Action? DailyRaceRequested;
     public event Action? ChallengesRequested;
+    public event Action? TradesRequested;
     public event Action? ShareSelectedRequested;
     public event Action? RemoveSelectedRequested;
 
@@ -142,17 +143,22 @@ public partial class ConnectedZonePanel : VBoxContainer
         var sessionActions = new HBoxContainer();
         sessionActions.AddThemeConstantOverride("separation", 6);
         var invite = UiFactory.CreateButton(Tr("UI_ONLINE_INVITE"));
-        invite.CustomMinimumSize = new Vector2(112, 25);
+        invite.CustomMinimumSize = new Vector2(104, 25);
         invite.Pressed += () => InviteRequested?.Invoke();
         sessionActions.AddChild(invite);
 
         var challenges = UiFactory.CreateButton(Tr("UI_ONLINE_CHALLENGES"));
-        challenges.CustomMinimumSize = new Vector2(112, 25);
+        challenges.CustomMinimumSize = new Vector2(104, 25);
         challenges.Pressed += () => ChallengesRequested?.Invoke();
         sessionActions.AddChild(challenges);
 
+        var trades = UiFactory.CreateButton(Tr("UI_ONLINE_TRADES"));
+        trades.CustomMinimumSize = new Vector2(84, 25);
+        trades.Pressed += () => TradesRequested?.Invoke();
+        sessionActions.AddChild(trades);
+
         var leave = UiFactory.CreateButton(Tr("UI_ONLINE_LEAVE"));
-        leave.CustomMinimumSize = new Vector2(96, 25);
+        leave.CustomMinimumSize = new Vector2(88, 25);
         leave.Pressed += () => LeaveRequested?.Invoke();
         sessionActions.AddChild(leave);
         AddChild(sessionActions);
