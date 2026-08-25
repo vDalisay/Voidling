@@ -315,6 +315,9 @@ msgstr "Invite Friends"
 msgid "UI_ONLINE_LEAVE"
 msgstr "Leave Garden"
 
+msgid "UI_ONLINE_FRIEND_BOARDS"
+msgstr "Friend Boards"
+
 msgid "UI_ONLINE_SHARE_TITLE"
 msgstr "Shared Voidling"
 
@@ -341,3 +344,33 @@ msgstr "Could not share the selected Voidling: {0}"
 
 msgid "UI_ONLINE_REMOVE_FAILED"
 msgstr "Could not stop sharing the selected Voidling: {0}"
+
+msgid "UI_LEADERBOARD_TITLE"
+msgstr "FRIEND LEADERBOARDS"
+
+msgid "UI_LEADERBOARD_WINS"
+msgstr "Multiplayer Wins"
+
+msgid "UI_LEADERBOARD_DAILY"
+msgstr "Today's Daily"
+
+msgid "UI_LEADERBOARD_WINS_CONTEXT"
+msgstr "Multiplayer wins among Steam friends"
+
+msgid "UI_LEADERBOARD_DAILY_CONTEXT"
+msgstr "Daily race • {0} UTC"
+
+msgid "UI_LEADERBOARD_LOADING"
+msgstr "Loading friend scores..."
+
+msgid "UI_LEADERBOARD_EMPTY"
+msgstr "No friend scores are available on this board yet."
+
+msgid "UI_LEADERBOARD_UNAVAILABLE"
+msgstr "Steam friend leaderboards are unavailable."
+
+msgid "UI_LEADERBOARD_ERROR"
+msgstr "Could not load friend scores: {0}"
+
+msgid "UI_LEADERBOARD_WINS_SCORE"
+msgstr "{0} wins"
