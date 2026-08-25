@@ -50,7 +50,35 @@ Normal launches do not activate the LAN adapter. If no LAN flags are present, no
 
 The LAN topology is host-relayed. Clients physically connect to the ENet host, but application packets retain their logical source, target, channel, and reliable/unreliable delivery mode. The Application layer therefore receives the same packet contract it uses with Steam.
 
+Physical ENet channel `0` is reserved for LAN control/roster traffic. The five production Application channels are mapped to ENet channels `1` through `5`, so the ENet peer is created with six physical channels.
+
 Default UDP port: **27181**.
+
+## Recommended Windows launcher
+
+For ordinary local testing, use the repository-root helper instead of typing development flags manually:
+
+```bat
+playgame-local-multiplayer.bat
+```
+
+It asks for:
+
+- Host or Join mode;
+- player display name;
+- development save profile;
+- UDP port;
+- host address when joining;
+- whether to build before launch.
+
+Defaults are optimized for a two-instance same-PC test:
+
+- Host defaults to name/profile `Host`, UDP `27181`, and builds before launch.
+- Join defaults to name/profile `Client`, address `127.0.0.1`, UDP `27181`, and skips rebuilding.
+
+When running two copies on one PC, **the save profiles must be different**. This keeps trades, ownership changes, and race rewards in separate `user://` save files.
+
+For two PCs, run the same launcher on both machines. On the joining PC, enter the host computer's LAN IPv4 address instead of `127.0.0.1`. Choose to build on the joining PC if that checkout has not already been built.
 
 ## Command-line flags
 
@@ -63,35 +91,42 @@ Default UDP port: **27181**.
 | `--voidling-dev-profile=<profile>` | Use a separate `user://` save for this process. Strongly recommended for same-PC tests. |
 | `--voidling-lan-smoke` | Automated two-peer Hello handshake probe; exits `0` on success or `2` on timeout/failure. |
 
-`playgame.bat` forwards unknown arguments to Godot, so these flags can be supplied directly after the normal optional `--no-build`/`-n` build flag.
+`playgame.bat` forwards unknown arguments to Godot, so these flags can still be supplied directly after the normal optional `--no-build`/`-n` build flag.
 
 ## First test: two instances on one Windows PC
 
-### 1. Build once
+### 1. Start the host
 
-From the repository root:
-
-```bat
-build.bat
-```
-
-### 2. Start the host
-
-Open a command prompt in the repository root:
+Double-click or run:
 
 ```bat
-playgame.bat --no-build --voidling-lan-host --voidling-lan-name=Alice --voidling-dev-profile=A
+playgame-local-multiplayer.bat
 ```
+
+Choose **Host**. For example:
+
+- player name: `Alice`;
+- profile: `A`;
+- port: `27181`;
+- build: `Y`.
 
 The host automatically opens the LAN connected-Garden session. You do not need Steam or GodotSteam for this launch.
 
-### 3. Start the client
+### 2. Start the client
 
-Open a second command prompt in the same repository root:
+Open a second copy of:
 
 ```bat
-playgame.bat --no-build --voidling-lan-join=127.0.0.1 --voidling-lan-name=Bob --voidling-dev-profile=B
+playgame-local-multiplayer.bat
 ```
+
+Choose **Join**. For example:
+
+- player name: `Bob`;
+- profile: `B`;
+- host address: `127.0.0.1`;
+- port: `27181`;
+- build: `N`.
 
 The two profiles use different save files:
 
@@ -100,9 +135,9 @@ user://voidling_mvp_save_A.json
 user://voidling_mvp_save_B.json
 ```
 
-Do **not** omit the profiles when running both processes on one computer if you intend to test trading or persistent race rewards. Without profiles both processes would point at the normal save file.
+Do **not** use the same profile when running both processes on one computer if you intend to test trading or persistent race rewards. Using the same profile would point both processes at the same development save.
 
-### 4. Verify the Connected Garden
+### 3. Verify the Connected Garden
 
 Open **Online** in both windows. Verify:
 
@@ -111,7 +146,7 @@ Open **Online** in both windows. Verify:
 3. Steam Friend Boards are unavailable in LAN mode, without affecting the Garden;
 4. ordinary single-player systems continue functioning in both windows.
 
-### 5. Verify shared Voidlings
+### 4. Verify shared Voidlings
 
 On Alice:
 
@@ -129,7 +164,7 @@ On Bob verify:
 
 Repeat in the opposite direction.
 
-### 6. Verify trading
+### 5. Verify trading
 
 Use **Online -> Trades**:
 
@@ -140,7 +175,7 @@ Use **Online -> Trades**:
 5. test a two-sided trade;
 6. close and reopen each game after a completed trade and verify ownership persisted correctly.
 
-### 7. Verify multiplayer racing
+### 6. Verify multiplayer racing
 
 Use **Online -> Challenges**:
 
@@ -153,6 +188,22 @@ Use **Online -> Challenges**:
 7. verify both clients finish with the same ordering;
 8. return to each local Garden;
 9. verify the winner's local multiplayer-win progress persists.
+
+## Direct same-PC commands
+
+The interactive launcher is preferred, but the equivalent direct commands remain useful for debugging.
+
+Host:
+
+```bat
+playgame.bat --no-build --voidling-lan-host --voidling-lan-name=Alice --voidling-dev-profile=A
+```
+
+Client:
+
+```bat
+playgame.bat --no-build --voidling-lan-join=127.0.0.1 --voidling-lan-name=Bob --voidling-dev-profile=B
+```
 
 ## Automated same-machine socket smoke
 
@@ -176,19 +227,29 @@ Each process should print:
 [multiplayer-probe] LAN_SMOKE_SUCCESS
 ```
 
-and exit successfully. The GitHub Actions workflow runs the same two-process handshake headlessly on every PR build.
+and exit successfully. The GitHub Actions workflow runs the same two-process handshake headlessly on every PR build. The CI step always prints both process logs and exit codes before reporting a smoke failure so ENet/socket regressions remain diagnosable.
 
 ## Two computers on the same LAN
 
-On the host computer:
+On both computers, run:
+
+```bat
+playgame-local-multiplayer.bat
+```
+
+Choose **Host** on the first computer. Find that computer's LAN IPv4 address, for example `192.168.1.50`.
+
+Choose **Join** on the second computer and enter that LAN IPv4 address. Both machines must use the same UDP port.
+
+The equivalent direct commands are:
+
+Host:
 
 ```bat
 playgame.bat --no-build --voidling-lan-host --voidling-lan-name=Alice --voidling-dev-profile=A
 ```
 
-Find that computer's LAN IPv4 address, for example `192.168.1.50`.
-
-On the second computer:
+Join:
 
 ```bat
 playgame.bat --no-build --voidling-lan-join=192.168.1.50 --voidling-lan-name=Bob --voidling-dev-profile=B
@@ -218,7 +279,7 @@ For a custom port, specify the same value on both processes:
 ## Recommended validation order before merging multiplayer
 
 1. GitHub Actions two-process LAN Hello smoke.
-2. Same-PC Connected Garden sharing/movement.
+2. Same-PC Connected Garden sharing/movement using `playgame-local-multiplayer.bat`.
 3. Same-PC trading, including restart persistence.
 4. Same-PC 2-player deterministic race + Cheer.
 5. Two-PC LAN repetition of the same flows.
