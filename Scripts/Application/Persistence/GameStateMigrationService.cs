@@ -16,7 +16,7 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 6;
+    public const int CurrentSaveVersion = 7;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -39,6 +39,7 @@ public sealed class GameStateMigrationService
         state.TrainingItems ??= new Dictionary<string, int>(StringComparer.Ordinal);
         state.PendingTradeJournal ??= new List<PendingTradeJournalEntry>();
         state.AppliedTradeIds ??= new List<string>();
+        state.AppliedMultiplayerRaceIds ??= new List<string>();
 
         // Version 4 introduced persisted audio and race auto-finish settings.
         if (previousVersion < 4)
@@ -80,6 +81,15 @@ public sealed class GameStateMigrationService
         state.AppliedTradeIds = state.AppliedTradeIds
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        // Version 7 keeps the multiplayer-win total and a bounded local dedupe history. Both are
+        // purely local persistence; normalization never queries Steam or attempts leaderboard IO.
+        state.MultiplayerWins = Math.Max(0, state.MultiplayerWins);
+        state.AppliedMultiplayerRaceIds = state.AppliedMultiplayerRaceIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .TakeLast(256)
             .ToList();
 
         state.SaveVersion = CurrentSaveVersion;
