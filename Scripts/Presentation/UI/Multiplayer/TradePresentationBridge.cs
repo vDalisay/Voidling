@@ -33,6 +33,23 @@ public partial class TradePresentationBridge : Node
         _durableFacade.LocalTradeCommitted += HandleLocalTradeCommitted;
     }
 
+    public override void _Ready()
+    {
+        var args = OS.GetCmdlineUserArgs();
+        if (!Array.Exists(args, arg =>
+                string.Equals(arg, "--voidling-lan-trade-smoke", StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        var probe = new TradeLanSmokeProbe
+        {
+            Name = nameof(TradeLanSmokeProbe)
+        };
+        probe.Configure(this);
+        AddChild(probe);
+    }
+
     public TradeNegotiationOperationResult Invite(string partnerKey)
         => RequireNegotiation().Invite(partnerKey);
 
