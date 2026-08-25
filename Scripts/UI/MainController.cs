@@ -71,6 +71,8 @@ public partial class MainController : Node
 
         if (GodotObject.IsInstanceValid(_connectedZoneBridge))
             _connectedZoneBridge.StateChanged -= OnConnectedZoneStateChanged;
+
+        DetachMultiplayerRacePresentation();
     }
 
     public override void _Process(double delta)
@@ -85,7 +87,7 @@ public partial class MainController : Node
 
     public override void _UnhandledInput(InputEvent inputEvent)
     {
-        if (_race != null || !inputEvent.IsActionPressed("ui_cancel"))
+        if (_race != null || _multiplayerRaceScreen != null || !inputEvent.IsActionPressed("ui_cancel"))
             return;
 
         if (_modalHost.IsOpen)
@@ -194,7 +196,7 @@ public partial class MainController : Node
     {
         _modalHost.Close();
 
-        if (restoreGardenHud && _race == null && _uiRoot != null && _uiRoot.Visible)
+        if (restoreGardenHud && _race == null && _multiplayerRaceScreen == null && _uiRoot != null && _uiRoot.Visible)
             RefreshUi();
     }
 
