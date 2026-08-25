@@ -15,7 +15,8 @@ public sealed record RaceObstacleResolvedEvent(
 
 public sealed record RaceParticipantFinishedEvent(
     string ParticipantId,
-    int Placement) : RaceSimulationEvent(ParticipantId);
+    int Placement,
+    int FixedStep = 0) : RaceSimulationEvent(ParticipantId);
 
 public readonly record struct RaceParticipantStateSnapshot(
     RaceParticipantSnapshot Participant,
@@ -71,6 +72,7 @@ public sealed class RaceSimulation
     private readonly List<string> _finishOrder = new();
     private readonly IReadOnlyList<string> _finishOrderView;
     private double _accumulator;
+    private int _fixedStepCount;
 
     private sealed class ParticipantState
     {
@@ -128,6 +130,7 @@ public sealed class RaceSimulation
     public IReadOnlyList<string> FinishOrder => _finishOrderView;
     public bool IsComplete => _finishOrder.Count == _participants.Count;
     public int ParticipantCount => _participants.Count;
+    public int FixedStepCount => _fixedStepCount;
 
     public RaceParticipantStateSnapshot GetState(string participantId)
     {
@@ -210,7 +213,7 @@ public sealed class RaceSimulation
         state.X = _course.EndX;
         state.Finished = true;
         _finishOrder.Add(participantId);
-        return new RaceParticipantFinishedEvent(participantId, _finishOrder.Count);
+        return new RaceParticipantFinishedEvent(participantId, _finishOrder.Count, _fixedStepCount);
     }
 
     public bool TryCheer(string participantId)
@@ -227,6 +230,8 @@ public sealed class RaceSimulation
 
     private void Step(float step, List<RaceSimulationEvent> events)
     {
+        _fixedStepCount++;
+
         foreach (var state in _participants)
         {
             if (state.Finished)
@@ -328,7 +333,10 @@ public sealed class RaceSimulation
         state.X = _course.EndX;
         state.Finished = true;
         _finishOrder.Add(state.Participant.CreatureId);
-        events.Add(new RaceParticipantFinishedEvent(state.Participant.CreatureId, _finishOrder.Count));
+        events.Add(new RaceParticipantFinishedEvent(
+            state.Participant.CreatureId,
+            _finishOrder.Count,
+            _fixedStepCount));
     }
 
     private RaceParticipantStateSnapshot Snapshot(ParticipantState state)
