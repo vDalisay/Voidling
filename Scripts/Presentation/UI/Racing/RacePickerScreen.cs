@@ -77,6 +77,7 @@ public partial class RacePickerScreen : VBoxContainer
         var previewRow = new HBoxContainer();
         previewRow.AddThemeConstantOverride("separation", 12);
         var previewPortrait = UiFactory.CreatePortrait(
+            selected.Name,
             selected.TintColor,
             selected.HasAngelMutation,
             selected.OtherMutationCount,
@@ -99,6 +100,7 @@ public partial class RacePickerScreen : VBoxContainer
             _selectedId = candidate.Id;
             UiFactory.SetPortraitData(
                 previewPortrait,
+                candidate.Name,
                 candidate.TintColor,
                 candidate.HasAngelMutation,
                 candidate.OtherMutationCount);
@@ -121,6 +123,7 @@ public partial class RacePickerScreen : VBoxContainer
             cardButtons[creature.Id] = card;
 
             var portrait = UiFactory.CreatePortrait(
+                creature.Name,
                 creature.TintColor,
                 creature.HasAngelMutation,
                 creature.OtherMutationCount,
