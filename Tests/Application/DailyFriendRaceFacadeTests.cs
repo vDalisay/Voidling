@@ -33,7 +33,7 @@ public sealed class DailyFriendRaceFacadeTests
         var started = facade.BeginOrResume("runner", Today);
         runner.Name = "Renamed after start";
         var resumed = facade.BeginOrResume("alternate", Today.AddSeconds(30));
-        var status = facade.GetToday(Today.AddMinutes(1));
+        var status = facade.GetToday(Today.AddSeconds(45));
 
         Assert.True(initial.CanStart);
         Assert.True(started.Success, started.Error);
