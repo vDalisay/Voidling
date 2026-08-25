@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Voidling.Application.Breeding;
+using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Rules;
@@ -16,7 +17,7 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 7;
+    public const int CurrentSaveVersion = 8;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -40,6 +41,7 @@ public sealed class GameStateMigrationService
         state.PendingTradeJournal ??= new List<PendingTradeJournalEntry>();
         state.AppliedTradeIds ??= new List<string>();
         state.AppliedMultiplayerRaceIds ??= new List<string>();
+        state.DailyRaceAttempts ??= new List<DailyRaceAttemptData>();
 
         // Version 4 introduced persisted audio and race auto-finish settings.
         if (previousVersion < 4)
@@ -90,6 +92,20 @@ public sealed class GameStateMigrationService
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Distinct(StringComparer.Ordinal)
             .TakeLast(256)
+            .ToList();
+
+        // Version 8 persists local daily-race attempts. Keep at most one structurally valid attempt
+        // per UTC day and retain old rules-version attempts instead of erasing them: an incompatible
+        // update may prevent resume, but must not accidentally grant a second attempt that day.
+        state.DailyRaceAttempts = state.DailyRaceAttempts
+            .Where(attempt => DailyFriendRaceService.IsStructurallyValid(
+                attempt,
+                requireCurrentRules: false,
+                out _))
+            .GroupBy(attempt => attempt.DailyKey, StringComparer.Ordinal)
+            .Select(group => group.Last())
+            .OrderBy(attempt => attempt.DailyKey, StringComparer.Ordinal)
+            .TakeLast(DailyFriendRaceService.MaxAttemptHistory)
             .ToList();
 
         state.SaveVersion = CurrentSaveVersion;
