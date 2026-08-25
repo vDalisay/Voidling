@@ -222,6 +222,24 @@ public sealed class TradeNegotiationFacade
             ? null
             : choices.FirstOrDefault(choice => string.Equals(choice.AssetId, localAsset.AssetId, StringComparison.Ordinal));
 
+        // Commit removes the outgoing Voidling from local ownership before LocalTradeCommitted is
+        // raised. Keep rendering the already-synchronized preview while Finalizing so the local slot
+        // never flashes empty between mutual confirmation and the exchange animation.
+        if (localAsset != null && localOffer == null)
+        {
+            var localPreview = _previews.GetPreview(state.NegotiationId, local.Id);
+            if (localPreview != null &&
+                string.Equals(localPreview.AssetId, localAsset.AssetId, StringComparison.Ordinal))
+            {
+                localOffer = new TradeVoidlingChoiceView(
+                    localPreview.AssetId,
+                    localPreview.DisplayName,
+                    localPreview.TintHex,
+                    localPreview.HasAngelMutation,
+                    localPreview.OtherMutationCount);
+            }
+        }
+
         TradeVoidlingChoiceView? remoteOffer = null;
         var preview = _previews.GetPreview(state.NegotiationId, partner);
         if (remoteAsset != null && preview != null &&
