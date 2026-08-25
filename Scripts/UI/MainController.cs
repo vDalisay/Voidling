@@ -3,6 +3,7 @@ using Godot;
 using Voidling.Presentation.Racing;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Garden;
+using Voidling.Presentation.UI.Multiplayer;
 
 namespace VoidlingGame;
 
@@ -13,6 +14,7 @@ public partial class MainController : Node
 
     private GameSession _session = null!;
     private GardenController _garden = null!;
+    private ConnectedZonePresentationBridge _connectedZoneBridge = null!;
     private CanvasLayer _uiLayer = null!;
     private Control _uiRoot = null!;
     private ModalHost _modalHost = null!;
@@ -27,8 +29,11 @@ public partial class MainController : Node
     public override void _Ready()
     {
         _session = GetNode<GameSession>("/root/GameBootstrap/GameSession");
+        _connectedZoneBridge = GetNode<ConnectedZonePresentationBridge>(
+            "/root/GameBootstrap/ConnectedZonePresentationBridge");
         _garden = GetNode<GardenController>("Garden");
         _garden.VoidlingSelected += OnVoidlingSelected;
+        _connectedZoneBridge.StateChanged += OnConnectedZoneStateChanged;
 
         _uiLayer = new CanvasLayer { Layer = 10 };
         AddChild(_uiLayer);
@@ -59,6 +64,9 @@ public partial class MainController : Node
             _session.ToastRequested -= ShowToast;
             _session.GardenEventRaised -= AppendGardenEvent;
         }
+
+        if (GodotObject.IsInstanceValid(_connectedZoneBridge))
+            _connectedZoneBridge.StateChanged -= OnConnectedZoneStateChanged;
     }
 
     public override void _Process(double delta)
@@ -102,6 +110,7 @@ public partial class MainController : Node
         AddTopButton(row, Tr("UI_TOP_INVENTORY"), ShowInventory, 3, 68);
         AddTopButton(row, Tr("UI_TOP_BREED"), ShowBreeding, 6, 57);
         AddTopButton(row, Tr("UI_TOP_RACE"), ShowRacePicker, 12, 57);
+        AddTopButton(row, Tr("UI_TOP_ONLINE"), ShowConnectedZone, -1, 58);
         AddTopButton(row, Tr("UI_TOP_SETTINGS"), ShowSettingsExtended, -1, 67);
         AddTopButton(row, Tr("UI_TOP_CENTER"), _garden.ResetCamera, -1, 57);
         AddTopButton(row, Tr("UI_TOP_RESET"), ShowResetConfirm, -1, 54);
@@ -150,6 +159,7 @@ public partial class MainController : Node
 
         _garden.Select(_selectedId);
         RebuildDetailsPanel();
+        RefreshConnectedZonePanel();
 
         if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))
             _gardenEventLog.Visible = !_modalHost.IsOpen;
