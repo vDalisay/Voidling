@@ -103,6 +103,13 @@ public partial class GameBootstrap : Node
         connectedZoneBridge.Configure(multiplayer.ConnectedZoneFacade);
         AddChild(connectedZoneBridge);
 
+        var friendsLeaderboardBridge = new FriendsLeaderboardPresentationBridge
+        {
+            Name = nameof(FriendsLeaderboardPresentationBridge)
+        };
+        friendsLeaderboardBridge.Configure(_leaderboardProjection);
+        AddChild(friendsLeaderboardBridge);
+
         multiplayer.ConnectedZoneTransient.ProtocolRejected += reason =>
             GD.PushWarning($"Rejected connected-Garden transient packet: {reason}");
         _challengeCoordinator.ProtocolRejected += reason =>
