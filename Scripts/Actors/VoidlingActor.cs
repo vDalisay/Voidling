@@ -29,7 +29,7 @@ public partial class VoidlingActor : Node2D
         CreatureId = data.Id;
         _wanderBounds = wanderBounds;
         Position = startPosition;
-        _walkSpeed = data.Stage == LifeStage.Adult ? 20.0f : 17.0f;
+        _walkSpeed = data.Stage == LifeStage.Adult ? 10.0f : 8.5f;
         _rng.Seed = StableSeed(data.Id);
 
         var isAdult = data.Stage == LifeStage.Adult;
