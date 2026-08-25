@@ -14,6 +14,7 @@ public partial class MainController
     private TradeNegotiationPanel? _tradeNegotiationPanel;
     private TradeExchangeScreen? _tradeExchangeScreen;
     private bool _tradeBridgeSubscribed;
+    private string? _openTradeNegotiationId;
 
     private sealed record PendingTradeExchange(
         string NegotiationId,
@@ -48,6 +49,8 @@ public partial class MainController
             return;
         }
 
+        _openTradeNegotiationId = null;
+        _tradeNegotiationPanel = null;
         var box = OpenOnlineModal(Tr("UI_TRADE_TITLE"), new Vector2(548, 330), ShowConnectedZone);
         var panel = new TradeHubPanel();
         panel.Configure(current);
@@ -103,6 +106,7 @@ public partial class MainController
         }
 
         RememberPendingTrade(trade);
+        _openTradeNegotiationId = negotiationId;
         var box = OpenOnlineModal(Tr("UI_TRADE_ROOM_TITLE"), new Vector2(548, 330), ShowTrades);
         var panel = new TradeNegotiationPanel();
         panel.Configure(current);
@@ -137,6 +141,8 @@ public partial class MainController
         }
 
         _pendingTradeExchanges.Remove(negotiationId);
+        _openTradeNegotiationId = null;
+        _tradeNegotiationPanel = null;
         ShowToast(Tr("UI_TRADE_CANCELLED"));
         ShowTrades();
     }
@@ -151,20 +157,43 @@ public partial class MainController
         }
         else if (_tradeNegotiationPanel != null && GodotObject.IsInstanceValid(_tradeNegotiationPanel))
         {
-            _tradeNegotiationPanel.Render(state);
+            // Do not destroy the pre-commit offer snapshot synchronously. A successful durable
+            // commit can publish its terminal negotiation state immediately around the local commit
+            // callback. Defer room cleanup one frame so the exchange animation gets first chance to
+            // consume that snapshot; a real cancellation/failure will still return to the lobby.
+            ScheduleTradeRoomEndedCheck();
         }
 
         if (_tradeHubPanel != null && GodotObject.IsInstanceValid(_tradeHubPanel))
             _tradeHubPanel.Render(state);
+    }
 
-        // A negotiation that disappears without a durable local commit was cancelled/failed.
-        // There can be only one active negotiation per local player, so stale animation snapshots
-        // are safe to discard once the lobby no longer reports an active room or pending invite.
-        if (state.ActiveNegotiation == null && state.WaitingForPlayer == null && state.IncomingInvites.Count == 0 &&
-            _tradeExchangeScreen == null)
+    private void ScheduleTradeRoomEndedCheck()
+    {
+        var negotiationId = _openTradeNegotiationId;
+        if (string.IsNullOrWhiteSpace(negotiationId))
+            return;
+
+        Callable.From(() => HandleTradeRoomEndedCheck(negotiationId!)).CallDeferred();
+    }
+
+    private void HandleTradeRoomEndedCheck(string negotiationId)
+    {
+        if (_tradeExchangeScreen != null ||
+            !string.Equals(_openTradeNegotiationId, negotiationId, StringComparison.Ordinal))
         {
-            _pendingTradeExchanges.Clear();
+            return;
         }
+
+        var current = TradeBridge.Current;
+        if (current.ActiveNegotiation != null)
+            return;
+
+        _pendingTradeExchanges.Remove(negotiationId);
+        _openTradeNegotiationId = null;
+        _tradeNegotiationPanel = null;
+        ShowToast(Tr("UI_TRADE_ENDED"));
+        ShowTrades();
     }
 
     private void OnIncomingTradeInvite(TradeInviteView invite)
@@ -223,6 +252,8 @@ public partial class MainController
             return;
 
         _pendingTradeExchanges.Remove(pending.NegotiationId);
+        _openTradeNegotiationId = null;
+        _tradeNegotiationPanel = null;
         _gardenEventLog.Append(string.Format(
             Tr("UI_GARDEN_LOG_TRADE_COMPLETE"),
             1,
