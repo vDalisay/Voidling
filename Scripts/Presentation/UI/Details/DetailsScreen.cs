@@ -203,6 +203,7 @@ public partial class DetailsScreen : VBoxContainer
 
     private static TextureRect CreatePortrait(DetailsScreenState state, Vector2 size)
         => UiFactory.CreatePortrait(
+            state.Name,
             state.TintColor,
             state.HasAngelMutation,
             state.OtherMutationCount,
