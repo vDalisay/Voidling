@@ -86,6 +86,7 @@ public sealed class RaceSimulation
         public float X { get; set; }
         public int NextObstacleIndex { get; set; }
         public int RandomDrawCount { get; set; }
+        public bool ObstacleRetryPending { get; set; }
         public float DelaySeconds { get; set; }
         public float CheerSeconds { get; set; }
         public float MaxStamina { get; init; }
@@ -336,17 +337,32 @@ public sealed class RaceSimulation
         if (state.X < _course.Obstacles[obstacleIndex] - ObstacleTriggerLead)
             return;
 
-        var randomRoll = state.Random.NextDouble();
-        state.RandomDrawCount++;
-        var avoided = _performance.AvoidsObstacle(state.Participant, randomRoll);
+        // A failed hurdle attempt is the stumble/jump-in-place beat. Do not consume the
+        // hurdle at that point: after the delay, the racer approaches the same fence again
+        // and the retry is guaranteed to clear it so the sprite can never walk through it.
+        var avoided = state.ObstacleRetryPending;
+        if (state.ObstacleRetryPending)
+        {
+            state.ObstacleRetryPending = false;
+        }
+        else
+        {
+            var randomRoll = state.Random.NextDouble();
+            state.RandomDrawCount++;
+            avoided = _performance.AvoidsObstacle(state.Participant, randomRoll);
+        }
+
         if (!avoided)
         {
             state.DelaySeconds = _performance.GetObstacleDelaySeconds(state.Participant);
             state.X -= _performance.ObstacleRollbackDistance;
+            state.ObstacleRetryPending = true;
+            events.Add(new RaceObstacleResolvedEvent(state.Participant.CreatureId, obstacleIndex, false));
+            return;
         }
 
         state.NextObstacleIndex++;
-        events.Add(new RaceObstacleResolvedEvent(state.Participant.CreatureId, obstacleIndex, avoided));
+        events.Add(new RaceObstacleResolvedEvent(state.Participant.CreatureId, obstacleIndex, true));
     }
 
     private void ResolveFinish(ParticipantState state, List<RaceSimulationEvent> events)
