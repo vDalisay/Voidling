@@ -1,5 +1,6 @@
 using System;
 using Godot;
+using Godot.Collections;
 
 namespace Voidling.Infrastructure.Steam;
 
@@ -17,6 +18,9 @@ public partial class GodotSteamRuntime : Node
     internal event Action<long, long>? JoinRequested;
     internal event Action? LobbyMembershipChanged;
     internal event Action<long>? NetworkingMessagesSessionRequested;
+    internal event Action<long, bool>? LeaderboardFound;
+    internal event Action<bool, long, int, bool, int, int>? LeaderboardScoreUploaded;
+    internal event Action<string, long, Array>? LeaderboardScoresDownloaded;
 
     internal void Configure(GodotSteamApi api, Action? pollAction = null)
     {
@@ -51,6 +55,15 @@ public partial class GodotSteamRuntime : Node
         ConnectIfPresent(
             "network_messages_session_request",
             Callable.From<Variant>(OnNetworkingMessagesSessionRequest));
+        ConnectIfPresent(
+            "leaderboard_find_result",
+            Callable.From<Variant, Variant>(OnLeaderboardFindResult));
+        ConnectIfPresent(
+            "leaderboard_score_uploaded",
+            Callable.From<Variant, Variant, Variant, Variant, Variant, Variant>(OnLeaderboardScoreUploaded));
+        ConnectIfPresent(
+            "leaderboard_scores_downloaded",
+            Callable.From<Variant, Variant, Variant>(OnLeaderboardScoresDownloaded));
 
         SetProcess(true);
     }
@@ -94,4 +107,36 @@ public partial class GodotSteamRuntime : Node
 
     private void OnNetworkingMessagesSessionRequest(Variant remoteSteamId)
         => NetworkingMessagesSessionRequested?.Invoke(remoteSteamId.AsInt64());
+
+    private void OnLeaderboardFindResult(Variant leaderboardHandle, Variant found)
+        => LeaderboardFound?.Invoke(leaderboardHandle.AsInt64(), found.AsBool() || found.AsInt64() != 0);
+
+    private void OnLeaderboardScoreUploaded(
+        Variant success,
+        Variant leaderboardHandle,
+        Variant score,
+        Variant scoreChanged,
+        Variant globalRankNew,
+        Variant globalRankPrevious)
+        => LeaderboardScoreUploaded?.Invoke(
+            success.AsBool() || success.AsInt64() != 0,
+            leaderboardHandle.AsInt64(),
+            (int)score.AsInt64(),
+            scoreChanged.AsBool() || scoreChanged.AsInt64() != 0,
+            (int)globalRankNew.AsInt64(),
+            (int)globalRankPrevious.AsInt64());
+
+    private void OnLeaderboardScoresDownloaded(
+        Variant message,
+        Variant leaderboardHandle,
+        Variant entries)
+    {
+        var array = entries.VariantType == Variant.Type.Array
+            ? entries.AsGodotArray()
+            : new Array();
+        LeaderboardScoresDownloaded?.Invoke(
+            message.AsString(),
+            leaderboardHandle.AsInt64(),
+            array);
+    }
 }
