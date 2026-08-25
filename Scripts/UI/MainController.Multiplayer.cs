@@ -87,56 +87,69 @@ public partial class MainController
 
     private async void CreateConnectedZone()
     {
+        string? failure = null;
         try
         {
             var result = await _connectedZoneBridge.CreateAsync();
             if (!result.Success)
-            {
-                ShowToast(string.Format(
-                    Tr("UI_ONLINE_CREATE_FAILED"),
-                    result.Error ?? "unknown error"));
-            }
+                failure = result.Error ?? "unknown error";
         }
         catch (Exception exception)
         {
-            ShowToast(string.Format(Tr("UI_ONLINE_CREATE_FAILED"), exception.Message));
+            failure = exception.Message;
         }
 
-        RefreshConnectedZonePanel();
+        var capturedFailure = failure;
+        Callable.From(() =>
+        {
+            if (!string.IsNullOrWhiteSpace(capturedFailure))
+                ShowToast(string.Format(Tr("UI_ONLINE_CREATE_FAILED"), capturedFailure));
+            RefreshConnectedZonePanel();
+        }).CallDeferred();
     }
 
     private async void JoinConnectedZone(ulong lobbyId)
     {
+        string? failure = null;
         try
         {
             var result = await _connectedZoneBridge.JoinAsync(lobbyId);
             if (!result.Success)
-            {
-                ShowToast(string.Format(
-                    Tr("UI_ONLINE_JOIN_FAILED"),
-                    result.Error ?? "unknown error"));
-            }
+                failure = result.Error ?? "unknown error";
         }
         catch (Exception exception)
         {
-            ShowToast(string.Format(Tr("UI_ONLINE_JOIN_FAILED"), exception.Message));
+            failure = exception.Message;
         }
 
-        RefreshConnectedZonePanel();
+        var capturedFailure = failure;
+        Callable.From(() =>
+        {
+            if (!string.IsNullOrWhiteSpace(capturedFailure))
+                ShowToast(string.Format(Tr("UI_ONLINE_JOIN_FAILED"), capturedFailure));
+            RefreshConnectedZonePanel();
+        }).CallDeferred();
     }
 
     private async void LeaveConnectedZone()
     {
+        string? failure = null;
         try
         {
             await _connectedZoneBridge.LeaveAsync();
         }
         catch (Exception exception)
         {
-            GD.PushWarning($"Could not leave connected Garden cleanly: {exception.Message}");
+            failure = exception.Message;
         }
 
-        RefreshConnectedZonePanel();
+        var capturedFailure = failure;
+        Callable.From(() =>
+        {
+            if (!string.IsNullOrWhiteSpace(capturedFailure))
+                GD.PushWarning($"Could not leave connected Garden cleanly: {capturedFailure}");
+            RefreshConnectedZonePanel();
+        }).CallDeferred();
     }
 
     private void ShareSelectedVoidling()
