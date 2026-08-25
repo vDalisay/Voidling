@@ -321,6 +321,9 @@ msgstr "Friend Boards"
 msgid "UI_ONLINE_DAILY_RACE"
 msgstr "Daily Race"
 
+msgid "UI_ONLINE_CHALLENGES"
+msgstr "Challenges"
+
 msgid "UI_ONLINE_SHARE_TITLE"
 msgstr "Shared Voidling"
 
@@ -410,3 +413,72 @@ msgstr "Today's saved daily attempt cannot be used: {0}"
 
 msgid "UI_DAILY_START_FAILED"
 msgstr "Could not start the daily race: {0}"
+
+msgid "UI_CHALLENGE_TITLE"
+msgstr "CHALLENGES"
+
+msgid "UI_CHALLENGE_NEED_GARDEN"
+msgstr "Join a connected Garden before using multiplayer challenges."
+
+msgid "UI_CHALLENGE_OPEN_TITLE"
+msgstr "Open challenges"
+
+msgid "UI_CHALLENGE_EMPTY"
+msgstr "No challenges are being offered yet."
+
+msgid "UI_CHALLENGE_OFFER_RACE"
+msgstr "Offer Race"
+
+msgid "UI_CHALLENGE_PLAYERS"
+msgstr "{0} players"
+
+msgid "UI_CHALLENGE_ALREADY_ACTIVE"
+msgstr "Leave or finish your current challenge before offering another."
+
+msgid "UI_CHALLENGE_CARD_TITLE"
+msgstr "{0} • {1}"
+
+msgid "UI_CHALLENGE_COUNT"
+msgstr "{0} / {1}"
+
+msgid "UI_CHALLENGE_HOSTED_BY"
+msgstr "Offered by {0}"
+
+msgid "UI_CHALLENGE_YOU"
+msgstr "(you)"
+
+msgid "UI_CHALLENGE_CREATOR"
+msgstr "(creator)"
+
+msgid "UI_CHALLENGE_HOST"
+msgstr "(host)"
+
+msgid "UI_CHALLENGE_JOIN"
+msgstr "Join"
+
+msgid "UI_CHALLENGE_LEAVE"
+msgstr "Leave"
+
+msgid "UI_CHALLENGE_CANCEL"
+msgstr "Cancel"
+
+msgid "UI_CHALLENGE_KIND_RACE"
+msgstr "Race"
+
+msgid "UI_CHALLENGE_KIND_BATTLE"
+msgstr "Auto Battle"
+
+msgid "UI_CHALLENGE_PHASE_OPEN"
+msgstr "Open"
+
+msgid "UI_CHALLENGE_PHASE_FORMING"
+msgstr "Forming"
+
+msgid "UI_CHALLENGE_PHASE_READY"
+msgstr "Ready"
+
+msgid "UI_CHALLENGE_PHASE_RUNNING"
+msgstr "Running"
+
+msgid "UI_CHALLENGE_ACTION_FAILED"
+msgstr "Challenge action failed: {0}"
