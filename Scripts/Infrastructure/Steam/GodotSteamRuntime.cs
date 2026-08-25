@@ -1,6 +1,6 @@
 using System;
 using Godot;
-using Godot.Collections;
+using GodotArray = Godot.Collections.Array;
 
 namespace Voidling.Infrastructure.Steam;
 
@@ -20,7 +20,7 @@ public partial class GodotSteamRuntime : Node
     internal event Action<long>? NetworkingMessagesSessionRequested;
     internal event Action<long, bool>? LeaderboardFound;
     internal event Action<bool, long, int, bool, int, int>? LeaderboardScoreUploaded;
-    internal event Action<string, long, Array>? LeaderboardScoresDownloaded;
+    internal event Action<string, long, GodotArray>? LeaderboardScoresDownloaded;
 
     internal void Configure(GodotSteamApi api, Action? pollAction = null)
     {
@@ -133,7 +133,7 @@ public partial class GodotSteamRuntime : Node
     {
         var array = entries.VariantType == Variant.Type.Array
             ? entries.AsGodotArray()
-            : new Array();
+            : new GodotArray();
         LeaderboardScoresDownloaded?.Invoke(
             message.AsString(),
             leaderboardHandle.AsInt64(),
