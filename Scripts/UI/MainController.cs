@@ -15,6 +15,7 @@ public partial class MainController : Node
     private GameSession _session = null!;
     private GardenController _garden = null!;
     private ConnectedZonePresentationBridge _connectedZoneBridge = null!;
+    private FriendsLeaderboardPresentationBridge _friendsLeaderboardBridge = null!;
     private CanvasLayer _uiLayer = null!;
     private Control _uiRoot = null!;
     private ModalHost _modalHost = null!;
@@ -31,6 +32,8 @@ public partial class MainController : Node
         _session = GetNode<GameSession>("/root/GameBootstrap/GameSession");
         _connectedZoneBridge = GetNode<ConnectedZonePresentationBridge>(
             "/root/GameBootstrap/ConnectedZonePresentationBridge");
+        _friendsLeaderboardBridge = GetNode<FriendsLeaderboardPresentationBridge>(
+            "/root/GameBootstrap/FriendsLeaderboardPresentationBridge");
         _garden = GetNode<GardenController>("Garden");
         _garden.VoidlingSelected += OnVoidlingSelected;
         _connectedZoneBridge.StateChanged += OnConnectedZoneStateChanged;
