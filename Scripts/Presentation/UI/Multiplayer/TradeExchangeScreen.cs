@@ -1,6 +1,6 @@
 using System;
 using Godot;
-using Voidling.Presentation.UI.Common;
+using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Multiplayer;
 
