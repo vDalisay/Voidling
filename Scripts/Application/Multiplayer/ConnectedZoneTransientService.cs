@@ -12,17 +12,28 @@ namespace Voidling.Application.Multiplayer;
 /// </summary>
 public sealed class ConnectedZoneTransientService
 {
+    public static readonly TimeSpan DefaultMinimumPublishInterval = TimeSpan.FromMilliseconds(100);
+
     private readonly MultiplayerConnectionService _connection;
     private readonly ConnectedZoneService _zone;
+    private readonly TimeProvider _timeProvider;
+    private readonly TimeSpan _minimumPublishInterval;
     private readonly Dictionary<SharedVoidlingKey, SharedVoidlingTransform> _latest = new();
     private readonly Dictionary<SharedVoidlingKey, long> _nextLocalSequence = new();
+    private readonly Dictionary<SharedVoidlingKey, long> _lastLocalPublishTimestamp = new();
 
     public ConnectedZoneTransientService(
         MultiplayerConnectionService connection,
-        ConnectedZoneService zone)
+        ConnectedZoneService zone,
+        TimeProvider? timeProvider = null,
+        TimeSpan? minimumPublishInterval = null)
     {
         _connection = connection ?? throw new ArgumentNullException(nameof(connection));
         _zone = zone ?? throw new ArgumentNullException(nameof(zone));
+        _timeProvider = timeProvider ?? TimeProvider.System;
+        _minimumPublishInterval = minimumPublishInterval ?? DefaultMinimumPublishInterval;
+        if (_minimumPublishInterval < TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(minimumPublishInterval));
 
         _connection.PacketReceived += HandlePacket;
         _zone.StateChanged += HandleZoneStateChanged;
@@ -70,6 +81,15 @@ public sealed class ConnectedZoneTransientService
         if (!ConnectedZoneTransientValidation.IsValid(transform))
             return ConnectedZoneOperationResult.Failed("Connected-zone transform is invalid.");
 
+        var now = _timeProvider.GetTimestamp();
+        if (_lastLocalPublishTimestamp.TryGetValue(key, out var last) &&
+            _timeProvider.GetElapsedTime(last, now) < _minimumPublishInterval)
+        {
+            // A throttled sample is not an error; a later sample supersedes it by design.
+            return ConnectedZoneOperationResult.Succeeded;
+        }
+
+        _lastLocalPublishTimestamp[key] = now;
         _nextLocalSequence[key] = sequence;
         _latest[key] = transform;
 
@@ -140,6 +160,8 @@ public sealed class ConnectedZoneTransientService
             _latest.Remove(key);
         foreach (var key in _nextLocalSequence.Keys.Where(key => !published.Contains(key)).ToArray())
             _nextLocalSequence.Remove(key);
+        foreach (var key in _lastLocalPublishTimestamp.Keys.Where(key => !published.Contains(key)).ToArray())
+            _lastLocalPublishTimestamp.Remove(key);
     }
 
     private static bool ContainsPublishedVoidling(
@@ -151,6 +173,7 @@ public sealed class ConnectedZoneTransientService
     {
         _latest.Clear();
         _nextLocalSequence.Clear();
+        _lastLocalPublishTimestamp.Clear();
     }
 
     private void Reject(string reason)
