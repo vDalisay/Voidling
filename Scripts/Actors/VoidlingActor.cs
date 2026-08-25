@@ -46,10 +46,10 @@ public partial class VoidlingActor : Node2D
         var usesCustomVisual = customTexture != null;
 
         _baseScale = data.Stage == LifeStage.Adult ? 0.62f : 0.31f;
-        // The 32x32 cat sprites fill their canvas much more tightly than the legacy 48x48
-        // character sheet. Rendering them at 1:1 made Pip and Mallow visually oversized,
-        // so keep them on the same presentation scale as every other Voidling.
-        _baseVisualScale = _baseScale;
+        // The custom 32x32 cat sprites have a much denser silhouette than the legacy sheet.
+        // Render them at half the normal presentation scale so their perceived size matches
+        // the smaller garden Voidlings more closely.
+        _baseVisualScale = usesCustomVisual ? _baseScale * 0.5f : _baseScale;
         _baseSpriteY = VoidlingGroundVisualMetrics.SpriteCenterYOffset(_baseScale);
 
         _sprite = new AnimatedSprite2D
