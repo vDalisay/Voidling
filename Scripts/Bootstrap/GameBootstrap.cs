@@ -42,6 +42,7 @@ public partial class GameBootstrap : Node
     private MultiplayerRaceResultCoordinator? _multiplayerRaceResults;
     private TradeNetworkCoordinator? _tradeCoordinator;
     private LeaderboardProjectionService? _leaderboardProjection;
+    private DailyFriendRaceCoordinator? _dailyFriendRace;
 
     public override void _Ready()
     {
@@ -75,6 +76,7 @@ public partial class GameBootstrap : Node
         AddChild(session);
         ComposeTrading(rules, stateRepository, session);
         ComposeMultiplayerRaceResults(rules, stateRepository, session);
+        ComposeDailyFriendRace(rules, stateRepository, session);
 
         // Steam leaderboards are only a social projection of already-persisted local progress.
         // Retrying the total on every Steam-capable startup makes transient upload failures harmless
@@ -247,6 +249,31 @@ public partial class GameBootstrap : Node
         };
     }
 
+    private void ComposeDailyFriendRace(
+        GameBalanceRules rules,
+        GodotJsonGameStateRepository stateRepository,
+        GameSession session)
+    {
+        if (_leaderboardProjection == null)
+            return;
+
+        _dailyFriendRace = new DailyFriendRaceCoordinator(
+            new DailyFriendRaceService(new RaceEntryFactory(rules)),
+            stateRepository,
+            _leaderboardProjection);
+
+        // Only retry today's completed board on startup. This keeps Steam work bounded and avoids
+        // replaying a history of dynamic leaderboard operations. Local completion remains valid even
+        // if this projection never succeeds.
+        var today = DateTimeOffset.UtcNow;
+        var todayKey = DailyFriendRaceService.GetDailyKey(today);
+        var completedToday = session.State.DailyRaceAttempts.FirstOrDefault(attempt =>
+            string.Equals(attempt.DailyKey, todayKey, StringComparison.Ordinal) &&
+            attempt.State == DailyRaceAttemptState.Completed);
+        if (completedToday != null)
+            ProjectDailyRaceAttempt(completedToday, "startup retry");
+    }
+
     private async void ProjectMultiplayerWins(int totalWins, string reason)
     {
         var projection = _leaderboardProjection;
@@ -271,6 +298,31 @@ public partial class GameBootstrap : Node
             GD.PushWarning(
                 $"Steam multiplayer-win leaderboard projection threw during {reason}: {exception.Message}. " +
                 "Local progress is already saved and will be retried later.");
+        }
+    }
+
+    private async void ProjectDailyRaceAttempt(DailyRaceAttemptData attempt, string reason)
+    {
+        var daily = _dailyFriendRace;
+        if (daily == null || !daily.LeaderboardAvailability.IsAvailable)
+            return;
+
+        try
+        {
+            var result = await daily.ProjectCompletedAttemptAsync(attempt);
+            if (!result.Success)
+            {
+                GD.PushWarning(
+                    $"Steam daily-race leaderboard projection failed during {reason}: " +
+                    (result.Error ?? "unknown Steam leaderboard error") +
+                    ". The local daily result remains saved.");
+            }
+        }
+        catch (Exception exception)
+        {
+            GD.PushWarning(
+                $"Steam daily-race leaderboard projection threw during {reason}: {exception.Message}. " +
+                "The local daily result remains saved.");
         }
     }
 
