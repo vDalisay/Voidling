@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Presentation.UI.Common;
@@ -8,18 +9,44 @@ namespace VoidlingGame;
 
 public partial class MainController : Node
 {
+    private const float DetailsPanelRestX = 404.0f;
+    private const float DetailsPanelHiddenX = 646.0f;
+    private const double DetailsPanelEnterSeconds = 0.24;
+    private const double DetailsPanelExitSeconds = 0.18;
+    private const double ProfileProgressTweenSeconds = 0.34;
+
+    private readonly Dictionary<string, double> _profileDisplayedProgress = new(StringComparer.Ordinal);
+    private string _profileProgressCreatureId = string.Empty;
+
     private void RebuildDetailsPanel()
     {
+        var data = _session.FindVoidling(_selectedId);
+        if (data == null)
+        {
+            _profileProgressCreatureId = string.Empty;
+            _profileDisplayedProgress.Clear();
+            SlideOutDetailsPanel();
+            return;
+        }
+
+        var sameCreature = string.Equals(
+            _profileProgressCreatureId,
+            data.Id,
+            StringComparison.Ordinal);
+        if (!sameCreature)
+        {
+            _profileDisplayedProgress.Clear();
+            _profileProgressCreatureId = data.Id;
+        }
+
         if (_detailsPanel != null && GodotObject.IsInstanceValid(_detailsPanel))
             _detailsPanel.QueueFree();
         _detailsPanel = null;
 
-        var data = _session.FindVoidling(_selectedId);
-        if (data == null)
-            return;
-
         _detailsPanel = UiFactory.CreatePanel(new Vector2(226, 294));
-        _detailsPanel.Position = new Vector2(404, 57);
+        _detailsPanel.Position = new Vector2(
+            sameCreature ? DetailsPanelRestX : DetailsPanelHiddenX,
+            57);
         _detailsPanel.Size = new Vector2(226, 294);
         _uiRoot.AddChild(_detailsPanel);
 
@@ -71,7 +98,7 @@ public partial class MainController : Node
         box.AddChild(UiFactory.CreateLabel(stage, 7));
 
         foreach (var statId in GameRules.StatIds)
-            box.AddChild(CreateProfileStatBlock(data, statId));
+            box.AddChild(CreateProfileStatBlock(data, statId, sameCreature));
 
         var details = UiFactory.CreateButton("Details");
         details.CustomMinimumSize = new Vector2(194, 22);
@@ -102,6 +129,44 @@ public partial class MainController : Node
         goodbye.Pressed += () => ShowGoodbyeFirst(data.Id);
         actions.AddChild(goodbye);
         box.AddChild(actions);
+
+        if (!sameCreature)
+            SlideInDetailsPanel(_detailsPanel);
+    }
+
+    private void SlideInDetailsPanel(PanelContainer panel)
+    {
+        panel.Modulate = new Color(panel.Modulate.R, panel.Modulate.G, panel.Modulate.B, 0.94f);
+        var tween = CreateTween().SetParallel(true);
+        tween.TweenProperty(panel, "position:x", DetailsPanelRestX, DetailsPanelEnterSeconds)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(panel, "modulate:a", 1.0f, DetailsPanelEnterSeconds * 0.65)
+            .SetTrans(Tween.TransitionType.Sine)
+            .SetEase(Tween.EaseType.Out);
+    }
+
+    private void SlideOutDetailsPanel()
+    {
+        if (_detailsPanel == null || !GodotObject.IsInstanceValid(_detailsPanel))
+        {
+            _detailsPanel = null;
+            return;
+        }
+
+        var panel = _detailsPanel;
+        _detailsPanel = null;
+        panel.MouseFilter = Control.MouseFilterEnum.Ignore;
+        var tween = CreateTween().SetParallel(true);
+        tween.TweenProperty(panel, "position:x", DetailsPanelHiddenX, DetailsPanelExitSeconds)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.In);
+        tween.TweenProperty(panel, "modulate:a", 0.92f, DetailsPanelExitSeconds);
+        tween.Finished += () =>
+        {
+            if (GodotObject.IsInstanceValid(panel))
+                panel.QueueFree();
+        };
     }
 
     private void BeginInlineRename(HBoxContainer heading, Button nameButton, VoidlingData data)
@@ -143,7 +208,7 @@ public partial class MainController : Node
         edit.SelectAll();
     }
 
-    private Control CreateProfileStatBlock(VoidlingData data, string statId)
+    private Control CreateProfileStatBlock(VoidlingData data, string statId, bool animateProgress)
     {
         var container = new VBoxContainer { CustomMinimumSize = new Vector2(194, 28) };
         container.AddThemeConstantOverride("separation", 1);
@@ -174,18 +239,28 @@ public partial class MainController : Node
         row.AddChild(use);
         container.AddChild(row);
 
-        var bar = CreateStatProgressBar(data, statId, new Vector2(142, 6));
+        var bar = CreateStatProgressBar(data, statId, new Vector2(142, 6), animateProgress);
         container.AddChild(bar);
         return container;
     }
 
-    private static ProgressBar CreateStatProgressBar(VoidlingData data, string statId, Vector2 size)
+    private ProgressBar CreateStatProgressBar(
+        VoidlingData data,
+        string statId,
+        Vector2 size,
+        bool animateProgress)
     {
+        var target = GameRules.StatLevelProgress(data, statId);
+        var start = animateProgress && _profileDisplayedProgress.TryGetValue(statId, out var previous)
+            ? previous
+            : target;
+        _profileDisplayedProgress[statId] = target;
+
         var bar = new ProgressBar
         {
             MinValue = 0,
             MaxValue = 1,
-            Value = GameRules.StatLevelProgress(data, statId),
+            Value = start,
             ShowPercentage = false,
             CustomMinimumSize = size
         };
@@ -197,6 +272,20 @@ public partial class MainController : Node
         fill.CornerRadiusBottomLeft = fill.CornerRadiusBottomRight = 1;
         bar.AddThemeStyleboxOverride("background", background);
         bar.AddThemeStyleboxOverride("fill", fill);
+
+        if (animateProgress && Math.Abs(target - start) > 0.0001)
+        {
+            Callable.From(() =>
+            {
+                if (!GodotObject.IsInstanceValid(bar) || !bar.IsInsideTree())
+                    return;
+                var tween = bar.CreateTween();
+                tween.TweenProperty(bar, "value", target, ProfileProgressTweenSeconds)
+                    .SetTrans(Tween.TransitionType.Cubic)
+                    .SetEase(Tween.EaseType.Out);
+            }).CallDeferred();
+        }
+
         return bar;
     }
 
