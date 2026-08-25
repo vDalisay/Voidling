@@ -190,15 +190,28 @@ public partial class GameBootstrap : Node
         _tradeCoordinator.ProtocolRejected += reason =>
             GD.PushWarning($"Rejected multiplayer trade packet: {reason}");
 
-        var tradeFacade = new TradeFacade(
+        // The negotiation coordinator is deliberately separate from the durable coordinator. It
+        // synchronizes invite/selection/confirmation only, then hands the two agreed Voidlings to
+        // the existing journaled two-phase transfer implementation.
+        var negotiationCoordinator = new TradeNegotiationCoordinator(
+            _multiplayerConnection,
+            _tradeCoordinator);
+        negotiationCoordinator.ProtocolRejected += reason =>
+            GD.PushWarning($"Rejected multiplayer trade negotiation packet: {reason}");
+
+        var durableFacade = new TradeFacade(
             _multiplayerConnection,
             _tradeCoordinator,
+            () => session.State);
+        var negotiationFacade = new TradeNegotiationFacade(
+            _multiplayerConnection,
+            negotiationCoordinator,
             () => session.State);
         var tradeBridge = new TradePresentationBridge
         {
             Name = nameof(TradePresentationBridge)
         };
-        tradeBridge.Configure(tradeFacade);
+        tradeBridge.Configure(durableFacade, negotiationFacade);
         AddChild(tradeBridge);
     }
 
