@@ -30,6 +30,7 @@ public partial class ConnectedZonePanel : VBoxContainer
     public event Action? InviteRequested;
     public event Action? LeaveRequested;
     public event Action? FriendsLeaderboardRequested;
+    public event Action? DailyRaceRequested;
     public event Action? ShareSelectedRequested;
     public event Action? RemoveSelectedRequested;
 
@@ -78,6 +79,7 @@ public partial class ConnectedZonePanel : VBoxContainer
             reason.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             AddChild(reason);
             AddChild(UiFactory.CreateLabel(Tr("UI_ONLINE_OFFLINE_SAFE"), 7));
+            AddChild(BuildDailyRaceButton());
             return;
         }
 
@@ -112,7 +114,11 @@ public partial class ConnectedZonePanel : VBoxContainer
             AddChild(joinRow);
 
             AddChild(UiFactory.CreateLabel(Tr("UI_ONLINE_JOIN_HINT"), 6));
-            AddChild(BuildFriendsBoardButton());
+            var social = new HBoxContainer();
+            social.AddThemeConstantOverride("separation", 6);
+            social.AddChild(BuildDailyRaceButton());
+            social.AddChild(BuildFriendsBoardButton());
+            AddChild(social);
             return;
         }
 
@@ -135,16 +141,20 @@ public partial class ConnectedZonePanel : VBoxContainer
         var actions = new HBoxContainer();
         actions.AddThemeConstantOverride("separation", 6);
         var invite = UiFactory.CreateButton(Tr("UI_ONLINE_INVITE"));
-        invite.CustomMinimumSize = new Vector2(112, 25);
+        invite.CustomMinimumSize = new Vector2(105, 25);
         invite.Pressed += () => InviteRequested?.Invoke();
         actions.AddChild(invite);
 
+        var daily = BuildDailyRaceButton();
+        daily.CustomMinimumSize = new Vector2(91, 25);
+        actions.AddChild(daily);
+
         var boards = BuildFriendsBoardButton();
-        boards.CustomMinimumSize = new Vector2(118, 25);
+        boards.CustomMinimumSize = new Vector2(105, 25);
         actions.AddChild(boards);
 
         var leave = UiFactory.CreateButton(Tr("UI_ONLINE_LEAVE"));
-        leave.CustomMinimumSize = new Vector2(96, 25);
+        leave.CustomMinimumSize = new Vector2(91, 25);
         leave.Pressed += () => LeaveRequested?.Invoke();
         actions.AddChild(leave);
         AddChild(actions);
@@ -174,10 +184,18 @@ public partial class ConnectedZonePanel : VBoxContainer
         AddChild(share);
     }
 
+    private Button BuildDailyRaceButton()
+    {
+        var button = UiFactory.CreateButton(Tr("UI_ONLINE_DAILY_RACE"));
+        button.CustomMinimumSize = new Vector2(140, 25);
+        button.Pressed += () => DailyRaceRequested?.Invoke();
+        return button;
+    }
+
     private Button BuildFriendsBoardButton()
     {
         var button = UiFactory.CreateButton(Tr("UI_ONLINE_FRIEND_BOARDS"));
-        button.CustomMinimumSize = new Vector2(190, 25);
+        button.CustomMinimumSize = new Vector2(140, 25);
         button.Pressed += () => FriendsLeaderboardRequested?.Invoke();
         return button;
     }
