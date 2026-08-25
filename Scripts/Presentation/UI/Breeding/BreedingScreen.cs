@@ -139,6 +139,7 @@ public partial class BreedingScreen : VBoxContainer
         var column = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         column.AddThemeConstantOverride("separation", 3);
         var portrait = UiFactory.CreatePortrait(
+            parent.Name,
             parent.TintColor,
             parent.HasAngelMutation,
             parent.OtherMutationCount,
@@ -151,6 +152,7 @@ public partial class BreedingScreen : VBoxContainer
     private static void SetPortrait(TextureRect portrait, BreedingParentViewState parent)
         => UiFactory.SetPortraitData(
             portrait,
+            parent.Name,
             parent.TintColor,
             parent.HasAngelMutation,
             parent.OtherMutationCount);
