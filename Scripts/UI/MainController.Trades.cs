@@ -11,12 +11,14 @@ public partial class MainController
 {
     private TradePresentationBridge? _tradeBridge;
     private TradeHubPanel? _tradeHubPanel;
+    private TradeNegotiationPanel? _tradeNegotiationPanel;
     private TradeExchangeScreen? _tradeExchangeScreen;
     private bool _tradeBridgeSubscribed;
 
     private sealed record PendingTradeExchange(
-        TradeExchangeAssetView? Outgoing,
-        int OutgoingCount);
+        string NegotiationId,
+        string OutgoingAssetId,
+        TradeExchangeAssetView Outgoing);
 
     private readonly Dictionary<string, PendingTradeExchange> _pendingTradeExchanges = new(StringComparer.Ordinal);
 
@@ -30,7 +32,8 @@ public partial class MainController
             return;
 
         TradeBridge.StateChanged += OnTradeStateChanged;
-        TradeBridge.IncomingOfferReceived += OnIncomingTradeOffer;
+        TradeBridge.IncomingInviteReceived += OnIncomingTradeInvite;
+        TradeBridge.NegotiationActivated += OnTradeNegotiationActivated;
         TradeBridge.LocalTradeCommitted += OnLocalTradeCommitted;
         _tradeBridgeSubscribed = true;
     }
@@ -38,137 +41,191 @@ public partial class MainController
     private void ShowTrades()
     {
         ComposeTradePresentation();
+        var current = TradeBridge.Current;
+        if (current.ActiveNegotiation != null)
+        {
+            ShowTradeRoom(current.ActiveNegotiation.NegotiationId);
+            return;
+        }
+
         var box = OpenOnlineModal(Tr("UI_TRADE_TITLE"), new Vector2(548, 330), ShowConnectedZone);
         var panel = new TradeHubPanel();
-        panel.Configure(TradeBridge.Current);
-        panel.OfferRequested += OfferTrade;
-        panel.RespondRequested += ShowTradeResponse;
+        panel.Configure(current);
+        panel.InviteRequested += InviteTrade;
+        panel.AcceptInviteRequested += AcceptTradeInvite;
+        panel.DeclineInviteRequested += DeclineTradeInvite;
         _tradeHubPanel = panel;
         box.AddChild(panel);
     }
 
-    private void OfferTrade(string counterpartyKey, TradeAssetReference[] assets)
+    private void InviteTrade(string partnerKey)
     {
-        var result = TradeBridge.Offer(counterpartyKey, assets);
+        var result = TradeBridge.Invite(partnerKey);
         if (!result.Success)
         {
-            ShowToast(string.Format(
-                Tr("UI_TRADE_ACTION_FAILED"),
-                result.Error ?? "unknown trade error"));
+            ShowTradeFailure(result.Error ?? "unknown trade invitation error");
+            return;
         }
-        else if (!string.IsNullOrWhiteSpace(result.TradeId))
-        {
-            _pendingTradeExchanges[result.TradeId!] = CreatePendingTradeExchange(
-                assets);
-        }
+
+        ShowToast(Tr("UI_TRADE_INVITE_SENT"));
         RefreshTradeHub();
     }
 
-    private void ShowTradeResponse(string tradeId)
+    private void AcceptTradeInvite(string negotiationId)
     {
-        var offer = TradeBridge.GetIncomingOffer(tradeId);
-        if (offer == null)
+        var result = TradeBridge.AcceptInvite(negotiationId);
+        if (!result.Success)
         {
-            ShowToast(Tr("UI_TRADE_OFFER_GONE"));
-            RefreshTradeHub();
+            ShowTradeFailure(result.Error ?? "unknown trade invitation error");
             return;
         }
 
+        // The host-authoritative negotiation state opens the shared room for both participants.
+        RefreshTradeHub();
+    }
+
+    private void DeclineTradeInvite(string negotiationId)
+    {
+        var result = TradeBridge.DeclineInvite(negotiationId);
+        if (!result.Success)
+            ShowTradeFailure(result.Error ?? "unknown trade decline error");
+        RefreshTradeHub();
+    }
+
+    private void ShowTradeRoom(string negotiationId)
+    {
         var current = TradeBridge.Current;
-        var box = OpenOnlineModal(Tr("UI_TRADE_RESPONSE_TITLE"), new Vector2(520, 292), ShowTrades);
-        var panel = new TradeResponsePanel();
-        panel.Configure(new TradeResponsePanelState(offer, current.LocalAssets));
-        panel.AcceptRequested += assets => AcceptTrade(tradeId, assets);
-        panel.DeclineRequested += () => DeclineTrade(tradeId);
+        var trade = current.ActiveNegotiation;
+        if (trade == null || !string.Equals(trade.NegotiationId, negotiationId, StringComparison.Ordinal))
+        {
+            ShowTrades();
+            return;
+        }
+
+        RememberPendingTrade(trade);
+        var box = OpenOnlineModal(Tr("UI_TRADE_ROOM_TITLE"), new Vector2(548, 330), ShowTrades);
+        var panel = new TradeNegotiationPanel();
+        panel.Configure(current);
+        panel.SelectVoidlingRequested += assetId => SelectTradeVoidling(negotiationId, assetId);
+        panel.AcceptedChanged += accepted => SetTradeAccepted(negotiationId, accepted);
+        panel.CancelRequested += () => CancelTradeNegotiation(negotiationId);
+        _tradeNegotiationPanel = panel;
         box.AddChild(panel);
     }
 
-    private void AcceptTrade(string tradeId, TradeAssetReference[] assets)
+    private void SelectTradeVoidling(string negotiationId, string? assetId)
     {
-        var offer = TradeBridge.GetIncomingOffer(tradeId);
-        if (offer == null)
-        {
-            ShowToast(Tr("UI_TRADE_OFFER_GONE"));
-            return;
-        }
-
-        _pendingTradeExchanges[tradeId] = CreatePendingTradeExchange(
-            assets);
-        var result = TradeBridge.Accept(tradeId, assets);
+        var result = TradeBridge.SelectVoidling(negotiationId, assetId);
         if (!result.Success)
-        {
-            _pendingTradeExchanges.Remove(tradeId);
-            ShowToast(string.Format(
-                Tr("UI_TRADE_ACTION_FAILED"),
-                result.Error ?? "unknown trade acceptance error"));
-            return;
-        }
-
-        ShowToast(Tr("UI_TRADE_ACCEPTED_PENDING"));
+            ShowTradeFailure(result.Error ?? "could not update the offered Voidling");
     }
 
-    private void DeclineTrade(string tradeId)
+    private void SetTradeAccepted(string negotiationId, bool accepted)
     {
-        var result = TradeBridge.Decline(tradeId);
+        var result = TradeBridge.SetAccepted(negotiationId, accepted);
+        if (!result.Success)
+            ShowTradeFailure(result.Error ?? "could not update trade confirmation");
+    }
+
+    private void CancelTradeNegotiation(string negotiationId)
+    {
+        var result = TradeBridge.Cancel(negotiationId);
         if (!result.Success)
         {
-            ShowToast(string.Format(
-                Tr("UI_TRADE_ACTION_FAILED"),
-                result.Error ?? "unknown trade decline error"));
+            ShowTradeFailure(result.Error ?? "could not cancel the trade");
             return;
         }
 
+        _pendingTradeExchanges.Remove(negotiationId);
+        ShowToast(Tr("UI_TRADE_CANCELLED"));
         ShowTrades();
     }
 
-    private void OnTradeStateChanged(TradeHubViewState state)
+    private void OnTradeStateChanged(TradeLobbyViewState state)
     {
-        foreach (var terminal in state.RecentStatuses.Where(status =>
-                     status.Status is TradeSessionStatus.Failed or TradeSessionStatus.Aborted or TradeSessionStatus.Declined))
+        if (state.ActiveNegotiation != null)
         {
-            _pendingTradeExchanges.Remove(terminal.TradeId);
+            RememberPendingTrade(state.ActiveNegotiation);
+            if (_tradeNegotiationPanel != null && GodotObject.IsInstanceValid(_tradeNegotiationPanel))
+                _tradeNegotiationPanel.Render(state);
         }
-        if (_tradeHubPanel == null || !GodotObject.IsInstanceValid(_tradeHubPanel))
-            return;
+        else if (_tradeNegotiationPanel != null && GodotObject.IsInstanceValid(_tradeNegotiationPanel))
+        {
+            _tradeNegotiationPanel.Render(state);
+        }
 
-        _tradeHubPanel.Render(state);
+        if (_tradeHubPanel != null && GodotObject.IsInstanceValid(_tradeHubPanel))
+            _tradeHubPanel.Render(state);
+
+        // A negotiation that disappears without a durable local commit was cancelled/failed.
+        // There can be only one active negotiation per local player, so stale animation snapshots
+        // are safe to discard once the lobby no longer reports an active room or pending invite.
+        if (state.ActiveNegotiation == null && state.WaitingForPlayer == null && state.IncomingInvites.Count == 0 &&
+            _tradeExchangeScreen == null)
+        {
+            _pendingTradeExchanges.Clear();
+        }
     }
 
-    private void OnIncomingTradeOffer(TradeIncomingOfferView offer)
+    private void OnIncomingTradeInvite(TradeInviteView invite)
     {
         _gardenEventLog.AppendAction(
-            string.Format(Tr("UI_GARDEN_LOG_TRADE_OFFER"), offer.InitiatorDisplayName),
-            () => ShowTradeResponse(offer.TradeId));
+            string.Format(Tr("UI_GARDEN_LOG_TRADE_OFFER"), invite.FromDisplayName),
+            ShowTrades);
         ShowToast(string.Format(
             Tr("UI_TRADE_INCOMING_TOAST"),
-            offer.InitiatorDisplayName));
+            invite.FromDisplayName));
     }
 
-    private PendingTradeExchange CreatePendingTradeExchange(
-        TradeAssetReference[] outgoing)
-        => new(
-            BuildTradeExchangeAsset(outgoing
-                .OrderBy(asset => asset.Kind == TradeAssetKind.Voidling ? 0 : 1)
-                .FirstOrDefault()),
-            outgoing.Length);
+    private void OnTradeNegotiationActivated(TradeNegotiationView negotiation)
+    {
+        RememberPendingTrade(negotiation);
+        var negotiationId = negotiation.NegotiationId;
+        Callable.From(() => ShowTradeRoom(negotiationId)).CallDeferred();
+    }
+
+    private void RememberPendingTrade(TradeNegotiationView negotiation)
+    {
+        var outgoing = negotiation.LocalOffer;
+        if (outgoing == null)
+        {
+            _pendingTradeExchanges.Remove(negotiation.NegotiationId);
+            return;
+        }
+
+        _pendingTradeExchanges[negotiation.NegotiationId] = new PendingTradeExchange(
+            negotiation.NegotiationId,
+            outgoing.AssetId,
+            BuildTradeExchangeAsset(outgoing));
+    }
 
     private void OnLocalTradeCommitted(TradeCommittedView trade)
     {
-        if (!_pendingTradeExchanges.TryGetValue(trade.TradeId, out var pending) ||
-            _tradeExchangeScreen != null)
+        if (_tradeExchangeScreen != null)
+            return;
+
+        var outgoingReference = trade.OutgoingAssets.FirstOrDefault(asset => asset.Kind == TradeAssetKind.Voidling);
+        PendingTradeExchange? pending = null;
+        if (outgoingReference != null)
+        {
+            pending = _pendingTradeExchanges.Values.FirstOrDefault(value =>
+                string.Equals(value.OutgoingAssetId, outgoingReference.AssetId, StringComparison.Ordinal));
+        }
+        pending ??= _pendingTradeExchanges.Values.FirstOrDefault();
+        if (pending == null)
             return;
 
         var incomingReference = trade.IncomingAssets
             .OrderBy(asset => asset.Kind == TradeAssetKind.Voidling ? 0 : 1)
             .FirstOrDefault();
         var incoming = BuildTradeExchangeAsset(incomingReference);
-        if (incoming == null && pending.Outgoing == null)
+        if (incoming == null)
             return;
 
-        _pendingTradeExchanges.Remove(trade.TradeId);
+        _pendingTradeExchanges.Remove(pending.NegotiationId);
         _gardenEventLog.Append(string.Format(
             Tr("UI_GARDEN_LOG_TRADE_COMPLETE"),
-            pending.OutgoingCount,
+            1,
             trade.IncomingAssets.Count));
         if (_modalHost.IsOpen)
             CloseModal(false);
@@ -180,12 +237,20 @@ public partial class MainController
         screen.Configure(new TradeExchangeScreenState(
             pending.Outgoing,
             incoming,
-            pending.OutgoingCount,
+            1,
             trade.IncomingAssets.Count));
         screen.ReturnRequested += EndTradeExchange;
         _tradeExchangeScreen = screen;
         AddChild(screen);
     }
+
+    private TradeExchangeAssetView BuildTradeExchangeAsset(TradeVoidlingChoiceView voidling)
+        => new(
+            voidling.DisplayName,
+            false,
+            voidling.TintHex,
+            voidling.HasAngelMutation,
+            voidling.OtherMutationCount);
 
     private TradeExchangeAssetView? BuildTradeExchangeAsset(TradeAssetReference? asset)
     {
@@ -205,7 +270,7 @@ public partial class MainController
                 false,
                 voidling.TintHex,
                 hasAngel,
-                voidling.RareTraits.Count - (hasAngel ? 1 : 0));
+                Math.Max(0, voidling.RareTraits.Count - (hasAngel ? 1 : 0)));
         }
 
         var eggIndex = _session.State.OwnedEggs.FindIndex(egg =>
@@ -242,13 +307,17 @@ public partial class MainController
         _tradeHubPanel.Render(TradeBridge.Current);
     }
 
+    private void ShowTradeFailure(string error)
+        => ShowToast(string.Format(Tr("UI_TRADE_ACTION_FAILED"), error));
+
     private void DetachTradePresentation()
     {
         if (!_tradeBridgeSubscribed || _tradeBridge == null)
             return;
 
         _tradeBridge.StateChanged -= OnTradeStateChanged;
-        _tradeBridge.IncomingOfferReceived -= OnIncomingTradeOffer;
+        _tradeBridge.IncomingInviteReceived -= OnIncomingTradeInvite;
+        _tradeBridge.NegotiationActivated -= OnTradeNegotiationActivated;
         _tradeBridge.LocalTradeCommitted -= OnLocalTradeCommitted;
         _tradeBridgeSubscribed = false;
     }
