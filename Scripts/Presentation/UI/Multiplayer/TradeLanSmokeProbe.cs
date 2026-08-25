@@ -126,6 +126,15 @@ public partial class TradeLanSmokeProbe : Node
         }
 
         _negotiationId = active.NegotiationId;
+        if (!string.IsNullOrWhiteSpace(active.RemoteOfferAssetId))
+            _remoteAssetId = active.RemoteOfferAssetId;
+
+        // Once both players confirm, ownership can change before the presentation commit callback is
+        // delivered. Never interpret a Finalizing room as a request to select again; just wait for the
+        // durable callback that proves the negotiated assets were committed.
+        if (active.Phase != TradeNegotiationPhase.Negotiating)
+            return;
+
         if (active.LocalOffer == null)
         {
             var selected = _bridge.SelectVoidling(active.NegotiationId, _localAssetId);
@@ -138,9 +147,6 @@ public partial class TradeLanSmokeProbe : Node
             GD.Print($"[trade-lan-smoke] selected local Voidling {_localAssetId}");
             return;
         }
-
-        if (!string.IsNullOrWhiteSpace(active.RemoteOfferAssetId))
-            _remoteAssetId = active.RemoteOfferAssetId;
 
         // Wait for the presentation preview as well as the authoritative asset reference. This
         // proves that both players can actually see what the other side placed into the room.
