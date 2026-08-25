@@ -47,7 +47,7 @@ public sealed class MultiplayerRaceResultCoordinatorTests
             out _,
             out var result));
         Assert.Equal(fixture.ChallengeId, result.ChallengeId);
-        Assert.Equal(localResult, result);
+        AssertResultEquivalent(localResult!, result);
 
         fixture.Transport.Emit(new NetworkPacket(
             remote.Id,
@@ -90,7 +90,8 @@ public sealed class MultiplayerRaceResultCoordinatorTests
 
         Finish(fixture.Lockstep, fixture.ChallengeId);
 
-        Assert.Equal(hostResult, accepted);
+        Assert.NotNull(accepted);
+        AssertResultEquivalent(hostResult, accepted!);
         var ack = Assert.Single(fixture.Transport.Sent.Where(message =>
             message.Peer == host.Id &&
             MultiplayerRaceResultProtocol.TryDecodeResultAck(
@@ -137,7 +138,8 @@ public sealed class MultiplayerRaceResultCoordinatorTests
 
         Assert.NotNull(mismatch);
         Assert.Equal(fixture.ChallengeId, mismatch!.ChallengeId);
-        Assert.Equal(hostResult, accepted);
+        Assert.NotNull(accepted);
+        AssertResultEquivalent(hostResult, accepted!);
         Assert.Contains(fixture.Transport.Sent, message =>
             message.Peer == host.Id &&
             MultiplayerRaceResultProtocol.TryDecodeResultAck(
@@ -168,6 +170,16 @@ public sealed class MultiplayerRaceResultCoordinatorTests
 
         Assert.Null(accepted);
         Assert.Empty(fixture.Transport.Sent);
+    }
+
+    private static void AssertResultEquivalent(MultiplayerRaceResult expected, MultiplayerRaceResult actual)
+    {
+        Assert.Equal(expected.ChallengeId, actual.ChallengeId);
+        Assert.Equal(expected.FinalTick, actual.FinalTick);
+        Assert.Equal(expected.FinalChecksum, actual.FinalChecksum);
+        Assert.Equal(expected.Placements.Length, actual.Placements.Length);
+        for (var i = 0; i < expected.Placements.Length; i++)
+            Assert.Equal(expected.Placements[i], actual.Placements[i]);
     }
 
     private static RaceFixture CreateHostRace(PlatformUser host, PlatformUser remote)
