@@ -19,13 +19,27 @@ public sealed record OptionalMultiplayerComposition(
     string? UnavailableReason);
 
 /// <summary>
-/// Selects Steam adapters when available and offline adapters otherwise. Failure to initialize
-/// Steam is a capability loss only; it is never a game-startup failure.
+/// Selects the explicit development LAN transport first, Steam adapters for normal online play,
+/// and offline adapters otherwise. Every failure is a capability loss only; it is never a
+/// single-player startup failure.
 /// </summary>
 public static class OptionalMultiplayerComposer
 {
     public static OptionalMultiplayerComposition Create()
     {
+        var args = OS.GetCmdlineArgs();
+        if (LanMultiplayerOptions.IsLanRequested(args))
+        {
+            if (!LanMultiplayerOptions.TryParse(args, out var lanOptions, out var lanError) || lanOptions == null)
+            {
+                return CreateOffline(
+                    $"LAN test multiplayer configuration is invalid: {lanError ?? "unknown error"}. " +
+                    "Single-player remains available.");
+            }
+
+            return CreateLan(lanOptions);
+        }
+
         if (!Engine.HasSingleton("Steam"))
             return CreateOffline("GodotSteam is not installed or not loaded. Single-player remains available.");
 
@@ -77,6 +91,45 @@ public static class OptionalMultiplayerComposer
         catch (Exception exception)
         {
             return CreateOffline($"Steam multiplayer setup failed: {exception.Message}. Single-player remains available.");
+        }
+    }
+
+    private static OptionalMultiplayerComposition CreateLan(LanMultiplayerOptions options)
+    {
+        try
+        {
+            var runtime = new LanMultiplayerRuntime
+            {
+                Name = nameof(LanMultiplayerRuntime)
+            };
+            runtime.Configure(options);
+
+            IPlatformIdentityService identity = runtime;
+            ILobbyService lobbies = runtime;
+            IMultiplayerTransport transport = runtime;
+            ILeaderboardService leaderboards = new OfflineLeaderboardService(
+                "Steam friend leaderboards are not emulated by the LAN development transport.");
+            var connection = new MultiplayerConnectionService(identity, lobbies, transport);
+            var connectedZone = new ConnectedZoneService(connection);
+            var connectedZoneTransient = new ConnectedZoneTransientService(connection, connectedZone);
+            var connectedZoneFacade = new ConnectedZoneFacade(connection, connectedZone, connectedZoneTransient);
+            var challenges = new ChallengeCoordinator(connection);
+
+            return new OptionalMultiplayerComposition(
+                connection,
+                connectedZone,
+                connectedZoneTransient,
+                connectedZoneFacade,
+                challenges,
+                leaderboards,
+                runtime,
+                false,
+                null);
+        }
+        catch (Exception exception)
+        {
+            return CreateOffline(
+                $"LAN test multiplayer setup failed: {exception.Message}. Single-player remains available.");
         }
     }
 
