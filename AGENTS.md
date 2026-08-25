@@ -70,6 +70,7 @@ Infrastructure (Godot filesystem, audio, Resources, localization adapters)
 - Player-facing text must use localization keys unless it is user-generated content.
 - `Scripts/Presentation/UI/Settings/SettingsScreen.cs` is the current reference screen pattern.
 - Voidling presentation primitives are shared across contexts. In particular, mutation/halo geometry comes from `VoidlingMutationVisualMetrics`, world mutations render through `MutationAdornment2D`, portrait mutations render through `HaloBadge`, and ground/shadow proportions come from `VoidlingGroundVisualMetrics`. Do not recreate challenge-, family-tree-, menu-, or garden-specific copies of these visuals.
+- **Hard rule — Voidling sprite consistency:** any change to a Voidling's sprite, sprite sheet, visual scale, orientation, palette treatment, or creature-specific visual must be audited and applied everywhere that Voidling is rendered, not only in the screen currently being edited. At minimum check the garden/world actor, races and race results, profiles/details, portraits, breeding/family-tree UI, menus/selection screens, and any challenge/minigame presentation. Do not leave a legacy placeholder renderer active in another context. Prefer a shared visual resolver/catalog over duplicating name-to-texture logic between screens. A sprite task is not complete until all rendering contexts are consistent or an explicitly documented exception exists.
 
 ### Infrastructure
 
