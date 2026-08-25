@@ -27,7 +27,8 @@ public sealed record LeaderboardEntry(
     PlatformUserId UserId,
     int GlobalRank,
     int Score,
-    IReadOnlyList<int> Details);
+    IReadOnlyList<int> Details,
+    string? DisplayName = null);
 
 public sealed record LeaderboardOperationResult(bool Success, string? Error)
 {
