@@ -1,5 +1,6 @@
 using System;
 using Godot;
+using Voidling.Application.Ports.Multiplayer;
 
 namespace Voidling.Infrastructure.Steam;
 
@@ -12,6 +13,12 @@ internal sealed class GodotSteamApi
     private const int FriendsOnlyLobbyType = 1; // Steam ELobbyType::k_ELobbyTypeFriendsOnly.
     private const int NetworkingSendUnreliable = 0;
     private const int NetworkingSendReliable = 8;
+    private const int LeaderboardSortAscending = 1;
+    private const int LeaderboardSortDescending = 2;
+    private const int LeaderboardDisplayNumeric = 1;
+    private const int LeaderboardDisplaySeconds = 2;
+    private const int LeaderboardDisplayMilliseconds = 3;
+    private const int LeaderboardDataRequestFriends = 2;
 
     private readonly GodotObject _steam;
 
@@ -138,4 +145,47 @@ internal sealed class GodotSteamApi
 
     public Variant ReceiveMessagesOnChannel(int channel, int maxMessages)
         => _steam.Call("receiveMessagesOnChannel", channel, maxMessages);
+
+    public bool SupportsLeaderboards
+        => _steam.HasMethod("findOrCreateLeaderboard") &&
+           _steam.HasMethod("uploadLeaderboardScore") &&
+           _steam.HasMethod("downloadLeaderboardEntries");
+
+    public void FindOrCreateLeaderboard(LeaderboardDefinition definition)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        _steam.Call(
+            "findOrCreateLeaderboard",
+            definition.Name,
+            definition.SortDirection == LeaderboardSortDirection.Ascending
+                ? LeaderboardSortAscending
+                : LeaderboardSortDescending,
+            definition.DisplayFormat switch
+            {
+                LeaderboardDisplayFormat.Numeric => LeaderboardDisplayNumeric,
+                LeaderboardDisplayFormat.Seconds => LeaderboardDisplaySeconds,
+                LeaderboardDisplayFormat.Milliseconds => LeaderboardDisplayMilliseconds,
+                _ => LeaderboardDisplayNumeric
+            });
+    }
+
+    public void UploadLeaderboardScore(
+        ulong leaderboardHandle,
+        int score,
+        bool keepBest,
+        int[] details)
+        => _steam.Call(
+            "uploadLeaderboardScore",
+            score,
+            keepBest,
+            details ?? Array.Empty<int>(),
+            unchecked((long)leaderboardHandle));
+
+    public void DownloadFriendLeaderboardEntries(ulong leaderboardHandle)
+        => _steam.Call(
+            "downloadLeaderboardEntries",
+            0,
+            0,
+            LeaderboardDataRequestFriends,
+            unchecked((long)leaderboardHandle));
 }
