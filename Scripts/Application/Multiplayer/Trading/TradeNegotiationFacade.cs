@@ -22,6 +22,7 @@ public sealed record TradeNegotiationView(
     TradeNegotiationPhase Phase,
     string PartnerDisplayName,
     TradeVoidlingChoiceView? LocalOffer,
+    TradeVoidlingChoiceView? RemoteOffer,
     string? RemoteOfferAssetId,
     bool LocalAccepted,
     bool RemoteAccepted,
@@ -42,12 +43,14 @@ public sealed record TradeLobbyViewState(
 
 /// <summary>
 /// Presentation-safe façade for the mutual-confirmation negotiation. Platform IDs remain opaque,
-/// and only locally owned Voidling IDs can be submitted as the player's offered slot.
+/// and only locally owned Voidling IDs can be submitted as the player's offered slot. Remote visual
+/// metadata is a presentation-only preview and never participates in durable ownership validation.
 /// </summary>
 public sealed class TradeNegotiationFacade
 {
     private readonly MultiplayerConnectionService _connection;
     private readonly TradeNegotiationCoordinator _negotiation;
+    private readonly TradeOfferPreviewCoordinator _previews;
     private readonly Func<GameStateData> _stateProvider;
     private readonly Dictionary<PlatformUserId, string> _partnerKeys = new();
     private readonly Dictionary<string, TradeNegotiationPhase> _observedPhases = new(StringComparer.Ordinal);
@@ -55,10 +58,12 @@ public sealed class TradeNegotiationFacade
     public TradeNegotiationFacade(
         MultiplayerConnectionService connection,
         TradeNegotiationCoordinator negotiation,
+        TradeOfferPreviewCoordinator previews,
         Func<GameStateData> stateProvider)
     {
         _connection = connection ?? throw new ArgumentNullException(nameof(connection));
         _negotiation = negotiation ?? throw new ArgumentNullException(nameof(negotiation));
+        _previews = previews ?? throw new ArgumentNullException(nameof(previews));
         _stateProvider = stateProvider ?? throw new ArgumentNullException(nameof(stateProvider));
 
         _connection.LobbyChanged += _ =>
@@ -69,6 +74,7 @@ public sealed class TradeNegotiationFacade
         _connection.LobbyLeft += Reset;
         _negotiation.NegotiationChanged += HandleNegotiationChanged;
         _negotiation.IncomingInvite += HandleIncomingInvite;
+        _previews.PreviewChanged += _ => RaiseStateChanged();
     }
 
     public event Action<TradeLobbyViewState>? StateChanged;
@@ -95,12 +101,35 @@ public sealed class TradeNegotiationFacade
 
     public TradeNegotiationOperationResult SelectVoidling(string negotiationId, string? assetId)
     {
-        if (assetId != null && !_stateProvider().Voidlings.Any(voidling =>
-                string.Equals(voidling.Id, assetId, StringComparison.Ordinal)))
+        var choices = BuildLocalVoidlings();
+        TradeVoidlingChoiceView? selected = null;
+        if (assetId != null)
         {
-            return TradeNegotiationOperationResult.Failed("That Voidling is no longer in your Garden.");
+            selected = choices.FirstOrDefault(voidling =>
+                string.Equals(voidling.AssetId, assetId, StringComparison.Ordinal));
+            if (selected == null)
+                return TradeNegotiationOperationResult.Failed("That Voidling is no longer in your Garden.");
         }
-        return _negotiation.SelectVoidling(negotiationId, assetId);
+
+        var result = _negotiation.SelectVoidling(negotiationId, assetId);
+        if (!result.Success)
+            return result;
+
+        var preview = selected == null
+            ? null
+            : new TradeVoidlingOfferPreview(
+                selected.AssetId,
+                selected.DisplayName,
+                selected.TintHex,
+                selected.HasAngelMutation,
+                selected.OtherMutationCount);
+        if (!_previews.Publish(negotiationId, preview))
+        {
+            return TradeNegotiationOperationResult.Failed(
+                "The Voidling was selected, but its trade-room preview could not be synchronized. Select it again to retry.");
+        }
+
+        return result;
     }
 
     public TradeNegotiationOperationResult SetAccepted(string negotiationId, bool accepted)
@@ -181,11 +210,25 @@ public sealed class TradeNegotiationFacade
             ? null
             : choices.FirstOrDefault(choice => string.Equals(choice.AssetId, localAsset.AssetId, StringComparison.Ordinal));
 
+        TradeVoidlingChoiceView? remoteOffer = null;
+        var preview = _previews.GetPreview(state.NegotiationId, partner);
+        if (remoteAsset != null && preview != null &&
+            string.Equals(remoteAsset.AssetId, preview.AssetId, StringComparison.Ordinal))
+        {
+            remoteOffer = new TradeVoidlingChoiceView(
+                preview.AssetId,
+                preview.DisplayName,
+                preview.TintHex,
+                preview.HasAngelMutation,
+                preview.OtherMutationCount);
+        }
+
         return new TradeNegotiationView(
             state.NegotiationId,
             state.Phase,
             DisplayName(partner),
             localOffer,
+            remoteOffer,
             remoteAsset?.AssetId,
             localAccepted,
             remoteAccepted,
