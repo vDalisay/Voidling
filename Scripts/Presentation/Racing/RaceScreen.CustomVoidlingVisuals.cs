@@ -10,14 +10,6 @@ public partial class RaceScreen
     private static readonly Texture2D MallowRaceTexture = GD.Load<Texture2D>(
         "res://Assets/Voidlings/Mallow/dark_voidling.png");
 
-    public override void _EnterTree()
-    {
-        // _Ready builds the race visuals. Apply the creature-specific presentation immediately
-        // afterwards so every race mode (run/swim/glide) keeps the same Voidling identity used
-        // in the garden instead of falling back to the legacy placeholder spritesheet.
-        CallDeferred(MethodName.ApplyCustomVoidlingRaceVisuals);
-    }
-
     private void ApplyCustomVoidlingRaceVisuals()
     {
         foreach (var visual in _visuals.Values)
