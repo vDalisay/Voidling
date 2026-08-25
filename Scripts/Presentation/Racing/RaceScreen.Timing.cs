@@ -6,8 +6,8 @@ namespace Voidling.Presentation.Racing;
 public partial class RaceScreen
 {
     /// <summary>
-    /// Returns the selected player's result time derived only from deterministic 60 Hz simulation
-    /// steps. Frame time and wall-clock time never contribute to a leaderboard score.
+    /// Returns the selected player's result time derived only from deterministic simulation steps.
+    /// Frame time and wall-clock time never contribute to a leaderboard score.
     /// </summary>
     public bool TryGetPlayerFinishMilliseconds(out int milliseconds)
     {
@@ -19,13 +19,15 @@ public partial class RaceScreen
             return false;
         }
 
-        // RaceSimulation is exactly 60 Hz. Round to the nearest millisecond using integer math so
-        // the same fixed step always maps to the same uploaded score on every platform.
-        var rounded = ((long)fixedStep * 1000L + 30L) / 60L;
-        if (rounded <= 0 || rounded > int.MaxValue)
+        try
+        {
+            milliseconds = RaceTiming.FixedStepsToMilliseconds(fixedStep);
+            return true;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            milliseconds = 0;
             return false;
-
-        milliseconds = (int)rounded;
-        return true;
+        }
     }
 }
