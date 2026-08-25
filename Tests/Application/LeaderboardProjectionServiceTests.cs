@@ -60,6 +60,23 @@ public sealed class LeaderboardProjectionServiceTests
     }
 
     [Fact]
+    public async Task CourseBestTimeUsesAscendingMillisecondsAndKeepBest()
+    {
+        var fake = new FakeLeaderboardService();
+        var projection = new LeaderboardProjectionService(fake);
+
+        var result = await projection.UploadCourseBestTimeAsync("GardenSprint", 3, 33_400);
+
+        Assert.True(result.Success, result.Error);
+        var upload = Assert.Single(fake.Uploads);
+        Assert.Equal("voidling_course_gardensprint_v3", upload.Definition.Name);
+        Assert.Equal(LeaderboardSortDirection.Ascending, upload.Definition.SortDirection);
+        Assert.Equal(LeaderboardDisplayFormat.Milliseconds, upload.Definition.DisplayFormat);
+        Assert.Equal(33_400, upload.Score);
+        Assert.True(upload.KeepBest);
+    }
+
+    [Fact]
     public async Task DailyRaceUploadUsesVersionedAscendingMillisecondsBoardAndKeepBest()
     {
         var fake = new FakeLeaderboardService();
