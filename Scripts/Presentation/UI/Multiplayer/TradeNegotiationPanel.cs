@@ -58,15 +58,27 @@ public partial class TradeNegotiationPanel : VBoxContainer
             return;
         }
 
-        AddChild(UiFactory.CreateLabel(
+        var heading = UiFactory.CreateLabel(
             string.Format(Tr("UI_TRADE_ROOM_WITH"), trade.PartnerDisplayName),
-            9));
+            9);
+        heading.HorizontalAlignment = HorizontalAlignment.Center;
+        AddChild(heading);
 
         var slots = new HBoxContainer();
         slots.AddThemeConstantOverride("separation", 18);
         slots.Alignment = BoxContainer.AlignmentMode.Center;
-        slots.AddChild(BuildLocalSlot(trade));
-        slots.AddChild(BuildRemoteSlot(trade));
+        slots.AddChild(BuildOfferSlot(
+            Tr("UI_TRADE_YOUR_OFFER"),
+            trade.LocalOffer,
+            trade.LocalOffer == null ? Tr("UI_TRADE_SLOT_EMPTY") : string.Empty,
+            trade.LocalAccepted));
+        slots.AddChild(BuildOfferSlot(
+            string.Format(Tr("UI_TRADE_THEIR_OFFER"), trade.PartnerDisplayName),
+            trade.RemoteOffer,
+            trade.RemoteOfferAssetId == null
+                ? Tr("UI_TRADE_SLOT_WAITING")
+                : Tr("UI_TRADE_REMOTE_SYNCING"),
+            trade.RemoteAccepted));
         AddChild(slots);
 
         if (trade.CanChangeOffer)
@@ -135,58 +147,54 @@ public partial class TradeNegotiationPanel : VBoxContainer
         AddChild(statusLabel);
     }
 
-    private Control BuildLocalSlot(TradeNegotiationView trade)
+    private Control BuildOfferSlot(
+        string titleText,
+        TradeVoidlingChoiceView? offer,
+        string emptyText,
+        bool accepted)
     {
-        var box = new VBoxContainer { CustomMinimumSize = new Vector2(190, 84) };
-        box.AddThemeConstantOverride("separation", 2);
-        var title = UiFactory.CreateLabel(Tr("UI_TRADE_YOUR_OFFER"), 8);
+        var panel = UiFactory.CreatePanel(new Vector2(205, 94));
+        panel.CustomMinimumSize = new Vector2(205, 94);
+        var box = new VBoxContainer();
+        box.AddThemeConstantOverride("separation", 1);
+        panel.AddChild(box);
+
+        var title = UiFactory.CreateLabel(titleText, 7);
         title.HorizontalAlignment = HorizontalAlignment.Center;
         box.AddChild(title);
 
-        if (trade.LocalOffer == null)
+        if (offer == null)
         {
-            var empty = UiFactory.CreateLabel(Tr("UI_TRADE_SLOT_EMPTY"), 7);
+            var empty = UiFactory.CreateLabel(emptyText, 7);
             empty.HorizontalAlignment = HorizontalAlignment.Center;
-            empty.CustomMinimumSize = new Vector2(180, 54);
             empty.VerticalAlignment = VerticalAlignment.Center;
+            empty.CustomMinimumSize = new Vector2(190, 52);
             box.AddChild(empty);
         }
         else
         {
-            var choice = trade.LocalOffer;
             var portrait = UiFactory.CreatePortrait(
-                UiFactory.ParseTint(choice.TintHex),
-                choice.HasAngelMutation,
-                choice.OtherMutationCount,
-                new Vector2(48, 48));
-            var center = new CenterContainer { CustomMinimumSize = new Vector2(180, 50) };
-            center.AddChild(portrait);
-            box.AddChild(center);
-            var name = UiFactory.CreateLabel(choice.DisplayName, 7);
+                UiFactory.ParseTint(offer.TintHex),
+                offer.HasAngelMutation,
+                offer.OtherMutationCount,
+                new Vector2(46, 46));
+            var portraitCenter = new CenterContainer { CustomMinimumSize = new Vector2(190, 48) };
+            portraitCenter.AddChild(portrait);
+            box.AddChild(portraitCenter);
+
+            var name = UiFactory.CreateLabel(offer.DisplayName, 7);
             name.HorizontalAlignment = HorizontalAlignment.Center;
             box.AddChild(name);
         }
-        return box;
-    }
 
-    private Control BuildRemoteSlot(TradeNegotiationView trade)
-    {
-        var box = new VBoxContainer { CustomMinimumSize = new Vector2(190, 84) };
-        box.AddThemeConstantOverride("separation", 2);
-        var title = UiFactory.CreateLabel(
-            string.Format(Tr("UI_TRADE_THEIR_OFFER"), trade.PartnerDisplayName),
-            8);
-        title.HorizontalAlignment = HorizontalAlignment.Center;
-        box.AddChild(title);
+        if (accepted)
+        {
+            var ready = UiFactory.CreateLabel(Tr("UI_TRADE_ACCEPTED_MARK"), 6);
+            ready.HorizontalAlignment = HorizontalAlignment.Center;
+            ready.AddThemeColorOverride("font_color", Color.FromHtml("#4F7A54"));
+            box.AddChild(ready);
+        }
 
-        var text = trade.RemoteOfferAssetId == null
-            ? Tr("UI_TRADE_SLOT_WAITING")
-            : Tr("UI_TRADE_REMOTE_SELECTED");
-        var offered = UiFactory.CreateLabel(text, 7);
-        offered.HorizontalAlignment = HorizontalAlignment.Center;
-        offered.VerticalAlignment = VerticalAlignment.Center;
-        offered.CustomMinimumSize = new Vector2(180, 58);
-        box.AddChild(offered);
-        return box;
+        return panel;
     }
 }
