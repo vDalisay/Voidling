@@ -57,7 +57,7 @@ public sealed class MultiplayerRaceResultTests
     }
 
     [Fact]
-    public void MigrationToVersionSevenNormalizesMultiplayerRaceProgressWithoutSteam()
+    public void MigrationNormalizesMultiplayerRaceProgressWithoutSteam()
     {
         var state = new GameStateData
         {
@@ -72,7 +72,6 @@ public sealed class MultiplayerRaceResultTests
         new GameStateMigrationService(Rules).Normalize(state);
 
         Assert.Equal(GameStateMigrationService.CurrentSaveVersion, state.SaveVersion);
-        Assert.Equal(7, state.SaveVersion);
         Assert.Equal(0, state.MultiplayerWins);
         Assert.Equal(MultiplayerRaceResultUseCase.MaxAppliedRaceIds, state.AppliedMultiplayerRaceIds.Count);
         Assert.Equal("race-14", state.AppliedMultiplayerRaceIds[0]);
