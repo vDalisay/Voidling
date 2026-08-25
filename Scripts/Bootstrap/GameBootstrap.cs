@@ -4,6 +4,7 @@ using Godot;
 using Voidling.Application.Breeding;
 using Voidling.Application.Multiplayer;
 using Voidling.Application.Multiplayer.Challenges;
+using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Racing;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Application.Persistence;
@@ -40,6 +41,7 @@ public partial class GameBootstrap : Node
     private MultiplayerRaceLockstepCoordinator? _multiplayerRaceLockstep;
     private MultiplayerRaceResultCoordinator? _multiplayerRaceResults;
     private TradeNetworkCoordinator? _tradeCoordinator;
+    private LeaderboardProjectionService? _leaderboardProjection;
 
     public override void _Ready()
     {
@@ -73,6 +75,13 @@ public partial class GameBootstrap : Node
         AddChild(session);
         ComposeTrading(rules, stateRepository, session);
         ComposeMultiplayerRaceResults(rules, stateRepository, session);
+
+        // Steam leaderboards are only a social projection of already-persisted local progress.
+        // Retrying the total on every Steam-capable startup makes transient upload failures harmless
+        // without adding another persisted "last uploaded" field or making Steam part of save loading.
+        if (session.State.MultiplayerWins > 0)
+            ProjectMultiplayerWins(session.State.MultiplayerWins, "startup retry");
+
         ComposeMultiplayerProbeIfRequested(session);
     }
 
@@ -82,6 +91,7 @@ public partial class GameBootstrap : Node
         _multiplayerConnection = multiplayer.Connection;
         _connectedZone = multiplayer.ConnectedZone;
         _challengeCoordinator = multiplayer.Challenges;
+        _leaderboardProjection = new LeaderboardProjectionService(multiplayer.Leaderboards);
         _challengeCoordinator.ProtocolRejected += reason =>
             GD.PushWarning($"Rejected multiplayer challenge packet: {reason}");
 
@@ -220,6 +230,10 @@ public partial class GameBootstrap : Node
                 GD.Print(
                     $"Applied multiplayer race {result.ChallengeId}: place {applied.Place}, " +
                     $"reward {applied.CoinReward}, multiplayer wins {applied.MultiplayerWins}.");
+
+                // Projection happens strictly after the local save. If Steam is unavailable or the
+                // callback fails, the persisted total remains intact and will be retried next startup/win.
+                ProjectMultiplayerWins(applied.MultiplayerWins, $"race {result.ChallengeId}");
             }
             catch (Exception exception)
             {
@@ -231,6 +245,33 @@ public partial class GameBootstrap : Node
                     exception.Message);
             }
         };
+    }
+
+    private async void ProjectMultiplayerWins(int totalWins, string reason)
+    {
+        var projection = _leaderboardProjection;
+        if (projection == null || !projection.Availability.IsAvailable || totalWins < 0)
+            return;
+
+        try
+        {
+            var result = await projection.UploadMultiplayerWinsAsync(totalWins);
+            if (!result.Success)
+            {
+                GD.PushWarning(
+                    $"Steam multiplayer-win leaderboard projection failed during {reason}: " +
+                    (result.Error ?? "unknown Steam leaderboard error") +
+                    ". Local progress is already saved and will be retried later.");
+            }
+        }
+        catch (Exception exception)
+        {
+            // The adapter is designed to return failures, but this final boundary protects the
+            // single-player/session lifetime from any unexpected Steam callback/interop exception.
+            GD.PushWarning(
+                $"Steam multiplayer-win leaderboard projection threw during {reason}: {exception.Message}. " +
+                "Local progress is already saved and will be retried later.");
+        }
     }
 
     private static void RecoverInterruptedTradePrepares(
