@@ -89,6 +89,7 @@ public sealed class RaceSimulation
         public bool GlideFailed { get; set; }
         public float GlideEndX { get; set; }
         public bool Finished { get; set; }
+        public int FinishFixedStep { get; set; }
     }
 
     public RaceSimulation(
@@ -137,6 +138,20 @@ public sealed class RaceSimulation
         if (!_participantsById.TryGetValue(participantId, out var state))
             throw new KeyNotFoundException($"Unknown race participant '{participantId}'.");
         return Snapshot(state);
+    }
+
+    public bool TryGetFinishFixedStep(string participantId, out int fixedStep)
+    {
+        fixedStep = 0;
+        if (!_participantsById.TryGetValue(participantId, out var state) ||
+            !state.Finished ||
+            state.FinishFixedStep <= 0)
+        {
+            return false;
+        }
+
+        fixedStep = state.FinishFixedStep;
+        return true;
     }
 
     public RaceDeterministicStateSnapshot GetDeterministicStateSnapshot()
@@ -212,8 +227,12 @@ public sealed class RaceSimulation
 
         state.X = _course.EndX;
         state.Finished = true;
+        state.FinishFixedStep = Math.Max(1, _fixedStepCount);
         _finishOrder.Add(participantId);
-        return new RaceParticipantFinishedEvent(participantId, _finishOrder.Count, _fixedStepCount);
+        return new RaceParticipantFinishedEvent(
+            participantId,
+            _finishOrder.Count,
+            state.FinishFixedStep);
     }
 
     public bool TryCheer(string participantId)
@@ -332,11 +351,12 @@ public sealed class RaceSimulation
 
         state.X = _course.EndX;
         state.Finished = true;
+        state.FinishFixedStep = _fixedStepCount;
         _finishOrder.Add(state.Participant.CreatureId);
         events.Add(new RaceParticipantFinishedEvent(
             state.Participant.CreatureId,
             _finishOrder.Count,
-            _fixedStepCount));
+            state.FinishFixedStep));
     }
 
     private RaceParticipantStateSnapshot Snapshot(ParticipantState state)
