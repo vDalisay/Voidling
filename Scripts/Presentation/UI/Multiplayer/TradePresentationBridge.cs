@@ -41,18 +41,25 @@ public partial class TradePresentationBridge : Node
     public override void _Ready()
     {
         var args = OS.GetCmdlineUserArgs();
-        if (!Array.Exists(args, arg =>
+        if (Array.Exists(args, arg =>
                 string.Equals(arg, "--voidling-lan-trade-smoke", StringComparison.OrdinalIgnoreCase)))
         {
-            return;
+            var probe = new TradeLanSmokeProbe
+            {
+                Name = nameof(TradeLanSmokeProbe)
+            };
+            probe.Configure(this);
+            AddChild(probe);
         }
 
-        var probe = new TradeLanSmokeProbe
+        if (Array.Exists(args, arg =>
+                string.Equals(arg, "--voidling-trade-panel-smoke", StringComparison.OrdinalIgnoreCase)))
         {
-            Name = nameof(TradeLanSmokeProbe)
-        };
-        probe.Configure(this);
-        AddChild(probe);
+            AddChild(new TradePanelSmokeProbe
+            {
+                Name = nameof(TradePanelSmokeProbe)
+            });
+        }
     }
 
     public override void _Process(double delta)
