@@ -23,6 +23,7 @@ public partial class TradeLanSmokeProbe : Node
     private string? _negotiationId;
     private string? _localAssetId;
     private string? _remoteAssetId;
+    private string _lastDiagnosticState = string.Empty;
 
     public void Configure(TradePresentationBridge bridge)
     {
@@ -55,8 +56,11 @@ public partial class TradeLanSmokeProbe : Node
         _bridge.LocalTradeCommitted -= OnLocalTradeCommitted;
     }
 
-    private void OnStateChanged(TradeLobbyViewState _)
-        => ScheduleAdvance();
+    private void OnStateChanged(TradeLobbyViewState state)
+    {
+        PrintState(state);
+        ScheduleAdvance();
+    }
 
     private void ScheduleAdvance()
     {
@@ -77,6 +81,7 @@ public partial class TradeLanSmokeProbe : Node
             return;
 
         var state = _bridge.Current;
+        PrintState(state);
         if (!state.Availability.IsAvailable || !state.IsConnected || state.LocalVoidlings.Count == 0)
             return;
 
@@ -160,6 +165,11 @@ public partial class TradeLanSmokeProbe : Node
         if (_complete)
             return;
 
+        GD.Print(
+            $"[trade-lan-smoke] local durable commit trade={trade.TradeId} " +
+            $"outgoing=[{string.Join(',', trade.OutgoingAssets.Select(asset => asset.AssetId))}] " +
+            $"incoming=[{string.Join(',', trade.IncomingAssets.Select(asset => asset.AssetId))}]");
+
         if (string.IsNullOrWhiteSpace(_localAssetId) || string.IsNullOrWhiteSpace(_remoteAssetId))
         {
             Fail("durable trade committed before the smoke probe observed both negotiated Voidling IDs");
@@ -184,6 +194,18 @@ public partial class TradeLanSmokeProbe : Node
             $"[trade-lan-smoke] LAN_TRADE_SMOKE_SUCCESS negotiation={_negotiationId} " +
             $"outgoing={_localAssetId} incoming={_remoteAssetId}");
         GetTree().Quit(0);
+    }
+
+    private void PrintState(TradeLobbyViewState state)
+    {
+        var active = state.ActiveNegotiation;
+        var marker = active == null
+            ? $"connected={state.IsConnected} partners={state.Partners.Count} invites={state.IncomingInvites.Count} waiting={state.WaitingForPlayer ?? "-"}"
+            : $"id={active.NegotiationId} phase={active.Phase} local={active.LocalOffer?.AssetId ?? "-"} remote={active.RemoteOfferAssetId ?? "-"} preview={(active.RemoteOffer != null ? "yes" : "no")} accepted={active.LocalAccepted}/{active.RemoteAccepted}";
+        if (string.Equals(marker, _lastDiagnosticState, StringComparison.Ordinal))
+            return;
+        _lastDiagnosticState = marker;
+        GD.Print($"[trade-lan-smoke] state {marker}");
     }
 
     private async System.Threading.Tasks.Task RunTimeoutAsync()
