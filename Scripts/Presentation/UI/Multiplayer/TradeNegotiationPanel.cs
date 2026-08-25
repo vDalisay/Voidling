@@ -140,7 +140,11 @@ public partial class TradeNegotiationPanel : VBoxContainer
             : trade.RemoteAccepted
                 ? Tr("UI_TRADE_PARTNER_ACCEPTED")
                 : Tr("UI_TRADE_PARTNER_WAITING");
-        if (!string.IsNullOrWhiteSpace(trade.Message))
+
+        // Normal finalization text belongs to presentation/localization. The Application message is
+        // still surfaced for actual failure/diagnostic states, but should not replace localized copy
+        // just because the coordinator supplied its English debug description of Finalizing.
+        if (trade.Phase != TradeNegotiationPhase.Finalizing && !string.IsNullOrWhiteSpace(trade.Message))
             status = trade.Message!;
         var statusLabel = UiFactory.CreateLabel(status, 7);
         statusLabel.HorizontalAlignment = HorizontalAlignment.Center;
