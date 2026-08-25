@@ -324,6 +324,9 @@ msgstr "Daily Race"
 msgid "UI_ONLINE_CHALLENGES"
 msgstr "Challenges"
 
+msgid "UI_ONLINE_TRADES"
+msgstr "Trades"
+
 msgid "UI_ONLINE_SHARE_TITLE"
 msgstr "Shared Voidling"
 
@@ -545,3 +548,75 @@ msgstr "Finished #{0}"
 
 msgid "UI_MP_RACE_CHEER_FAILED"
 msgstr "Cheer could not be scheduled."
+
+msgid "UI_TRADE_TITLE"
+msgstr "TRADES"
+
+msgid "UI_TRADE_NEED_GARDEN"
+msgstr "Join a connected Garden before trading with friends."
+
+msgid "UI_TRADE_OFFER_TITLE"
+msgstr "Offer a trade"
+
+msgid "UI_TRADE_NO_PARTNERS"
+msgstr "No other friends are currently in this Garden."
+
+msgid "UI_TRADE_NO_ASSETS"
+msgstr "You have no transferable Voidlings or eggs."
+
+msgid "UI_TRADE_SEND_OFFER"
+msgstr "Send Offer"
+
+msgid "UI_TRADE_ACTIVE_HINT"
+msgstr "Finish or decline the active trade before starting another."
+
+msgid "UI_TRADE_INCOMING_TITLE"
+msgstr "Incoming offers"
+
+msgid "UI_TRADE_INCOMING_EMPTY"
+msgstr "No incoming trade offers."
+
+msgid "UI_TRADE_INCOMING_SUMMARY"
+msgstr "{0} offers {1} Voidling(s) and {2} egg(s)."
+
+msgid "UI_TRADE_RESPOND"
+msgstr "Respond"
+
+msgid "UI_TRADE_STATUS_TITLE"
+msgstr "Latest trade status"
+
+msgid "UI_TRADE_ASSET_VOIDLING"
+msgstr "Voidling • {0}"
+
+msgid "UI_TRADE_ASSET_EGG"
+msgstr "{0}"
+
+msgid "UI_TRADE_RESPONSE_TITLE"
+msgstr "RESPOND TO TRADE"
+
+msgid "UI_TRADE_RESPONSE_OFFER"
+msgstr "{0} offers {1} Voidling(s) and {2} egg(s)."
+
+msgid "UI_TRADE_RESPONSE_PICK"
+msgstr "Choose anything you want to send back."
+
+msgid "UI_TRADE_ACCEPT_GIFT_HINT"
+msgstr "Selecting nothing accepts this as a gift."
+
+msgid "UI_TRADE_ACCEPT"
+msgstr "Accept Trade"
+
+msgid "UI_TRADE_DECLINE"
+msgstr "Decline"
+
+msgid "UI_TRADE_ACTION_FAILED"
+msgstr "Trade action failed: {0}"
+
+msgid "UI_TRADE_OFFER_GONE"
+msgstr "That trade offer is no longer available."
+
+msgid "UI_TRADE_ACCEPTED_PENDING"
+msgstr "Trade accepted. Finalizing safely with both players..."
+
+msgid "UI_TRADE_INCOMING_TOAST"
+msgstr "Trade offer received from {0}."
