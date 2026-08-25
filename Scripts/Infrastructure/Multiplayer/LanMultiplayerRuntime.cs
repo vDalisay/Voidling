@@ -40,6 +40,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
     private TaskCompletionSource<LobbyOperationResult>? _joinCompletion;
     private ulong _connectStartedAt;
     private bool _started;
+    private bool _clientFailurePending;
     private int _maxMembers = MaxMembers;
 
     public MultiplayerAvailability Availability => _availability;
@@ -306,17 +307,19 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
             return;
 
         var peerId = (int)peerIdValue;
-        PeerSessionFailed?.Invoke(new PlatformUserId((ulong)peerId));
-
         if (_options.Mode == LanMultiplayerMode.Host)
         {
+            PeerSessionFailed?.Invoke(new PlatformUserId((ulong)peerId));
             if (_memberNames.Remove(peerId))
                 RebuildHostLobby(broadcastRoster: true);
             return;
         }
 
         if (peerId == ServerPeerId)
-            HandleClientConnectionFailure("LAN host disconnected.");
+        {
+            ScheduleClientConnectionFailure("LAN host disconnected.");
+            PeerSessionFailed?.Invoke(new PlatformUserId((ulong)peerId));
+        }
     }
 
     private void EnsureClientIdentityAndHandshake()
@@ -549,6 +552,19 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         GD.PushWarning(reason);
     }
 
+    private void ScheduleClientConnectionFailure(string reason)
+    {
+        if (_clientFailurePending)
+            return;
+
+        _clientFailurePending = true;
+        Callable.From(() =>
+        {
+            _clientFailurePending = false;
+            HandleClientConnectionFailure(reason);
+        }).CallDeferred();
+    }
+
     private void FailRuntime(string reason)
     {
         Shutdown();
@@ -563,6 +579,7 @@ public partial class LanMultiplayerRuntime : Node, IPlatformIdentityService, ILo
         DetachAndDispose(_peer);
         _peer = null;
         _started = false;
+        _clientFailurePending = false;
         _connectStartedAt = 0;
         _currentLobby = null;
         _localUser = null;

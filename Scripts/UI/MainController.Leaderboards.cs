@@ -13,9 +13,12 @@ public partial class MainController
     private int _friendsLeaderboardRequestVersion;
 
     private void ShowFriendsLeaderboards()
+        => ShowFriendsLeaderboards(ShowConnectedZone);
+
+    private void ShowFriendsLeaderboards(Action backRequested)
     {
         var availability = _friendsLeaderboardBridge.Availability;
-        var box = OpenModal(Tr("UI_LEADERBOARD_TITLE"), new Vector2(470, 318));
+        var box = OpenOnlineModal(Tr("UI_LEADERBOARD_TITLE"), new Vector2(470, 318), backRequested);
         var panel = new FriendsLeaderboardPanel();
         panel.Configure(new FriendsLeaderboardPanelState(
             availability.IsAvailable,

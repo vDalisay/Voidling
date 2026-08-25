@@ -111,32 +111,19 @@ public partial class RacePickerScreen : VBoxContainer
 
         foreach (var creature in voidlings)
         {
-            var entry = new VBoxContainer { CustomMinimumSize = new Vector2(84, 78) };
-            entry.AddThemeConstantOverride("separation", 1);
-
-            var card = UiFactory.CreateButton("");
-            card.CustomMinimumSize = new Vector2(80, 58);
-            card.ToggleMode = true;
-            card.KeepPressedOutside = true;
-            cardButtons[creature.Id] = card;
-
-            var portrait = UiFactory.CreatePortrait(
+            var captured = creature;
+            var entry = UiFactory.CreateVoidlingCard(
+                creature.Name,
                 creature.TintColor,
                 creature.HasAngelMutation,
                 creature.OtherMutationCount,
-                new Vector2(48, 48));
-            portrait.Position = new Vector2(16, 4);
-            portrait.Size = new Vector2(48, 48);
-            card.AddChild(portrait);
-
-            var captured = creature;
-            card.Pressed += () => UpdatePreview(captured);
-            entry.AddChild(card);
-
-            var name = UiFactory.CreateLabel(creature.Name, 6);
-            name.HorizontalAlignment = HorizontalAlignment.Center;
-            name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-            entry.AddChild(name);
+                pressed =>
+                {
+                    if (pressed)
+                        UpdatePreview(captured);
+                },
+                out var card);
+            cardButtons[creature.Id] = card;
             cards.AddChild(entry);
         }
 

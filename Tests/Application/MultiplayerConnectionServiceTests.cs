@@ -74,6 +74,29 @@ public sealed class MultiplayerConnectionServiceTests
         Assert.Equal(remote, received);
     }
 
+    [Fact]
+    public void RemoteHostFailure_ClearsClientLobbyAndRaisesLobbyLeft()
+    {
+        var host = new PlatformUser(new PlatformUserId(1), "Host");
+        var client = new PlatformUser(new PlatformUserId(2), "Client");
+        var lobby = new LobbySnapshot(
+            10,
+            host.Id,
+            new[] { new LobbyMember(host, true), new LobbyMember(client, false) });
+        var transport = new FakeTransport();
+        var service = new MultiplayerConnectionService(
+            new FakeIdentity(client),
+            new FakeLobby(lobby),
+            transport);
+        var left = false;
+        service.LobbyLeft += () => left = true;
+
+        transport.EmitFailure(host.Id);
+
+        Assert.True(left);
+        Assert.Null(service.CurrentLobby);
+    }
+
     private sealed class FakeIdentity : IPlatformIdentityService
     {
         public FakeIdentity(PlatformUser local) => LocalUser = local;
@@ -111,5 +134,6 @@ public sealed class MultiplayerConnectionServiceTests
         public void Poll() { }
         public void Close(PlatformUserId peer) { }
         public void Emit(NetworkPacket packet) => PacketReceived?.Invoke(packet);
+        public void EmitFailure(PlatformUserId peer) => PeerSessionFailed?.Invoke(peer);
     }
 }

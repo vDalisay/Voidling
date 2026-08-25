@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Application.Multiplayer.Racing;
 using Voidling.Application.Racing;
 using Voidling.Domain.Racing;
+using Voidling.Presentation.UI.Multiplayer;
 using VoidlingGame;
 
 namespace Voidling.Presentation.Racing;
@@ -24,6 +26,7 @@ public partial class RaceScreen : Node2D
     private const float TrackBottom = 244.0f;
     private const float FlightAltitude = 38.0f;
     private const float JumpDurationSeconds = 0.58f;
+    private const int MaxCatchUpStepsPerFrame = 30;
 
     private static readonly RaceCourse Course = RaceCourse.Demo;
     private static readonly Texture2D CharacterTexture = GD.Load<Texture2D>(
@@ -42,9 +45,15 @@ public partial class RaceScreen : Node2D
 
     private readonly float[] _racerOffsets = { -16.0f, -5.0f, 6.0f, 17.0f };
     private readonly Dictionary<string, RacerVisual> _visuals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, float> _cheerParticleAccumulators = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _previousObstacleIndices = new(StringComparer.Ordinal);
 
     private RaceEntry? _entry;
     private RaceSimulation? _simulation;
+    private MultiplayerRacePresentationBridge? _multiplayerBridge;
+    private MultiplayerRaceFrameView? _multiplayerFrame;
+    private string _multiplayerChallengeId = string.Empty;
+    private double _multiplayerTickAccumulator;
     private bool _autoFinish;
     private bool _running;
     private bool _resultsShown;
@@ -59,7 +68,6 @@ public partial class RaceScreen : Node2D
     private Label _staminaLabel = null!;
     private Label _sectionLabel = null!;
     private RaceMiniMap _miniMap = null!;
-    private float _cheerParticleAccumulator;
 
     private sealed class RacerVisual
     {
@@ -86,16 +94,37 @@ public partial class RaceScreen : Node2D
         _vfxRandom = new Random(unchecked((int)(entry.SimulationSeed ^ 0x51A7E5UL)));
     }
 
+    public void ConfigureMultiplayer(
+        ResolvedMultiplayerRace race,
+        MultiplayerRacePresentationBridge bridge)
+    {
+        ArgumentNullException.ThrowIfNull(race);
+        ArgumentNullException.ThrowIfNull(bridge);
+        if (!bridge.TryGetFrame(race.Start.ChallengeId, out var frame))
+            throw new InvalidOperationException("Multiplayer race lockstep frame is unavailable at presentation launch.");
+
+        var local = frame.Participants.SingleOrDefault(participant => participant.IsLocal)
+            ?? throw new InvalidOperationException("Multiplayer race has no local participant.");
+        Configure(race.Entry, autoFinish: false);
+        _multiplayerBridge = bridge;
+        _multiplayerChallengeId = race.Start.ChallengeId;
+        _multiplayerFrame = frame;
+        _playerId = local.ParticipantId;
+    }
+
     public override void _Ready()
     {
         if (_entry == null)
             throw new InvalidOperationException("RaceScreen must be configured before AddChild.");
 
-        _simulation = new RaceSimulation(
-            Course,
-            _entry.Rules,
-            _entry.Entrants.Select(entrant => entrant.Participant).ToArray(),
-            _entry.SimulationSeed);
+        if (_multiplayerBridge == null)
+        {
+            _simulation = new RaceSimulation(
+                Course,
+                _entry.Rules,
+                _entry.Entrants.Select(entrant => entrant.Participant).ToArray(),
+                _entry.SimulationSeed);
+        }
 
         BuildCoursePresentation();
         CreateEntrantVisuals(_entry.Entrants);
@@ -103,16 +132,28 @@ public partial class RaceScreen : Node2D
         CreatePlayerMarker();
         CreateHud();
 
-        _running = true;
+        _running = false;
         QueueRedraw();
-        SyncVisuals(0.0f);
+        if (_multiplayerFrame != null)
+            RenderMultiplayerFrame(_multiplayerFrame, 0.0f);
+        else
+            SyncVisuals(0.0f);
         UpdatePlayerTracking();
         UpdateHud();
+        PlayRaceIntro();
     }
 
     public override void _Process(double delta)
     {
-        if (!_running || _simulation == null || _playerVisual == null)
+        if (!_running || _playerVisual == null)
+            return;
+
+        if (_multiplayerBridge != null)
+        {
+            ProcessMultiplayer(delta);
+            return;
+        }
+        if (_simulation == null)
             return;
 
         ApplySimulationEvents(_simulation.Advance(delta));
@@ -127,6 +168,45 @@ public partial class RaceScreen : Node2D
             _running = false;
             SyncVisuals(0.0f);
             ShowResults();
+        }
+    }
+
+    private void ProcessMultiplayer(double delta)
+    {
+        var bridge = _multiplayerBridge!;
+        _multiplayerTickAccumulator += Math.Max(0.0, delta);
+        var availableSteps = (int)Math.Floor(_multiplayerTickAccumulator / RaceSimulation.FixedStepSeconds);
+        var steps = Math.Min(availableSteps, MaxCatchUpStepsPerFrame);
+        if (steps > 0)
+        {
+            var advanced = bridge.AdvanceFixedSteps(_multiplayerChallengeId, steps);
+            if (!advanced.Success)
+            {
+                _running = false;
+                SetSectionLabel(Tr("UI_MP_RACE_SYNC_ERROR"), Color.FromHtml("#9C514B"));
+                return;
+            }
+            _multiplayerTickAccumulator -= steps * RaceSimulation.FixedStepSeconds;
+        }
+
+        if (!bridge.TryGetFrame(_multiplayerChallengeId, out var frame))
+            return;
+
+        _multiplayerFrame = frame;
+        RenderMultiplayerFrame(frame, (float)delta);
+        HandleCheerVfx((float)delta);
+        UpdatePlayerTracking();
+        UpdateHud();
+
+        if (frame.IsComplete && !_resultsShown)
+        {
+            _running = false;
+            RenderMultiplayerFrame(frame, 0.0f);
+            ShowResults(frame.Participants
+                .Where(participant => participant.Placement.HasValue)
+                .OrderBy(participant => participant.Placement)
+                .Select(participant => participant.ParticipantId)
+                .ToArray());
         }
     }
 
@@ -168,7 +248,7 @@ public partial class RaceScreen : Node2D
         AddFlightRamp();
 
         foreach (var obstacleX in Course.Obstacles)
-            AddHurdle(obstacleX);
+            AddHurdle(obstacleX + 18.0f);
 
         AddWorldLabel("SWIM", (swim.StartX + swim.EndX) * 0.5f, 108, SwimColor);
         AddWorldLabel("GLIDE / SWIM", (glide.StartX + glide.EndX) * 0.5f, 108, FlyColor);
@@ -225,7 +305,7 @@ public partial class RaceScreen : Node2D
         {
             switch (simulationEvent)
             {
-                case RaceObstacleResolvedEvent obstacle when obstacle.Avoided:
+                case RaceObstacleResolvedEvent obstacle:
                     if (_visuals.TryGetValue(obstacle.ParticipantId, out var visual))
                         visual.JumpSeconds = JumpDurationSeconds;
                     break;
@@ -271,6 +351,42 @@ public partial class RaceScreen : Node2D
         {
             var state = _simulation.GetState(pair.Key);
             UpdateRacerVisual(pair.Value, state, delta);
+        }
+    }
+
+    private void RenderMultiplayerFrame(MultiplayerRaceFrameView frame, float delta)
+    {
+        var entrants = _entry!.Entrants.ToDictionary(
+            entrant => entrant.Participant.CreatureId,
+            StringComparer.Ordinal);
+        foreach (var participant in frame.Participants)
+        {
+            if (!_visuals.TryGetValue(participant.ParticipantId, out var visual) ||
+                !entrants.TryGetValue(participant.ParticipantId, out var entrant))
+            {
+                continue;
+            }
+
+            var previousObstacleIndex = _previousObstacleIndices.GetValueOrDefault(
+                participant.ParticipantId,
+                participant.NextObstacleIndex);
+            if (participant.NextObstacleIndex > previousObstacleIndex && !participant.Finished)
+                visual.JumpSeconds = JumpDurationSeconds;
+            _previousObstacleIndices[participant.ParticipantId] = participant.NextObstacleIndex;
+
+            UpdateRacerVisual(visual, new RaceParticipantStateSnapshot(
+                entrant.Participant,
+                participant.X,
+                participant.MaxStamina,
+                participant.CurrentStamina,
+                participant.DelaySeconds,
+                participant.CheerSeconds,
+                participant.Terrain == RaceTerrain.Glide,
+                participant.Terrain == RaceTerrain.FailedGlideSwim,
+                participant.GlideEndX,
+                participant.NextObstacleIndex,
+                participant.Finished,
+                participant.Terrain), delta);
         }
     }
 
@@ -435,41 +551,60 @@ public partial class RaceScreen : Node2D
 
     private void CheerPlayer()
     {
-        if (!_running || _simulation == null || !_simulation.TryCheer(_playerId))
+        if (!_running)
             return;
 
-        _cheerParticleAccumulator = 0.075f;
-        SpawnCheerSpeedParticle();
+        if (_multiplayerBridge != null)
+        {
+            var result = _multiplayerBridge.RequestCheer(_multiplayerChallengeId);
+            if (!result.Success)
+            {
+                SetSectionLabel(result.Error ?? Tr("UI_MP_RACE_CHEER_FAILED"), Color.FromHtml("#9C514B"));
+                return;
+            }
+        }
+        else if (_simulation == null || !_simulation.TryCheer(_playerId))
+        {
+            return;
+        }
+
+        if (TryGetPlayerState(out var playerState) && _playerVisual != null)
+        {
+            _cheerParticleAccumulators[_playerId] = 0.0f;
+            SpawnCheerSpeedParticle(playerState, _playerVisual);
+        }
         UpdateHud();
     }
 
     private void HandleCheerVfx(float delta)
     {
-        if (_simulation == null || _playerVisual == null)
+        if (_entry == null)
             return;
 
-        var playerState = _simulation.GetState(_playerId);
-        if (playerState.CheerSeconds > 0.0f && !playerState.Finished)
+        foreach (var entrant in _entry.Entrants)
         {
-            _cheerParticleAccumulator += delta;
-            while (_cheerParticleAccumulator >= 0.075f)
+            var id = entrant.Participant.CreatureId;
+            var state = GetParticipantState(entrant);
+            if (state.CheerSeconds <= 0.0f || state.Finished || !_visuals.TryGetValue(id, out var visual))
             {
-                _cheerParticleAccumulator -= 0.075f;
-                SpawnCheerSpeedParticle();
+                _cheerParticleAccumulators[id] = 0.0f;
+                continue;
             }
-        }
-        else
-        {
-            _cheerParticleAccumulator = 0.0f;
+
+            var accumulator = _cheerParticleAccumulators.GetValueOrDefault(id) + delta;
+            while (accumulator >= 0.075f)
+            {
+                accumulator -= 0.075f;
+                SpawnCheerSpeedParticle(state, visual);
+            }
+            _cheerParticleAccumulators[id] = accumulator;
         }
     }
 
-    private void SpawnCheerSpeedParticle()
+    private void SpawnCheerSpeedParticle(
+        RaceParticipantStateSnapshot state,
+        RacerVisual visual)
     {
-        if (_simulation == null || _playerVisual == null)
-            return;
-
-        var state = _simulation.GetState(_playerId);
         var yJitter = (float)(_vfxRandom.NextDouble() * 18.0 - 9.0);
         var length = 9.0f + (float)_vfxRandom.NextDouble() * 8.0f;
         var streak = new Line2D
@@ -479,8 +614,8 @@ public partial class RaceScreen : Node2D
             ZIndex = 8,
             Points = new[]
             {
-                new Vector2(state.X - 13.0f - length, _playerVisual.Sprite.Position.Y + 8.0f + yJitter),
-                new Vector2(state.X - 13.0f, _playerVisual.Sprite.Position.Y + 8.0f + yJitter)
+                new Vector2(state.X - 13.0f - length, visual.Sprite.Position.Y + 8.0f + yJitter),
+                new Vector2(state.X - 13.0f, visual.Sprite.Position.Y + 8.0f + yJitter)
             }
         };
         AddChild(streak);
@@ -494,10 +629,9 @@ public partial class RaceScreen : Node2D
 
     private void UpdateHud()
     {
-        if (_simulation == null || _entry == null || _miniMap == null)
+        if (_entry == null || _miniMap == null || !TryGetPlayerState(out var player))
             return;
 
-        var player = _simulation.GetState(_playerId);
         _staminaBar.MaxValue = player.MaxStamina;
         _staminaBar.Value = player.CurrentStamina;
         _staminaLabel.Text = $"STAMINA {Mathf.CeilToInt(player.CurrentStamina)} / {Mathf.CeilToInt(player.MaxStamina)}";
@@ -527,7 +661,7 @@ public partial class RaceScreen : Node2D
 
         var points = _entry.Entrants.Select(entrant =>
         {
-            var state = _simulation.GetState(entrant.Participant.CreatureId);
+            var state = GetParticipantState(entrant);
             return new RaceMiniMapPoint
             {
                 Id = entrant.Participant.CreatureId,
@@ -539,6 +673,41 @@ public partial class RaceScreen : Node2D
         _miniMap.SetPoints(points);
     }
 
+    private RaceParticipantStateSnapshot GetParticipantState(RaceEntrant entrant)
+    {
+        if (_simulation != null)
+            return _simulation.GetState(entrant.Participant.CreatureId);
+
+        var participant = _multiplayerFrame!.Participants.Single(value =>
+            string.Equals(value.ParticipantId, entrant.Participant.CreatureId, StringComparison.Ordinal));
+        return new RaceParticipantStateSnapshot(
+            entrant.Participant,
+            participant.X,
+            participant.MaxStamina,
+            participant.CurrentStamina,
+            participant.DelaySeconds,
+            participant.CheerSeconds,
+            participant.Terrain == RaceTerrain.Glide,
+            participant.Terrain == RaceTerrain.FailedGlideSwim,
+            participant.GlideEndX,
+            participant.NextObstacleIndex,
+            participant.Finished,
+            participant.Terrain);
+    }
+
+    private bool TryGetPlayerState(out RaceParticipantStateSnapshot state)
+    {
+        state = default;
+        if (_entry == null)
+            return false;
+        var entrant = _entry.Entrants.FirstOrDefault(value =>
+            string.Equals(value.Participant.CreatureId, _playerId, StringComparison.Ordinal));
+        if (entrant == null || (_simulation == null && _multiplayerFrame == null))
+            return false;
+        state = GetParticipantState(entrant);
+        return true;
+    }
+
     private void SetSectionLabel(string text, Color color)
     {
         _sectionLabel.Text = text;
@@ -547,22 +716,22 @@ public partial class RaceScreen : Node2D
 
     private void UpdatePlayerTracking()
     {
-        if (_simulation == null || _playerVisual == null)
+        if (_playerVisual == null || !TryGetPlayerState(out var player))
             return;
 
-        var player = _simulation.GetState(_playerId);
         _camera.Zoom = Vector2.One;
         _camera.Position = new Vector2(player.X, ScreenHeight * 0.5f);
         _playerMarker.Position = new Vector2(player.X, _playerVisual.Sprite.Position.Y - 21.0f);
     }
 
-    private void ShowResults()
+    private void ShowResults(IReadOnlyList<string>? multiplayerFinishOrder = null)
     {
-        if (_simulation == null || _entry == null)
+        if (_entry == null || (_simulation == null && multiplayerFinishOrder == null))
             return;
 
         _resultsShown = true;
-        var selectedPlace = _simulation.FinishOrder.IndexOf(_playerId) + 1;
+        var finishOrder = multiplayerFinishOrder ?? _simulation!.FinishOrder;
+        var selectedPlace = finishOrder.ToList().IndexOf(_playerId) + 1;
         if (selectedPlace <= 0)
             selectedPlace = _entry.Entrants.Count;
 
@@ -573,7 +742,7 @@ public partial class RaceScreen : Node2D
         }
 
         var byId = _entry.Entrants.ToDictionary(entrant => entrant.Participant.CreatureId, StringComparer.Ordinal);
-        var finishers = _simulation.FinishOrder.Select(id => byId[id]).ToList();
+        var finishers = finishOrder.Select(id => byId[id]).ToList();
 
         var canvas = new CanvasLayer { Layer = 50 };
         AddChild(canvas);
@@ -602,13 +771,14 @@ public partial class RaceScreen : Node2D
         var stage = new Control { CustomMinimumSize = new Vector2(480, 192) };
         box.AddChild(stage);
 
-        if (finishers.Count >= 4)
-        {
+        if (finishers.Count >= 2)
             AddPodiumSlot(stage, finishers[1], 2, new Vector2(55, 105), new Vector2(100, 67));
+        if (finishers.Count >= 1)
             AddPodiumSlot(stage, finishers[0], 1, new Vector2(181, 72), new Vector2(112, 100));
+        if (finishers.Count >= 3)
             AddPodiumSlot(stage, finishers[2], 3, new Vector2(319, 120), new Vector2(92, 52));
+        if (finishers.Count >= 4)
             AddFourthPlacePuddle(stage, finishers[3], new Vector2(428, 112));
-        }
 
         var button = UiFactory.CreateButton("Return to Garden");
         button.CustomMinimumSize = new Vector2(160, 25);

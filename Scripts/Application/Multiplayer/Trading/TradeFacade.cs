@@ -13,18 +13,27 @@ public sealed record TradeCounterpartyView(
 public sealed record TradeLocalAssetView(
     TradeAssetKind Kind,
     string AssetId,
-    string DisplayName);
+    string DisplayName,
+    string TintHex,
+    bool HasAngelMutation,
+    int OtherMutationCount);
 
 public sealed record TradeIncomingOfferView(
     string TradeId,
     string InitiatorDisplayName,
     int VoidlingCount,
-    int EggCount);
+    int EggCount,
+    IReadOnlyList<TradeAssetReference> Assets);
 
 public sealed record TradeStatusView(
     string TradeId,
     TradeSessionStatus Status,
     string Message);
+
+public sealed record TradeCommittedView(
+    string TradeId,
+    IReadOnlyList<TradeAssetReference> OutgoingAssets,
+    IReadOnlyList<TradeAssetReference> IncomingAssets);
 
 public sealed record TradeHubViewState(
     MultiplayerAvailability Availability,
@@ -63,6 +72,7 @@ public sealed class TradeFacade
 
         _coordinator.TradeOfferReceived += HandleOfferReceived;
         _coordinator.TradeStatusChanged += HandleStatusChanged;
+        _coordinator.LocalTradeCommitted += HandleLocalTradeCommitted;
         _coordinator.LocalStateChanged += RaiseStateChanged;
         _connection.LobbyChanged += _ =>
         {
@@ -74,6 +84,7 @@ public sealed class TradeFacade
 
     public event Action<TradeHubViewState>? StateChanged;
     public event Action<TradeIncomingOfferView>? IncomingOfferReceived;
+    public event Action<TradeCommittedView>? LocalTradeCommitted;
 
     public TradeHubViewState Current => BuildState();
 
@@ -181,10 +192,18 @@ public sealed class TradeFacade
         var voidlings = state.Voidlings
             .OrderBy(voidling => voidling.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(voidling => voidling.Id, StringComparer.Ordinal)
-            .Select(voidling => new TradeLocalAssetView(
-                TradeAssetKind.Voidling,
-                voidling.Id,
-                voidling.Name))
+            .Select(voidling =>
+            {
+                var hasAngel = voidling.RareTraits.Any(trait =>
+                    string.Equals(trait.TraitId, "Angel", StringComparison.OrdinalIgnoreCase));
+                return new TradeLocalAssetView(
+                    TradeAssetKind.Voidling,
+                    voidling.Id,
+                    voidling.Name,
+                    voidling.TintHex,
+                    hasAngel,
+                    voidling.RareTraits.Count - (hasAngel ? 1 : 0));
+            })
             .ToList();
 
         for (var i = 0; i < state.OwnedEggs.Count; i++)
@@ -193,7 +212,10 @@ public sealed class TradeFacade
             voidlings.Add(new TradeLocalAssetView(
                 TradeAssetKind.Egg,
                 egg.Id,
-                $"Egg {i + 1} • {egg.Source}"));
+                $"Egg {i + 1} • {egg.Source}",
+                string.Empty,
+                false,
+                0));
         }
 
         return voidlings.ToArray();
@@ -231,7 +253,8 @@ public sealed class TradeFacade
             offer.TradeId,
             initiatorName,
             assets.Count(asset => asset.Kind == TradeAssetKind.Voidling),
-            assets.Count(asset => asset.Kind == TradeAssetKind.Egg));
+            assets.Count(asset => asset.Kind == TradeAssetKind.Egg),
+            Array.AsReadOnly(assets.ToArray()));
     }
 
     private bool TryResolveCounterparty(string key, out PlatformUserId counterparty)
@@ -297,6 +320,22 @@ public sealed class TradeFacade
         if (update.Status != TradeSessionStatus.Offered)
             _incomingOffers.Remove(update.TradeId);
         RaiseStateChanged();
+    }
+
+    private void HandleLocalTradeCommitted(TradeTerms terms)
+    {
+        var local = _connection.LocalUser;
+        if (local == null)
+            return;
+
+        var outgoing = TradeValidation.AssetsFor(terms, local.Id).ToArray();
+        var incoming = TradeValidation.AssetsFor(
+            terms,
+            TradeValidation.CounterpartyFor(terms, local.Id)).ToArray();
+        LocalTradeCommitted?.Invoke(new TradeCommittedView(
+            terms.TradeId,
+            Array.AsReadOnly(outgoing),
+            Array.AsReadOnly(incoming)));
     }
 
     private void RememberStatus(TradeStatusUpdate update)

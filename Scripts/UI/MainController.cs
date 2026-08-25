@@ -53,6 +53,7 @@ public partial class MainController : Node
         _modalHost = new ModalHost { ZIndex = 100 };
         _uiRoot.AddChild(_modalHost);
         ComposeTradePresentation();
+        ComposeChallengePresentation();
 
         _session.StateChanged += RefreshUi;
         _session.ToastRequested += ShowToast;
@@ -89,7 +90,8 @@ public partial class MainController : Node
 
     public override void _UnhandledInput(InputEvent inputEvent)
     {
-        if (_race != null || _multiplayerRaceScreen != null || !inputEvent.IsActionPressed("ui_cancel"))
+        if (_race != null || _multiplayerRaceScreen != null || _tradeExchangeScreen != null ||
+            !inputEvent.IsActionPressed("ui_cancel"))
             return;
 
         if (_modalHost.IsOpen)
@@ -177,11 +179,17 @@ public partial class MainController : Node
     }
 
     private VBoxContainer OpenModal(string title, Vector2 size)
+        => OpenModal(title, size, null);
+
+    private VBoxContainer OpenOnlineModal(string title, Vector2 size, Action backRequested)
+        => OpenModal(title, size, backRequested);
+
+    private VBoxContainer OpenModal(string title, Vector2 size, Action? backRequested)
     {
         if (_modalHost.IsOpen)
             CloseModal(false);
         HideGardenHudPanels();
-        return _modalHost.Open(title, size, CloseModal);
+        return _modalHost.Open(title, size, CloseModal, backRequested);
     }
 
     private void HideGardenHudPanels()
@@ -221,6 +229,7 @@ public partial class MainController : Node
 
     private void OnRaceCompleted(int placement)
     {
+        _gardenEventLog.Append(string.Format(Tr("UI_GARDEN_LOG_RACE_RESULT"), placement));
         _session.ApplyRacePlacementReward(placement);
 
         // Steam is only a best-time projection. The local race reward is already persisted above,

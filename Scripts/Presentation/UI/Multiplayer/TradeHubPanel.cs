@@ -94,12 +94,12 @@ public partial class TradeHubPanel : VBoxContainer
         var selectedAssets = new List<TradeAssetReference>();
         var scroll = new ScrollContainer
         {
-            CustomMinimumSize = new Vector2(500, 76),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+            CustomMinimumSize = new Vector2(500, 90),
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            VerticalScrollMode = ScrollContainer.ScrollMode.Disabled
         };
-        var assets = new VBoxContainer();
-        assets.AddThemeConstantOverride("separation", 1);
-        assets.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        var assets = new HBoxContainer();
+        assets.AddThemeConstantOverride("separation", 7);
         scroll.AddChild(assets);
         AddChild(scroll);
 
@@ -111,26 +111,27 @@ public partial class TradeHubPanel : VBoxContainer
         {
             foreach (var asset in state.LocalAssets)
             {
+                if (asset.Kind == TradeAssetKind.Voidling)
+                {
+                    var voidlingAsset = asset;
+                    assets.AddChild(UiFactory.CreateVoidlingCard(
+                        asset.DisplayName,
+                        UiFactory.ParseTint(asset.TintHex),
+                        asset.HasAngelMutation,
+                        asset.OtherMutationCount,
+                        pressed => ToggleAsset(selectedAssets, voidlingAsset, pressed),
+                        out _));
+                    continue;
+                }
+
                 var check = new CheckBox
                 {
                     Text = AssetLabel(asset),
                     FocusMode = Control.FocusModeEnum.None
                 };
                 UiFactory.ApplyPixelFont(check, 7);
-                var captured = asset;
-                check.Toggled += pressed =>
-                {
-                    var reference = new TradeAssetReference(captured.Kind, captured.AssetId);
-                    if (pressed)
-                    {
-                        if (!selectedAssets.Contains(reference))
-                            selectedAssets.Add(reference);
-                    }
-                    else
-                    {
-                        selectedAssets.Remove(reference);
-                    }
-                };
+                var eggAsset = asset;
+                check.Toggled += pressed => ToggleAsset(selectedAssets, eggAsset, pressed);
                 assets.AddChild(check);
             }
         }
@@ -197,4 +198,21 @@ public partial class TradeHubPanel : VBoxContainer
         => asset.Kind == TradeAssetKind.Egg
             ? string.Format(Tr("UI_TRADE_ASSET_EGG"), asset.DisplayName)
             : string.Format(Tr("UI_TRADE_ASSET_VOIDLING"), asset.DisplayName);
+
+    private static void ToggleAsset(
+        ICollection<TradeAssetReference> selected,
+        TradeLocalAssetView asset,
+        bool pressed)
+    {
+        var reference = new TradeAssetReference(asset.Kind, asset.AssetId);
+        if (pressed)
+        {
+            if (!selected.Contains(reference))
+                selected.Add(reference);
+        }
+        else
+        {
+            selected.Remove(reference);
+        }
+    }
 }

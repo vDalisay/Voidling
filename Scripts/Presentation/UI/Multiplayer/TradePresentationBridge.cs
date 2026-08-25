@@ -14,6 +14,7 @@ public partial class TradePresentationBridge : Node
 
     public event Action<TradeHubViewState>? StateChanged;
     public event Action<TradeIncomingOfferView>? IncomingOfferReceived;
+    public event Action<TradeCommittedView>? LocalTradeCommitted;
 
     public TradeHubViewState Current => RequireFacade().Current;
 
@@ -24,6 +25,7 @@ public partial class TradePresentationBridge : Node
         _facade = facade ?? throw new ArgumentNullException(nameof(facade));
         _facade.StateChanged += HandleStateChanged;
         _facade.IncomingOfferReceived += HandleIncomingOfferReceived;
+        _facade.LocalTradeCommitted += HandleLocalTradeCommitted;
     }
 
     public TradeNetworkOperationResult Offer(
@@ -48,6 +50,7 @@ public partial class TradePresentationBridge : Node
             return;
         _facade.StateChanged -= HandleStateChanged;
         _facade.IncomingOfferReceived -= HandleIncomingOfferReceived;
+        _facade.LocalTradeCommitted -= HandleLocalTradeCommitted;
     }
 
     private void HandleStateChanged(TradeHubViewState state)
@@ -55,6 +58,9 @@ public partial class TradePresentationBridge : Node
 
     private void HandleIncomingOfferReceived(TradeIncomingOfferView offer)
         => IncomingOfferReceived?.Invoke(offer);
+
+    private void HandleLocalTradeCommitted(TradeCommittedView trade)
+        => LocalTradeCommitted?.Invoke(trade);
 
     private TradeFacade RequireFacade()
         => _facade ?? throw new InvalidOperationException("Trade presentation bridge is not configured.");

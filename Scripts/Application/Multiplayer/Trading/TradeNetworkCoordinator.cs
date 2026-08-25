@@ -64,6 +64,7 @@ public sealed class TradeNetworkCoordinator
 
     public event Action<TradeOfferNotice>? TradeOfferReceived;
     public event Action<TradeStatusUpdate>? TradeStatusChanged;
+    public event Action<TradeTerms>? LocalTradeCommitted;
     public event Action? LocalStateChanged;
     public event Action<string>? ProtocolRejected;
 
@@ -668,6 +669,7 @@ public sealed class TradeNetworkCoordinator
         }
 
         LocalStateChanged?.Invoke();
+        LocalTradeCommitted?.Invoke(localTerms.Terms);
         TradeStatusChanged?.Invoke(new TradeStatusUpdate(
             tradeId,
             TradeSessionStatus.Committing,

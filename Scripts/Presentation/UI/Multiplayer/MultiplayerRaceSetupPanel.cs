@@ -10,6 +10,9 @@ namespace Voidling.Presentation.UI.Multiplayer;
 public sealed record MultiplayerRaceSetupVoidlingView(
     string Id,
     string Name,
+    Color TintColor,
+    bool HasAngelMutation,
+    int OtherMutationCount,
     string StatSummary);
 
 public sealed record MultiplayerRaceSetupPanelState(
@@ -95,43 +98,59 @@ public partial class MultiplayerRaceSetupPanel : VBoxContainer
         }
 
         AddChild(UiFactory.CreateLabel(Tr("UI_MP_RACE_PICK"), 7));
-        var selectionRow = new HBoxContainer();
-        selectionRow.AddThemeConstantOverride("separation", 6);
-        var option = new OptionButton
+        var scroll = new ScrollContainer
         {
-            CustomMinimumSize = new Vector2(240, 25),
+            CustomMinimumSize = new Vector2(490, 90),
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            FocusMode = Control.FocusModeEnum.None
+            VerticalScrollMode = ScrollContainer.ScrollMode.Disabled
         };
-        UiFactory.ApplyPixelFont(option, 7);
-        UiFactory.ApplyButtonChrome(option);
+        var cards = new HBoxContainer();
+        cards.AddThemeConstantOverride("separation", 7);
+        scroll.AddChild(cards);
+        AddChild(scroll);
+
         var selectedIndex = 0;
         for (var i = 0; i < state.Voidlings.Count; i++)
         {
-            var creature = state.Voidlings[i];
-            option.AddItem(creature.Name, i);
-            option.SetItemMetadata(i, creature.Id);
-            if (string.Equals(creature.Id, prep.SelectedCreatureId, StringComparison.Ordinal))
+            if (string.Equals(state.Voidlings[i].Id, prep.SelectedCreatureId, StringComparison.Ordinal))
                 selectedIndex = i;
         }
-        option.Select(selectedIndex);
-        selectionRow.AddChild(option);
+        var selectedId = state.Voidlings[selectedIndex].Id;
+        var stats = UiFactory.CreateLabel(state.Voidlings[selectedIndex].StatSummary, 6);
+        stats.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        var cardButtons = new Dictionary<string, Button>(StringComparer.Ordinal);
+        foreach (var creature in state.Voidlings)
+        {
+            var captured = creature;
+            var entry = UiFactory.CreateVoidlingCard(
+                creature.Name,
+                creature.TintColor,
+                creature.HasAngelMutation,
+                creature.OtherMutationCount,
+                pressed =>
+                {
+                    if (!pressed)
+                        return;
+                    selectedId = captured.Id;
+                    stats.Text = captured.StatSummary;
+                    foreach (var pair in cardButtons)
+                        pair.Value.ButtonPressed = pair.Key == captured.Id;
+                },
+                out var card);
+            card.ButtonPressed = creature.Id == selectedId;
+            cardButtons[creature.Id] = card;
+            cards.AddChild(entry);
+        }
+        AddChild(stats);
 
         var lockIn = UiFactory.CreateButton(Tr("UI_MP_RACE_LOCK_IN"));
         lockIn.CustomMinimumSize = new Vector2(112, 25);
         lockIn.Pressed += () =>
         {
-            var id = option.GetItemMetadata(option.Selected).AsString();
-            if (!string.IsNullOrWhiteSpace(id))
-                SelectionRequested?.Invoke(id);
+            if (!string.IsNullOrWhiteSpace(selectedId))
+                SelectionRequested?.Invoke(selectedId);
         };
-        selectionRow.AddChild(lockIn);
-        AddChild(selectionRow);
-
-        var selected = state.Voidlings[selectedIndex];
-        var stats = UiFactory.CreateLabel(selected.StatSummary, 6);
-        stats.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        AddChild(stats);
+        AddChild(lockIn);
 
         if (!string.IsNullOrWhiteSpace(prep.SelectedCreatureName))
         {

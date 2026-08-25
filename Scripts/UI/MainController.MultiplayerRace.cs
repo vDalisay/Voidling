@@ -11,7 +11,7 @@ public partial class MainController
 {
     private MultiplayerRacePresentationBridge? _multiplayerRaceBridge;
     private MultiplayerRaceSetupPanel? _multiplayerRaceSetupPanel;
-    private MultiplayerRaceScreen? _multiplayerRaceScreen;
+    private RaceScreen? _multiplayerRaceScreen;
     private string _multiplayerRaceSetupChallengeId = string.Empty;
     private bool _multiplayerRaceBridgeSubscribed;
 
@@ -36,7 +36,7 @@ public partial class MainController
     {
         _multiplayerRaceSetupChallengeId = challengeId;
         var state = BuildMultiplayerRaceSetupState(challengeId);
-        var box = OpenModal(Tr("UI_MP_RACE_SETUP_TITLE"), new Vector2(522, 270));
+        var box = OpenOnlineModal(Tr("UI_MP_RACE_SETUP_TITLE"), new Vector2(522, 330), ShowChallenges);
         var panel = new MultiplayerRaceSetupPanel();
         panel.Configure(state);
         panel.SelectionRequested += creatureId => SubmitMultiplayerRaceSelection(challengeId, creatureId);
@@ -55,6 +55,9 @@ public partial class MainController
                 return new MultiplayerRaceSetupVoidlingView(
                     view.Id,
                     view.Name,
+                    view.TintColor,
+                    view.HasAngelMutation,
+                    view.OtherMutationCount,
                     view.StatSummary);
             })
             .ToArray();
@@ -123,17 +126,22 @@ public partial class MainController
         _garden.Visible = false;
         _uiRoot.Visible = false;
 
-        var screen = new MultiplayerRaceScreen();
-        screen.Configure(MultiplayerRaceBridge, race.Start.ChallengeId);
+        var screen = new RaceScreen();
+        screen.ConfigureMultiplayer(race, MultiplayerRaceBridge);
+        screen.RaceCompleted += OnMultiplayerRaceCompleted;
         screen.ReturnRequested += EndMultiplayerRace;
         _multiplayerRaceScreen = screen;
         AddChild(screen);
     }
 
+    private void OnMultiplayerRaceCompleted(int placement)
+        => _gardenEventLog.Append(string.Format(Tr("UI_GARDEN_LOG_RACE_RESULT"), placement));
+
     private void EndMultiplayerRace()
     {
         if (_multiplayerRaceScreen != null && GodotObject.IsInstanceValid(_multiplayerRaceScreen))
         {
+            _multiplayerRaceScreen.RaceCompleted -= OnMultiplayerRaceCompleted;
             _multiplayerRaceScreen.ReturnRequested -= EndMultiplayerRace;
             _multiplayerRaceScreen.QueueFree();
         }

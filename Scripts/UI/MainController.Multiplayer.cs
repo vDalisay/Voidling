@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Application.Multiplayer;
@@ -11,6 +12,8 @@ public partial class MainController
 {
     private ConnectedZonePanel? _connectedZonePanel;
     private ConnectedZoneGardenSync? _connectedZoneGardenSync;
+    private ulong? _observedConnectedLobbyId;
+    private readonly Dictionary<ulong, (string Name, bool IsLocal)> _observedConnectedMembers = new();
 
     private void ComposeConnectedZoneGardenPresentation()
     {
@@ -29,7 +32,7 @@ public partial class MainController
 
     private void ShowConnectedZone()
     {
-        var box = OpenModal(Tr("UI_ONLINE_TITLE"), new Vector2(470, 318));
+        var box = OpenOnlineModal(Tr("UI_ONLINE_TITLE"), new Vector2(470, 318), CloseModal);
         var panel = new ConnectedZonePanel();
         panel.Configure(BuildConnectedZonePanelState(_connectedZoneBridge.Current));
         panel.CreateRequested += CreateConnectedZone;
@@ -74,10 +77,56 @@ public partial class MainController
 
     private void OnConnectedZoneStateChanged(ConnectedZoneViewState state)
     {
+        LogConnectedMembershipChanges(state);
         if (_connectedZonePanel == null || !GodotObject.IsInstanceValid(_connectedZonePanel))
             return;
 
         _connectedZonePanel.Render(BuildConnectedZonePanelState(state));
+    }
+
+    private void LogConnectedMembershipChanges(ConnectedZoneViewState state)
+    {
+        if (!state.LobbyId.HasValue)
+        {
+            _observedConnectedLobbyId = null;
+            _observedConnectedMembers.Clear();
+            return;
+        }
+
+        var current = state.Members.ToDictionary(
+            member => member.UserId.Value,
+            member => (member.DisplayName, member.IsLocal));
+        if (_observedConnectedLobbyId != state.LobbyId)
+        {
+            _observedConnectedLobbyId = state.LobbyId;
+            _observedConnectedMembers.Clear();
+            foreach (var pair in current)
+                _observedConnectedMembers[pair.Key] = pair.Value;
+            return;
+        }
+
+        foreach (var pair in current)
+        {
+            if (!_observedConnectedMembers.ContainsKey(pair.Key) && !pair.Value.IsLocal)
+            {
+                _gardenEventLog.Append(string.Format(
+                    Tr("UI_GARDEN_LOG_PLAYER_JOINED"),
+                    pair.Value.DisplayName));
+            }
+        }
+        foreach (var pair in _observedConnectedMembers)
+        {
+            if (!current.ContainsKey(pair.Key) && !pair.Value.IsLocal)
+            {
+                _gardenEventLog.Append(string.Format(
+                    Tr("UI_GARDEN_LOG_PLAYER_LEFT"),
+                    pair.Value.Name));
+            }
+        }
+
+        _observedConnectedMembers.Clear();
+        foreach (var pair in current)
+            _observedConnectedMembers[pair.Key] = pair.Value;
     }
 
     private void RefreshConnectedZonePanel()

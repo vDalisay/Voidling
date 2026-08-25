@@ -14,6 +14,8 @@ public sealed class MultiplayerConnectionService
     private readonly IPlatformIdentityService _identity;
     private readonly ILobbyService _lobbies;
     private readonly IMultiplayerTransport _transport;
+    private LobbySnapshot? _currentLobby;
+    private bool _localWasHost;
 
     public MultiplayerConnectionService(
         IPlatformIdentityService identity,
@@ -23,11 +25,13 @@ public sealed class MultiplayerConnectionService
         _identity = identity ?? throw new ArgumentNullException(nameof(identity));
         _lobbies = lobbies ?? throw new ArgumentNullException(nameof(lobbies));
         _transport = transport ?? throw new ArgumentNullException(nameof(transport));
+        _currentLobby = _lobbies.CurrentLobby;
+        _localWasHost = _currentLobby?.OwnerId == _identity.LocalUser?.Id;
 
-        _lobbies.LobbyChanged += lobby => LobbyChanged?.Invoke(lobby);
+        _lobbies.LobbyChanged += HandleLobbyChanged;
         _lobbies.JoinRequested += request => JoinRequested?.Invoke(request);
         _transport.PacketReceived += OnPacketReceived;
-        _transport.PeerSessionFailed += peer => PeerSessionFailed?.Invoke(peer);
+        _transport.PeerSessionFailed += OnPeerSessionFailed;
     }
 
     public bool IsAvailable =>
@@ -41,7 +45,7 @@ public sealed class MultiplayerConnectionService
         _transport.Availability.Reason;
 
     public PlatformUser? LocalUser => _identity.LocalUser;
-    public LobbySnapshot? CurrentLobby => _lobbies.CurrentLobby;
+    public LobbySnapshot? CurrentLobby => _currentLobby;
     public bool IsLocalHost =>
         LocalUser != null &&
         CurrentLobby != null &&
@@ -76,6 +80,8 @@ public sealed class MultiplayerConnectionService
     public async Task LeaveConnectedZoneAsync(CancellationToken cancellationToken = default)
     {
         await _lobbies.LeaveAsync(cancellationToken);
+        _currentLobby = null;
+        _localWasHost = false;
         LobbyLeft?.Invoke();
     }
 
@@ -156,5 +162,24 @@ public sealed class MultiplayerConnectionService
 
         if (MultiplayerProtocol.TryDecodeHello(packet.Payload.Span, packet.Sender, out var sender))
             PeerHelloReceived?.Invoke(sender);
+    }
+
+    private void HandleLobbyChanged(LobbySnapshot lobby)
+    {
+        _currentLobby = lobby;
+        _localWasHost = lobby.OwnerId == _identity.LocalUser?.Id;
+        LobbyChanged?.Invoke(lobby);
+    }
+
+    private void OnPeerSessionFailed(PlatformUserId peer)
+    {
+        var ownerDisconnected = _currentLobby?.OwnerId == peer && !_localWasHost;
+        PeerSessionFailed?.Invoke(peer);
+        if (!ownerDisconnected)
+            return;
+
+        _currentLobby = null;
+        _localWasHost = false;
+        LobbyLeft?.Invoke();
     }
 }

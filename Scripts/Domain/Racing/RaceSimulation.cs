@@ -28,6 +28,7 @@ public readonly record struct RaceParticipantStateSnapshot(
     bool GlideResolved,
     bool GlideFailed,
     float GlideEndX,
+    int NextObstacleIndex,
     bool Finished,
     RaceTerrain Terrain);
 
@@ -370,6 +371,7 @@ public sealed class RaceSimulation
             GlideResolved: state.GlideResolved,
             GlideFailed: state.GlideFailed,
             GlideEndX: state.GlideEndX,
+            NextObstacleIndex: state.NextObstacleIndex,
             Finished: state.Finished,
             Terrain: _course.TerrainAt(state.X, state.GlideFailed));
 }

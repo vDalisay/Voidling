@@ -55,11 +55,11 @@ public partial class TradeResponsePanel : VBoxContainer
         var scroll = new ScrollContainer
         {
             CustomMinimumSize = new Vector2(470, 105),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            VerticalScrollMode = ScrollContainer.ScrollMode.Disabled
         };
-        var assets = new VBoxContainer();
-        assets.AddThemeConstantOverride("separation", 2);
-        assets.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        var assets = new HBoxContainer();
+        assets.AddThemeConstantOverride("separation", 7);
         scroll.AddChild(assets);
         AddChild(scroll);
 
@@ -71,6 +71,19 @@ public partial class TradeResponsePanel : VBoxContainer
         {
             foreach (var asset in state.LocalAssets)
             {
+                if (asset.Kind == TradeAssetKind.Voidling)
+                {
+                    var voidlingAsset = asset;
+                    assets.AddChild(UiFactory.CreateVoidlingCard(
+                        asset.DisplayName,
+                        UiFactory.ParseTint(asset.TintHex),
+                        asset.HasAngelMutation,
+                        asset.OtherMutationCount,
+                        pressed => ToggleAsset(selected, voidlingAsset, pressed),
+                        out _));
+                    continue;
+                }
+
                 var check = new CheckBox
                 {
                     Text = asset.Kind == TradeAssetKind.Egg
@@ -79,20 +92,8 @@ public partial class TradeResponsePanel : VBoxContainer
                     FocusMode = Control.FocusModeEnum.None
                 };
                 UiFactory.ApplyPixelFont(check, 7);
-                var captured = asset;
-                check.Toggled += pressed =>
-                {
-                    var reference = new TradeAssetReference(captured.Kind, captured.AssetId);
-                    if (pressed)
-                    {
-                        if (!selected.Contains(reference))
-                            selected.Add(reference);
-                    }
-                    else
-                    {
-                        selected.Remove(reference);
-                    }
-                };
+                var eggAsset = asset;
+                check.Toggled += pressed => ToggleAsset(selected, eggAsset, pressed);
                 assets.AddChild(check);
             }
         }
@@ -109,5 +110,22 @@ public partial class TradeResponsePanel : VBoxContainer
         decline.Pressed += () => DeclineRequested?.Invoke();
         actions.AddChild(decline);
         AddChild(actions);
+    }
+
+    private static void ToggleAsset(
+        ICollection<TradeAssetReference> selected,
+        TradeLocalAssetView asset,
+        bool pressed)
+    {
+        var reference = new TradeAssetReference(asset.Kind, asset.AssetId);
+        if (pressed)
+        {
+            if (!selected.Contains(reference))
+                selected.Add(reference);
+        }
+        else
+        {
+            selected.Remove(reference);
+        }
     }
 }

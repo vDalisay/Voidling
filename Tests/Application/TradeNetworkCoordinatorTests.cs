@@ -39,7 +39,9 @@ public sealed class TradeNetworkCoordinatorTests
             repository,
             () => state);
         var statuses = new List<TradeStatusUpdate>();
+        TradeTerms? locallyCommitted = null;
         coordinator.TradeStatusChanged += statuses.Add;
+        coordinator.LocalTradeCommitted += terms => locallyCommitted = terms;
 
         var localReference = new TradeAssetReference(TradeAssetKind.Voidling, localCreature.Id);
         var offered = coordinator.OfferTrade(remote.Id, new[] { localReference });
@@ -89,6 +91,10 @@ public sealed class TradeNetworkCoordinatorTests
         Assert.DoesNotContain(state.Voidlings, creature => creature.Id == localCreature.Id);
         Assert.Contains(state.Voidlings, creature => creature.Id == "remote-creature");
         Assert.Contains(terms.TradeId, state.AppliedTradeIds);
+        Assert.NotNull(locallyCommitted);
+        Assert.Equal(terms.TradeId, locallyCommitted!.TradeId);
+        Assert.Equal(terms.InitiatorAssets, locallyCommitted.InitiatorAssets);
+        Assert.Equal(terms.CounterpartyAssets, locallyCommitted.CounterpartyAssets);
         Assert.Equal(2, repository.SaveCount);
         Assert.Contains(transport.Sent, message =>
             message.Peer == remote.Id && IsCommit(message.Payload, host.Id));

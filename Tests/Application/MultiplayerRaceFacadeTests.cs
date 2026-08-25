@@ -8,6 +8,7 @@ using Voidling.Application.Multiplayer.Challenges;
 using Voidling.Application.Multiplayer.Racing;
 using Voidling.Application.Ports.Multiplayer;
 using Voidling.Domain.Genetics;
+using Voidling.Domain.Racing;
 using Voidling.Domain.Rules;
 using VoidlingGame;
 using Xunit;
@@ -129,12 +130,17 @@ public sealed class MultiplayerRaceFacadeTests
         Assert.Equal(2, frame.Participants.Count);
         var local = Assert.Single(frame.Participants, participant => participant.IsLocal);
         Assert.Equal("Host Sprout", local.DisplayName);
+        Assert.Equal(RaceCourse.Demo.StartX, local.X);
         Assert.InRange(local.Progress, 0.0f, 1.0f);
+        Assert.True(float.IsFinite(local.DelaySeconds));
+        Assert.True(float.IsFinite(local.GlideEndX));
+        Assert.Equal(0, local.NextObstacleIndex);
 
         var advanced = facade.AdvanceFixedSteps(challengeId, 15);
         Assert.True(advanced.Success, advanced.Error);
         Assert.True(facade.TryGetFrame(challengeId, out var advancedFrame));
         Assert.Equal(15, advancedFrame.CurrentTick);
+        Assert.True(Assert.Single(advancedFrame.Participants, participant => participant.IsLocal).X > local.X);
 
         var cheer = facade.RequestCheer(challengeId);
         Assert.True(cheer.Success, cheer.Error);

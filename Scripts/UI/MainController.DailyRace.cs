@@ -21,7 +21,7 @@ public partial class MainController
     private void ShowDailyRace()
     {
         var status = DailyRaceBridge.GetToday(DateTimeOffset.UtcNow);
-        var box = OpenModal(Tr("UI_DAILY_TITLE"), new Vector2(572, 330));
+        var box = OpenOnlineModal(Tr("UI_DAILY_TITLE"), new Vector2(572, 330), ShowConnectedZone);
 
         var date = UiFactory.CreateLabel(
             string.Format(Tr("UI_DAILY_DATE"), status.DailyKey),
@@ -52,7 +52,7 @@ public partial class MainController
             var boards = UiFactory.CreateButton(Tr("UI_ONLINE_FRIEND_BOARDS"));
             boards.CustomMinimumSize = new Vector2(175, 25);
             boards.Disabled = !_friendsLeaderboardBridge.Availability.IsAvailable;
-            boards.Pressed += ShowFriendsLeaderboards;
+            boards.Pressed += () => ShowFriendsLeaderboards(ShowDailyRace);
             box.AddChild(boards);
 
             if (!DailyRaceBridge.LeaderboardAvailability.IsAvailable)
@@ -125,7 +125,7 @@ public partial class MainController
         AddChild(race);
     }
 
-    private void OnDailyRaceCompleted(int _)
+    private void OnDailyRaceCompleted(int placement)
     {
         if (_dailyRaceResultHandled ||
             _race == null ||
@@ -134,6 +134,8 @@ public partial class MainController
         {
             return;
         }
+
+        _gardenEventLog.Append(string.Format(Tr("UI_GARDEN_LOG_RACE_RESULT"), placement));
 
         if (!_race.TryGetPlayerFinishMilliseconds(out var finishedMilliseconds))
         {

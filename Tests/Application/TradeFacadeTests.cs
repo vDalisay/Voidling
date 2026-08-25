@@ -117,6 +117,9 @@ public sealed class TradeFacadeTests
         Assert.Equal("Host Friend", notified!.InitiatorDisplayName);
         Assert.Equal(2, notified.VoidlingCount);
         Assert.Equal(1, notified.EggCount);
+        Assert.Equal(3, notified.Assets.Count);
+        Assert.Contains(notified.Assets, asset =>
+            asset.Kind == TradeAssetKind.Voidling && asset.AssetId == "remote-a");
         var incoming = Assert.Single(facade.Current.IncomingOffers);
         Assert.Equal(tradeId, incoming.TradeId);
 

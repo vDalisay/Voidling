@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Godot;
 using Voidling.Application.Multiplayer.Challenges;
 using Voidling.Presentation.UI.Multiplayer;
@@ -9,6 +11,7 @@ public partial class MainController
     private ChallengePresentationBridge? _challengeBridge;
     private ChallengeHubPanel? _challengeHubPanel;
     private bool _challengeBridgeSubscribed;
+    private readonly HashSet<string> _loggedJoinableChallenges = new(StringComparer.Ordinal);
 
     private ChallengePresentationBridge ChallengeBridge
     {
@@ -25,9 +28,12 @@ public partial class MainController
         }
     }
 
+    private void ComposeChallengePresentation()
+        => _ = ChallengeBridge;
+
     private void ShowChallenges()
     {
-        var box = OpenModal(Tr("UI_CHALLENGE_TITLE"), new Vector2(552, 330));
+        var box = OpenOnlineModal(Tr("UI_CHALLENGE_TITLE"), new Vector2(552, 330), ShowConnectedZone);
         var panel = new ChallengeHubPanel();
         panel.Configure(ChallengeBridge.Current);
         panel.OfferRaceRequested += OfferRaceChallenge;
@@ -44,6 +50,18 @@ public partial class MainController
 
     private void JoinChallenge(string challengeId)
         => ApplyChallengeOperation(ChallengeBridge.Join(challengeId));
+
+    private void JoinChallengeFromLog(string challengeId)
+    {
+        var result = ChallengeBridge.Join(challengeId);
+        if (!result.Success)
+        {
+            ApplyChallengeOperation(result);
+            return;
+        }
+
+        ShowMultiplayerRaceSetup(challengeId);
+    }
 
     private void LeaveChallenge(string challengeId)
         => ApplyChallengeOperation(ChallengeBridge.Leave(challengeId));
@@ -65,6 +83,17 @@ public partial class MainController
 
     private void OnChallengeHubStateChanged(ChallengeHubViewState state)
     {
+        foreach (var challenge in state.Challenges)
+        {
+            if (!challenge.CanJoin || !_loggedJoinableChallenges.Add(challenge.ChallengeId))
+                continue;
+
+            var challengeId = challenge.ChallengeId;
+            _gardenEventLog.AppendAction(
+                string.Format(Tr("UI_GARDEN_LOG_RACE_OFFER"), challenge.CreatorDisplayName),
+                () => JoinChallengeFromLog(challengeId));
+        }
+
         if (_challengeHubPanel == null || !GodotObject.IsInstanceValid(_challengeHubPanel))
             return;
 

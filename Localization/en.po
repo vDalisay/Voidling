@@ -15,6 +15,12 @@ msgstr "Cancel"
 msgid "UI_COMMON_CONTINUE"
 msgstr "Continue"
 
+msgid "UI_COMMON_BACK"
+msgstr "Back"
+
+msgid "UI_COMMON_SKIP"
+msgstr "Skip"
+
 msgid "UI_TOP_SPROUTS"
 msgstr "Sprouts: {0}"
 
@@ -156,6 +162,12 @@ msgstr "Choose one Voidling. All other racers are generated CPU opponents."
 msgid "UI_RACE_START"
 msgstr "Start Race"
 
+msgid "UI_RACE_LOADING"
+msgstr "GROWING THE RACE TRACK..."
+
+msgid "UI_RACE_COUNTDOWN_GO"
+msgstr "RACE!"
+
 msgid "UI_INVENTORY_TITLE"
 msgstr "INVENTORY"
 
@@ -272,6 +284,12 @@ msgstr "GARDEN LOG"
 
 msgid "UI_GARDEN_LOG_STARTED"
 msgstr "Garden session started."
+
+msgid "UI_GARDEN_LOG_TRADE_OFFER"
+msgstr "{0} wants to trade. Click to respond."
+
+msgid "UI_GARDEN_LOG_RACE_OFFER"
+msgstr "{0} opened a race. Click to join."
 
 msgid "UI_ONLINE_TITLE"
 msgstr "CONNECTED GARDEN"
@@ -620,3 +638,39 @@ msgstr "Trade accepted. Finalizing safely with both players..."
 
 msgid "UI_TRADE_INCOMING_TOAST"
 msgstr "Trade offer received from {0}."
+
+msgid "UI_TRADE_EXCHANGE_TITLE"
+msgstr "VOIDLING EXCHANGE"
+
+msgid "UI_TRADE_EXCHANGE_YOURS"
+msgstr "SENDING ({0})"
+
+msgid "UI_TRADE_EXCHANGE_INCOMING"
+msgstr "RECEIVING ({0})"
+
+msgid "UI_TRADE_EXCHANGE_SENDING"
+msgstr "Sending your trade through the link..."
+
+msgid "UI_TRADE_EXCHANGE_GOODBYE"
+msgstr "Say goodbye to {0}!"
+
+msgid "UI_TRADE_EXCHANGE_LINKING"
+msgstr "Exchange confirmed!"
+
+msgid "UI_TRADE_EXCHANGE_ARRIVED"
+msgstr "{0} arrived safely."
+
+msgid "UI_TRADE_EXCHANGE_EGG"
+msgstr "Egg {0}"
+
+msgid "UI_GARDEN_LOG_PLAYER_JOINED"
+msgstr "{0} joined the connected Garden."
+
+msgid "UI_GARDEN_LOG_PLAYER_LEFT"
+msgstr "{0} left the connected Garden."
+
+msgid "UI_GARDEN_LOG_RACE_RESULT"
+msgstr "Race finished — you placed #{0}."
+
+msgid "UI_GARDEN_LOG_TRADE_COMPLETE"
+msgstr "Trade complete — sent {0}, received {1}."

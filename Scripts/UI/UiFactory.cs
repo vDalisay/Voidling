@@ -127,6 +127,40 @@ public static class UiFactory
         return portrait;
     }
 
+    public static VBoxContainer CreateVoidlingCard(
+        string name,
+        Color tintColor,
+        bool hasAngelMutation,
+        int otherMutationCount,
+        Action<bool> toggled,
+        out Button card)
+    {
+        var entry = new VBoxContainer { CustomMinimumSize = new Vector2(84, 78) };
+        entry.AddThemeConstantOverride("separation", 1);
+
+        card = CreateButton("");
+        card.CustomMinimumSize = new Vector2(80, 58);
+        card.ToggleMode = true;
+        card.KeepPressedOutside = true;
+        var portrait = CreatePortrait(
+            tintColor,
+            hasAngelMutation,
+            otherMutationCount,
+            new Vector2(48, 48));
+        portrait.Position = new Vector2(16, 4);
+        portrait.Size = new Vector2(48, 48);
+        card.AddChild(portrait);
+        card.Toggled += pressed => toggled(pressed);
+        entry.AddChild(card);
+
+        var label = CreateLabel(name, 6);
+        label.HorizontalAlignment = HorizontalAlignment.Center;
+        label.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        label.AddThemeColorOverride("font_color", Color.FromHtml("#2F4437"));
+        entry.AddChild(label);
+        return entry;
+    }
+
     public static void SetPortraitData(TextureRect portrait, VoidlingData data)
     {
         var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
@@ -203,6 +237,12 @@ public static class UiFactory
     {
         control.AddThemeFontOverride("font", PixelFont);
         control.AddThemeFontSizeOverride("font_size", size);
+    }
+
+    public static Color ParseTint(string tintHex)
+    {
+        try { return Color.FromHtml(tintHex); }
+        catch { return Color.FromHtml("#F6F0C9"); }
     }
 
     private static StyleBoxTexture CreatePanelStyle()

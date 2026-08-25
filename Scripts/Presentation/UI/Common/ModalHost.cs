@@ -19,7 +19,11 @@ public partial class ModalHost : Control
         Visible = false;
     }
 
-    public VBoxContainer Open(string title, Vector2 size, Action closeRequested)
+    public VBoxContainer Open(
+        string title,
+        Vector2 size,
+        Action closeRequested,
+        Action? backRequested = null)
     {
         if (closeRequested == null)
             throw new ArgumentNullException(nameof(closeRequested));
@@ -53,6 +57,13 @@ public partial class ModalHost : Control
 
         var heading = new HBoxContainer();
         heading.AddThemeConstantOverride("separation", 7);
+        if (backRequested != null)
+        {
+            var back = UiFactory.CreateButton(Tr("UI_COMMON_BACK"));
+            back.CustomMinimumSize = new Vector2(66, 23);
+            back.Pressed += backRequested;
+            heading.AddChild(back);
+        }
         var titleLabel = UiFactory.CreateTitle(title);
         titleLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         titleLabel.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
