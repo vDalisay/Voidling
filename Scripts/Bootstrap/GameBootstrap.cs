@@ -19,6 +19,7 @@ using Voidling.Infrastructure.Audio;
 using Voidling.Infrastructure.Multiplayer;
 using Voidling.Infrastructure.Persistence;
 using Voidling.Infrastructure.Resources;
+using Voidling.Presentation.UI.Multiplayer;
 using VoidlingGame;
 
 namespace Voidling.Bootstrap;
@@ -94,6 +95,16 @@ public partial class GameBootstrap : Node
         _connectedZone = multiplayer.ConnectedZone;
         _challengeCoordinator = multiplayer.Challenges;
         _leaderboardProjection = new LeaderboardProjectionService(multiplayer.Leaderboards);
+
+        var connectedZoneBridge = new ConnectedZonePresentationBridge
+        {
+            Name = nameof(ConnectedZonePresentationBridge)
+        };
+        connectedZoneBridge.Configure(multiplayer.ConnectedZoneFacade);
+        AddChild(connectedZoneBridge);
+
+        multiplayer.ConnectedZoneTransient.ProtocolRejected += reason =>
+            GD.PushWarning($"Rejected connected-Garden transient packet: {reason}");
         _challengeCoordinator.ProtocolRejected += reason =>
             GD.PushWarning($"Rejected multiplayer challenge packet: {reason}");
 
