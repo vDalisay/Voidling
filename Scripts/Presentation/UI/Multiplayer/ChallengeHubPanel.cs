@@ -16,6 +16,7 @@ public partial class ChallengeHubPanel : VBoxContainer
     public event Action<string>? JoinRequested;
     public event Action<string>? LeaveRequested;
     public event Action<string>? CancelRequested;
+    public event Action<string>? RaceSetupRequested;
 
     private ChallengeHubViewState? _state;
     private bool _ready;
@@ -175,6 +176,15 @@ public partial class ChallengeHubPanel : VBoxContainer
             join.CustomMinimumSize = new Vector2(82, 23);
             join.Pressed += () => JoinRequested?.Invoke(challenge.ChallengeId);
             actions.AddChild(join);
+        }
+        if (challenge.Kind == ChallengeKind.Race &&
+            challenge.LocalParticipating &&
+            challenge.Phase is ChallengePhase.Offered or ChallengePhase.Forming or ChallengePhase.Ready)
+        {
+            var setup = UiFactory.CreateButton(Tr("UI_CHALLENGE_SETUP_RACE"));
+            setup.CustomMinimumSize = new Vector2(96, 23);
+            setup.Pressed += () => RaceSetupRequested?.Invoke(challenge.ChallengeId);
+            actions.AddChild(setup);
         }
         if (challenge.CanLeave)
         {
