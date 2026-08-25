@@ -29,6 +29,7 @@ public partial class ConnectedZonePanel : VBoxContainer
     public event Action<ulong>? JoinRequested;
     public event Action? InviteRequested;
     public event Action? LeaveRequested;
+    public event Action? FriendsLeaderboardRequested;
     public event Action? ShareSelectedRequested;
     public event Action? RemoveSelectedRequested;
 
@@ -111,6 +112,7 @@ public partial class ConnectedZonePanel : VBoxContainer
             AddChild(joinRow);
 
             AddChild(UiFactory.CreateLabel(Tr("UI_ONLINE_JOIN_HINT"), 6));
+            AddChild(BuildFriendsBoardButton());
             return;
         }
 
@@ -133,12 +135,16 @@ public partial class ConnectedZonePanel : VBoxContainer
         var actions = new HBoxContainer();
         actions.AddThemeConstantOverride("separation", 6);
         var invite = UiFactory.CreateButton(Tr("UI_ONLINE_INVITE"));
-        invite.CustomMinimumSize = new Vector2(125, 25);
+        invite.CustomMinimumSize = new Vector2(112, 25);
         invite.Pressed += () => InviteRequested?.Invoke();
         actions.AddChild(invite);
 
+        var boards = BuildFriendsBoardButton();
+        boards.CustomMinimumSize = new Vector2(118, 25);
+        actions.AddChild(boards);
+
         var leave = UiFactory.CreateButton(Tr("UI_ONLINE_LEAVE"));
-        leave.CustomMinimumSize = new Vector2(100, 25);
+        leave.CustomMinimumSize = new Vector2(96, 25);
         leave.Pressed += () => LeaveRequested?.Invoke();
         actions.AddChild(leave);
         AddChild(actions);
@@ -166,5 +172,13 @@ public partial class ConnectedZonePanel : VBoxContainer
                 ShareSelectedRequested?.Invoke();
         };
         AddChild(share);
+    }
+
+    private Button BuildFriendsBoardButton()
+    {
+        var button = UiFactory.CreateButton(Tr("UI_ONLINE_FRIEND_BOARDS"));
+        button.CustomMinimumSize = new Vector2(190, 25);
+        button.Pressed += () => FriendsLeaderboardRequested?.Invoke();
+        return button;
     }
 }
