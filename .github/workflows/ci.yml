@@ -91,3 +91,42 @@ jobs:
             echo 'Godot runtime emitted an error.'
             exit 1
           fi
+
+      # Exercise the real development ENet adapter with two independent game processes. Both
+      # processes must form one LAN lobby and exchange the same typed Application Hello packet
+      # used by Steam before the command-line probe exits successfully.
+      - name: LAN multiplayer two-process smoke test
+        shell: bash
+        run: |
+          set -u
+          rm -f lan-host.log lan-client.log
+
+          timeout 20s godot --headless --path . -- \
+            --voidling-lan-host \
+            --voidling-lan-name=CIHost \
+            --voidling-dev-profile=ci_host \
+            --voidling-lan-smoke >lan-host.log 2>&1 &
+          host_pid=$!
+
+          sleep 1
+          timeout 20s godot --headless --path . -- \
+            --voidling-lan-join=127.0.0.1 \
+            --voidling-lan-name=CIClient \
+            --voidling-dev-profile=ci_client \
+            --voidling-lan-smoke >lan-client.log 2>&1
+          client_code=$?
+
+          wait "$host_pid"
+          host_code=$?
+
+          echo '--- LAN host log ---'
+          cat lan-host.log
+          echo '--- LAN client log ---'
+          cat lan-client.log
+
+          if [ "$host_code" -ne 0 ] || [ "$client_code" -ne 0 ]; then
+            echo "LAN smoke failed: host=$host_code client=$client_code"
+            exit 1
+          fi
+          grep -q 'LAN_SMOKE_SUCCESS' lan-host.log
+          grep -q 'LAN_SMOKE_SUCCESS' lan-client.log
