@@ -3,12 +3,29 @@ using System.Linq;
 using Godot;
 using Voidling.Application.Multiplayer;
 using Voidling.Presentation.UI.Multiplayer;
+using Voidling.Presentation.Voidlings;
 
 namespace VoidlingGame;
 
 public partial class MainController
 {
     private ConnectedZonePanel? _connectedZonePanel;
+    private ConnectedZoneGardenSync? _connectedZoneGardenSync;
+
+    private void ComposeConnectedZoneGardenPresentation()
+    {
+        if (_connectedZoneGardenSync != null && GodotObject.IsInstanceValid(_connectedZoneGardenSync))
+            return;
+
+        var sync = new ConnectedZoneGardenSync
+        {
+            Name = nameof(ConnectedZoneGardenSync),
+            ZIndex = 1
+        };
+        sync.Configure(_connectedZoneBridge, _garden);
+        _connectedZoneGardenSync = sync;
+        _garden.AddChild(sync);
+    }
 
     private void ShowConnectedZone()
     {
