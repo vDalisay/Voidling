@@ -43,6 +43,50 @@ public sealed class LeaderboardProjectionService
         CancellationToken cancellationToken = default)
         => _leaderboards.DownloadFriendsAsync(MultiplayerWins, cancellationToken);
 
+    public Task<LeaderboardOperationResult> UploadCourseBestTimeAsync(
+        string stableCourseId,
+        int rulesVersion,
+        int finishedMilliseconds,
+        CancellationToken cancellationToken = default)
+    {
+        if (finishedMilliseconds <= 0)
+            return Task.FromResult(LeaderboardOperationResult.Failed("Course race time must be positive."));
+
+        LeaderboardDefinition definition;
+        try
+        {
+            definition = CourseBestTime(stableCourseId, rulesVersion);
+        }
+        catch (ArgumentException exception)
+        {
+            return Task.FromResult(LeaderboardOperationResult.Failed(exception.Message));
+        }
+
+        return _leaderboards.UploadScoreAsync(
+            definition,
+            finishedMilliseconds,
+            keepBest: true,
+            details: null,
+            cancellationToken);
+    }
+
+    public Task<LeaderboardEntriesResult> DownloadFriendCourseBestTimeAsync(
+        string stableCourseId,
+        int rulesVersion,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return _leaderboards.DownloadFriendsAsync(
+                CourseBestTime(stableCourseId, rulesVersion),
+                cancellationToken);
+        }
+        catch (ArgumentException exception)
+        {
+            return Task.FromResult(LeaderboardEntriesResult.Failed(exception.Message));
+        }
+    }
+
     public Task<LeaderboardOperationResult> UploadDailyRaceTimeAsync(
         string utcDailyKey,
         int rulesVersion,
