@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_balance")
 HigherAlleleExpressionChance = 0.7
+AbilityRankBreakthroughChance = 0.01
 RareFounderTraitChance = 0.0005
 RareTraitTransmissionChance = 0.1
 RelatedAncestorDepth = 3
