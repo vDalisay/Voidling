@@ -28,6 +28,7 @@ public readonly record struct RaceCourseSegment(
 public sealed class RaceCourse
 {
     private const float CoordinateTolerance = 0.001f;
+    public const float DefaultObstacleTriggerOffsetX = 4.0f;
 
     /// <summary>
     /// Compatibility alias for the current standard course. New code that needs semantic course
@@ -40,16 +41,20 @@ public sealed class RaceCourse
         float endX,
         float glideLaunchStartX,
         IEnumerable<RaceCourseSegment> segments,
-        IEnumerable<float> obstacles)
+        IEnumerable<float> obstacles,
+        float obstacleTriggerOffsetX = DefaultObstacleTriggerOffsetX)
     {
         if (!float.IsFinite(startX) || !float.IsFinite(endX) || endX <= startX)
             throw new ArgumentOutOfRangeException(nameof(endX), "Race end must be finite and after race start.");
         if (!float.IsFinite(glideLaunchStartX) || glideLaunchStartX < startX || glideLaunchStartX >= endX)
             throw new ArgumentOutOfRangeException(nameof(glideLaunchStartX), "Glide launch marker must remain inside the course bounds.");
+        if (!float.IsFinite(obstacleTriggerOffsetX))
+            throw new ArgumentOutOfRangeException(nameof(obstacleTriggerOffsetX), "Obstacle trigger offset must be finite.");
 
         StartX = startX;
         EndX = endX;
         GlideLaunchStartX = glideLaunchStartX;
+        ObstacleTriggerOffsetX = obstacleTriggerOffsetX;
 
         var authoredSegments = (segments ?? throw new ArgumentNullException(nameof(segments))).ToArray();
         if (authoredSegments.Length == 0)
@@ -102,6 +107,16 @@ public sealed class RaceCourse
             .ToArray();
         if (orderedObstacles.Any(x => !float.IsFinite(x) || x < StartX || x >= EndX))
             throw new ArgumentException("Race obstacles must be finite and remain inside the course bounds.", nameof(obstacles));
+        if (orderedObstacles.Any(x =>
+            {
+                var triggerX = x + ObstacleTriggerOffsetX;
+                return !float.IsFinite(triggerX) || triggerX < StartX || triggerX >= EndX;
+            }))
+        {
+            throw new ArgumentException(
+                "Race obstacle trigger positions must remain inside the course bounds.",
+                nameof(obstacles));
+        }
 
         Segments = Array.AsReadOnly(orderedSegments);
         Obstacles = Array.AsReadOnly(orderedObstacles);
@@ -111,6 +126,7 @@ public sealed class RaceCourse
     public float StartX { get; }
     public float EndX { get; }
     public float GlideLaunchStartX { get; }
+    public float ObstacleTriggerOffsetX { get; }
     public IReadOnlyList<RaceCourseSegment> Segments { get; }
     public IReadOnlyList<float> Obstacles { get; }
     public RaceCourseSegment GlideSegment { get; }

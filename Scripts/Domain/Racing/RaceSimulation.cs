@@ -65,11 +65,6 @@ public sealed class RaceSimulation
     public const double FixedStepSeconds = 1.0 / 60.0;
     private const float GlideFailureTolerance = 1.0f;
 
-    // RaceScreen intentionally places the visible hurdle 18px ahead of the course marker. Keep the
-    // obstacle event 14px before that visible center so the jump animation peaks at the hurdle,
-    // rather than resolving ~32px before the sprite as it did previously.
-    private const float ObstacleTriggerLead = -4.0f;
-
     private readonly RaceCourse _course;
     private readonly RacePerformanceModel _performance;
     private readonly List<ParticipantState> _participants;
@@ -334,7 +329,7 @@ public sealed class RaceSimulation
             return;
 
         var obstacleIndex = state.NextObstacleIndex;
-        if (state.X < _course.Obstacles[obstacleIndex] - ObstacleTriggerLead)
+        if (state.X < _course.Obstacles[obstacleIndex] + _course.ObstacleTriggerOffsetX)
             return;
 
         // A failed hurdle attempt is the stumble/jump-in-place beat. Do not consume the

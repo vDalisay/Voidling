@@ -447,8 +447,13 @@ public static class RaceCourseFingerprint
     public static string Compute(RaceCourse course)
     {
         ArgumentNullException.ThrowIfNull(course);
-        var builder = new StringBuilder("race-course:v1");
-        Append(builder, course.StartX, course.EndX, course.GlideLaunchStartX);
+        var builder = new StringBuilder("race-course:v2");
+        Append(
+            builder,
+            course.StartX,
+            course.EndX,
+            course.GlideLaunchStartX,
+            course.ObstacleTriggerOffsetX);
         foreach (var segment in course.Segments)
         {
             builder.Append('|').Append(segment.Id)

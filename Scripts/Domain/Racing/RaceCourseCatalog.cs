@@ -48,7 +48,8 @@ public static class RaceCourseCatalog
                 new RaceCourseSegment("glide", 1080.0f, 1370.0f, RaceSegmentKind.Glide),
                 new RaceCourseSegment("ground-finish", 1370.0f, 1810.0f, RaceSegmentKind.Ground)
             },
-            obstacles: new[] { 340.0f, 890.0f, 1510.0f, 1660.0f }));
+            obstacles: new[] { 340.0f, 890.0f, 1510.0f, 1660.0f },
+            obstacleTriggerOffsetX: 4.0f));
 
     /// <summary>
     /// Longer standard-race content using only mechanics already owned by RaceSimulation: more
@@ -72,7 +73,8 @@ public static class RaceCourseCatalog
                 new RaceCourseSegment("glide", 1350.0f, 1680.0f, RaceSegmentKind.Glide),
                 new RaceCourseSegment("ground-finish", 1680.0f, 2250.0f, RaceSegmentKind.Ground)
             },
-            obstacles: new[] { 310.0f, 820.0f, 1240.0f, 1780.0f, 1980.0f, 2140.0f }));
+            obstacles: new[] { 310.0f, 820.0f, 1240.0f, 1780.0f, 1980.0f, 2140.0f },
+            obstacleTriggerOffsetX: 4.0f));
 
     private static readonly IReadOnlyList<RaceCourseDefinition> Definitions = Array.AsReadOnly(new[]
     {

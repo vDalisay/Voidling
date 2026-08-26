@@ -17,6 +17,7 @@ public sealed class RaceSimulationTests
     {
         Assert.Equal(70.0f, Course.StartX, 3);
         Assert.Equal(1810.0f, Course.EndX, 3);
+        Assert.Equal(4.0f, Course.ObstacleTriggerOffsetX, 3);
         Assert.Equal(RaceTerrain.Ground, Course.TerrainAt(340.0f, false));
         Assert.Equal(RaceTerrain.Swim, Course.TerrainAt(600.0f, false));
         Assert.Equal(RaceTerrain.Glide, Course.TerrainAt(1150.0f, false));
@@ -101,6 +102,30 @@ public sealed class RaceSimulationTests
                 new RaceCourseSegment("finish", 250.0f, 300.0f, RaceSegmentKind.Ground)
             },
             obstacles: Array.Empty<float>()));
+    }
+
+    [Fact]
+    public void ObstacleTriggerOffset_IsCourseOwnedAndChangesResolutionTiming()
+    {
+        var earlier = FirstObstacleResolutionStep(-25.0f);
+        var later = FirstObstacleResolutionStep(25.0f);
+
+        Assert.True(later > earlier);
+    }
+
+    [Fact]
+    public void RaceCourse_RejectsObstacleTriggerPositionsOutsideCourseBounds()
+    {
+        Assert.Throws<ArgumentException>(() => new RaceCourse(
+            startX: 0.0f,
+            endX: 200.0f,
+            glideLaunchStartX: 50.0f,
+            segments: new[]
+            {
+                new RaceCourseSegment("ground", 0.0f, 200.0f, RaceSegmentKind.Ground)
+            },
+            obstacles: new[] { 195.0f },
+            obstacleTriggerOffsetX: 10.0f));
     }
 
     [Fact]
@@ -218,6 +243,38 @@ public sealed class RaceSimulationTests
             new RaceParticipantSnapshot("cpu-b", "Moss", "#B7B2E8", 84, 35, 44, 40, 45),
             new RaceParticipantSnapshot("cpu-c", "Puck", "#F0C778", 58, 55, 85, 35, 74)
         };
+
+    private static int FirstObstacleResolutionStep(float triggerOffset)
+    {
+        var course = new RaceCourse(
+            startX: 0.0f,
+            endX: 500.0f,
+            glideLaunchStartX: 250.0f,
+            segments: new[]
+            {
+                new RaceCourseSegment("ground", 0.0f, 500.0f, RaceSegmentKind.Ground)
+            },
+            obstacles: new[] { 200.0f },
+            obstacleTriggerOffsetX: triggerOffset);
+        var participant = new RaceParticipantSnapshot(
+            "runner",
+            "Runner",
+            "#FFFFFF",
+            100,
+            0,
+            0,
+            0,
+            100);
+        var simulation = new RaceSimulation(course, Rules, new[] { participant }, 12345UL);
+
+        for (var step = 1; step <= 20000; step++)
+        {
+            if (simulation.AdvanceFixedSteps(1).OfType<RaceObstacleResolvedEvent>().Any())
+                return simulation.FixedStepCount;
+        }
+
+        throw new InvalidOperationException("Obstacle was not resolved within deterministic test guard.");
+    }
 
     private static IReadOnlyList<string> RunWithElapsedChunks(RaceSimulation simulation, double chunk)
     {
