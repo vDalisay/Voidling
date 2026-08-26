@@ -22,5 +22,6 @@ RankATrainingCap = 100
 RankSTrainingCap = 120
 ChildToAdultSeconds = 45.0
 EvolutionSpecializationThreshold = 0.5
+GardenCoinsPerMinute = 1.0
 StoreEggPrice = 30
 TrainingItemPrice = 8

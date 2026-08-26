@@ -75,6 +75,10 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "0,1,0.01")]
     public float EvolutionSpecializationThreshold { get; set; } = 0.50f;
 
+    [ExportGroup("Economy")]
+    [Export(PropertyHint.Range, "0,100,0.1")]
+    public float GardenCoinsPerMinute { get; set; } = 1.0f;
+
     [ExportGroup("Shop")]
     [Export(PropertyHint.Range, "0,10000,1")]
     public int StoreEggPrice { get; set; } = 30;
@@ -119,6 +123,10 @@ public partial class GameBalanceResource : Resource
             Evolution = defaults.Evolution with
             {
                 SpecializationThreshold = Math.Clamp(EvolutionSpecializationThreshold, 0.0f, 1.0f)
+            },
+            Economy = defaults.Economy with
+            {
+                GardenCoinsPerMinute = Math.Max(0.0f, GardenCoinsPerMinute)
             },
             Shop = defaults.Shop with
             {

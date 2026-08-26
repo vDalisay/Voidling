@@ -48,6 +48,13 @@ public sealed record LifecycleRules(float ChildToAdultSeconds);
 public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice);
 
 /// <summary>
+/// Open-game Garden income. The exact rate is prototype balance and intentionally authorable;
+/// the stable product rule is that passive currency accrues while the game is running, with no
+/// active-computer-use multiplier or daily cap baked into Domain logic.
+/// </summary>
+public sealed record EconomyRules(float GardenCoinsPerMinute);
+
+/// <summary>
 /// First-evolution tuning. Raising influence is normalized against MaxTrainingPoints, so the
 /// threshold remains meaningful when the overall training scale is rebalanced.
 /// </summary>
@@ -104,6 +111,7 @@ public sealed record GameBalanceRules(
     RaceRules Racing)
 {
     public EvolutionRules Evolution { get; init; } = new(SpecializationThreshold: 0.50f);
+    public EconomyRules Economy { get; init; } = new(GardenCoinsPerMinute: 1.0f);
 
     public static GameBalanceRules DemoDefaults { get; } = new(
         Genetics: new GeneticsRules(

@@ -18,7 +18,7 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 9;
+    public const int CurrentSaveVersion = 10;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -118,6 +118,15 @@ public sealed class GameStateMigrationService
             .OrderBy(attempt => attempt.DailyKey, StringComparer.Ordinal)
             .TakeLast(DailyFriendRaceService.MaxAttemptHistory)
             .ToList();
+
+        // Version 10 adds only fractional open-game Garden income progress. Old saves naturally
+        // start at zero; malformed values are discarded rather than being converted into currency.
+        if (!double.IsFinite(state.GardenIncomeCoinRemainder) ||
+            state.GardenIncomeCoinRemainder < 0.0 ||
+            state.GardenIncomeCoinRemainder >= 1.0)
+        {
+            state.GardenIncomeCoinRemainder = 0.0;
+        }
 
         state.SaveVersion = CurrentSaveVersion;
     }

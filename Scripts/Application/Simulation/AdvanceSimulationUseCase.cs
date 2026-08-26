@@ -21,8 +21,8 @@ public sealed record SimulationStepResult(bool Changed, IReadOnlyList<GameSimula
 
 /// <summary>
 /// Advances persistent garden simulation from an explicit elapsed duration. This contains no
-/// Godot frame, scene, UI, persistence, or wall-clock dependency, so lifecycle/hatching can be
-/// tested and later reused for offline/real-time catch-up without changing presentation code.
+/// Godot frame, scene, UI, persistence, or wall-clock dependency, so lifecycle/hatching/economy can
+/// be tested and reused from any runtime host without changing presentation code.
 /// </summary>
 public sealed class AdvanceSimulationUseCase
 {
@@ -36,10 +36,10 @@ public sealed class AdvanceSimulationUseCase
     public SimulationStepResult Advance(GameStateData state, float elapsedSeconds)
     {
         ArgumentNullException.ThrowIfNull(state);
-        if (elapsedSeconds <= 0.0f)
+        if (!float.IsFinite(elapsedSeconds) || elapsedSeconds <= 0.0f)
             return new SimulationStepResult(false, Array.Empty<GameSimulationEvent>());
 
-        var changed = false;
+        var changed = AdvanceGardenIncome(state, elapsedSeconds);
         var events = new List<GameSimulationEvent>();
 
         foreach (var creature in state.Voidlings)
@@ -96,6 +96,31 @@ public sealed class AdvanceSimulationUseCase
         }
 
         return new SimulationStepResult(changed, events);
+    }
+
+    private bool AdvanceGardenIncome(GameStateData state, float elapsedSeconds)
+    {
+        var coinsPerMinute = Math.Max(0.0f, _rules.Economy.GardenCoinsPerMinute);
+        if (coinsPerMinute <= 0.0f)
+            return false;
+
+        var totalCoins = state.GardenIncomeCoinRemainder +
+                         elapsedSeconds * (double)coinsPerMinute / 60.0;
+        if (!double.IsFinite(totalCoins) || totalCoins < 0.0)
+            return false;
+
+        var wholeCoins = Math.Floor(totalCoins);
+        state.GardenIncomeCoinRemainder = totalCoins - wholeCoins;
+        if (wholeCoins < 1.0)
+            return false;
+
+        var available = Math.Max(0L, (long)int.MaxValue - state.Coins);
+        var awarded = Math.Min((long)wholeCoins, available);
+        if (awarded <= 0)
+            return false;
+
+        state.Coins += (int)awarded;
+        return true;
     }
 
     private VoidlingData Hatch(GameStateData state, EggData egg)
