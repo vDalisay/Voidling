@@ -349,3 +349,131 @@ public partial class GameBootstrap : Node
         var today = DateTimeOffset.UtcNow;
         var todayKey = DailyFriendRaceService.GetDailyKey(today);
         var completedToday = session.State.DailyRaceAttempts.FirstOrDefault(attempt =>
+            string.Equals(attempt.DailyKey, todayKey, StringComparison.Ordinal) &&
+            attempt.State == DailyRaceAttemptState.Completed);
+        if (completedToday != null)
+            ProjectDailyRaceAttempt(completedToday, "startup retry");
+    }
+
+    private async void ProjectMultiplayerWins(int totalWins, string reason)
+    {
+        var projection = _leaderboardProjection;
+        if (projection == null || !projection.Availability.IsAvailable || totalWins < 0)
+            return;
+
+        try
+        {
+            var result = await projection.UploadMultiplayerWinsAsync(totalWins);
+            if (!result.Success)
+            {
+                GD.PushWarning(
+                    $"Steam multiplayer-win leaderboard projection failed during {reason}: " +
+                    (result.Error ?? "unknown Steam leaderboard error") +
+                    ". Local progress is already saved and will be retried later.");
+            }
+        }
+        catch (Exception exception)
+        {
+            // The adapter is designed to return failures, but this final boundary protects the
+            // single-player/session lifetime from any unexpected Steam callback/interop exception.
+            GD.PushWarning(
+                $"Steam multiplayer-win leaderboard projection threw during {reason}: {exception.Message}. " +
+                "Local progress is already saved and will be retried later.");
+        }
+    }
+
+    private async void ProjectDailyRaceAttempt(DailyRaceAttemptData attempt, string reason)
+    {
+        var daily = _dailyFriendRace;
+        if (daily == null || !daily.LeaderboardAvailability.IsAvailable)
+            return;
+
+        try
+        {
+            var result = await daily.ProjectCompletedAttemptAsync(attempt);
+            if (!result.Success)
+            {
+                GD.PushWarning(
+                    $"Steam daily-race leaderboard projection failed during {reason}: " +
+                    (result.Error ?? "unknown Steam leaderboard error") +
+                    ". The local daily result remains saved.");
+            }
+        }
+        catch (Exception exception)
+        {
+            GD.PushWarning(
+                $"Steam daily-race leaderboard projection threw during {reason}: {exception.Message}. " +
+                "The local daily result remains saved.");
+        }
+    }
+
+    private static void RecoverInterruptedTradePrepares(
+        TradeTransferService transfers,
+        GodotJsonGameStateRepository stateRepository,
+        GameSession session)
+    {
+        var interrupted = session.State.PendingTradeJournal
+            .Select(entry => entry.TradeId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (interrupted.Length == 0)
+            return;
+
+        foreach (var tradeId in interrupted)
+            transfers.AbortPrepared(session.State, tradeId);
+
+        try
+        {
+            stateRepository.Save(session.State);
+            session.NotifyExternallyPersistedStateChanged();
+            GD.Print($"Recovered {interrupted.Length} interrupted pre-commit multiplayer trade(s) by aborting them locally.");
+        }
+        catch (Exception exception)
+        {
+            // Recovery is an unlock operation only. A persistence problem must not prevent the
+            // offline/singleplayer game from starting; the same idempotent recovery will retry next launch.
+            GD.PushWarning($"Could not persist interrupted trade recovery: {exception.Message}");
+        }
+    }
+
+    private void ComposeMultiplayerProbeIfRequested(GameSession session)
+    {
+        if (_multiplayerConnection == null || _connectedZone == null)
+            return;
+
+        var args = OS.GetCmdlineUserArgs();
+        var requested = false;
+        foreach (var arg in args)
+        {
+            if (!arg.StartsWith("--voidling-mp-", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(arg, "--voidling-lan-smoke", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            requested = true;
+            break;
+        }
+
+        if (!requested)
+            return;
+
+        var probe = new MultiplayerConnectivityProbe
+        {
+            Name = nameof(MultiplayerConnectivityProbe)
+        };
+        probe.Configure(_multiplayerConnection, _connectedZone, session, args);
+        AddChild(probe);
+    }
+
+    private static GameBalanceRules LoadBalanceRules()
+    {
+        var authored = ResourceLoader.Load<GameBalanceResource>(BalancePath);
+        if (authored != null)
+            return authored.ToDomainRules();
+
+        GD.PushWarning($"Could not load balance resource at {BalancePath}; using code defaults.");
+        return GameBalanceRules.DemoDefaults;
+    }
+}
