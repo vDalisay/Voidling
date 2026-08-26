@@ -61,7 +61,8 @@ public partial class MainController : Node
         return new RacePickerVoidlingViewState(
             creature.CreatureId,
             creature.DisplayName,
-            ParseProfileTint(creature.TintHex),
+            creature.TintHex,
+            ToAppearancePhenotype(creature.Appearance),
             creature.HasAngelMutation,
             creature.OtherMutationCount,
             statSummary);
@@ -113,7 +114,8 @@ public partial class MainController : Node
             data.FamilyGeneration,
             data.ActiveInbreedingBurden,
             data.InbreedingHistoryFlag,
-            ParseProfileTint(data.TintHex),
+            data.TintHex,
+            ToAppearancePhenotype(data.Appearance),
             data.HasAngelMutation,
             data.OtherMutationCount,
             data.ColorDnaProfile1,
