@@ -3,6 +3,7 @@ using System.Linq;
 using Voidling.Domain.Evolution;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shared;
+using Voidling.Domain.Stats;
 using VoidlingGame;
 
 namespace Voidling.Application.Training;
@@ -13,7 +14,8 @@ public enum TrainingFailure
     UnknownStat,
     CreatureNotFound,
     NotEnoughCurrency,
-    NoItemOwned
+    NoItemOwned,
+    StatAtCap
 }
 
 public readonly record struct TrainingPurchaseResult(TrainingFailure Failure)
@@ -30,15 +32,17 @@ public readonly record struct TrainingApplicationResult(TrainingFailure Failure,
 /// Coordinates training inventory and stat progression without UI, persistence or Godot APIs.
 /// The caller owns seed allocation and persistence so both remain explicit side effects.
 /// Child training also feeds deterministic hidden evolution influence; it never mutates ability
-/// DNA directly.
+/// DNA directly. The expressed DNA rank supplies the hard training ceiling.
 /// </summary>
 public sealed class TrainingUseCase
 {
     private readonly GameBalanceRules _rules;
+    private readonly StatCalculator _stats;
 
     public TrainingUseCase(GameBalanceRules rules)
     {
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
+        _stats = new StatCalculator(_rules.Stats);
     }
 
     public TrainingPurchaseResult BuyTrainingItem(GameStateData state, string statId)
@@ -61,8 +65,12 @@ public sealed class TrainingUseCase
         ArgumentNullException.ThrowIfNull(state);
         if (!_rules.Genetics.StatIds.Contains(statId))
             return TrainingFailure.UnknownStat;
-        if (state.Voidlings.All(v => v.Id != creatureId))
+
+        var creature = state.Voidlings.FirstOrDefault(v => v.Id == creatureId);
+        if (creature == null)
             return TrainingFailure.CreatureNotFound;
+        if (_stats.GetTrainingPoints(creature, statId) >= _stats.GetTrainingPointCap(creature, statId))
+            return TrainingFailure.StatAtCap;
 
         state.TrainingItems.TryGetValue(statId, out var count);
         return count > 0 ? TrainingFailure.None : TrainingFailure.NoItemOwned;
@@ -78,8 +86,9 @@ public sealed class TrainingUseCase
         state.TrainingItems[statId]--;
 
         var rolledGain = StableRandom.Create(seed, $"training:{creatureId}:{statId}").Next(5, 10);
-        creature.TrainingPoints.TryGetValue(statId, out var current);
-        var updated = Math.Min(_rules.Stats.MaxTrainingPoints, current + rolledGain);
+        var current = _stats.GetTrainingPoints(creature, statId);
+        var cap = _stats.GetTrainingPointCap(creature, statId);
+        var updated = Math.Min(cap, current + rolledGain);
         var appliedGain = Math.Max(0, updated - current);
         creature.TrainingPoints[statId] = updated;
 

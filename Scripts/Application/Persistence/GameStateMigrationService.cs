@@ -6,6 +6,7 @@ using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Stats;
 using VoidlingGame;
 
 namespace Voidling.Application.Persistence;
@@ -17,14 +18,16 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 8;
+    public const int CurrentSaveVersion = 9;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
+    private readonly StatCalculator _stats;
 
     public GameStateMigrationService(GameBalanceRules rules)
     {
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
+        _stats = new StatCalculator(_rules.Stats);
     }
 
     public void Normalize(GameStateData state)
@@ -63,6 +66,14 @@ public sealed class GameStateMigrationService
             {
                 if (!creature.TrainingPoints.ContainsKey(statId))
                     creature.TrainingPoints[statId] = 0;
+
+                // Version 9 makes the DNA rank the actual hard training ceiling. Clamp legacy
+                // over-cap data once rather than preserving banked points that could become active
+                // after a later evolution rank promotion.
+                creature.TrainingPoints[statId] = Math.Clamp(
+                    creature.TrainingPoints[statId],
+                    0,
+                    _stats.GetTrainingPointCap(creature, statId));
             }
 
             creature.RareTraits ??= new List<RareTraitData>();

@@ -20,7 +20,28 @@ public sealed record BreedingRules(float CooldownSeconds, IReadOnlyList<int> Hat
 
 public sealed record HatchingRules(float IncubationSeconds);
 
-public sealed record StatGrowthRules(int TrainingPointsPerLevel, int MaxLevel, int MaxTrainingPoints);
+/// <summary>
+/// Designer-authored hard training ceilings for the six confirmed E..S ability ranks.
+/// Values are prototype balance, not product invariants; ordering is validated by the Resource
+/// adapter while the rank identities themselves remain stable domain concepts.
+/// </summary>
+public sealed record RankTrainingCaps(int E, int D, int C, int B, int A, int S)
+{
+    public int ForRank(int rank) => rank switch
+    {
+        <= 0 => E,
+        1 => D,
+        2 => C,
+        3 => B,
+        4 => A,
+        _ => S
+    };
+}
+
+public sealed record StatGrowthRules(int TrainingPointsPerLevel, int MaxLevel, int MaxTrainingPoints)
+{
+    public RankTrainingCaps RankCaps { get; init; } = new(E: 20, D: 40, C: 60, B: 80, A: 100, S: 120);
+}
 
 public sealed record LifecycleRules(float ChildToAdultSeconds);
 

@@ -50,6 +50,24 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "1,10000,1")]
     public int MaxTrainingPoints { get; set; } = 120;
 
+    [Export(PropertyHint.Range, "0,10000,1")]
+    public int RankETrainingCap { get; set; } = 20;
+
+    [Export(PropertyHint.Range, "0,10000,1")]
+    public int RankDTrainingCap { get; set; } = 40;
+
+    [Export(PropertyHint.Range, "0,10000,1")]
+    public int RankCTrainingCap { get; set; } = 60;
+
+    [Export(PropertyHint.Range, "0,10000,1")]
+    public int RankBTrainingCap { get; set; } = 80;
+
+    [Export(PropertyHint.Range, "0,10000,1")]
+    public int RankATrainingCap { get; set; } = 100;
+
+    [Export(PropertyHint.Range, "0,10000,1")]
+    public int RankSTrainingCap { get; set; } = 120;
+
     [Export(PropertyHint.Range, "1,3600,1")]
     public float ChildToAdultSeconds { get; set; } = 45.0f;
 
@@ -67,6 +85,7 @@ public partial class GameBalanceResource : Resource
     public GameBalanceRules ToDomainRules()
     {
         var defaults = GameBalanceRules.DemoDefaults;
+        var maxTrainingPoints = Math.Max(1, MaxTrainingPoints);
 
         return defaults with
         {
@@ -90,7 +109,8 @@ public partial class GameBalanceResource : Resource
             {
                 TrainingPointsPerLevel = Math.Max(1, TrainingPointsPerLevel),
                 MaxLevel = Math.Max(1, MaxStatLevel),
-                MaxTrainingPoints = Math.Max(1, MaxTrainingPoints)
+                MaxTrainingPoints = maxTrainingPoints,
+                RankCaps = BuildRankCaps(maxTrainingPoints)
             },
             Lifecycle = defaults.Lifecycle with
             {
@@ -106,6 +126,17 @@ public partial class GameBalanceResource : Resource
                 TrainingItemPrice = Math.Max(0, TrainingItemPrice)
             }
         };
+    }
+
+    private RankTrainingCaps BuildRankCaps(int maxTrainingPoints)
+    {
+        var e = Math.Clamp(RankETrainingCap, 0, maxTrainingPoints);
+        var d = Math.Clamp(Math.Max(e, RankDTrainingCap), 0, maxTrainingPoints);
+        var c = Math.Clamp(Math.Max(d, RankCTrainingCap), 0, maxTrainingPoints);
+        var b = Math.Clamp(Math.Max(c, RankBTrainingCap), 0, maxTrainingPoints);
+        var a = Math.Clamp(Math.Max(b, RankATrainingCap), 0, maxTrainingPoints);
+        var s = Math.Clamp(Math.Max(a, RankSTrainingCap), 0, maxTrainingPoints);
+        return new RankTrainingCaps(e, d, c, b, a, s);
     }
 
     private static double Probability(float value) => Math.Clamp((double)value, 0.0, 1.0);

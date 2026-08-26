@@ -33,6 +33,11 @@ public partial class GameSession
             ToastRequested?.Invoke($"Buy a {DisplayStatId(statId)} treat first.");
             return;
         }
+        if (failure == TrainingFailure.StatAtCap)
+        {
+            ToastRequested?.Invoke($"{creature.Name}'s {DisplayStatId(statId)} training is capped by its current DNA rank.");
+            return;
+        }
         if (failure != TrainingFailure.None)
             return;
 
