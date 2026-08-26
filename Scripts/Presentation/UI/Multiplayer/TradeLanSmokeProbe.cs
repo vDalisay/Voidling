@@ -13,6 +13,7 @@ namespace Voidling.Presentation.UI.Multiplayer;
 public partial class TradeLanSmokeProbe : Node
 {
     private const double TimeoutSeconds = 25.0;
+    private const double PostCommitNetworkGraceSeconds = 0.75;
 
     private TradePresentationBridge? _bridge;
     private bool _hostMode;
@@ -199,7 +200,21 @@ public partial class TradeLanSmokeProbe : Node
         GD.Print(
             $"[trade-lan-smoke] LAN_TRADE_SMOKE_SUCCESS negotiation={_negotiationId} " +
             $"outgoing={_localAssetId} incoming={_remoteAssetId}");
-        GetTree().Quit(0);
+
+        // The durable callback runs inside the packet/commit stack. Quitting immediately can tear
+        // down ENet before the peer receives its reliable commit packet or before this process flushes
+        // its committed/commit-observed acknowledgement. Keep this smoke-only process alive briefly;
+        // the production runtime itself never exits when the callback fires.
+        _ = QuitAfterNetworkGraceAsync();
+    }
+
+    private async System.Threading.Tasks.Task QuitAfterNetworkGraceAsync()
+    {
+        await ToSignal(
+            GetTree().CreateTimer(PostCommitNetworkGraceSeconds),
+            SceneTreeTimer.SignalName.Timeout);
+        if (IsInsideTree())
+            GetTree().Quit(0);
     }
 
     private void PrintState(TradeLobbyViewState state)
