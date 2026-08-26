@@ -10,6 +10,10 @@ namespace Voidling.Domain.Genetics;
 /// Creates a child's normal genome from the two selected parents only. Each ability locus keeps
 /// exactly two visible DNA-profile values: profile 1 comes from parent A and profile 2 from parent B.
 /// Deeper ancestry is intentionally outside this service and is reserved for pedigree/inbreeding.
+///
+/// Appearance loci are also diploid: one allele is selected from each parent independently. The
+/// child's persisted expressed-index coin only resolves ties between equally-dominant alleles; the
+/// actual Chao-style dominance rules are centralized in AppearancePhenotypeResolver.
 /// </summary>
 public sealed class GenomeInheritanceService
 {
@@ -43,13 +47,64 @@ public sealed class GenomeInheritanceService
         }
 
         ApplyNormalRankBreakthrough(parentA, parentB, genome, seed);
-
-        var colorA = StableRandom.Create(seed, "inherit:color:a");
-        var colorB = StableRandom.Create(seed, "inherit:color:b");
-        genome.ColorAlleleA = colorA.NextDouble() < 0.5 ? parentA.Genome.ColorAlleleA : parentA.Genome.ColorAlleleB;
-        genome.ColorAlleleB = colorB.NextDouble() < 0.5 ? parentB.Genome.ColorAlleleA : parentB.Genome.ColorAlleleB;
-        genome.ExpressedColorIndex = StableRandom.Create(seed, "express:color").NextDouble() < 0.5 ? 0 : 1;
+        InheritAppearance(parentA.Genome, parentB.Genome, genome, seed);
         return genome;
+    }
+
+    private static void InheritAppearance(
+        GenomeData parentA,
+        GenomeData parentB,
+        GenomeData child,
+        ulong seed)
+    {
+        child.ColorAlleleA = PickAllele(
+            parentA.ColorAlleleA,
+            parentA.ColorAlleleB,
+            StableRandom.Create(seed, "inherit:color:a"));
+        child.ColorAlleleB = PickAllele(
+            parentB.ColorAlleleA,
+            parentB.ColorAlleleB,
+            StableRandom.Create(seed, "inherit:color:b"));
+        child.ExpressedColorIndex = PickExpressionIndex(seed, "express:color");
+
+        child.ToneAlleleA = PickAllele(
+            parentA.ToneAlleleA,
+            parentA.ToneAlleleB,
+            StableRandom.Create(seed, "inherit:appearance:tone:a"));
+        child.ToneAlleleB = PickAllele(
+            parentB.ToneAlleleA,
+            parentB.ToneAlleleB,
+            StableRandom.Create(seed, "inherit:appearance:tone:b"));
+        child.ExpressedToneIndex = PickExpressionIndex(seed, "express:appearance:tone");
+
+        child.PatternAlleleA = PickAllele(
+            parentA.PatternAlleleA,
+            parentA.PatternAlleleB,
+            StableRandom.Create(seed, "inherit:appearance:pattern:a"));
+        child.PatternAlleleB = PickAllele(
+            parentB.PatternAlleleA,
+            parentB.PatternAlleleB,
+            StableRandom.Create(seed, "inherit:appearance:pattern:b"));
+        child.ExpressedPatternIndex = PickExpressionIndex(seed, "express:appearance:pattern");
+
+        child.ShinyAlleleA = PickAllele(
+            parentA.ShinyAlleleA,
+            parentA.ShinyAlleleB,
+            StableRandom.Create(seed, "inherit:appearance:shiny:a"));
+        child.ShinyAlleleB = PickAllele(
+            parentB.ShinyAlleleA,
+            parentB.ShinyAlleleB,
+            StableRandom.Create(seed, "inherit:appearance:shiny:b"));
+
+        child.CoatAlleleA = PickAllele(
+            parentA.CoatAlleleA,
+            parentA.CoatAlleleB,
+            StableRandom.Create(seed, "inherit:appearance:coat:a"));
+        child.CoatAlleleB = PickAllele(
+            parentB.CoatAlleleA,
+            parentB.CoatAlleleB,
+            StableRandom.Create(seed, "inherit:appearance:coat:b"));
+        child.ExpressedCoatIndex = PickExpressionIndex(seed, "express:appearance:coat");
     }
 
     private void ApplyNormalRankBreakthrough(
@@ -97,6 +152,12 @@ public sealed class GenomeInheritanceService
             StableRandom.Create(seed, $"express:{selectedStatId}"),
             _rules);
     }
+
+    private static int PickAllele(int alleleA, int alleleB, Random random)
+        => random.NextDouble() < 0.5 ? alleleA : alleleB;
+
+    private static int PickExpressionIndex(ulong seed, string salt)
+        => StableRandom.Create(seed, salt).NextDouble() < 0.5 ? 0 : 1;
 
     private static int BestParentalAllele(VoidlingData parentA, VoidlingData parentB, string statId)
     {
