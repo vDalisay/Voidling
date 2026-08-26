@@ -4,12 +4,17 @@ This file is the repository map for coding agents. Keep it short. Detailed archi
 
 ## Start here
 
+- Agent execution contract: `docs/AGENT_HANDOFF_IMPLEMENTATION_PLAN.md`
 - Architecture: `ARCHITECTURE.md`
 - Current architecture migration status: `docs/architecture/MIGRATION_STATUS.md`
+- Voidling visual/art pipeline: `docs/architecture/VOIDLING_VISUAL_ASSET_PIPELINE.md`
 - Architecture research/restructuring plan: `docs/architecture/RESTRUCTURING_PLAN.md`
 - Architecture decisions: `docs/architecture/decisions/`
-- Product implementation plan: `docs/GENETICS_BREEDING_HATCHING_RACING_IMPLEMENTATION_PLAN.md`
+- Player-facing design context: `docs/GAMEPLAY_DESIGN_REFINEMENT_CONTEXT.md`
+- Detailed genetics/breeding/racing research: `docs/GENETICS_BREEDING_HATCHING_RACING_IMPLEMENTATION_PLAN.md`
 - Demo behavior: `docs/DEMO_MVP.md`
+
+When old implementation/research plans conflict with the agent execution contract, active architecture, current `main` compatibility, or the newer gameplay context, follow the authority order documented in `docs/AGENT_HANDOFF_IMPLEMENTATION_PLAN.md`.
 
 ## Build and verify
 
@@ -69,7 +74,8 @@ Infrastructure (Godot filesystem, audio, Resources, localization adapters)
 - Use signals/events for local scene reactions; avoid a global event bus.
 - Player-facing text must use localization keys unless it is user-generated content.
 - `Scripts/Presentation/UI/Settings/SettingsScreen.cs` is the current reference screen pattern.
-- Voidling presentation primitives are shared across contexts. In particular, mutation/halo geometry comes from `VoidlingMutationVisualMetrics`, world mutations render through `MutationAdornment2D`, portrait mutations render through `HaloBadge`, and ground/shadow proportions come from `VoidlingGroundVisualMetrics`. Do not recreate challenge-, family-tree-, menu-, or garden-specific copies of these visuals.
+- Base Voidling artwork has one source of truth: `Resources/Presentation/Voidlings/DefaultVoidlingVisual.tres`, resolved through `VoidlingVisualFactory`. Do not load base/run/swim creature atlases directly from Garden, race, multiplayer or UI consumers.
+- Voidling presentation primitives are shared across contexts. Mutation/halo geometry comes from `VoidlingMutationVisualMetrics`, world mutations render through `MutationAdornment2D`, portrait mutations render through `HaloBadge`, and ground/shadow proportions come from `VoidlingGroundVisualMetrics`; their art-dependent anchors/geometry resolve from the canonical visual definition. Do not recreate challenge-, family-tree-, menu-, or garden-specific copies of these visuals.
 
 ### Infrastructure
 
