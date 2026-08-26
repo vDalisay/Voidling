@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Voidling.Domain.Evolution;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shared;
 using VoidlingGame;
@@ -28,6 +29,8 @@ public readonly record struct TrainingApplicationResult(TrainingFailure Failure,
 /// <summary>
 /// Coordinates training inventory and stat progression without UI, persistence or Godot APIs.
 /// The caller owns seed allocation and persistence so both remain explicit side effects.
+/// Child training also feeds deterministic hidden evolution influence; it never mutates ability
+/// DNA directly.
 /// </summary>
 public sealed class TrainingUseCase
 {
@@ -73,9 +76,14 @@ public sealed class TrainingUseCase
 
         var creature = state.Voidlings.First(v => v.Id == creatureId);
         state.TrainingItems[statId]--;
-        var gain = StableRandom.Create(seed, $"training:{creatureId}:{statId}").Next(5, 10);
+
+        var rolledGain = StableRandom.Create(seed, $"training:{creatureId}:{statId}").Next(5, 10);
         creature.TrainingPoints.TryGetValue(statId, out var current);
-        creature.TrainingPoints[statId] = Math.Min(_rules.Stats.MaxTrainingPoints, current + gain);
-        return new TrainingApplicationResult(TrainingFailure.None, gain);
+        var updated = Math.Min(_rules.Stats.MaxTrainingPoints, current + rolledGain);
+        var appliedGain = Math.Max(0, updated - current);
+        creature.TrainingPoints[statId] = updated;
+
+        EvolutionService.ApplyTrainingInfluence(creature, statId, appliedGain, _rules.Stats);
+        return new TrainingApplicationResult(TrainingFailure.None, appliedGain);
     }
 }

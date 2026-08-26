@@ -27,6 +27,12 @@ public sealed record LifecycleRules(float ChildToAdultSeconds);
 public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice);
 
 /// <summary>
+/// First-evolution tuning. Raising influence is normalized against MaxTrainingPoints, so the
+/// threshold remains meaningful when the overall training scale is rebalanced.
+/// </summary>
+public sealed record EvolutionRules(float SpecializationThreshold);
+
+/// <summary>
 /// Current race constants extracted from the MVP controller. Keeping them immutable and
 /// domain-owned lets the forthcoming headless simulator reuse exactly the same balancing
 /// while Godot presentation remains free to change independently.
@@ -76,6 +82,8 @@ public sealed record GameBalanceRules(
     ShopRules Shop,
     RaceRules Racing)
 {
+    public EvolutionRules Evolution { get; init; } = new(SpecializationThreshold: 0.50f);
+
     public static GameBalanceRules DemoDefaults { get; } = new(
         Genetics: new GeneticsRules(
             StatIds: Array.AsReadOnly(new[] { "run", "swim", "fly", "power", "stamina" }),

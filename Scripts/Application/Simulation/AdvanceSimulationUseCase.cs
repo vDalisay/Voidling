@@ -1,12 +1,19 @@
 using System;
 using System.Collections.Generic;
+using Voidling.Domain.Evolution;
 using Voidling.Domain.Rules;
 using VoidlingGame;
 
 namespace Voidling.Application.Simulation;
 
 public abstract record GameSimulationEvent;
-public sealed record CreatureBecameAdultEvent(string CreatureId, string Name) : GameSimulationEvent;
+public sealed record CreatureBecameAdultEvent(
+    string CreatureId,
+    string Name,
+    EvolutionSpecialization Specialization,
+    string PromotedStatId,
+    int PreviousRank,
+    int NewRank) : GameSimulationEvent;
 public sealed record CreatureHatchedEvent(string EggId, string CreatureId, string Name) : GameSimulationEvent;
 public sealed record EggFailedEvent(string EggId) : GameSimulationEvent;
 
@@ -51,8 +58,15 @@ public sealed class AdvanceSimulationUseCase
             if (creature.AgeSeconds < _rules.Lifecycle.ChildToAdultSeconds)
                 continue;
 
+            var evolution = EvolutionService.ResolveFirstEvolution(creature, _rules);
             creature.Stage = LifeStage.Adult;
-            events.Add(new CreatureBecameAdultEvent(creature.Id, creature.Name));
+            events.Add(new CreatureBecameAdultEvent(
+                creature.Id,
+                creature.Name,
+                evolution.Specialization,
+                evolution.PromotedStatId,
+                evolution.PreviousRank,
+                evolution.NewRank));
         }
 
         var hatchQueue = new List<EggData>();

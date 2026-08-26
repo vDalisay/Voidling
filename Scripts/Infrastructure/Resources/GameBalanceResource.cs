@@ -53,6 +53,10 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "1,3600,1")]
     public float ChildToAdultSeconds { get; set; } = 45.0f;
 
+    [ExportGroup("Evolution")]
+    [Export(PropertyHint.Range, "0,1,0.01")]
+    public float EvolutionSpecializationThreshold { get; set; } = 0.50f;
+
     [ExportGroup("Shop")]
     [Export(PropertyHint.Range, "0,10000,1")]
     public int StoreEggPrice { get; set; } = 30;
@@ -91,6 +95,10 @@ public partial class GameBalanceResource : Resource
             Lifecycle = defaults.Lifecycle with
             {
                 ChildToAdultSeconds = Math.Max(0.1f, ChildToAdultSeconds)
+            },
+            Evolution = defaults.Evolution with
+            {
+                SpecializationThreshold = Math.Clamp(EvolutionSpecializationThreshold, 0.0f, 1.0f)
             },
             Shop = defaults.Shop with
             {

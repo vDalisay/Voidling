@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Voidling.Domain.Evolution;
 
 namespace VoidlingGame;
 
@@ -28,6 +29,13 @@ public sealed class VoidlingData
     public bool InbreedingHistoryFlag { get; set; }
     public string TintHex { get; set; } = "#F6F0C9";
     public List<RareTraitData> RareTraits { get; set; } = new();
+
+    // Hidden raising influence is persisted independently from trained performance. It determines
+    // first-evolution specialization but is never read by race simulation as a substitute stat.
+    public float SwimFlyInfluence { get; set; }
+    public float RunPowerInfluence { get; set; }
+    public EvolutionSpecialization EvolutionSpecialization { get; set; } = EvolutionSpecialization.None;
+    public float EvolutionMagnitude { get; set; }
 
     // Initial/world placement. Normal wandering does not continuously write to the save.
     public float WorldX { get; set; }
