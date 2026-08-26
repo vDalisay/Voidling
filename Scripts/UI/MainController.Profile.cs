@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Application.Creatures;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Inventory;
 
@@ -21,7 +22,8 @@ public partial class MainController : Node
     private void RebuildDetailsPanel()
     {
         var data = _session.FindVoidling(_selectedId);
-        if (data == null)
+        var profile = _session.CreateVoidlingProfileProjection(_selectedId);
+        if (data == null || profile == null)
         {
             _profileProgressCreatureId = string.Empty;
             _profileDisplayedProgress.Clear();
@@ -31,12 +33,12 @@ public partial class MainController : Node
 
         var sameCreature = string.Equals(
             _profileProgressCreatureId,
-            data.Id,
+            profile.CreatureId,
             StringComparison.Ordinal);
         if (!sameCreature)
         {
             _profileDisplayedProgress.Clear();
-            _profileProgressCreatureId = data.Id;
+            _profileProgressCreatureId = profile.CreatureId;
         }
 
         if (_detailsPanel != null && GodotObject.IsInstanceValid(_detailsPanel))
@@ -59,7 +61,7 @@ public partial class MainController : Node
 
         var nameButton = new Button
         {
-            Text = data.Name,
+            Text = profile.DisplayName,
             Flat = true,
             FocusMode = Control.FocusModeEnum.None,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
@@ -78,11 +80,11 @@ public partial class MainController : Node
         follow.CustomMinimumSize = new Vector2(28, 23);
         follow.TooltipText = "Follow this Voidling with the camera";
         follow.ToggleMode = true;
-        follow.ButtonPressed = _garden.IsFollowing(data.Id);
+        follow.ButtonPressed = _garden.IsFollowing(profile.CreatureId);
         follow.Pressed += () =>
         {
-            _garden.ToggleFollowVoidling(data.Id);
-            follow.ButtonPressed = _garden.IsFollowing(data.Id);
+            _garden.ToggleFollowVoidling(profile.CreatureId);
+            follow.ButtonPressed = _garden.IsFollowing(profile.CreatureId);
         };
         heading.AddChild(follow);
 
@@ -92,13 +94,13 @@ public partial class MainController : Node
         heading.AddChild(close);
         box.AddChild(heading);
 
-        var stage = data.Stage == LifeStage.Adult
+        var stage = profile.IsAdult
             ? "Adult"
             : $"Child • {Math.Max(0, (int)Math.Ceiling(GameRules.ChildToAdultSeconds - data.AgeSeconds))}s to adult";
         box.AddChild(UiFactory.CreateLabel(stage, 7));
 
-        foreach (var statId in GameRules.StatIds)
-            box.AddChild(CreateProfileStatBlock(data, statId, sameCreature));
+        foreach (var stat in profile.Stats)
+            box.AddChild(CreateProfileStatBlock(stat, sameCreature));
 
         var details = UiFactory.CreateButton("Details");
         details.CustomMinimumSize = new Vector2(194, 22);
@@ -126,7 +128,7 @@ public partial class MainController : Node
         goodbye.CustomMinimumSize = new Vector2(86, 21);
         UiFactory.ApplyPixelFont(goodbye, 7);
         goodbye.AddThemeColorOverride("font_color", Color.FromHtml("#9C514B"));
-        goodbye.Pressed += () => ShowGoodbyeFirst(data.Id);
+        goodbye.Pressed += () => ShowGoodbyeFirst(profile.CreatureId);
         actions.AddChild(goodbye);
         box.AddChild(actions);
 
@@ -208,26 +210,26 @@ public partial class MainController : Node
         edit.SelectAll();
     }
 
-    private Control CreateProfileStatBlock(VoidlingData data, string statId, bool animateProgress)
+    private Control CreateProfileStatBlock(VoidlingStatProfileProjection stat, bool animateProgress)
     {
+        var statId = stat.StatId;
         var container = new VBoxContainer { CustomMinimumSize = new Vector2(194, 28) };
         container.AddThemeConstantOverride("separation", 1);
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 4);
 
-        var gene = GameRules.GetGene(data, statId);
-        var effective = (int)Math.Round(GameRules.EffectiveStat(data, statId));
-        var level = GameRules.StatLevel(data, statId);
+        var effective = (int)Math.Round(stat.EffectiveValue);
+        var level = stat.TrainingLevel;
         var count = _session.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0;
         var color = StatPresentationCatalog.ColorFor(statId);
 
         var label = UiFactory.CreateLabel(
-            $"{StatPresentationCatalog.NameFor(statId).ToUpperInvariant(),-7} {GameRules.GradeName(gene.ExpressedValue)}  LV{level:00}  {effective:00}", 7);
+            $"{StatPresentationCatalog.NameFor(statId).ToUpperInvariant(),-7} {StatPresentationCatalog.RankFor(stat.ExpressedPotentialRank)}  LV{level:00}  {effective:00}", 7);
         label.CustomMinimumSize = new Vector2(142, 17);
         label.AddThemeColorOverride("font_color", color);
         label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
         label.AddThemeConstantOverride("outline_size", statId == "stamina" ? 2 : 1);
-        label.TooltipText = $"DNA {GameRules.GradeName(gene.AlleleA)}/{GameRules.GradeName(gene.AlleleB)} • training {GameRules.GetTrainingPoints(data, statId)}";
+        label.TooltipText = $"DNA {StatPresentationCatalog.RankFor(stat.DnaProfile1Rank)}/{StatPresentationCatalog.RankFor(stat.DnaProfile2Rank)} • training {stat.TrainingPoints}";
         row.AddChild(label);
 
         var use = UiFactory.CreateButton($"+1 ({count})");
@@ -239,18 +241,17 @@ public partial class MainController : Node
         row.AddChild(use);
         container.AddChild(row);
 
-        var bar = CreateStatProgressBar(data, statId, new Vector2(142, 6), animateProgress);
+        var bar = CreateStatProgressBar(statId, stat.TrainingLevelProgress, new Vector2(142, 6), animateProgress);
         container.AddChild(bar);
         return container;
     }
 
     private ProgressBar CreateStatProgressBar(
-        VoidlingData data,
         string statId,
+        double target,
         Vector2 size,
         bool animateProgress)
     {
-        var target = GameRules.StatLevelProgress(data, statId);
         var start = animateProgress && _profileDisplayedProgress.TryGetValue(statId, out var previous)
             ? previous
             : target;
