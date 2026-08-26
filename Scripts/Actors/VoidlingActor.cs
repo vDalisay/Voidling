@@ -10,9 +10,6 @@ public partial class VoidlingActor : Node2D
 
     public string CreatureId { get; private set; } = "";
 
-    private static readonly Texture2D CharacterTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
-
     private readonly RandomNumberGenerator _rng = new();
     private AnimatedSprite2D _sprite = null!;
     private Rect2 _wanderBounds;
@@ -33,12 +30,13 @@ public partial class VoidlingActor : Node2D
         _walkSpeed = data.Stage == LifeStage.Adult ? 20.0f : 17.0f;
         _rng.Seed = StableSeed(data.Id);
 
-        _baseScale = data.Stage == LifeStage.Adult ? 0.62f : 0.31f;
+        var isAdult = data.Stage == LifeStage.Adult;
+        _baseScale = VoidlingVisualFactory.WorldScale(isAdult);
         _baseSpriteY = VoidlingGroundVisualMetrics.SpriteCenterYOffset(_baseScale);
 
         _sprite = new AnimatedSprite2D
         {
-            SpriteFrames = BuildSpriteFrames(),
+            SpriteFrames = VoidlingVisualFactory.GetWorldFrames(),
             Scale = Vector2.One * _baseScale,
             Position = new Vector2(0, _baseSpriteY),
             Modulate = GameRules.TintColor(data.TintHex),
@@ -51,11 +49,13 @@ public partial class VoidlingActor : Node2D
         mutationAdornment.Setup(data, _sprite);
         AddChild(mutationAdornment);
 
-        var hitSize = data.Stage == LifeStage.Adult ? new Vector2(23, 27) : new Vector2(14, 16);
         var area = new Area2D { InputPickable = true };
         var collision = new CollisionShape2D
         {
-            Shape = new RectangleShape2D { Size = hitSize },
+            Shape = new RectangleShape2D
+            {
+                Size = VoidlingVisualFactory.WorldHitboxSize(isAdult)
+            },
             Position = new Vector2(0, _baseSpriteY)
         };
         area.AddChild(collision);
@@ -129,10 +129,15 @@ public partial class VoidlingActor : Node2D
 
         if (_sprite != null)
         {
-            _sprite.Scale = Vector2.One * (pickedUp ? _baseScale * 1.14f : _baseScale);
+            _sprite.Scale = Vector2.One * (
+                pickedUp
+                    ? _baseScale * VoidlingVisualFactory.HeldScaleMultiplier
+                    : _baseScale);
             if (pickedUp)
             {
-                _sprite.Position = new Vector2(0, _baseSpriteY - 9.0f);
+                _sprite.Position = new Vector2(
+                    0,
+                    _baseSpriteY + VoidlingVisualFactory.HeldSpriteYOffset);
             }
             else if (wasPickedUp)
             {
@@ -288,33 +293,5 @@ public partial class VoidlingActor : Node2D
             hash *= prime;
         }
         return hash;
-    }
-
-    private static SpriteFrames BuildSpriteFrames()
-    {
-        var frames = new SpriteFrames();
-        frames.RemoveAnimation("default");
-        AddDirection(frames, "walk_down", 0);
-        AddDirection(frames, "walk_up", 1);
-        AddDirection(frames, "walk_left", 2);
-        AddDirection(frames, "walk_right", 3);
-        return frames;
-    }
-
-    private static void AddDirection(SpriteFrames frames, string name, int row)
-    {
-        frames.AddAnimation(name);
-        frames.SetAnimationLoop(name, true);
-        frames.SetAnimationSpeed(name, 6.0);
-
-        for (var column = 0; column < 4; column++)
-        {
-            var atlas = new AtlasTexture
-            {
-                Atlas = CharacterTexture,
-                Region = new Rect2(column * 48, row * 48, 48, 48)
-            };
-            frames.AddFrame(name, atlas);
-        }
     }
 }
