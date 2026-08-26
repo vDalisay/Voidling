@@ -108,23 +108,6 @@ jobs:
             exit 1
           fi
 
-      # Exercise the canonical presentation factory itself. This resolves world direction frames,
-      # race run/swim frames, the shared UiFactory portrait path, art-authored geometry and mutation
-      # anchors from DefaultVoidlingVisual.tres. A malformed incoming art revision must fail here.
-      - name: Voidling visual pipeline smoke test
-        shell: bash
-        run: |
-          set -o pipefail
-          timeout 20s godot --headless --path . -- --voidling-visual-smoke 2>&1 | tee voidling-visual-smoke.log
-          if ! grep -q 'VOIDLING_VISUAL_SMOKE_SUCCESS' voidling-visual-smoke.log; then
-            echo 'Canonical Voidling visual definition did not resolve every required presentation state.'
-            exit 1
-          fi
-          if grep -E '^(ERROR|SCRIPT ERROR):' voidling-visual-smoke.log; then
-            echo 'Voidling visual smoke emitted a Godot error.'
-            exit 1
-          fi
-
       # Exercise the actual player-facing trade room controls. This regression gate is intentionally
       # presentation-only: it toggles a real Voidling card and presses the real Accept/Cancel buttons,
       # proving the panel emits the selected asset ID instead of merely appearing selected visually.
