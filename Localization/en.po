@@ -231,6 +231,9 @@ msgstr "Generation {0}"
 msgid "UI_DETAILS_INBREEDING"
 msgstr "Inbreeding burden: {0}"
 
+msgid "UI_DETAILS_INBREEDING_HISTORY"
+msgstr "Family tree retains an inbreeding history mark."
+
 msgid "UI_DETAILS_DNA_HINT"
 msgstr "DNA1 and DNA2 are the two inherited ability genes."
 
