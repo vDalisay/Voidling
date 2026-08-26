@@ -48,8 +48,8 @@ public sealed class TradeNegotiationCoordinatorTests
             remoteRoom.RemoteOffer.Appearance);
 
         Assert.True(pair.Host.Facade.SetAccepted(id, true).Success);
-        Assert.True(pair.Host.State.Voidlings.Any(value => value.Id == pair.Host.Primary.Id));
-        Assert.True(pair.Remote.State.Voidlings.Any(value => value.Id == pair.Remote.Primary.Id));
+        Assert.Contains(pair.Host.State.Voidlings, value => value.Id == pair.Host.Primary.Id);
+        Assert.Contains(pair.Remote.State.Voidlings, value => value.Id == pair.Remote.Primary.Id);
         Assert.Equal(0, pair.Host.Repository.SaveCount);
         Assert.Equal(0, pair.Remote.Repository.SaveCount);
 
@@ -249,6 +249,7 @@ public sealed class TradeNegotiationCoordinatorTests
         private LinkedTransport? _peer;
 
         public LinkedTransport(PlatformUserId localId) => LocalId = localId;
+        public PlatformUserId LocalId { get; }
         public MultiplayerAvailability Availability => MultiplayerAvailability.Available;
         public event Action<NetworkPacket>? PacketReceived;
         public event Action<PlatformUserId>? PeerSessionFailed;
