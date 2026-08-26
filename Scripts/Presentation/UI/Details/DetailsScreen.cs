@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Voidling.Domain.Genetics;
+using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Details;
@@ -27,7 +29,8 @@ public sealed record DetailsScreenState(
     int FamilyGeneration,
     int InbreedingBurden,
     bool InbreedingHistoryFlag,
-    Color TintColor,
+    string TintHex,
+    AppearancePhenotype Appearance,
     bool HasAngelMutation,
     int OtherMutationCount,
     int ColorAlleleA,
@@ -173,16 +176,25 @@ public partial class DetailsScreen : VBoxContainer
         row.AddChild(CreatePortrait(state, new Vector2(130, 130)));
 
         var info = new VBoxContainer();
-        info.AddThemeConstantOverride("separation", 7);
+        info.AddThemeConstantOverride("separation", 5);
         info.AddChild(UiFactory.CreateLabel(Tr("UI_DETAILS_CURRENT_APPEARANCE"), 9));
         info.AddChild(new ColorRect
         {
-            Color = state.TintColor,
+            Color = ParseTint(state.TintHex),
             CustomMinimumSize = new Vector2(118, 30)
         });
-        var expressedColor = state.ExpressedColorIndex == 0 ? state.ColorAlleleA : state.ColorAlleleB;
-        info.AddChild(UiFactory.CreateLabel(string.Format(Tr("UI_DETAILS_SHOWN_COLOR"), expressedColor), 7));
-        info.AddChild(UiFactory.CreateLabel(string.Format(Tr("UI_DETAILS_COLOR_PAIR"), state.ColorAlleleA, state.ColorAlleleB), 7));
+        info.AddChild(UiFactory.CreateLabel(
+            string.Format(Tr("UI_DETAILS_SHOWN_COLOR"), state.Appearance.ColorAllele), 7));
+        info.AddChild(UiFactory.CreateLabel(
+            string.Format(Tr("UI_DETAILS_COLOR_PAIR"), state.ColorAlleleA, state.ColorAlleleB), 7));
+        info.AddChild(UiFactory.CreateLabel(
+            $"Tone: {(state.Appearance.Tone == AppearanceTone.MonoTone ? "Mono" : "Two-tone")}", 7));
+        info.AddChild(UiFactory.CreateLabel(
+            $"Pattern: {state.Appearance.PatternAllele}", 7));
+        info.AddChild(UiFactory.CreateLabel(
+            $"Shiny: {(state.Appearance.Shiny ? "Yes" : "No")}", 7));
+        info.AddChild(UiFactory.CreateLabel(
+            $"Coat: {state.Appearance.CoatAllele}", 7));
         row.AddChild(info);
         _body.AddChild(row);
 
@@ -205,8 +217,9 @@ public partial class DetailsScreen : VBoxContainer
     }
 
     private static TextureRect CreatePortrait(DetailsScreenState state, Vector2 size)
-        => UiFactory.CreatePortrait(
-            state.TintColor,
+        => VoidlingAppearancePresenter.CreatePortrait(
+            state.TintHex,
+            state.Appearance,
             state.HasAngelMutation,
             state.OtherMutationCount,
             size);
@@ -323,5 +336,11 @@ public partial class DetailsScreen : VBoxContainer
         bar.AddThemeStyleboxOverride("background", background);
         bar.AddThemeStyleboxOverride("fill", fill);
         return bar;
+    }
+
+    private static Color ParseTint(string tintHex)
+    {
+        try { return Color.FromHtml(tintHex); }
+        catch { return Color.FromHtml("#F6F0C9"); }
     }
 }
