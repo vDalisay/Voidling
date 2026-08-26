@@ -6,7 +6,7 @@ on:
       - main
       - feature/demo-mvp
       - architecture/futureproof-foundation
-      - agent/contextualized-implementation-plan
+      - agent/implementation-plan
   pull_request:
 
 jobs:
