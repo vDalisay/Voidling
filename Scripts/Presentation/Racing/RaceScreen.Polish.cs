@@ -9,7 +9,8 @@ namespace Voidling.Presentation.Racing;
 
 public partial class RaceScreen
 {
-    private const float RaceSpriteScale = 0.72f;
+    private const float LegacyRaceSpriteCenterYOffset = -8.0f;
+    private bool _canonicalVoidlingVisualsApplied;
     private bool _finalShadowCorrectionApplied;
     private bool _resultPresentationPolished;
     private bool _coursePresentationPolished;
@@ -25,6 +26,12 @@ public partial class RaceScreen
 
     internal void ApplyPostRaceScreenPresentationFrame()
     {
+        if (!_canonicalVoidlingVisualsApplied && _visuals.Count > 0)
+        {
+            ApplyCanonicalVoidlingVisuals();
+            _canonicalVoidlingVisualsApplied = true;
+        }
+
         if (!_coursePresentationPolished && _visuals.Count > 0)
         {
             _coursePresentationPolished = true;
@@ -49,14 +56,39 @@ public partial class RaceScreen
         }
     }
 
-    private void ApplyUnifiedVoidlingGroundMetrics()
+    private void ApplyCanonicalVoidlingVisuals()
     {
-        var desiredSpriteBaseOffset = VoidlingGroundVisualMetrics.SpriteCenterYOffset(RaceSpriteScale);
-        var correctedShadowPolygon = VoidlingGroundVisualMetrics.BuildShadowPolygon(RaceSpriteScale, 20);
+        var frames = VoidlingVisualFactory.GetRaceFrames();
+        var scale = Vector2.One * VoidlingVisualFactory.RaceScale;
 
         foreach (var visual in _visuals.Values)
         {
-            var animatedYOffset = visual.Sprite.Position.Y - (visual.BaseY - 8.0f);
+            var wasPlaying = visual.Sprite.IsPlaying();
+            var animation = visual.VisualMode == "swim" ? "swim" : "run";
+
+            visual.Sprite.SpriteFrames = frames;
+            visual.Sprite.Scale = scale;
+            visual.Sprite.Animation = animation;
+
+            if (wasPlaying)
+                visual.Sprite.Play(animation);
+        }
+    }
+
+    private void ApplyUnifiedVoidlingGroundMetrics()
+    {
+        var raceScale = VoidlingVisualFactory.RaceScale;
+        var desiredSpriteBaseOffset = VoidlingVisualFactory.RaceSpriteCenterYOffset();
+        var correctedShadowPolygon = VoidlingGroundVisualMetrics.BuildShadowPolygon(raceScale, 20);
+
+        foreach (var visual in _visuals.Values)
+        {
+            // RaceScreen's legacy shell still writes its historical -8px baseline before this
+            // presentation pass. Convert that baseline to the art definition while preserving the
+            // simulation-driven jump/swim/glide Y offset. Once the shell is fully migrated this
+            // compatibility subtraction can be removed without changing the Resource contract.
+            var animatedYOffset = visual.Sprite.Position.Y -
+                                  (visual.BaseY + LegacyRaceSpriteCenterYOffset);
             visual.Sprite.Position = new Vector2(
                 visual.Sprite.Position.X,
                 visual.BaseY + desiredSpriteBaseOffset + animatedYOffset);
