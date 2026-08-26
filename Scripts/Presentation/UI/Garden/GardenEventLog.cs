@@ -12,7 +12,9 @@ namespace Voidling.Presentation.UI.Garden;
 /// </summary>
 public partial class GardenEventLog : Control
 {
-    private const int MaxEntries = 80;
+    // Product design intentionally keeps a substantial session history so players can catch up on
+    // important Garden events after leaving the idle game unattended for a while.
+    private const int MaxEntries = 300;
 
     private sealed record Entry(string Id, string Text, Action? Action);
 
