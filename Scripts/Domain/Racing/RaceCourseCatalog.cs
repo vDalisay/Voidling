@@ -4,23 +4,25 @@ using System.Linq;
 
 namespace Voidling.Domain.Racing;
 
-public sealed record RaceCourseDefinition(string Id, int Version, RaceCourse Course)
+public sealed class RaceCourseDefinition
 {
-    public RaceCourseDefinition : this(
-        NormalizeId(Id),
-        Version > 0 ? Version : throw new ArgumentOutOfRangeException(nameof(Version), "Course version must be positive."),
-        Course ?? throw new ArgumentNullException(nameof(Course)))
+    public RaceCourseDefinition(string id, int version, RaceCourse course)
     {
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentException("Course ID is required.", nameof(id));
+        if (id.Length > 64)
+            throw new ArgumentException("Course ID cannot exceed 64 characters.", nameof(id));
+        if (version <= 0)
+            throw new ArgumentOutOfRangeException(nameof(version), "Course version must be positive.");
+
+        Id = id.Trim();
+        Version = version;
+        Course = course ?? throw new ArgumentNullException(nameof(course));
     }
 
-    private static string NormalizeId(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            throw new ArgumentException("Course ID is required.", nameof(value));
-        if (value.Length > 64)
-            throw new ArgumentException("Course ID cannot exceed 64 characters.", nameof(value));
-        return value.Trim();
-    }
+    public string Id { get; }
+    public int Version { get; }
+    public RaceCourse Course { get; }
 }
 
 /// <summary>
@@ -82,9 +84,16 @@ public static class RaceCourseCatalog
 
     public static bool TryGet(string id, int version, out RaceCourseDefinition definition)
     {
-        definition = Definitions.FirstOrDefault(candidate =>
+        var match = Definitions.FirstOrDefault(candidate =>
             string.Equals(candidate.Id, id, StringComparison.Ordinal) &&
-            candidate.Version == version)!;
-        return definition != null;
+            candidate.Version == version);
+        if (match == null)
+        {
+            definition = null!;
+            return false;
+        }
+
+        definition = match;
+        return true;
     }
 }
