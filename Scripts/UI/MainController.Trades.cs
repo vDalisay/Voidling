@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Application.Multiplayer.Trading;
+using Voidling.Domain.Genetics;
 using Voidling.Presentation.UI.Multiplayer;
 
 namespace VoidlingGame;
@@ -321,7 +322,8 @@ public partial class MainController
             false,
             voidling.TintHex,
             voidling.HasAngelMutation,
-            voidling.OtherMutationCount);
+            voidling.OtherMutationCount,
+            voidling.Appearance);
 
     private TradeExchangeAssetView? BuildTradeExchangeAsset(TradeAssetReference? asset)
     {
@@ -341,7 +343,8 @@ public partial class MainController
                 false,
                 voidling.TintHex,
                 hasAngel,
-                Math.Max(0, voidling.RareTraits.Count - (hasAngel ? 1 : 0)));
+                Math.Max(0, voidling.RareTraits.Count - (hasAngel ? 1 : 0)),
+                AppearancePhenotypeResolver.ResolveSemantic(voidling.Genome));
         }
 
         var eggIndex = _session.State.OwnedEggs.FindIndex(egg =>
