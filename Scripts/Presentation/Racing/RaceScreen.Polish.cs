@@ -10,7 +10,6 @@ namespace Voidling.Presentation.Racing;
 public partial class RaceScreen
 {
     private const float RaceSpriteScale = 0.72f;
-    private readonly Dictionary<string, float> _previousObstacleDelay = new(StringComparer.Ordinal);
     private bool _finalShadowCorrectionApplied;
     private bool _resultPresentationPolished;
     private bool _coursePresentationPolished;
@@ -35,7 +34,6 @@ public partial class RaceScreen
         if (_running)
         {
             ApplyUnifiedVoidlingGroundMetrics();
-            ApplyObstacleRecoveryJumps();
             _finalShadowCorrectionApplied = false;
         }
         else if (!_finalShadowCorrectionApplied && _visuals.Count > 0)
@@ -67,27 +65,6 @@ public partial class RaceScreen
             visual.Shadow.Position = new Vector2(
                 visual.Shadow.Position.X,
                 visual.BaseY + VoidlingGroundVisualMetrics.ShadowCenterYOffset);
-        }
-    }
-
-    private void ApplyObstacleRecoveryJumps()
-    {
-        if (_simulation == null)
-            return;
-
-        foreach (var pair in _visuals)
-        {
-            var state = _simulation.GetState(pair.Key);
-            var previous = _previousObstacleDelay.TryGetValue(pair.Key, out var oldDelay)
-                ? oldDelay
-                : state.DelaySeconds;
-
-            // A failed hurdle pauses the racer. When that delay ends, make the resumed racer
-            // visibly clear the same hurdle rather than simply walking through it.
-            if (previous > 0.0f && state.DelaySeconds <= 0.0f && !state.Finished)
-                pair.Value.JumpSeconds = JumpDurationSeconds;
-
-            _previousObstacleDelay[pair.Key] = state.DelaySeconds;
         }
     }
 

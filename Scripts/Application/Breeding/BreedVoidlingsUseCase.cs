@@ -45,6 +45,7 @@ public sealed class BreedVoidlingsUseCase
 {
     private readonly GameBalanceRules _rules;
     private readonly RelationshipService _relationships;
+    private readonly LineageArchiveService _lineage;
     private readonly InbreedingBurdenService _burden;
     private readonly GenomeInheritanceService _genomeInheritance;
     private readonly RareTraitInheritanceService _rareTraits;
@@ -55,6 +56,7 @@ public sealed class BreedVoidlingsUseCase
     {
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
         _relationships = new RelationshipService(rules.Genetics.RelatedAncestorDepth);
+        _lineage = new LineageArchiveService();
         _burden = new InbreedingBurdenService();
         _genomeInheritance = new GenomeInheritanceService(rules.Genetics);
         _rareTraits = new RareTraitInheritanceService(rules.Genetics);
@@ -69,7 +71,7 @@ public sealed class BreedVoidlingsUseCase
         if (failure != BreedingFailure.None || first == null || second == null)
             return new BreedingPreview(failure, false, 0, 0, false);
 
-        var related = _relationships.AreRelated(first, second, GetLineage(state));
+        var related = _relationships.AreRelated(first, second, _lineage.GetEffectiveLineage(state));
         var childBurden = _burden.ComputeChildBurden(first, second, related);
         var maxParentBurden = Math.Max(first.InbreedingBurdenLevel, second.InbreedingBurdenLevel);
         return new BreedingPreview(
@@ -94,7 +96,7 @@ public sealed class BreedVoidlingsUseCase
         if (failure != BreedingFailure.None || first == null || second == null)
             return new BreedingResult(failure, null, false, 0, 0);
 
-        var related = _relationships.AreRelated(first, second, GetLineage(state));
+        var related = _relationships.AreRelated(first, second, _lineage.GetEffectiveLineage(state));
         var childBurden = _burden.ComputeChildBurden(first, second, related);
         var genome = _genomeInheritance.CreateChild(first, second, eggSeed);
         var egg = new EggData
@@ -146,7 +148,4 @@ public sealed class BreedVoidlingsUseCase
             return (BreedingFailure.ParentOnCooldown, first, second);
         return (BreedingFailure.None, first, second);
     }
-
-    private static VoidlingData[] GetLineage(GameStateData state)
-        => state.Voidlings.Concat(state.DepartedVoidlings).ToArray();
 }

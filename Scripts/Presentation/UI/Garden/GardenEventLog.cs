@@ -14,8 +14,11 @@ public partial class GardenEventLog : Control
 {
     private const int MaxEntries = 80;
 
-    private readonly Queue<string> _entries = new();
+    private sealed record Entry(string Id, string Text, Action? Action);
+
+    private readonly Queue<Entry> _entries = new();
     private RichTextLabel _history = null!;
+    private int _nextActionId;
 
     public override void _Ready()
     {
@@ -33,6 +36,7 @@ public partial class GardenEventLog : Control
             CustomMinimumSize = CustomMinimumSize,
             MouseFilter = MouseFilterEnum.Stop
         };
+        _history.MetaClicked += HandleMetaClicked;
         _history.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         UiFactory.ApplyPixelFont(_history, 6);
 
@@ -53,12 +57,19 @@ public partial class GardenEventLog : Control
     }
 
     public void Append(string message)
+        => Append(message, null);
+
+    public void AppendAction(string message, Action action)
+        => Append(message, action ?? throw new ArgumentNullException(nameof(action)));
+
+    private void Append(string message, Action? action)
     {
         if (string.IsNullOrWhiteSpace(message))
             return;
 
         var timestamp = DateTime.Now.ToString("HH:mm");
-        _entries.Enqueue($"[{timestamp}]  {message.Trim()}");
+        var id = action == null ? string.Empty : $"action-{++_nextActionId}";
+        _entries.Enqueue(new Entry(id, $"[{timestamp}]  {message.Trim()}", action));
         while (_entries.Count > MaxEntries)
             _entries.Dequeue();
 
@@ -70,8 +81,30 @@ public partial class GardenEventLog : Control
         if (_history == null || !GodotObject.IsInstanceValid(_history))
             return;
 
-        _history.Text = string.Join("\n", _entries);
+        _history.Clear();
+        foreach (var entry in _entries)
+        {
+            if (entry.Action == null)
+            {
+                _history.AddText(entry.Text);
+            }
+            else
+            {
+                _history.PushColor(Color.FromHtml("#315F85"));
+                _history.PushMeta(entry.Id);
+                _history.AddText(entry.Text);
+                _history.Pop();
+                _history.Pop();
+            }
+            _history.Newline();
+        }
         _history.ScrollToLine(Math.Max(0, _entries.Count - 1));
+    }
+
+    private void HandleMetaClicked(Variant meta)
+    {
+        var id = meta.AsString();
+        _entries.FirstOrDefault(entry => string.Equals(entry.Id, id, StringComparison.Ordinal))?.Action?.Invoke();
     }
 
     private void StyleScrollbar()

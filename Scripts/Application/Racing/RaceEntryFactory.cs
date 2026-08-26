@@ -43,10 +43,22 @@ public sealed class RaceEntryFactory
     public RaceEntry Create(VoidlingData selected, ulong simulationSeed)
     {
         ArgumentNullException.ThrowIfNull(selected);
+        return Create(CreateOwnedEntrant(selected), simulationSeed);
+    }
+
+    /// <summary>
+    /// Rebuilds a race from an already-frozen owned entrant. This is used by resumable/daily races:
+    /// CPUs remain deterministic from the seed while later Garden training cannot change the entrant
+    /// that was committed when the attempt began.
+    /// </summary>
+    public RaceEntry Create(RaceEntrant selected, ulong simulationSeed)
+    {
+        ArgumentNullException.ThrowIfNull(selected);
+        ArgumentNullException.ThrowIfNull(selected.Participant);
 
         var entrants = new List<RaceEntrant>(4)
         {
-            CreateOwnedEntrant(selected)
+            selected
         };
 
         for (var cpuIndex = 0; cpuIndex < 3; cpuIndex++)
@@ -68,8 +80,10 @@ public sealed class RaceEntryFactory
         return new RaceEntry(simulationSeed, _rules.Racing, entrants.AsReadOnly());
     }
 
-    private RaceEntrant CreateOwnedEntrant(VoidlingData selected)
+    public RaceEntrant CreateOwnedEntrant(VoidlingData selected)
     {
+        ArgumentNullException.ThrowIfNull(selected);
+
         var hasAngel = selected.RareTraits.Exists(trait =>
             string.Equals(trait.TraitId, "Angel", StringComparison.OrdinalIgnoreCase));
         var otherMutationCount = selected.RareTraits.Count(trait =>

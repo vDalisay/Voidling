@@ -15,6 +15,12 @@ msgstr "Cancel"
 msgid "UI_COMMON_CONTINUE"
 msgstr "Continue"
 
+msgid "UI_COMMON_BACK"
+msgstr "Back"
+
+msgid "UI_COMMON_SKIP"
+msgstr "Skip"
+
 msgid "UI_TOP_SPROUTS"
 msgstr "Sprouts: {0}"
 
@@ -29,6 +35,9 @@ msgstr "Breed"
 
 msgid "UI_TOP_RACE"
 msgstr "Race"
+
+msgid "UI_TOP_ONLINE"
+msgstr "Online"
 
 msgid "UI_TOP_SETTINGS"
 msgstr "Settings"
@@ -153,6 +162,12 @@ msgstr "Choose one Voidling. All other racers are generated CPU opponents."
 msgid "UI_RACE_START"
 msgstr "Start Race"
 
+msgid "UI_RACE_LOADING"
+msgstr "GROWING THE RACE TRACK..."
+
+msgid "UI_RACE_COUNTDOWN_GO"
+msgstr "RACE!"
+
 msgid "UI_INVENTORY_TITLE"
 msgstr "INVENTORY"
 
@@ -269,3 +284,393 @@ msgstr "GARDEN LOG"
 
 msgid "UI_GARDEN_LOG_STARTED"
 msgstr "Garden session started."
+
+msgid "UI_GARDEN_LOG_TRADE_OFFER"
+msgstr "{0} wants to trade. Click to respond."
+
+msgid "UI_GARDEN_LOG_RACE_OFFER"
+msgstr "{0} opened a race. Click to join."
+
+msgid "UI_ONLINE_TITLE"
+msgstr "CONNECTED GARDEN"
+
+msgid "UI_ONLINE_UNAVAILABLE"
+msgstr "Online Garden unavailable"
+
+msgid "UI_ONLINE_OFFLINE_SAFE"
+msgstr "Your local Garden and save remain fully available."
+
+msgid "UI_ONLINE_READY"
+msgstr "Create a friends-only Garden, accept a Steam invite, or join by lobby ID."
+
+msgid "UI_ONLINE_CREATE"
+msgstr "Create Friends Garden"
+
+msgid "UI_ONLINE_LOBBY_ID_PLACEHOLDER"
+msgstr "Steam lobby ID"
+
+msgid "UI_ONLINE_JOIN"
+msgstr "Join"
+
+msgid "UI_ONLINE_JOIN_HINT"
+msgstr "Steam invites are the normal path; lobby ID is a fallback/testing option."
+
+msgid "UI_ONLINE_CONNECTED"
+msgstr "Connected • Lobby {0}"
+
+msgid "UI_ONLINE_MEMBERS"
+msgstr "Members"
+
+msgid "UI_ONLINE_MEMBER_HOST"
+msgstr "(host)"
+
+msgid "UI_ONLINE_MEMBER_YOU"
+msgstr "(you)"
+
+msgid "UI_ONLINE_INVITE"
+msgstr "Invite Friends"
+
+msgid "UI_ONLINE_LEAVE"
+msgstr "Leave Garden"
+
+msgid "UI_ONLINE_FRIEND_BOARDS"
+msgstr "Friend Boards"
+
+msgid "UI_ONLINE_DAILY_RACE"
+msgstr "Daily Race"
+
+msgid "UI_ONLINE_CHALLENGES"
+msgstr "Challenges"
+
+msgid "UI_ONLINE_TRADES"
+msgstr "Trades"
+
+msgid "UI_ONLINE_SHARE_TITLE"
+msgstr "Shared Voidling"
+
+msgid "UI_ONLINE_SELECT_VOIDLING"
+msgstr "Select a Voidling in your Garden to share it."
+
+msgid "UI_ONLINE_SELECTED_VOIDLING"
+msgstr "Selected: {0}"
+
+msgid "UI_ONLINE_SHARE_VOIDLING"
+msgstr "Share Selected"
+
+msgid "UI_ONLINE_REMOVE_VOIDLING"
+msgstr "Stop Sharing"
+
+msgid "UI_ONLINE_CREATE_FAILED"
+msgstr "Could not create the connected Garden: {0}"
+
+msgid "UI_ONLINE_JOIN_FAILED"
+msgstr "Could not join the connected Garden: {0}"
+
+msgid "UI_ONLINE_SHARE_FAILED"
+msgstr "Could not share the selected Voidling: {0}"
+
+msgid "UI_ONLINE_REMOVE_FAILED"
+msgstr "Could not stop sharing the selected Voidling: {0}"
+
+msgid "UI_LEADERBOARD_TITLE"
+msgstr "FRIEND LEADERBOARDS"
+
+msgid "UI_LEADERBOARD_WINS"
+msgstr "Multiplayer Wins"
+
+msgid "UI_LEADERBOARD_DAILY"
+msgstr "Today's Daily"
+
+msgid "UI_LEADERBOARD_WINS_CONTEXT"
+msgstr "Multiplayer wins among Steam friends"
+
+msgid "UI_LEADERBOARD_DAILY_CONTEXT"
+msgstr "Daily race • {0} UTC"
+
+msgid "UI_LEADERBOARD_LOADING"
+msgstr "Loading friend scores..."
+
+msgid "UI_LEADERBOARD_EMPTY"
+msgstr "No friend scores are available on this board yet."
+
+msgid "UI_LEADERBOARD_UNAVAILABLE"
+msgstr "Steam friend leaderboards are unavailable."
+
+msgid "UI_LEADERBOARD_ERROR"
+msgstr "Could not load friend scores: {0}"
+
+msgid "UI_LEADERBOARD_WINS_SCORE"
+msgstr "{0} wins"
+
+msgid "UI_DAILY_TITLE"
+msgstr "DAILY FRIEND RACE"
+
+msgid "UI_DAILY_DATE"
+msgstr "UTC challenge • {0}"
+
+msgid "UI_DAILY_PICK_HINT"
+msgstr "Pick today's Voidling. Its race snapshot is locked as soon as the attempt starts."
+
+msgid "UI_DAILY_ONCE_PER_DAY"
+msgstr "One attempt per UTC day. The race itself works offline; Steam only shares the saved result with friends."
+
+msgid "UI_DAILY_RESUME_HINT"
+msgstr "Today's attempt is already locked to {0}."
+
+msgid "UI_DAILY_RESUME_SAME"
+msgstr "Resume recreates the exact same Voidling snapshot, CPU field and deterministic seed."
+
+msgid "UI_DAILY_RESUME"
+msgstr "Resume Daily Race"
+
+msgid "UI_DAILY_COMPLETE"
+msgstr "Complete • {0} • {1}"
+
+msgid "UI_DAILY_SAVED_OFFLINE"
+msgstr "Result is saved locally. Steam friend-board projection is currently unavailable."
+
+msgid "UI_DAILY_INVALID"
+msgstr "Today's saved daily attempt cannot be used: {0}"
+
+msgid "UI_DAILY_START_FAILED"
+msgstr "Could not start the daily race: {0}"
+
+msgid "UI_CHALLENGE_TITLE"
+msgstr "CHALLENGES"
+
+msgid "UI_CHALLENGE_NEED_GARDEN"
+msgstr "Join a connected Garden before using multiplayer challenges."
+
+msgid "UI_CHALLENGE_OPEN_TITLE"
+msgstr "Open challenges"
+
+msgid "UI_CHALLENGE_EMPTY"
+msgstr "No challenges are being offered yet."
+
+msgid "UI_CHALLENGE_OFFER_RACE"
+msgstr "Offer Race"
+
+msgid "UI_CHALLENGE_PLAYERS"
+msgstr "{0} players"
+
+msgid "UI_CHALLENGE_ALREADY_ACTIVE"
+msgstr "Leave or finish your current challenge before offering another."
+
+msgid "UI_CHALLENGE_CARD_TITLE"
+msgstr "{0} • {1}"
+
+msgid "UI_CHALLENGE_COUNT"
+msgstr "{0} / {1}"
+
+msgid "UI_CHALLENGE_HOSTED_BY"
+msgstr "Offered by {0}"
+
+msgid "UI_CHALLENGE_YOU"
+msgstr "(you)"
+
+msgid "UI_CHALLENGE_CREATOR"
+msgstr "(creator)"
+
+msgid "UI_CHALLENGE_HOST"
+msgstr "(host)"
+
+msgid "UI_CHALLENGE_JOIN"
+msgstr "Join"
+
+msgid "UI_CHALLENGE_LEAVE"
+msgstr "Leave"
+
+msgid "UI_CHALLENGE_CANCEL"
+msgstr "Cancel"
+
+msgid "UI_CHALLENGE_SETUP_RACE"
+msgstr "Setup Race"
+
+msgid "UI_CHALLENGE_KIND_RACE"
+msgstr "Race"
+
+msgid "UI_CHALLENGE_KIND_BATTLE"
+msgstr "Auto Battle"
+
+msgid "UI_CHALLENGE_PHASE_OPEN"
+msgstr "Open"
+
+msgid "UI_CHALLENGE_PHASE_FORMING"
+msgstr "Forming"
+
+msgid "UI_CHALLENGE_PHASE_READY"
+msgstr "Ready"
+
+msgid "UI_CHALLENGE_PHASE_RUNNING"
+msgstr "Running"
+
+msgid "UI_CHALLENGE_ACTION_FAILED"
+msgstr "Challenge action failed: {0}"
+
+msgid "UI_MP_RACE_SETUP_TITLE"
+msgstr "MULTIPLAYER RACE SETUP"
+
+msgid "UI_MP_RACE_MISSING"
+msgstr "This multiplayer race is no longer available."
+
+msgid "UI_MP_RACE_PARTICIPANTS"
+msgstr "Participants: {0} / {1}"
+
+msgid "UI_MP_RACE_HANDSHAKE"
+msgstr "Synchronizing race start with every participant..."
+
+msgid "UI_MP_RACE_LAUNCHING"
+msgstr "Race synchronized. Launching..."
+
+msgid "UI_MP_RACE_SELECTION_LOCKED"
+msgstr "Voidling selections are locked for this race."
+
+msgid "UI_MP_RACE_PICK"
+msgstr "Choose the Voidling snapshot you want to race with."
+
+msgid "UI_MP_RACE_LOCK_IN"
+msgstr "Lock In"
+
+msgid "UI_MP_RACE_LOCKED"
+msgstr "Your locked racer: {0}"
+
+msgid "UI_MP_RACE_START"
+msgstr "Start Race"
+
+msgid "UI_MP_RACE_WAIT_SELECTIONS"
+msgstr "Waiting for every participant to lock in a Voidling."
+
+msgid "UI_MP_RACE_NEED_TWO"
+msgstr "At least two participants are required before the race can start."
+
+msgid "UI_MP_RACE_WAIT_HOST"
+msgstr "Your selection is sent. The creator or Garden host starts the race."
+
+msgid "UI_MP_RACE_SELECTION_FAILED"
+msgstr "Could not lock in the selected Voidling: {0}"
+
+msgid "UI_MP_RACE_START_FAILED"
+msgstr "Could not start the multiplayer race: {0}"
+
+msgid "UI_MP_RACE_TITLE"
+msgstr "CONNECTED SPROUT RUN"
+
+msgid "UI_MP_RACE_RUNNING"
+msgstr "Synchronized race in progress"
+
+msgid "UI_MP_RACE_SYNC_ERROR"
+msgstr "Race synchronization stopped."
+
+msgid "UI_MP_RACE_FINISHED"
+msgstr "Finished #{0}"
+
+msgid "UI_MP_RACE_CHEER_FAILED"
+msgstr "Cheer could not be scheduled."
+
+msgid "UI_TRADE_TITLE"
+msgstr "TRADES"
+
+msgid "UI_TRADE_NEED_GARDEN"
+msgstr "Join a connected Garden before trading with friends."
+
+msgid "UI_TRADE_OFFER_TITLE"
+msgstr "Offer a trade"
+
+msgid "UI_TRADE_NO_PARTNERS"
+msgstr "No other friends are currently in this Garden."
+
+msgid "UI_TRADE_NO_ASSETS"
+msgstr "You have no transferable Voidlings or eggs."
+
+msgid "UI_TRADE_SEND_OFFER"
+msgstr "Send Offer"
+
+msgid "UI_TRADE_ACTIVE_HINT"
+msgstr "Finish or decline the active trade before starting another."
+
+msgid "UI_TRADE_INCOMING_TITLE"
+msgstr "Incoming offers"
+
+msgid "UI_TRADE_INCOMING_EMPTY"
+msgstr "No incoming trade offers."
+
+msgid "UI_TRADE_INCOMING_SUMMARY"
+msgstr "{0} offers {1} Voidling(s) and {2} egg(s)."
+
+msgid "UI_TRADE_RESPOND"
+msgstr "Respond"
+
+msgid "UI_TRADE_STATUS_TITLE"
+msgstr "Latest trade status"
+
+msgid "UI_TRADE_ASSET_VOIDLING"
+msgstr "Voidling • {0}"
+
+msgid "UI_TRADE_ASSET_EGG"
+msgstr "{0}"
+
+msgid "UI_TRADE_RESPONSE_TITLE"
+msgstr "RESPOND TO TRADE"
+
+msgid "UI_TRADE_RESPONSE_OFFER"
+msgstr "{0} offers {1} Voidling(s) and {2} egg(s)."
+
+msgid "UI_TRADE_RESPONSE_PICK"
+msgstr "Choose anything you want to send back."
+
+msgid "UI_TRADE_ACCEPT_GIFT_HINT"
+msgstr "Selecting nothing accepts this as a gift."
+
+msgid "UI_TRADE_ACCEPT"
+msgstr "Accept Trade"
+
+msgid "UI_TRADE_DECLINE"
+msgstr "Decline"
+
+msgid "UI_TRADE_ACTION_FAILED"
+msgstr "Trade action failed: {0}"
+
+msgid "UI_TRADE_OFFER_GONE"
+msgstr "That trade offer is no longer available."
+
+msgid "UI_TRADE_ACCEPTED_PENDING"
+msgstr "Trade accepted. Finalizing safely with both players..."
+
+msgid "UI_TRADE_INCOMING_TOAST"
+msgstr "Trade offer received from {0}."
+
+msgid "UI_TRADE_EXCHANGE_TITLE"
+msgstr "VOIDLING EXCHANGE"
+
+msgid "UI_TRADE_EXCHANGE_YOURS"
+msgstr "SENDING ({0})"
+
+msgid "UI_TRADE_EXCHANGE_INCOMING"
+msgstr "RECEIVING ({0})"
+
+msgid "UI_TRADE_EXCHANGE_SENDING"
+msgstr "Sending your trade through the link..."
+
+msgid "UI_TRADE_EXCHANGE_GOODBYE"
+msgstr "Say goodbye to {0}!"
+
+msgid "UI_TRADE_EXCHANGE_LINKING"
+msgstr "Exchange confirmed!"
+
+msgid "UI_TRADE_EXCHANGE_ARRIVED"
+msgstr "{0} arrived safely."
+
+msgid "UI_TRADE_EXCHANGE_EGG"
+msgstr "Egg {0}"
+
+msgid "UI_GARDEN_LOG_PLAYER_JOINED"
+msgstr "{0} joined the connected Garden."
+
+msgid "UI_GARDEN_LOG_PLAYER_LEFT"
+msgstr "{0} left the connected Garden."
+
+msgid "UI_GARDEN_LOG_RACE_RESULT"
+msgstr "Race finished — you placed #{0}."
+
+msgid "UI_GARDEN_LOG_TRADE_COMPLETE"
+msgstr "Trade complete — sent {0}, received {1}."

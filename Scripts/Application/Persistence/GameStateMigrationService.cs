@@ -1,6 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Voidling.Application.Breeding;
+using Voidling.Application.Multiplayer.Leaderboards;
+using Voidling.Application.Multiplayer.Trading;
+using Voidling.Domain.Breeding;
 using Voidling.Domain.Rules;
 using VoidlingGame;
 
@@ -13,9 +17,10 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 4;
+    public const int CurrentSaveVersion = 8;
 
     private readonly GameBalanceRules _rules;
+    private readonly LineageArchiveService _lineage = new();
 
     public GameStateMigrationService(GameBalanceRules rules)
     {
@@ -29,9 +34,14 @@ public sealed class GameStateMigrationService
 
         state.Voidlings ??= new List<VoidlingData>();
         state.DepartedVoidlings ??= new List<VoidlingData>();
+        state.LineageArchive ??= new List<LineageArchiveEntry>();
         state.OwnedEggs ??= new List<EggData>();
         state.StoreEggs ??= new List<EggData>();
         state.TrainingItems ??= new Dictionary<string, int>(StringComparer.Ordinal);
+        state.PendingTradeJournal ??= new List<PendingTradeJournalEntry>();
+        state.AppliedTradeIds ??= new List<string>();
+        state.AppliedMultiplayerRaceIds ??= new List<string>();
+        state.DailyRaceAttempts ??= new List<DailyRaceAttemptData>();
 
         // Version 4 introduced persisted audio and race auto-finish settings.
         if (previousVersion < 4)
@@ -60,6 +70,43 @@ public sealed class GameStateMigrationService
 
         foreach (var egg in state.OwnedEggs.Concat(state.StoreEggs))
             egg.RareTraits ??= new List<RareTraitData>();
+
+        // Version 5 introduced a minimal persistent ancestry graph. Populate it from every full
+        // creature record already known locally, while preserving archive-only ancestors imported
+        // through multiplayer trades. This is deterministic and never changes genes or IDs.
+        _lineage.EnsureCurrentEntries(state);
+
+        // Version 6 adds only empty trade durability collections to old saves. Pending journals and
+        // applied transaction IDs are local data; loading a save never contacts Steam or a peer.
+        state.PendingTradeJournal.RemoveAll(entry =>
+            entry == null || string.IsNullOrWhiteSpace(entry.TradeId));
+        state.AppliedTradeIds = state.AppliedTradeIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        // Version 7 keeps the multiplayer-win total and a bounded local dedupe history. Both are
+        // purely local persistence; normalization never queries Steam or attempts leaderboard IO.
+        state.MultiplayerWins = Math.Max(0, state.MultiplayerWins);
+        state.AppliedMultiplayerRaceIds = state.AppliedMultiplayerRaceIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .TakeLast(256)
+            .ToList();
+
+        // Version 8 persists local daily-race attempts. Keep at most one structurally valid attempt
+        // per UTC day and retain old rules-version attempts instead of erasing them: an incompatible
+        // update may prevent resume, but must not accidentally grant a second attempt that day.
+        state.DailyRaceAttempts = state.DailyRaceAttempts
+            .Where(attempt => DailyFriendRaceService.IsStructurallyValid(
+                attempt,
+                requireCurrentRules: false,
+                out _))
+            .GroupBy(attempt => attempt.DailyKey, StringComparer.Ordinal)
+            .Select(group => group.Last())
+            .OrderBy(attempt => attempt.DailyKey, StringComparer.Ordinal)
+            .TakeLast(DailyFriendRaceService.MaxAttemptHistory)
+            .ToList();
 
         state.SaveVersion = CurrentSaveVersion;
     }

@@ -2,6 +2,7 @@ using System;
 using System.Text.Json;
 using Godot;
 using Voidling.Application.Ports;
+using Voidling.Infrastructure.Multiplayer;
 using VoidlingGame;
 
 namespace Voidling.Infrastructure.Persistence;
@@ -16,7 +17,12 @@ public sealed class GodotJsonGameStateRepository : IGameStateRepository
         if (string.IsNullOrWhiteSpace(savePath))
             throw new ArgumentException("A save path is required.", nameof(savePath));
 
-        _savePath = savePath;
+        // Development LAN testing often runs multiple game processes on one machine. Keep those
+        // processes from sharing/mutating the same user:// save when an explicit profile is supplied.
+        // Normal launches have no profile flag and therefore keep the exact existing save path.
+        _savePath = LanMultiplayerOptions.ResolveDevelopmentSavePath(
+            savePath,
+            OS.GetCmdlineUserArgs());
         _jsonOptions = new JsonSerializerOptions { WriteIndented = true };
     }
 

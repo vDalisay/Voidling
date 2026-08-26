@@ -133,6 +133,13 @@ public partial class GameSession : Node
         RaiseGardenEvent("The garden was reset.");
     }
 
+    /// <summary>
+    /// Notifies existing presentation that an external Application service already mutated and
+    /// persisted this exact State instance. This intentionally does not save again.
+    /// </summary>
+    public void NotifyExternallyPersistedStateChanged()
+        => StateChanged?.Invoke();
+
     private void LoadOrCreate()
     {
         try

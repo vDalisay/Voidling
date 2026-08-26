@@ -95,7 +95,10 @@ public partial class GardenController : Node2D
 
         if (!Input.IsMouseButtonPressed(MouseButton.Left))
         {
-            ClearPendingGrab();
+            // Area2D release events are not guaranteed to arrive before frame processing on every
+            // desktop/input path. Finish the gesture here as a click instead of silently discarding it.
+            var creatureId = _pendingGrabId;
+            EndVoidlingPointerInteraction(creatureId);
             return;
         }
 
@@ -115,9 +118,17 @@ public partial class GardenController : Node2D
                 (_draggedId.Length > 0 || _pendingGrabId.Length > 0))
             {
                 if (_draggedId.Length > 0)
+                {
                     DropGrabbedVoidling();
+                }
                 else
-                    ClearPendingGrab();
+                {
+                    // A pending press that never crossed the hold threshold is a normal click.
+                    // Resolve it here rather than clearing the pending ID, so click opens inspection
+                    // while click-and-hold remains exclusively the drag gesture.
+                    var creatureId = _pendingGrabId;
+                    EndVoidlingPointerInteraction(creatureId);
+                }
 
                 GetViewport().SetInputAsHandled();
                 return;

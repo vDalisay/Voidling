@@ -3,6 +3,7 @@ using Godot;
 using Voidling.Presentation.Racing;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Garden;
+using Voidling.Presentation.UI.Multiplayer;
 
 namespace VoidlingGame;
 
@@ -13,6 +14,8 @@ public partial class MainController : Node
 
     private GameSession _session = null!;
     private GardenController _garden = null!;
+    private ConnectedZonePresentationBridge _connectedZoneBridge = null!;
+    private FriendsLeaderboardPresentationBridge _friendsLeaderboardBridge = null!;
     private CanvasLayer _uiLayer = null!;
     private Control _uiRoot = null!;
     private ModalHost _modalHost = null!;
@@ -27,8 +30,14 @@ public partial class MainController : Node
     public override void _Ready()
     {
         _session = GetNode<GameSession>("/root/GameBootstrap/GameSession");
+        _connectedZoneBridge = GetNode<ConnectedZonePresentationBridge>(
+            "/root/GameBootstrap/ConnectedZonePresentationBridge");
+        _friendsLeaderboardBridge = GetNode<FriendsLeaderboardPresentationBridge>(
+            "/root/GameBootstrap/FriendsLeaderboardPresentationBridge");
         _garden = GetNode<GardenController>("Garden");
         _garden.VoidlingSelected += OnVoidlingSelected;
+        _connectedZoneBridge.StateChanged += OnConnectedZoneStateChanged;
+        ComposeConnectedZoneGardenPresentation();
 
         _uiLayer = new CanvasLayer { Layer = 10 };
         AddChild(_uiLayer);
@@ -43,6 +52,8 @@ public partial class MainController : Node
 
         _modalHost = new ModalHost { ZIndex = 100 };
         _uiRoot.AddChild(_modalHost);
+        ComposeTradePresentation();
+        ComposeChallengePresentation();
 
         _session.StateChanged += RefreshUi;
         _session.ToastRequested += ShowToast;
@@ -59,6 +70,12 @@ public partial class MainController : Node
             _session.ToastRequested -= ShowToast;
             _session.GardenEventRaised -= AppendGardenEvent;
         }
+
+        if (GodotObject.IsInstanceValid(_connectedZoneBridge))
+            _connectedZoneBridge.StateChanged -= OnConnectedZoneStateChanged;
+
+        DetachMultiplayerRacePresentation();
+        DetachTradePresentation();
     }
 
     public override void _Process(double delta)
@@ -73,7 +90,8 @@ public partial class MainController : Node
 
     public override void _UnhandledInput(InputEvent inputEvent)
     {
-        if (_race != null || !inputEvent.IsActionPressed("ui_cancel"))
+        if (_race != null || _multiplayerRaceScreen != null || _tradeExchangeScreen != null ||
+            !inputEvent.IsActionPressed("ui_cancel"))
             return;
 
         if (_modalHost.IsOpen)
@@ -102,6 +120,7 @@ public partial class MainController : Node
         AddTopButton(row, Tr("UI_TOP_INVENTORY"), ShowInventory, 3, 68);
         AddTopButton(row, Tr("UI_TOP_BREED"), ShowBreeding, 6, 57);
         AddTopButton(row, Tr("UI_TOP_RACE"), ShowRacePicker, 12, 57);
+        AddTopButton(row, Tr("UI_TOP_ONLINE"), ShowConnectedZone, -1, 58);
         AddTopButton(row, Tr("UI_TOP_SETTINGS"), ShowSettingsExtended, -1, 67);
         AddTopButton(row, Tr("UI_TOP_CENTER"), _garden.ResetCamera, -1, 57);
         AddTopButton(row, Tr("UI_TOP_RESET"), ShowResetConfirm, -1, 54);
@@ -150,6 +169,7 @@ public partial class MainController : Node
 
         _garden.Select(_selectedId);
         RebuildDetailsPanel();
+        RefreshConnectedZonePanel();
 
         if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))
             _gardenEventLog.Visible = !_modalHost.IsOpen;
@@ -159,11 +179,17 @@ public partial class MainController : Node
     }
 
     private VBoxContainer OpenModal(string title, Vector2 size)
+        => OpenModal(title, size, null);
+
+    private VBoxContainer OpenOnlineModal(string title, Vector2 size, Action backRequested)
+        => OpenModal(title, size, backRequested);
+
+    private VBoxContainer OpenModal(string title, Vector2 size, Action? backRequested)
     {
         if (_modalHost.IsOpen)
             CloseModal(false);
         HideGardenHudPanels();
-        return _modalHost.Open(title, size, CloseModal);
+        return _modalHost.Open(title, size, CloseModal, backRequested);
     }
 
     private void HideGardenHudPanels()
@@ -180,7 +206,7 @@ public partial class MainController : Node
     {
         _modalHost.Close();
 
-        if (restoreGardenHud && _race == null && _uiRoot != null && _uiRoot.Visible)
+        if (restoreGardenHud && _race == null && _multiplayerRaceScreen == null && _uiRoot != null && _uiRoot.Visible)
             RefreshUi();
     }
 
@@ -203,7 +229,17 @@ public partial class MainController : Node
 
     private void OnRaceCompleted(int placement)
     {
+        _gardenEventLog.Append(string.Format(Tr("UI_GARDEN_LOG_RACE_RESULT"), placement));
         _session.ApplyRacePlacementReward(placement);
+
+        // Steam is only a best-time projection. The local race reward is already persisted above,
+        // and leaderboard failure cannot invalidate or roll back that single-player result.
+        if (_race != null &&
+            GodotObject.IsInstanceValid(_race) &&
+            _race.TryGetPlayerFinishMilliseconds(out var finishedMilliseconds))
+        {
+            ProjectSinglePlayerCourseBestTime(finishedMilliseconds);
+        }
     }
 
     private void EndRace()

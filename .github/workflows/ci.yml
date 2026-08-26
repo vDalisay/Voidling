@@ -91,3 +91,151 @@ jobs:
             echo 'Godot runtime emitted an error.'
             exit 1
           fi
+
+      # Exercise the actual player-facing trade room controls. This regression gate is intentionally
+      # presentation-only: it toggles a real Voidling card and presses the real Accept/Cancel buttons,
+      # proving the panel emits the selected asset ID instead of merely appearing selected visually.
+      - name: Trade panel interaction smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 20s godot --headless --path . -- --voidling-trade-panel-smoke 2>&1 | tee trade-panel-smoke.log
+          if ! grep -q 'TRADE_PANEL_SMOKE_SUCCESS' trade-panel-smoke.log; then
+            echo 'Trade panel did not emit the expected selection/accept/cancel intents.'
+            exit 1
+          fi
+          if grep -E '^(ERROR|SCRIPT ERROR):' trade-panel-smoke.log; then
+            echo 'Trade panel smoke emitted a Godot error.'
+            exit 1
+          fi
+
+      # Exercise the real development ENet adapter with two independent game processes. Both
+      # processes must form one LAN lobby and exchange the same typed Application Hello packet
+      # used by Steam before the command-line probe exits successfully.
+      - name: LAN multiplayer two-process smoke test
+        shell: bash
+        run: |
+          set -u
+          rm -f lan-host.log lan-client.log
+          host_pid=''
+
+          cleanup() {
+            if [ -n "$host_pid" ] && kill -0 "$host_pid" 2>/dev/null; then
+              kill "$host_pid" 2>/dev/null || true
+              wait "$host_pid" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          timeout 20s godot --headless --path . -- \
+            --voidling-lan-host \
+            --voidling-lan-name=CIHost \
+            --voidling-dev-profile=ci_host \
+            --voidling-lan-smoke >lan-host.log 2>&1 &
+          host_pid=$!
+
+          sleep 1
+          set +e
+          timeout 20s godot --headless --path . -- \
+            --voidling-lan-join=127.0.0.1 \
+            --voidling-lan-name=CIClient \
+            --voidling-dev-profile=ci_client \
+            --voidling-lan-smoke >lan-client.log 2>&1
+          client_code=$?
+
+          wait "$host_pid"
+          host_code=$?
+          set -e
+          host_pid=''
+
+          echo '--- LAN host log ---'
+          cat lan-host.log || true
+          echo '--- LAN client log ---'
+          cat lan-client.log || true
+          echo "LAN smoke process exit codes: host=$host_code client=$client_code"
+
+          if [ "$host_code" -ne 0 ] || [ "$client_code" -ne 0 ]; then
+            echo 'LAN smoke process failed.'
+            exit 1
+          fi
+
+          if ! grep -q 'LAN_SMOKE_SUCCESS' lan-host.log; then
+            echo 'LAN host never completed the typed Hello handshake.'
+            exit 1
+          fi
+          if ! grep -q 'LAN_SMOKE_SUCCESS' lan-client.log; then
+            echo 'LAN client never completed the typed Hello handshake.'
+            exit 1
+          fi
+
+      # Run the actual Pokemon-style trade interaction over the same ENet adapter. The probe uses
+      # TradePresentationBridge just like the UI: invite -> accept invite -> choose one Voidling each
+      # -> both Accept -> durable two-phase commit. Both processes must observe the expected local
+      # outgoing/incoming IDs before they exit successfully.
+      - name: LAN multiplayer trade two-process smoke test
+        shell: bash
+        run: |
+          set -u
+          rm -f lan-trade-host.log lan-trade-client.log
+          host_pid=''
+
+          cleanup_trade() {
+            if [ -n "$host_pid" ] && kill -0 "$host_pid" 2>/dev/null; then
+              kill "$host_pid" 2>/dev/null || true
+              wait "$host_pid" 2>/dev/null || true
+            fi
+          }
+          trap cleanup_trade EXIT
+
+          timeout 35s godot --headless --path . -- \
+            --voidling-lan-host \
+            --voidling-lan-port=27182 \
+            --voidling-lan-name=CITradeHost \
+            --voidling-dev-profile=ci_trade_host \
+            --voidling-lan-trade-smoke >lan-trade-host.log 2>&1 &
+          host_pid=$!
+
+          sleep 1
+          set +e
+          timeout 35s godot --headless --path . -- \
+            --voidling-lan-join=127.0.0.1 \
+            --voidling-lan-port=27182 \
+            --voidling-lan-name=CITradeClient \
+            --voidling-dev-profile=ci_trade_client \
+            --voidling-lan-trade-smoke >lan-trade-client.log 2>&1
+          client_code=$?
+
+          wait "$host_pid"
+          host_code=$?
+          set -e
+          host_pid=''
+
+          echo '--- LAN trade host diagnostic ---'
+          grep -E '\[trade-lan-smoke\]|trade negotiation|multiplayer trade|ERROR|SCRIPT ERROR|WARNING' lan-trade-host.log || true
+          echo '--- LAN trade client diagnostic ---'
+          grep -E '\[trade-lan-smoke\]|trade negotiation|multiplayer trade|ERROR|SCRIPT ERROR|WARNING' lan-trade-client.log || true
+          echo "LAN trade process exit codes: host=$host_code client=$client_code"
+
+          if [ "$host_code" -ne 0 ] || [ "$client_code" -ne 0 ]; then
+            echo 'LAN trade smoke process failed.'
+            exit 1
+          fi
+
+          if ! grep -q 'LAN_TRADE_SMOKE_SUCCESS' lan-trade-host.log; then
+            echo 'LAN trade host never completed the negotiated durable exchange.'
+            exit 1
+          fi
+          if ! grep -q 'LAN_TRADE_SMOKE_SUCCESS' lan-trade-client.log; then
+            echo 'LAN trade client never completed the negotiated durable exchange.'
+            exit 1
+          fi
+
+      - name: Upload LAN trade smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lan-trade-smoke-logs
+          path: |
+            lan-trade-host.log
+            lan-trade-client.log
+          if-no-files-found: ignore

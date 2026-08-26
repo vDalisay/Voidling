@@ -10,9 +10,25 @@ if errorlevel 1 (
 )
 
 set "SKIP_BUILD=0"
-if /I "%~1"=="--no-build" set "SKIP_BUILD=1"
-if /I "%~1"=="-n" set "SKIP_BUILD=1"
+set "GAME_ARGS="
 
+:parse_args
+if "%~1"=="" goto args_done
+if /I "%~1"=="--no-build" (
+    set "SKIP_BUILD=1"
+    shift
+    goto parse_args
+)
+if /I "%~1"=="-n" (
+    set "SKIP_BUILD=1"
+    shift
+    goto parse_args
+)
+set "GAME_ARGS=%GAME_ARGS% %1"
+shift
+goto parse_args
+
+:args_done
 if "%SKIP_BUILD%"=="0" (
     call "%~dp0build.bat"
     if errorlevel 1 exit /b 1
@@ -45,7 +61,11 @@ echo Godot: %GODOT_EXE%
 echo .NET:  %DOTNET_EXE%
 echo.
 
-"%GODOT_EXE%" --path "%CD%"
+if defined GAME_ARGS (
+    "%GODOT_EXE%" --path "%CD%" -- %GAME_ARGS%
+) else (
+    "%GODOT_EXE%" --path "%CD%"
+)
 set "GAME_EXIT=%ERRORLEVEL%"
 
 if not "%GAME_EXIT%"=="0" (

@@ -15,7 +15,8 @@ public sealed record RaceObstacleResolvedEvent(
 
 public sealed record RaceParticipantFinishedEvent(
     string ParticipantId,
-    int Placement) : RaceSimulationEvent(ParticipantId);
+    int Placement,
+    int FixedStep = 0) : RaceSimulationEvent(ParticipantId);
 
 public readonly record struct RaceParticipantStateSnapshot(
     RaceParticipantSnapshot Participant,
@@ -27,8 +28,32 @@ public readonly record struct RaceParticipantStateSnapshot(
     bool GlideResolved,
     bool GlideFailed,
     float GlideEndX,
+    int NextObstacleIndex,
     bool Finished,
     RaceTerrain Terrain);
+
+/// <summary>
+/// Result-affecting state exposed strictly for deterministic diagnostics/replay verification. The
+/// random generator itself stays encapsulated; RandomDrawCount plus the immutable race seed and
+/// participant identity identifies the same deterministic point in that participant's RNG stream.
+/// </summary>
+public readonly record struct RaceParticipantDeterministicState(
+    string ParticipantId,
+    float X,
+    float MaxStamina,
+    float CurrentStamina,
+    float DelaySeconds,
+    float CheerSeconds,
+    bool GlideResolved,
+    bool GlideFailed,
+    float GlideEndX,
+    bool Finished,
+    int NextObstacleIndex,
+    int RandomDrawCount);
+
+public sealed record RaceDeterministicStateSnapshot(
+    IReadOnlyList<RaceParticipantDeterministicState> Participants,
+    IReadOnlyList<string> FinishOrder);
 
 /// <summary>
 /// Deterministic fixed-step race simulation for the current demo course. It owns every state
@@ -39,7 +64,11 @@ public sealed class RaceSimulation
 {
     public const double FixedStepSeconds = 1.0 / 60.0;
     private const float GlideFailureTolerance = 1.0f;
-    private const float ObstacleTriggerLead = 14.0f;
+
+    // RaceScreen intentionally places the visible hurdle 18px ahead of the course marker. Keep the
+    // obstacle event 14px before that visible center so the jump animation peaks at the hurdle,
+    // rather than resolving ~32px before the sprite as it did previously.
+    private const float ObstacleTriggerLead = -4.0f;
 
     private readonly RaceCourse _course;
     private readonly RacePerformanceModel _performance;
@@ -48,6 +77,7 @@ public sealed class RaceSimulation
     private readonly List<string> _finishOrder = new();
     private readonly IReadOnlyList<string> _finishOrderView;
     private double _accumulator;
+    private int _fixedStepCount;
 
     private sealed class ParticipantState
     {
@@ -55,6 +85,8 @@ public sealed class RaceSimulation
         public Random Random { get; init; } = null!;
         public float X { get; set; }
         public int NextObstacleIndex { get; set; }
+        public int RandomDrawCount { get; set; }
+        public bool ObstacleRetryPending { get; set; }
         public float DelaySeconds { get; set; }
         public float CheerSeconds { get; set; }
         public float MaxStamina { get; init; }
@@ -63,6 +95,7 @@ public sealed class RaceSimulation
         public bool GlideFailed { get; set; }
         public float GlideEndX { get; set; }
         public bool Finished { get; set; }
+        public int FinishFixedStep { get; set; }
     }
 
     public RaceSimulation(
@@ -104,12 +137,50 @@ public sealed class RaceSimulation
     public IReadOnlyList<string> FinishOrder => _finishOrderView;
     public bool IsComplete => _finishOrder.Count == _participants.Count;
     public int ParticipantCount => _participants.Count;
+    public int FixedStepCount => _fixedStepCount;
 
     public RaceParticipantStateSnapshot GetState(string participantId)
     {
         if (!_participantsById.TryGetValue(participantId, out var state))
             throw new KeyNotFoundException($"Unknown race participant '{participantId}'.");
         return Snapshot(state);
+    }
+
+    public bool TryGetFinishFixedStep(string participantId, out int fixedStep)
+    {
+        fixedStep = 0;
+        if (!_participantsById.TryGetValue(participantId, out var state) ||
+            !state.Finished ||
+            state.FinishFixedStep <= 0)
+        {
+            return false;
+        }
+
+        fixedStep = state.FinishFixedStep;
+        return true;
+    }
+
+    public RaceDeterministicStateSnapshot GetDeterministicStateSnapshot()
+    {
+        var participants = _participants
+            .Select(state => new RaceParticipantDeterministicState(
+                ParticipantId: state.Participant.CreatureId,
+                X: state.X,
+                MaxStamina: state.MaxStamina,
+                CurrentStamina: state.CurrentStamina,
+                DelaySeconds: state.DelaySeconds,
+                CheerSeconds: state.CheerSeconds,
+                GlideResolved: state.GlideResolved,
+                GlideFailed: state.GlideFailed,
+                GlideEndX: state.GlideEndX,
+                Finished: state.Finished,
+                NextObstacleIndex: state.NextObstacleIndex,
+                RandomDrawCount: state.RandomDrawCount))
+            .ToArray();
+
+        return new RaceDeterministicStateSnapshot(
+            Array.AsReadOnly(participants),
+            Array.AsReadOnly(_finishOrder.ToArray()));
     }
 
     public IReadOnlyList<RaceSimulationEvent> Advance(double elapsedSeconds)
@@ -162,8 +233,12 @@ public sealed class RaceSimulation
 
         state.X = _course.EndX;
         state.Finished = true;
+        state.FinishFixedStep = Math.Max(1, _fixedStepCount);
         _finishOrder.Add(participantId);
-        return new RaceParticipantFinishedEvent(participantId, _finishOrder.Count);
+        return new RaceParticipantFinishedEvent(
+            participantId,
+            _finishOrder.Count,
+            state.FinishFixedStep);
     }
 
     public bool TryCheer(string participantId)
@@ -180,6 +255,8 @@ public sealed class RaceSimulation
 
     private void Step(float step, List<RaceSimulationEvent> events)
     {
+        _fixedStepCount++;
+
         foreach (var state in _participants)
         {
             if (state.Finished)
@@ -260,15 +337,32 @@ public sealed class RaceSimulation
         if (state.X < _course.Obstacles[obstacleIndex] - ObstacleTriggerLead)
             return;
 
-        var avoided = _performance.AvoidsObstacle(state.Participant, state.Random.NextDouble());
+        // A failed hurdle attempt is the stumble/jump-in-place beat. Do not consume the
+        // hurdle at that point: after the delay, the racer approaches the same fence again
+        // and the retry is guaranteed to clear it so the sprite can never walk through it.
+        var avoided = state.ObstacleRetryPending;
+        if (state.ObstacleRetryPending)
+        {
+            state.ObstacleRetryPending = false;
+        }
+        else
+        {
+            var randomRoll = state.Random.NextDouble();
+            state.RandomDrawCount++;
+            avoided = _performance.AvoidsObstacle(state.Participant, randomRoll);
+        }
+
         if (!avoided)
         {
             state.DelaySeconds = _performance.GetObstacleDelaySeconds(state.Participant);
             state.X -= _performance.ObstacleRollbackDistance;
+            state.ObstacleRetryPending = true;
+            events.Add(new RaceObstacleResolvedEvent(state.Participant.CreatureId, obstacleIndex, false));
+            return;
         }
 
         state.NextObstacleIndex++;
-        events.Add(new RaceObstacleResolvedEvent(state.Participant.CreatureId, obstacleIndex, avoided));
+        events.Add(new RaceObstacleResolvedEvent(state.Participant.CreatureId, obstacleIndex, true));
     }
 
     private void ResolveFinish(ParticipantState state, List<RaceSimulationEvent> events)
@@ -278,8 +372,12 @@ public sealed class RaceSimulation
 
         state.X = _course.EndX;
         state.Finished = true;
+        state.FinishFixedStep = _fixedStepCount;
         _finishOrder.Add(state.Participant.CreatureId);
-        events.Add(new RaceParticipantFinishedEvent(state.Participant.CreatureId, _finishOrder.Count));
+        events.Add(new RaceParticipantFinishedEvent(
+            state.Participant.CreatureId,
+            _finishOrder.Count,
+            state.FinishFixedStep));
     }
 
     private RaceParticipantStateSnapshot Snapshot(ParticipantState state)
@@ -293,6 +391,7 @@ public sealed class RaceSimulation
             GlideResolved: state.GlideResolved,
             GlideFailed: state.GlideFailed,
             GlideEndX: state.GlideEndX,
+            NextObstacleIndex: state.NextObstacleIndex,
             Finished: state.Finished,
             Terrain: _course.TerrainAt(state.X, state.GlideFailed));
 }
