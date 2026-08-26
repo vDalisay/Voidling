@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Voidling.Domain.Genetics;
+using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Breeding;
@@ -8,7 +10,8 @@ namespace Voidling.Presentation.UI.Breeding;
 public readonly record struct BreedingParentViewState(
     string Id,
     string Name,
-    Color TintColor,
+    string TintHex,
+    AppearancePhenotype Appearance,
     bool HasAngelMutation,
     int OtherMutationCount);
 
@@ -138,8 +141,9 @@ public partial class BreedingScreen : VBoxContainer
     {
         var column = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         column.AddThemeConstantOverride("separation", 3);
-        var portrait = UiFactory.CreatePortrait(
-            parent.TintColor,
+        var portrait = VoidlingAppearancePresenter.CreatePortrait(
+            parent.TintHex,
+            parent.Appearance,
             parent.HasAngelMutation,
             parent.OtherMutationCount,
             new Vector2(70, 70));
@@ -149,9 +153,10 @@ public partial class BreedingScreen : VBoxContainer
     }
 
     private static void SetPortrait(TextureRect portrait, BreedingParentViewState parent)
-        => UiFactory.SetPortraitData(
+        => VoidlingAppearancePresenter.ApplyPortrait(
             portrait,
-            parent.TintColor,
+            parent.TintHex,
+            parent.Appearance,
             parent.HasAngelMutation,
             parent.OtherMutationCount);
 
