@@ -1,6 +1,7 @@
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Hatching;
 using Voidling.Domain.Rules;
+using VoidlingGame;
 using Xunit;
 
 namespace Voidling.Tests.Domain;
