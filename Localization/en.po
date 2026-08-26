@@ -156,8 +156,26 @@ msgstr "CHOOSE A RACER"
 msgid "UI_RACE_PICKER_EMPTY"
 msgstr "No Voidlings are currently on the farm."
 
+msgid "UI_RACE_PICKER_NO_COURSES"
+msgstr "No race courses are available."
+
 msgid "UI_RACE_PICKER_HINT"
-msgstr "Choose one Voidling. All other racers are generated CPU opponents."
+msgstr "Choose one Voidling and a course. All other racers are generated CPU opponents."
+
+msgid "UI_RACE_PICKER_COURSE"
+msgstr "Course"
+
+msgid "UI_RACE_COURSE_DEMO_NAME"
+msgstr "Sprout Run"
+
+msgid "UI_RACE_COURSE_DEMO_SUMMARY"
+msgstr "Standard course • 5 sections • 4 hurdles"
+
+msgid "UI_RACE_COURSE_LONG_NAME"
+msgstr "Long Sprout Run"
+
+msgid "UI_RACE_COURSE_LONG_SUMMARY"
+msgstr "Longer course • 7 sections • 6 hurdles • two swim stretches"
 
 msgid "UI_RACE_START"
 msgstr "Start Race"
