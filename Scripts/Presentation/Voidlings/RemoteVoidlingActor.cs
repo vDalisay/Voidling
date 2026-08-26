@@ -13,9 +13,6 @@ namespace Voidling.Presentation.Voidlings;
 /// </summary>
 public partial class RemoteVoidlingActor : Node2D
 {
-    private static readonly Texture2D CharacterTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
-
     private AnimatedSprite2D _sprite = null!;
     private MutationAdornment2D _mutationAdornment = null!;
     private Label _label = null!;
@@ -34,7 +31,7 @@ public partial class RemoteVoidlingActor : Node2D
 
         _sprite = new AnimatedSprite2D
         {
-            SpriteFrames = BuildSpriteFrames(),
+            SpriteFrames = VoidlingVisualFactory.GetWorldFrames(),
             ZIndex = 2
         };
         AddChild(_sprite);
@@ -63,7 +60,8 @@ public partial class RemoteVoidlingActor : Node2D
         if (snapshot.Key != Key)
             throw new InvalidOperationException("A remote actor cannot change connected-zone identity.");
 
-        _baseScale = snapshot.Stage == LifeStage.Adult ? 0.62f : 0.31f;
+        var isAdult = snapshot.Stage == LifeStage.Adult;
+        _baseScale = VoidlingVisualFactory.WorldScale(isAdult);
         _sprite.Scale = Vector2.One * _baseScale;
         _sprite.Position = new Vector2(0, VoidlingGroundVisualMetrics.SpriteCenterYOffset(_baseScale));
 
@@ -129,34 +127,6 @@ public partial class RemoteVoidlingActor : Node2D
             new Vector2(0, VoidlingGroundVisualMetrics.ShadowCenterYOffset),
             shadowRadii,
             new Color(0.20f, 0.24f, 0.20f, 0.16f));
-    }
-
-    private static SpriteFrames BuildSpriteFrames()
-    {
-        var frames = new SpriteFrames();
-        frames.RemoveAnimation("default");
-        AddDirection(frames, "walk_down", 0);
-        AddDirection(frames, "walk_up", 1);
-        AddDirection(frames, "walk_left", 2);
-        AddDirection(frames, "walk_right", 3);
-        return frames;
-    }
-
-    private static void AddDirection(SpriteFrames frames, string name, int row)
-    {
-        frames.AddAnimation(name);
-        frames.SetAnimationLoop(name, true);
-        frames.SetAnimationSpeed(name, 6.0);
-
-        for (var column = 0; column < 4; column++)
-        {
-            var atlas = new AtlasTexture
-            {
-                Atlas = CharacterTexture,
-                Region = new Rect2(column * 48, row * 48, 48, 48)
-            };
-            frames.AddFrame(name, atlas);
-        }
     }
 
     private void DrawEllipse(Vector2 center, Vector2 radii, Color color, int points = 20)
