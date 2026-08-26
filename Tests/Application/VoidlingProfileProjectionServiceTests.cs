@@ -1,6 +1,7 @@
 using System.Linq;
 using Voidling.Application.Creatures;
 using Voidling.Domain.Breeding;
+using Voidling.Domain.Evolution;
 using Voidling.Domain.Rules;
 using VoidlingGame;
 using Xunit;
@@ -26,15 +27,36 @@ public sealed class VoidlingProfileProjectionServiceTests
         state.Voidlings.Add(creature);
 
         var projection = new VoidlingProfileProjectionService(Rules).Create(state, creature.Id)!;
-        var run = Assert.Single(projection.Stats.Where(stat => stat.StatId == "run"));
+        var run = Assert.Single(projection.Stats, stat => stat.StatId == "run");
 
         Assert.Equal(1, run.DnaProfile1Rank);
         Assert.Equal(4, run.DnaProfile2Rank);
         Assert.Equal(4, run.ExpressedPotentialRank);
         Assert.Equal(24, run.TrainingPoints);
+        Assert.Equal(Rules.Stats.RankCaps.A, run.TrainingPointCap);
         Assert.Equal(3, run.TrainingLevel);
         Assert.Equal(0.0, run.TrainingLevelProgress, 5);
         Assert.True(run.EffectiveValue > 12.0f + 4 * 13.0f);
+    }
+
+    [Fact]
+    public void Projection_ExposesResolvedEvolutionWithoutHiddenInfluenceValues()
+    {
+        var state = new GameStateData();
+        var creature = CreateCreature("runner");
+        creature.EvolutionSpecialization = EvolutionSpecialization.Run;
+        creature.RunPowerInfluence = -0.85f;
+        creature.SwimFlyInfluence = 0.15f;
+        state.Voidlings.Add(creature);
+
+        var projection = new VoidlingProfileProjectionService(Rules).Create(state, creature.Id)!;
+        var publicProperties = typeof(VoidlingProfileProjection).GetProperties()
+            .Select(property => property.Name)
+            .ToArray();
+
+        Assert.Equal(EvolutionSpecialization.Run, projection.EvolutionSpecialization);
+        Assert.DoesNotContain(nameof(VoidlingData.RunPowerInfluence), publicProperties);
+        Assert.DoesNotContain(nameof(VoidlingData.SwimFlyInfluence), publicProperties);
     }
 
     [Fact]

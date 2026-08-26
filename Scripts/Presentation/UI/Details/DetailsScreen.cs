@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Voidling.Domain.Evolution;
 using Voidling.Domain.Genetics;
 using Voidling.Presentation.Voidlings;
 using VoidlingGame;
@@ -11,6 +12,8 @@ public readonly record struct DetailsStatViewState(
     string DisplayName,
     Color IdentityColor,
     string Rank,
+    int TrainingPoints,
+    int TrainingPointCap,
     int Level,
     int EffectiveValue,
     double Progress,
@@ -26,6 +29,7 @@ public readonly record struct DetailsRareTraitViewState(
 public sealed record DetailsScreenState(
     string Name,
     bool IsAdult,
+    EvolutionSpecialization EvolutionSpecialization,
     int FamilyGeneration,
     int InbreedingBurden,
     bool InbreedingHistoryFlag,
@@ -130,6 +134,11 @@ public partial class DetailsScreen : VBoxContainer
         var summary = new VBoxContainer();
         summary.AddThemeConstantOverride("separation", 2);
         summary.AddChild(UiFactory.CreateLabel(state.IsAdult ? Tr("UI_DETAILS_ADULT") : Tr("UI_DETAILS_CHILD"), 8));
+        if (state.IsAdult && state.EvolutionSpecialization != EvolutionSpecialization.None)
+        {
+            summary.AddChild(UiFactory.CreateLabel(
+                $"{state.EvolutionSpecialization.ToString().ToUpperInvariant()} FORM", 7));
+        }
         summary.AddChild(UiFactory.CreateLabel(Tr("UI_DETAILS_STATS_HINT"), 6));
         header.AddChild(summary);
         _body.AddChild(header);
@@ -251,11 +260,11 @@ public partial class DetailsScreen : VBoxContainer
         row.AddChild(name);
 
         var values = UiFactory.CreateLabel(
-            $"RANK {stat.Rank}   LV {stat.Level:00}   STAT {stat.EffectiveValue:00}", 7);
-        values.CustomMinimumSize = new Vector2(205, 19);
+            $"RANK {stat.Rank}  LV {stat.Level:00}  TRAIN {stat.TrainingPoints}/{stat.TrainingPointCap}  STAT {stat.EffectiveValue:00}", 6);
+        values.CustomMinimumSize = new Vector2(250, 19);
         row.AddChild(values);
 
-        var progress = CreateProgressBar(stat.Progress, stat.IdentityColor, new Vector2(165, 8));
+        var progress = CreateProgressBar(stat.Progress, stat.IdentityColor, new Vector2(120, 8));
         progress.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         row.AddChild(progress);
         return panel;

@@ -95,6 +95,8 @@ public partial class MainController : Node
             StatPresentationCatalog.NameFor(stat.StatId),
             StatPresentationCatalog.ColorFor(stat.StatId),
             StatPresentationCatalog.RankFor(stat.ExpressedPotentialRank),
+            stat.TrainingPoints,
+            stat.TrainingPointCap,
             stat.TrainingLevel,
             Mathf.RoundToInt(stat.EffectiveValue),
             stat.TrainingLevelProgress,
@@ -111,6 +113,7 @@ public partial class MainController : Node
         var state = new DetailsScreenState(
             data.DisplayName,
             data.IsAdult,
+            data.EvolutionSpecialization,
             data.FamilyGeneration,
             data.ActiveInbreedingBurden,
             data.InbreedingHistoryFlag,

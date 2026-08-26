@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Voidling.Application.Breeding;
+using Voidling.Domain.Evolution;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
@@ -15,6 +16,7 @@ public sealed record VoidlingStatProfileProjection(
     int DnaProfile2Rank,
     int ExpressedPotentialRank,
     int TrainingPoints,
+    int TrainingPointCap,
     int TrainingLevel,
     double TrainingLevelProgress,
     float EffectiveValue);
@@ -55,6 +57,7 @@ public sealed record VoidlingProfileProjection(
     string CreatureId,
     string DisplayName,
     bool IsAdult,
+    EvolutionSpecialization EvolutionSpecialization,
     int FamilyGeneration,
     int ActiveInbreedingBurden,
     bool InbreedingHistoryFlag,
@@ -70,9 +73,10 @@ public sealed record VoidlingProfileProjection(
 
 /// <summary>
 /// Builds immutable player-information read models from the mutable save aggregate. UI receives
-/// explicit DNA-profile values, trained progression, semantic appearance and lineage labels without
-/// traversing Genome, TrainingPoints, RareTraits or lineage collections itself. This intentionally
-/// reports current facts only; it does not calculate exact offspring probabilities.
+/// explicit DNA-profile values, trained progression/caps, semantic evolution/appearance and lineage
+/// labels without traversing Genome, TrainingPoints, RareTraits or lineage collections itself. This
+/// intentionally reports current facts only; it does not calculate exact offspring probabilities
+/// or expose hidden evolution influence values.
 /// </summary>
 public sealed class VoidlingProfileProjectionService
 {
@@ -125,6 +129,7 @@ public sealed class VoidlingProfileProjectionService
                 gene.AlleleB,
                 gene.ExpressedValue,
                 _stats.GetTrainingPoints(creature, statId),
+                _stats.GetTrainingPointCap(creature, statId),
                 _stats.GetLevel(creature, statId),
                 _stats.GetLevelProgress(creature, statId),
                 _stats.GetEffectiveStat(creature, statId));
@@ -170,6 +175,7 @@ public sealed class VoidlingProfileProjectionService
             creature.Id,
             creature.Name,
             creature.Stage == LifeStage.Adult,
+            creature.EvolutionSpecialization,
             Math.Max(0, creature.FamilyGeneration),
             Math.Max(0, creature.InbreedingBurdenLevel),
             creature.InbreedingHistoryFlag,
