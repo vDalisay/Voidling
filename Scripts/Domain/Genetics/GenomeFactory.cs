@@ -6,6 +6,18 @@ using VoidlingGame;
 
 namespace Voidling.Domain.Genetics;
 
+/// <summary>
+/// Explicit pure founder/store appearance. This is how rare cosmetic bloodlines such as shiny,
+/// glow, glisten or authored patterns enter the gene pool without inventing spontaneous mutation
+/// rates. Once introduced, ordinary breeding uses the same Chao-style inheritance rules.
+/// </summary>
+public sealed record FounderAppearanceTemplate(
+    int ColorAllele,
+    AppearanceTone Tone = AppearanceTone.TwoTone,
+    int PatternAllele = AppearanceAlleles.DefaultPattern,
+    bool Shiny = false,
+    int CoatAllele = AppearanceAlleles.NoSpecialCoat);
+
 public sealed class GenomeFactory
 {
     private readonly GeneticsRules _rules;
@@ -17,8 +29,17 @@ public sealed class GenomeFactory
 
     public GenomeData CreateRandom(ulong seed)
     {
-        var genome = new GenomeData();
+        var colorRandom = StableRandom.Create(seed, "random:color");
+        var color = colorRandom.Next(Math.Max(1, _rules.ColorAlleleCount));
+        return CreateRandom(seed, new FounderAppearanceTemplate(color));
+    }
 
+    public GenomeData CreateRandom(ulong seed, FounderAppearanceTemplate appearance)
+    {
+        ArgumentNullException.ThrowIfNull(appearance);
+        ValidateAppearance(appearance);
+
+        var genome = new GenomeData();
         foreach (var statId in _rules.StatIds)
         {
             var random = StableRandom.Create(seed, $"random:{statId}");
@@ -31,31 +52,37 @@ public sealed class GenomeFactory
                 _rules);
         }
 
-        // Chao-style founders/store stock are pure at appearance loci. This keeps breeding legible:
-        // heterozygous appearance genes arise by crossing bloodlines rather than hidden founder DNA.
-        // Rare coats/patterns can later be introduced by authored store/founder variants without
-        // changing the inheritance algorithm or any sprite consumer.
-        var colorRandom = StableRandom.Create(seed, "random:color");
-        var color = colorRandom.Next(Math.Max(1, _rules.ColorAlleleCount));
-        genome.ColorAlleleA = color;
-        genome.ColorAlleleB = color;
+        // Chao-style founders/store stock are pure at appearance loci. Heterozygous appearance
+        // genes arise by crossing bloodlines rather than hidden founder DNA.
+        var tone = (int)appearance.Tone;
+        var shiny = appearance.Shiny ? AppearanceAlleles.Shiny : AppearanceAlleles.NonShiny;
+        genome.ColorAlleleA = appearance.ColorAllele;
+        genome.ColorAlleleB = appearance.ColorAllele;
         genome.ExpressedColorIndex = 0;
-
-        genome.ToneAlleleA = AppearanceAlleles.TwoTone;
-        genome.ToneAlleleB = AppearanceAlleles.TwoTone;
+        genome.ToneAlleleA = tone;
+        genome.ToneAlleleB = tone;
         genome.ExpressedToneIndex = 0;
-
-        genome.PatternAlleleA = AppearanceAlleles.DefaultPattern;
-        genome.PatternAlleleB = AppearanceAlleles.DefaultPattern;
+        genome.PatternAlleleA = appearance.PatternAllele;
+        genome.PatternAlleleB = appearance.PatternAllele;
         genome.ExpressedPatternIndex = 0;
-
-        genome.ShinyAlleleA = AppearanceAlleles.NonShiny;
-        genome.ShinyAlleleB = AppearanceAlleles.NonShiny;
-
-        genome.CoatAlleleA = AppearanceAlleles.NoSpecialCoat;
-        genome.CoatAlleleB = AppearanceAlleles.NoSpecialCoat;
+        genome.ShinyAlleleA = shiny;
+        genome.ShinyAlleleB = shiny;
+        genome.CoatAlleleA = appearance.CoatAllele;
+        genome.CoatAlleleB = appearance.CoatAllele;
         genome.ExpressedCoatIndex = 0;
         return genome;
+    }
+
+    private void ValidateAppearance(FounderAppearanceTemplate appearance)
+    {
+        if (appearance.ColorAllele < 0 || appearance.ColorAllele >= Math.Max(1, _rules.ColorAlleleCount))
+            throw new ArgumentOutOfRangeException(nameof(appearance), "Founder colour allele is outside the configured palette.");
+        if (appearance.Tone is not (AppearanceTone.TwoTone or AppearanceTone.MonoTone))
+            throw new ArgumentOutOfRangeException(nameof(appearance), "Founder tone is invalid.");
+        if (appearance.PatternAllele < 0)
+            throw new ArgumentOutOfRangeException(nameof(appearance), "Founder pattern allele cannot be negative.");
+        if (appearance.CoatAllele < 0)
+            throw new ArgumentOutOfRangeException(nameof(appearance), "Founder coat allele cannot be negative.");
     }
 
     private int RollGrade(Random random)
