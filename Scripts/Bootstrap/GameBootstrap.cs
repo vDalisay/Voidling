@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
+using Voidling.Application.Creatures;
 using Voidling.Application.Multiplayer;
 using Voidling.Application.Multiplayer.Challenges;
 using Voidling.Application.Multiplayer.Leaderboards;
@@ -74,6 +75,7 @@ public partial class GameBootstrap : Node
             new RaceResultUseCase(rules),
             new LineageTreeProjectionService(rules));
         session.ConfigureRacing(new RaceEntryFactory(rules));
+        session.ConfigureReadModels(new VoidlingProfileProjectionService(rules));
 
         AddChild(session);
         ComposeTrading(rules, stateRepository, session);
