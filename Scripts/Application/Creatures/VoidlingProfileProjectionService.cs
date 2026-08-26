@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Voidling.Application.Breeding;
+using Voidling.Domain.Genetics;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
 using VoidlingGame;
@@ -33,6 +34,8 @@ public sealed record VoidlingProfileProjection(
     int ActiveInbreedingBurden,
     bool InbreedingHistoryFlag,
     string TintHex,
+    bool HasAngelMutation,
+    int OtherMutationCount,
     int ColorDnaProfile1,
     int ColorDnaProfile2,
     int ExpressedColorProfileIndex,
@@ -104,6 +107,10 @@ public sealed class VoidlingProfileProjectionService
                 Math.Max(0, trait.GenerationFromFounder),
                 trait.CanTransmit))
             .ToArray() ?? Array.Empty<VoidlingRareTraitProfileProjection>();
+        var hasAngelMutation = rareTraits.Any(trait =>
+            string.Equals(trait.TraitId, MutationIds.Angel, StringComparison.OrdinalIgnoreCase));
+        var otherMutationCount = rareTraits.Count(trait =>
+            !string.Equals(trait.TraitId, MutationIds.Angel, StringComparison.OrdinalIgnoreCase));
 
         return new VoidlingProfileProjection(
             creature.Id,
@@ -113,6 +120,8 @@ public sealed class VoidlingProfileProjectionService
             Math.Max(0, creature.InbreedingBurdenLevel),
             creature.InbreedingHistoryFlag,
             creature.TintHex,
+            hasAngelMutation,
+            otherMutationCount,
             creature.Genome.ColorAlleleA,
             creature.Genome.ColorAlleleB,
             creature.Genome.ExpressedColorIndex,
