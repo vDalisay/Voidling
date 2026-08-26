@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Voidling.Application.Ports.Multiplayer;
+using Voidling.Domain.Genetics;
 using VoidlingGame;
 
 namespace Voidling.Application.Multiplayer;
@@ -8,7 +9,7 @@ namespace Voidling.Application.Multiplayer;
 /// <summary>
 /// Builds an explicit network snapshot from a locally owned Voidling. Ownership validation happens
 /// before anything is sent, and only the fields required by connected-Garden presentation leave the
-/// local save aggregate.
+/// local save aggregate. Appearance is replicated as semantic phenotype, never asset paths.
 /// </summary>
 public sealed class SharedVoidlingSnapshotFactory
 {
@@ -66,6 +67,7 @@ public sealed class SharedVoidlingSnapshotFactory
             .Take(ConnectedZoneValidation.MaxRareTraits)
             .Cast<string>()
             .ToArray();
+        var appearance = AppearancePhenotypeResolver.ResolveSemantic(creature.Genome);
 
         snapshot = new SharedVoidlingSnapshot(
             creature.Id,
@@ -76,7 +78,11 @@ public sealed class SharedVoidlingSnapshotFactory
             Math.Max(0, creature.FamilyGeneration),
             rareTraitIds,
             zoneX,
-            zoneY);
+            zoneY,
+            (int)appearance.Tone,
+            appearance.PatternAllele,
+            appearance.Shiny,
+            appearance.CoatAllele);
 
         if (!ConnectedZoneValidation.IsValidSharedVoidling(snapshot))
         {
