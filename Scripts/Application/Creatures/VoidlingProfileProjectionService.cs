@@ -74,16 +74,20 @@ public sealed class VoidlingProfileProjectionService
         if (creature == null)
             return null;
 
-        var lineageNames = _lineage.GetEffectiveLineage(state)
-            .Where(entry => !string.IsNullOrWhiteSpace(entry.CreatureId))
-            .GroupBy(entry => entry.CreatureId, StringComparer.Ordinal)
-            .ToDictionary(
-                group => group.Key,
-                group => string.IsNullOrWhiteSpace(group.First().DisplayName)
-                    ? "Unknown"
-                    : group.First().DisplayName,
-                StringComparer.Ordinal);
+        return Project(creature, BuildLineageNameIndex(state));
+    }
 
+    public IReadOnlyList<VoidlingProfileProjection> CreateActive(GameStateData state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var lineageNames = BuildLineageNameIndex(state);
+        return state.Voidlings.Select(creature => Project(creature, lineageNames)).ToArray();
+    }
+
+    private VoidlingProfileProjection Project(
+        VoidlingData creature,
+        IReadOnlyDictionary<string, string> lineageNames)
+    {
         var stats = _statIds.Select(statId =>
         {
             var gene = StatCalculator.GetGene(creature, statId);
@@ -128,6 +132,17 @@ public sealed class VoidlingProfileProjectionService
             stats,
             rareTraits);
     }
+
+    private IReadOnlyDictionary<string, string> BuildLineageNameIndex(GameStateData state)
+        => _lineage.GetEffectiveLineage(state)
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.CreatureId))
+            .GroupBy(entry => entry.CreatureId, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => string.IsNullOrWhiteSpace(group.First().DisplayName)
+                    ? "Unknown"
+                    : group.First().DisplayName,
+                StringComparer.Ordinal);
 
     private static string ResolveFounderName(
         string founderCreatureId,
