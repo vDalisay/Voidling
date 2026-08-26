@@ -111,6 +111,19 @@ public sealed class VoidlingProfileProjectionServiceTests
     }
 
     [Fact]
+    public void Projection_CreateActiveIncludesOwnedOnlyAndPreservesRosterOrder()
+    {
+        var state = new GameStateData();
+        state.Voidlings.Add(CreateCreature("first"));
+        state.Voidlings.Add(CreateCreature("second"));
+        state.DepartedVoidlings.Add(CreateCreature("departed"));
+
+        var projections = new VoidlingProfileProjectionService(Rules).CreateActive(state);
+
+        Assert.Equal(new[] { "first", "second" }, projections.Select(value => value.CreatureId).ToArray());
+    }
+
+    [Fact]
     public void Projection_DoesNotExposeOffspringProbabilityData()
     {
         var publicProperties = typeof(VoidlingProfileProjection).GetProperties()
