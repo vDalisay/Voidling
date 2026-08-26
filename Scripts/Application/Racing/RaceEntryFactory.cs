@@ -16,7 +16,10 @@ public sealed record RaceEntrant(
 public sealed record RaceEntry(
     ulong SimulationSeed,
     RaceRules Rules,
-    IReadOnlyList<RaceEntrant> Entrants);
+    IReadOnlyList<RaceEntrant> Entrants)
+{
+    public RaceCourseDefinition CourseDefinition { get; init; } = RaceCourseCatalog.Demo;
+}
 
 /// <summary>
 /// Creates the complete immutable race entry before presentation starts. The live race therefore
@@ -41,9 +44,15 @@ public sealed class RaceEntryFactory
     }
 
     public RaceEntry Create(VoidlingData selected, ulong simulationSeed)
+        => Create(selected, simulationSeed, RaceCourseCatalog.Demo);
+
+    public RaceEntry Create(
+        VoidlingData selected,
+        ulong simulationSeed,
+        RaceCourseDefinition courseDefinition)
     {
         ArgumentNullException.ThrowIfNull(selected);
-        return Create(CreateOwnedEntrant(selected), simulationSeed);
+        return Create(CreateOwnedEntrant(selected), simulationSeed, courseDefinition);
     }
 
     /// <summary>
@@ -52,9 +61,16 @@ public sealed class RaceEntryFactory
     /// that was committed when the attempt began.
     /// </summary>
     public RaceEntry Create(RaceEntrant selected, ulong simulationSeed)
+        => Create(selected, simulationSeed, RaceCourseCatalog.Demo);
+
+    public RaceEntry Create(
+        RaceEntrant selected,
+        ulong simulationSeed,
+        RaceCourseDefinition courseDefinition)
     {
         ArgumentNullException.ThrowIfNull(selected);
         ArgumentNullException.ThrowIfNull(selected.Participant);
+        ArgumentNullException.ThrowIfNull(courseDefinition);
 
         var entrants = new List<RaceEntrant>(4)
         {
@@ -77,7 +93,10 @@ public sealed class RaceEntryFactory
             entrants.Add(new RaceEntrant(_snapshotFactory.Create(cpu), false, 0));
         }
 
-        return new RaceEntry(simulationSeed, _rules.Racing, entrants.AsReadOnly());
+        return new RaceEntry(simulationSeed, _rules.Racing, entrants.AsReadOnly())
+        {
+            CourseDefinition = courseDefinition
+        };
     }
 
     public RaceEntrant CreateOwnedEntrant(VoidlingData selected)
