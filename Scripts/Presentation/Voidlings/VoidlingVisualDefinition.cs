@@ -5,6 +5,11 @@ namespace Voidling.Presentation.Voidlings;
 /// <summary>
 /// Designer-authored presentation contract for the base Voidling artwork.
 /// Gameplay/domain state must never depend on these texture/layout values.
+///
+/// For production art, BaseAtlas/SwimAtlas contain the authored outline/details while optional
+/// aligned fill-mask atlases tell the palette shader which pixels can be recolored in code:
+/// R = primary/body, G = secondary/two-tone, B = accent. Pattern masks are indexed by semantic
+/// pattern allele and may be supplied later without changing breeding or consumer code.
 /// </summary>
 [GlobalClass]
 public partial class VoidlingVisualDefinition : Resource
@@ -18,6 +23,34 @@ public partial class VoidlingVisualDefinition : Resource
 
     [Export]
     public Texture2D SwimAtlas { get; set; } = null!;
+
+    [ExportGroup("Code Filled Appearance")]
+    [Export]
+    public Texture2D? BaseFillMaskAtlas { get; set; }
+
+    [Export]
+    public Texture2D? SwimFillMaskAtlas { get; set; }
+
+    [Export]
+    public Godot.Collections.Array<Texture2D> BasePatternMaskAtlases { get; set; } = new();
+
+    [Export]
+    public Godot.Collections.Array<Texture2D> SwimPatternMaskAtlases { get; set; } = new();
+
+    [Export]
+    public Color TwoToneSecondaryColor { get; set; } = new("F6F0C9");
+
+    [Export]
+    public Color PatternColor { get; set; } = new("FFF4A8");
+
+    [Export(PropertyHint.Range, "0,1,0.01")]
+    public float ShinyStrength { get; set; } = 0.16f;
+
+    [Export(PropertyHint.Range, "0,1,0.01")]
+    public float GlowStrength { get; set; } = 0.30f;
+
+    [Export(PropertyHint.Range, "0,1,0.01")]
+    public float GlistenStrength { get; set; } = 0.26f;
 
     [ExportGroup("Atlas Layout")]
     [Export(PropertyHint.Range, "1,512,1")]
