@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Voidling.Application.Creatures;
 
 namespace VoidlingGame;
@@ -21,5 +22,13 @@ public partial class GameSession
             throw new InvalidOperationException("VoidlingProfileProjectionService was not configured by Bootstrap.");
 
         return _voidlingProfiles.Create(State, creatureId);
+    }
+
+    public IReadOnlyList<VoidlingProfileProjection> CreateActiveVoidlingProfileProjections()
+    {
+        if (_voidlingProfiles == null)
+            throw new InvalidOperationException("VoidlingProfileProjectionService was not configured by Bootstrap.");
+
+        return _voidlingProfiles.CreateActive(State);
     }
 }
