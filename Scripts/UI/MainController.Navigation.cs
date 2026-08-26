@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
+using Voidling.Domain.Racing;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Details;
 using Voidling.Presentation.UI.Racing;
@@ -18,17 +19,36 @@ public partial class MainController : Node
             : owned.FirstOrDefault()?.Id ?? string.Empty;
 
         var viewState = owned.Select(CreateRacePickerView).ToArray();
-        var box = OpenModal(Tr("UI_RACE_PICKER_TITLE"), new Vector2(552, 310));
+        var courses = new[]
+        {
+            new RacePickerCourseViewState(
+                RaceCourseCatalog.Demo.Id,
+                RaceCourseCatalog.Demo.Version,
+                Tr("UI_RACE_COURSE_DEMO_NAME"),
+                Tr("UI_RACE_COURSE_DEMO_SUMMARY")),
+            new RacePickerCourseViewState(
+                RaceCourseCatalog.LongStandard.Id,
+                RaceCourseCatalog.LongStandard.Version,
+                Tr("UI_RACE_COURSE_LONG_NAME"),
+                Tr("UI_RACE_COURSE_LONG_SUMMARY"))
+        };
+
+        var box = OpenModal(Tr("UI_RACE_PICKER_TITLE"), new Vector2(552, 335));
         var screen = new RacePickerScreen();
-        screen.Configure(new RacePickerScreenState(viewState, selectedId));
-        screen.RaceRequested += creatureId =>
+        screen.Configure(new RacePickerScreenState(
+            viewState,
+            selectedId,
+            courses,
+            RaceCourseCatalog.Demo.Id,
+            RaceCourseCatalog.Demo.Version));
+        screen.RaceRequested += (creatureId, courseId, courseVersion) =>
         {
             var selected = _session.FindVoidling(creatureId);
             if (selected == null)
                 return;
 
             CloseModal();
-            StartRace(selected);
+            StartRace(selected, courseId, courseVersion);
         };
         box.AddChild(screen);
     }
@@ -48,6 +68,23 @@ public partial class MainController : Node
             hasAngel,
             otherMutations,
             statSummary);
+    }
+
+    private void StartRace(VoidlingData selected, string courseId, int courseVersion)
+    {
+        var entry = _session.CreateRaceEntryFor(selected.Id, courseId, courseVersion);
+        var autoFinish = _session.State.AutoFinishRaces;
+
+        _garden.SetGameplayActive(false);
+        _garden.Visible = false;
+        _uiRoot.Visible = false;
+
+        var race = new Voidling.Presentation.Racing.RaceScreen();
+        race.Configure(entry, autoFinish);
+        race.RaceCompleted += OnRaceCompleted;
+        race.ReturnRequested += EndRace;
+        _race = race;
+        AddChild(race);
     }
 
     private void ShowDetails()
