@@ -29,7 +29,7 @@ public sealed record VoidlingRareTraitProfileProjection(
 public sealed record VoidlingProfileProjection(
     string CreatureId,
     string DisplayName,
-    LifeStage Stage,
+    bool IsAdult,
     int FamilyGeneration,
     int ActiveInbreedingBurden,
     bool InbreedingHistoryFlag,
@@ -119,7 +119,7 @@ public sealed class VoidlingProfileProjectionService
         return new VoidlingProfileProjection(
             creature.Id,
             creature.Name,
-            creature.Stage,
+            creature.Stage == LifeStage.Adult,
             Math.Max(0, creature.FamilyGeneration),
             Math.Max(0, creature.InbreedingBurdenLevel),
             creature.InbreedingHistoryFlag,
