@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
+using Voidling.Application.Creatures;
 using Voidling.Presentation.UI.Breeding;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Shop;
@@ -50,8 +51,8 @@ public partial class MainController : Node
 
     private void ShowBreeding()
     {
-        var adults = _session.State.Voidlings
-            .Where(v => v.Stage == LifeStage.Adult)
+        var adults = _session.CreateActiveVoidlingProfileProjections()
+            .Where(profile => profile.IsAdult)
             .ToArray();
 
         var parentViews = adults.Select(CreateBreedingParentView).ToArray();
@@ -93,19 +94,13 @@ public partial class MainController : Node
         box.AddChild(screen);
     }
 
-    private static BreedingParentViewState CreateBreedingParentView(VoidlingData data)
-    {
-        var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
-        var otherMutations = data.RareTraits?.Count(trait =>
-            !string.Equals(trait.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
-
-        return new BreedingParentViewState(
-            Id: data.Id,
-            Name: data.Name,
-            TintColor: GameRules.TintColor(data.TintHex),
-            HasAngelMutation: hasAngel,
-            OtherMutationCount: otherMutations);
-    }
+    private static BreedingParentViewState CreateBreedingParentView(VoidlingProfileProjection profile)
+        => new(
+            Id: profile.CreatureId,
+            Name: profile.DisplayName,
+            TintColor: ParseProfileTint(profile.TintHex),
+            HasAngelMutation: profile.HasAngelMutation,
+            OtherMutationCount: profile.OtherMutationCount);
 
     private BreedingPreviewViewState CreateBreedingPreviewView(BreedingPreview preview)
     {
