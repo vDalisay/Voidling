@@ -23,6 +23,8 @@ public partial class RaceScreen
 
     internal void ApplyPostRaceScreenPresentationFrame()
     {
+        RefreshRaceAppearanceContexts();
+
         if (!_coursePresentationPolished && _visuals.Count > 0)
         {
             _coursePresentationPolished = true;
