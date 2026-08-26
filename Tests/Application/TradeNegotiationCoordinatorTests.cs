@@ -40,6 +40,12 @@ public sealed class TradeNegotiationCoordinatorTests
         var remoteRoom = Assert.IsType<TradeNegotiationView>(pair.Remote.Facade.Current.ActiveNegotiation);
         Assert.Equal(pair.Remote.Primary.Name, hostRoom.RemoteOffer!.DisplayName);
         Assert.Equal(pair.Host.Primary.Name, remoteRoom.RemoteOffer!.DisplayName);
+        Assert.Equal(
+            AppearancePhenotypeResolver.ResolveSemantic(pair.Remote.Primary.Genome),
+            hostRoom.RemoteOffer.Appearance);
+        Assert.Equal(
+            AppearancePhenotypeResolver.ResolveSemantic(pair.Host.Primary.Genome),
+            remoteRoom.RemoteOffer.Appearance);
 
         Assert.True(pair.Host.Facade.SetAccepted(id, true).Success);
         Assert.True(pair.Host.State.Voidlings.Any(value => value.Id == pair.Host.Primary.Id));
@@ -243,7 +249,6 @@ public sealed class TradeNegotiationCoordinatorTests
         private LinkedTransport? _peer;
 
         public LinkedTransport(PlatformUserId localId) => LocalId = localId;
-        public PlatformUserId LocalId { get; }
         public MultiplayerAvailability Availability => MultiplayerAvailability.Available;
         public event Action<NetworkPacket>? PacketReceived;
         public event Action<PlatformUserId>? PeerSessionFailed;
