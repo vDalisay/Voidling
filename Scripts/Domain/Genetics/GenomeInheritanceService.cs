@@ -67,20 +67,20 @@ public sealed class GenomeInheritanceService
 
         var maxGrade = _rules.GradeWeights.Count - 1;
         var eligibleStats = new List<string>();
-        foreach (var statId in _rules.StatIds)
+        foreach (var candidateStatId in _rules.StatIds)
         {
-            if (BestParentalAllele(parentA, parentB, statId) < maxGrade)
-                eligibleStats.Add(statId);
+            if (BestParentalAllele(parentA, parentB, candidateStatId) < maxGrade)
+                eligibleStats.Add(candidateStatId);
         }
 
         if (eligibleStats.Count == 0)
             return;
 
         var statRandom = StableRandom.Create(seed, "inherit:ability:breakthrough:stat");
-        var statId = eligibleStats[statRandom.Next(eligibleStats.Count)];
-        var targetGrade = Math.Min(BestParentalAllele(parentA, parentB, statId) + 1, maxGrade);
-        var inherited = childGenome.AbilityGenes[statId];
-        var profileRandom = StableRandom.Create(seed, $"inherit:ability:breakthrough:{statId}:profile");
+        var selectedStatId = eligibleStats[statRandom.Next(eligibleStats.Count)];
+        var targetGrade = Math.Min(BestParentalAllele(parentA, parentB, selectedStatId) + 1, maxGrade);
+        var inherited = childGenome.AbilityGenes[selectedStatId];
+        var profileRandom = StableRandom.Create(seed, $"inherit:ability:breakthrough:{selectedStatId}:profile");
 
         var alleleA = inherited.AlleleA;
         var alleleB = inherited.AlleleB;
@@ -91,10 +91,10 @@ public sealed class GenomeInheritanceService
 
         // Re-resolve expression from the same stable expression substream so the new higher allele
         // follows the normal heterozygous expression rule instead of being automatically expressed.
-        childGenome.AbilityGenes[statId] = AbilityGeneExpression.CreatePair(
+        childGenome.AbilityGenes[selectedStatId] = AbilityGeneExpression.CreatePair(
             alleleA,
             alleleB,
-            StableRandom.Create(seed, $"express:{statId}"),
+            StableRandom.Create(seed, $"express:{selectedStatId}"),
             _rules);
     }
 
