@@ -18,11 +18,17 @@ public static class VoidlingVisualFactory
     private static readonly SpriteFrames RaceFrames = BuildRaceFrames(Definition);
 
     public static string DefinitionId => Definition.DefinitionId;
+    public static int FrameWidth => Definition.FrameWidth;
+    public static int FrameHeight => Definition.FrameHeight;
     public static float AdultWorldScale => Definition.AdultWorldScale;
     public static float RaceScale => Definition.RaceScale;
     public static float ShadowCenterYOffset => Definition.ShadowCenterYOffset;
     public static float HeldScaleMultiplier => Definition.HeldScaleMultiplier;
     public static float HeldSpriteYOffset => Definition.HeldSpriteYOffset;
+    public static float MutationAdultCenterYOffset => Definition.MutationAdultCenterYOffset;
+    public static float MutationCompactCenterYOffset => Definition.MutationCompactCenterYOffset;
+    public static float MutationCompactScaleThreshold => Definition.MutationCompactScaleThreshold;
+    public static float PortraitMutationCompactPixelThreshold => Definition.PortraitMutationCompactPixelThreshold;
 
     public static SpriteFrames GetWorldFrames() => WorldFrames;
 
@@ -89,10 +95,19 @@ public static class VoidlingVisualFactory
             throw new InvalidOperationException("Voidling frame dimensions must be positive.");
         if (definition.WorldFrameCount <= 0 || definition.RaceRunFrameCount <= 0 || definition.RaceSwimFrameCount <= 0)
             throw new InvalidOperationException("Voidling animation frame counts must be positive.");
+        if (definition.PortraitColumn < 0 || definition.PortraitRow < 0)
+            throw new InvalidOperationException("Voidling portrait coordinates cannot be negative.");
         if (definition.AdultWorldScale <= 0.0f || definition.ChildWorldScale <= 0.0f || definition.RaceScale <= 0.0f)
             throw new InvalidOperationException("Voidling presentation scales must be positive.");
         if (definition.AdultShadowRadii.X <= 0.0f || definition.AdultShadowRadii.Y <= 0.0f)
             throw new InvalidOperationException("Voidling shadow radii must be positive.");
+        if (definition.AdultHitboxSize.X <= 0.0f || definition.AdultHitboxSize.Y <= 0.0f ||
+            definition.ChildHitboxSize.X <= 0.0f || definition.ChildHitboxSize.Y <= 0.0f)
+            throw new InvalidOperationException("Voidling hitbox sizes must be positive.");
+        if (definition.HeldScaleMultiplier <= 0.0f)
+            throw new InvalidOperationException("Voidling held scale multiplier must be positive.");
+        if (definition.MutationCompactScaleThreshold <= 0.0f || definition.PortraitMutationCompactPixelThreshold <= 0.0f)
+            throw new InvalidOperationException("Voidling mutation visual thresholds must be positive.");
 
         ValidateAtlasCoverage(
             definition.BaseAtlas,
@@ -102,8 +117,20 @@ public static class VoidlingVisualFactory
             definition.WalkDownRow,
             definition.WalkUpRow,
             definition.WalkLeftRow,
-            definition.WalkRightRow,
-            definition.RaceRunRow,
+            definition.WalkRightRow);
+
+        ValidateAtlasCoverage(
+            definition.BaseAtlas,
+            definition.FrameWidth,
+            definition.FrameHeight,
+            definition.RaceRunFrameCount,
+            definition.RaceRunRow);
+
+        ValidateAtlasCoverage(
+            definition.BaseAtlas,
+            definition.FrameWidth,
+            definition.FrameHeight,
+            definition.PortraitColumn + 1,
             definition.PortraitRow);
 
         var swimAtlas = definition.SwimAtlas ?? definition.BaseAtlas;
