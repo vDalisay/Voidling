@@ -1,5 +1,6 @@
 using System;
 using Godot;
+using Voidling.Domain.Genetics;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
 
@@ -13,7 +14,7 @@ namespace VoidlingGame;
 /// </summary>
 public static class GameRules
 {
-    public const string AngelMutationId = "Angel";
+    public const string AngelMutationId = MutationIds.Angel;
 
     private static GameBalanceRules _balance = GameBalanceRules.DemoDefaults;
     private static StatCalculator _stats = new(_balance.Stats);
