@@ -38,6 +38,7 @@ public partial class GameSession : Node
     private SettingsUseCase? _settings;
     private VoidlingRosterUseCase? _roster;
     private RaceResultUseCase? _raceResults;
+    private LineageTreeProjectionService? _lineageTreeProjection;
 
     public void Configure(
         IGameStateRepository stateRepository,
@@ -49,7 +50,8 @@ public partial class GameSession : Node
         ShopUseCase shop,
         SettingsUseCase settings,
         VoidlingRosterUseCase roster,
-        RaceResultUseCase raceResults)
+        RaceResultUseCase raceResults,
+        LineageTreeProjectionService lineageTreeProjection)
     {
         if (IsInsideTree())
             throw new InvalidOperationException("GameSession must be configured before entering the scene tree.");
@@ -64,13 +66,14 @@ public partial class GameSession : Node
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _roster = roster ?? throw new ArgumentNullException(nameof(roster));
         _raceResults = raceResults ?? throw new ArgumentNullException(nameof(raceResults));
+        _lineageTreeProjection = lineageTreeProjection ?? throw new ArgumentNullException(nameof(lineageTreeProjection));
     }
 
     public override void _Ready()
     {
         if (_stateRepository == null || _audioSettings == null || _migrations == null ||
             _simulation == null || _training == null || _breeding == null || _shop == null ||
-            _settings == null || _roster == null || _raceResults == null)
+            _settings == null || _roster == null || _raceResults == null || _lineageTreeProjection == null)
         {
             throw new InvalidOperationException("GameSession must be created by the composition root.");
         }
