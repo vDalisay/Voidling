@@ -14,6 +14,7 @@ public partial class FamilyTreeView : Control
     private readonly Dictionary<string, PanelContainer> _cardPanels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, VoidlingData> _membersById = new(StringComparer.Ordinal);
     private readonly HashSet<string> _departedIds = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _archivedIds = new(StringComparer.Ordinal);
     private readonly List<string> _visibleMemberIds = new();
 
     private string _selectedId = "";
@@ -54,6 +55,13 @@ public partial class FamilyTreeView : Control
         string selectedId,
         IReadOnlyList<VoidlingData> activeVoidlings,
         IReadOnlyList<VoidlingData> departedVoidlings)
+        => Build(selectedId, activeVoidlings, departedVoidlings, Array.Empty<VoidlingData>());
+
+    private void Build(
+        string selectedId,
+        IReadOnlyList<VoidlingData> activeVoidlings,
+        IReadOnlyList<VoidlingData> departedVoidlings,
+        IReadOnlyList<VoidlingData> archivedVoidlings)
     {
         foreach (var child in GetChildren())
             child.QueueFree();
@@ -62,6 +70,7 @@ public partial class FamilyTreeView : Control
         _cardPanels.Clear();
         _membersById.Clear();
         _departedIds.Clear();
+        _archivedIds.Clear();
         _visibleMemberIds.Clear();
         _selectedId = selectedId;
         _highlightedConnectionKey = "";
@@ -72,6 +81,11 @@ public partial class FamilyTreeView : Control
         {
             _membersById[member.Id] = member;
             _departedIds.Add(member.Id);
+        }
+        foreach (var member in archivedVoidlings)
+        {
+            _membersById[member.Id] = member;
+            _archivedIds.Add(member.Id);
         }
 
         if (!_membersById.ContainsKey(selectedId))
@@ -122,7 +136,11 @@ public partial class FamilyTreeView : Control
                     new Vector2(startX + i * (cardWidth + horizontalGap), y),
                     new Vector2(cardWidth, cardHeight));
                 _baseCardRects[member.Id] = rect;
-                AddCard(member, rect, _departedIds.Contains(member.Id));
+                AddCard(
+                    member,
+                    rect,
+                    _departedIds.Contains(member.Id),
+                    _archivedIds.Contains(member.Id));
             }
         }
 
@@ -370,7 +388,7 @@ public partial class FamilyTreeView : Control
         return anchors.Count == 0 ? float.MaxValue : anchors.Average();
     }
 
-    private void AddCard(VoidlingData member, Rect2 rect, bool departed)
+    private void AddCard(VoidlingData member, Rect2 rect, bool departed, bool archived)
     {
         var panel = UiFactory.CreatePanel(rect.Size);
         panel.Position = rect.Position;
@@ -384,7 +402,7 @@ public partial class FamilyTreeView : Control
         panel.AddChild(column);
 
         var portrait = UiFactory.CreatePortrait(member, new Vector2(38, 38));
-        if (departed)
+        if (departed || archived)
             portrait.Modulate = new Color(0.55f, 0.55f, 0.55f, 0.72f);
         column.AddChild(portrait);
 
@@ -399,13 +417,15 @@ public partial class FamilyTreeView : Control
             : $"G{member.FamilyGeneration}";
         if (departed)
             generationText += " • LEFT";
+        else if (archived)
+            generationText += " • ARCHIVED";
 
         var detail = UiFactory.CreateLabel(generationText, 6);
         detail.HorizontalAlignment = HorizontalAlignment.Center;
         detail.MouseFilter = MouseFilterEnum.Ignore;
         if (member.InbreedingHistoryFlag)
             detail.AddThemeColorOverride("font_color", Color.FromHtml("#A75D55"));
-        else if (departed)
+        else if (departed || archived)
             detail.AddThemeColorOverride("font_color", Color.FromHtml("#7A7267"));
         column.AddChild(detail);
 
