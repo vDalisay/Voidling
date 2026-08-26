@@ -78,10 +78,10 @@ public partial class MainController
         box.AddChild(UiFactory.CreateLabel(Tr("UI_DAILY_PICK_HINT"), 7));
         box.AddChild(UiFactory.CreateLabel(Tr("UI_DAILY_ONCE_PER_DAY"), 7));
 
-        var owned = _session.State.Voidlings.ToArray();
-        var selectedId = owned.Any(value => value.Id == _selectedId)
+        var owned = _session.CreateActiveVoidlingProfileProjections().ToArray();
+        var selectedId = owned.Any(value => value.CreatureId == _selectedId)
             ? _selectedId
-            : owned.FirstOrDefault()?.Id ?? string.Empty;
+            : owned.FirstOrDefault()?.CreatureId ?? string.Empty;
         var dailyCourse = new RacePickerCourseViewState(
             RaceCourseCatalog.Demo.Id,
             RaceCourseCatalog.Demo.Version,
