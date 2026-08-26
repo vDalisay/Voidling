@@ -48,7 +48,7 @@ public partial class MainController
     private MultiplayerRaceSetupPanelState BuildMultiplayerRaceSetupState(string challengeId)
     {
         var preparation = MultiplayerRaceBridge.GetPreparation(challengeId);
-        var voidlings = _session.State.Voidlings
+        var voidlings = _session.CreateActiveVoidlingProfileProjections()
             .Select(creature =>
             {
                 var view = CreateRacePickerView(creature);
