@@ -39,13 +39,17 @@ public sealed class AppearancePhenotypeResolver
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
     }
 
-    public AppearancePhenotype Resolve(GenomeData genome)
+    /// <summary>
+    /// Resolves semantic phenotype without palette knowledge. This is safe for Presentation to use
+    /// when choosing mask layers/material effects because it contains no Godot or asset concerns.
+    /// </summary>
+    public static AppearancePhenotype ResolveSemantic(GenomeData genome)
     {
         ArgumentNullException.ThrowIfNull(genome);
 
         var color = ResolveRecessiveZero(
-            genome.ColorAlleleA,
-            genome.ColorAlleleB,
+            Math.Max(0, genome.ColorAlleleA),
+            Math.Max(0, genome.ColorAlleleB),
             genome.ExpressedColorIndex);
         var tone = ResolveEqual(
             NormalizeBinary(genome.ToneAlleleA),
@@ -61,11 +65,17 @@ public sealed class AppearancePhenotypeResolver
             genome.ExpressedCoatIndex);
 
         return new AppearancePhenotype(
-            ClampColor(color),
+            color,
             tone == AppearanceAlleles.MonoTone ? AppearanceTone.MonoTone : AppearanceTone.TwoTone,
             pattern,
             genome.ShinyAlleleA == AppearanceAlleles.Shiny || genome.ShinyAlleleB == AppearanceAlleles.Shiny,
             coat);
+    }
+
+    public AppearancePhenotype Resolve(GenomeData genome)
+    {
+        var semantic = ResolveSemantic(genome);
+        return semantic with { ColorAllele = ClampColor(semantic.ColorAllele) };
     }
 
     public string ResolveTint(GenomeData genome)
