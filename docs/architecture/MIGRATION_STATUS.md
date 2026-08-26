@@ -1,7 +1,7 @@
 # Architecture migration status
 
-**Branch:** current `main` plus active architecture/feature branches  
-**Baseline:** post-demo `main`  
+**Branch:** `agent/implementation-plan` over current `main`  
+**Baseline:** `main` at `940546fc0db82c76d538995bd577c124cf50f1eb`  
 **Purpose:** current truth for what has actually moved behind the architecture boundaries.
 
 `ARCHITECTURE.md` defines the durable target and rules. `RESTRUCTURING_PLAN.md` records the original research and migration strategy. `docs/AGENT_HANDOFF_IMPLEMENTATION_PLAN.md` is the current execution contract for remaining product work. This file records implementation status so humans and coding agents do not need to infer it from old checklist boxes.
@@ -17,7 +17,8 @@ Implemented seams include:
 - deterministic named RNG streams (`StableRandom`);
 - typed immutable `GameBalanceRules`;
 - ability-gene expression;
-- genome creation and inheritance;
+- genome creation and parent-only inheritance;
+- bounded rare +1 rank breakthrough behavior;
 - appearance/color resolution;
 - rare mutation inheritance;
 - relationship traversal and inbreeding burden;
@@ -26,14 +27,14 @@ Implemented seams include:
 - stat calculation/progression;
 - immutable race participant snapshots;
 - race performance formulas;
-- data-described demo race course/segments;
+- authored `RaceCourseCatalog` definitions with stable semantic course IDs/versions;
 - deterministic fixed-step `RaceSimulation` owning movement, stamina, cheer, glide endurance/failure, obstacle outcomes and finish order.
 
-Race simulation is frame-chunk independent and supports headless fast-forward through the exact same fixed-step path used during normal progression.
+Race simulation is frame-chunk independent and supports headless fast-forward through the exact same fixed-step path used during normal progression. The current authored catalog contains the original demo course plus a longer standard course using only existing deterministic mechanics.
 
 The old `GeneticsService` and `GameRules` remain compatibility facades for legacy callers. New deterministic rules belong in Domain rather than expanding those facades.
 
-### Application — Godot-free use cases
+### Application — Godot-free use cases and read models
 
 `Scripts/Application/**` is Godot-free and CI-enforced.
 
@@ -45,16 +46,18 @@ Implemented use cases/services include:
 - `AdvanceSimulationUseCase` for lifecycle/incubation/hatching;
 - `SettingsUseCase`;
 - `VoidlingRosterUseCase` for identity, world-position persistence, departure and failed-egg removal;
+- `LineageTreeProjectionService` for immutable pedigree/family-tree UI data;
+- `VoidlingProfileProjectionService` for immutable DNA/training/lineage/player-information data;
 - `RaceParticipantSnapshotFactory`;
-- `RaceEntryFactory` for immutable player/CPU race entry creation;
+- `RaceEntryFactory` for immutable player/CPU race entry creation and frozen course identity;
 - `RaceResultUseCase`;
 - `GameStateMigrationService`.
 
-Application returns data/results and mutates the supplied runtime aggregate. It does not render, persist files, play audio or call Godot APIs.
+Application returns data/results and mutates the supplied runtime aggregate where a use case owns a state transition. It does not render, persist files, play audio or call Godot APIs.
 
 ### Infrastructure
 
-Implemented adapters:
+Implemented adapters include:
 
 - `IGameStateRepository` → `GodotJsonGameStateRepository`;
 - `IAudioSettingsAdapter` → `GodotAudioSettingsAdapter`;
@@ -62,11 +65,7 @@ Implemented adapters:
 
 The existing save path remains `user://voidling_mvp_save.json`.
 
-Designer-facing active balance data lives in:
-
-- `Resources/Balance/demo_balance.tres`
-
-The Resource is loaded only by Bootstrap and converted before entering Application/Domain. Product invariants such as stable stat IDs, inbreeding tiers and fixed identity catalogs are intentionally not exposed as casual tuning knobs. Race tuning is not duplicated in the Inspector while the authored resource does not yet control those values.
+Designer-facing active balance data lives in `Resources/Balance/demo_balance.tres`. The Resource is loaded only by Bootstrap and converted before entering Application/Domain. Product invariants such as stable stat IDs, inbreeding tiers and fixed identity catalogs are intentionally not exposed as casual tuning knobs.
 
 ### Bootstrap / dependency composition
 
@@ -74,7 +73,7 @@ The Resource is loaded only by Bootstrap and converted before entering Applicati
 
 It loads the designer-authored balance Resource once, converts it to immutable domain rules, and supplies that same rules object to the Application services. The transitional `GameRules` facade is configured from the same object so legacy callers cannot drift onto a second ruleset.
 
-No DI container has been introduced. Manual composition remains small and readable.
+`VoidlingProfileProjectionService` and the lineage projection service are composed explicitly and exposed through narrow `GameSession` compatibility methods for scene-owned callers. No DI container has been introduced. Manual composition remains small and readable.
 
 The old `GameSession.Instance` service locator has been removed entirely. Scene-owned/root presentation code resolves the composed `GameSession` node once and passes or stores that explicit reference. CI rejects any future `GameSession.Instance` usage anywhere under `Scripts/**`.
 
@@ -90,7 +89,7 @@ Standalone Presentation components now include:
 - `DetailsScreen` for Stats/DNA/Visual tabs;
 - `ModalHost` for overlay/window lifetime;
 - `RaceScreen`, a Godot-only shell over the pure `RaceSimulation`;
-- `StatPresentationCatalog` for player-facing stat labels/colors;
+- `StatPresentationCatalog` for player-facing stat labels/colors/rank labels;
 - `VoidlingGroundVisualMetrics` for shared sprite-ground pivot/shadow proportions across world/challenge presentation;
 - `VoidlingVisualDefinition` + `VoidlingVisualFactory` for the canonical base Voidling art contract.
 
@@ -98,85 +97,94 @@ These components receive presentation-ready snapshots and emit intent where inte
 
 #### Centralized Voidling visual/art pipeline
 
-WP0 of the contextualized handoff is implemented on the active visual-pipeline branch.
+WP0 is implemented on the unified implementation branch.
 
-`Resources/Presentation/Voidlings/DefaultVoidlingVisual.tres` is now the single authoring source for base Voidling presentation. It owns the base/swim atlas references plus art-dependent layout and geometry: frame dimensions and rows, animation rates, portrait crop, adult/child/race scale, feet offsets, hitboxes, held offset, shadow geometry and mutation anchors.
+`Resources/Presentation/Voidlings/DefaultVoidlingVisual.tres` is the single authoring source for base Voidling presentation. It owns the base/swim atlas references plus art-dependent layout and geometry: frame dimensions and rows, animation rates, portrait crop, adult/child/race scale, feet offsets, hitboxes, held offset, shadow geometry and mutation anchors.
 
-`VoidlingVisualFactory` validates that definition and caches the shared world/race `SpriteFrames`. The following consumers no longer load or slice the base creature atlas themselves:
+`VoidlingVisualFactory` validates that definition and caches shared world/race `SpriteFrames`. The following consumers no longer load or slice the base creature atlas themselves:
 
 - local Garden `VoidlingActor`;
 - connected/remote Garden `RemoteVoidlingActor`;
 - single-player and multiplayer `RaceScreen` presentation;
 - `UiFactory` portraits/cards, which transitively covers breeding, race picking/results, details/inspection, trade screens, family tree and other portrait consumers.
 
-`VoidlingGroundVisualMetrics` and `VoidlingMutationVisualMetrics` now derive silhouette-dependent geometry/anchors from the same definition rather than preserving a second set of art constants.
+`VoidlingGroundVisualMetrics` and `VoidlingMutationVisualMetrics` derive silhouette-dependent geometry/anchors from the same definition rather than preserving a second set of art constants.
 
-The migration intentionally keeps the existing Sprout Lands textures referenced by the default `.tres`, so it changes architecture without changing the currently visible creature art. A production-art replacement can now update the resource (and source PNGs) without editing each consumer. `Assets/Voidlings/README.md` documents the artist workflow.
+The migration intentionally keeps the existing Sprout Lands textures referenced by the default `.tres`, so it changes architecture without changing currently visible creature art. A production-art replacement can update the resource and source PNGs without editing each consumer. `Assets/Voidlings/README.md` documents the artist workflow.
 
 The old `voidling-cats` branch was reviewed rather than copied wholesale. Its central-catalog idea was useful, but its display-name-keyed Pip/Mallow overrides and hard-coded asset rules are not part of the production architecture. Future multiple visual families require a stable semantic ID, not a creature name or texture path in saves.
 
-`RaceScreen` receives an immutable `RaceEntry`, maps simulation snapshots/events to sprites/camera/HUD/minimap/podium, sends cheer through `RaceSimulation.TryCheer`, and uses the simulator's fast-forward path. VFX has a separate non-authoritative RNG, so particle timing can no longer perturb race outcomes.
+The dedicated command-line visual smoke probe was removed after the normal build/import/runtime gates proved sufficient and the extra probe was not worth maintaining. CI keeps the cheap, durable no-bypass checks: it requires the canonical `.tres` and rejects direct base/swim atlas paths from C# consumers.
 
-Result presentation is also presentation-only: podium pop/tilt animations, confetti and the fourth-place embarrassment drop do not affect simulation state or result RNG.
+#### Race content presentation
 
-`ModalHost` uses deferred `QueueFree()` disposal for modal subtrees. This is required because close/navigation can be requested from a button signal owned by the subtree itself; synchronous `Free()` during that signal emission is unsafe in Godot.
+`RaceScreen` receives an immutable `RaceEntry`, reads the frozen `CourseDefinition`, maps simulation snapshots/events to sprites/camera/HUD/minimap/podium, sends cheer through `RaceSimulation.TryCheer`, and uses the simulator's fast-forward path. VFX has a separate non-authoritative RNG, so particle timing cannot perturb race outcomes.
 
-The legacy result-owning `Scripts/Race/RaceController*.cs` implementation has been removed.
+The standard race picker can now select the original `demo` course or `long-standard`. The daily friend race deliberately remains pinned to the original demo course so an already-saved daily attempt recreates the same course identity. Multiplayer also remains on its existing canonical demo-course protocol while using the same result-authoritative `RaceSimulation` and rules model.
 
-The root `MainController` still coordinates navigation and legacy HUD/family-tree/goodbye flows, but it receives/resolves the composed `GameSession` once rather than using global static access. Modal lifetime is delegated to `ModalHost`.
+Result presentation remains presentation-only: podium pop/tilt animations, confetti and the fourth-place embarrassment drop do not affect simulation state or result RNG.
 
-`GardenController` likewise holds one explicit session reference. `FamilyTreeView` receives edge-panning as view state rather than querying global settings.
+#### Player-information projections
 
-Stat display names/colors have moved out of `GameRules` into `StatPresentationCatalog`. Stable stat IDs and gameplay formulas remain outside Presentation.
+WP6 introduced `VoidlingProfileProjectionService` so UI does not need to traverse `Genome`, `TrainingPoints` or rare-trait collections to explain a Voidling.
+
+The projection separates:
+
+- DNA profile 1 rank;
+- DNA profile 2 rank;
+- expressed inherited potential;
+- current training points/level/progress;
+- current effective stat value;
+- active inbreeding burden;
+- historical inbreeding mark;
+- rare-trait founder/display information;
+- current visual/color DNA facts.
+
+The general race picker, daily race picker, multiplayer race setup, breeding parent cards, selected-Voidling HUD and Details screen now consume this projection for player-information rendering. `DetailsScreen` visibly distinguishes inherited DNA ranks from trained progress and shows the historical lineage mark without exposing an offspring probability calculator.
+
+Family Tree already consumes `LineageTreeProjectionService`, including archive-only ancestors, rather than traversing mutable save objects itself.
 
 ### Localization
 
-Godot's native translation pipeline is registered through the committed gettext catalogs.
+Godot's native translation pipeline is registered through the committed gettext catalog.
 
 `project.godot` registers source translation files directly. It intentionally does **not** reference importer-generated `.translation` files: generated translation artifacts may not exist yet when Godot first reads project settings on a clean checkout.
 
-Migrated representative UI includes:
-
-- global top navigation/currency label;
-- Settings;
-- Shop;
-- Breeding and breeding validation/risk text;
-- Race Picker;
-- Inventory;
-- Details Stats/DNA/Visual tabs and explanatory labels;
-- race result/placement messages introduced by the presentation polish pass;
-- multiplayer/trade presentation introduced by the later multiplayer foundation.
+Migrated representative UI includes global top navigation/currency, Settings, Shop, Breeding validation/risk text, Race Picker and course labels, Inventory, Details Stats/DNA/Visual tabs and lineage-history text, race result/placement messages, and multiplayer/trade presentation.
 
 Use semantic keys (`UI_*`) for new player-facing presentation text. User-created Voidling names remain literal.
 
-The direct Windows launcher still performs a blocking Godot import phase for ordinary imported assets before launch, but localization no longer depends on a generated CSV artifact or pre-existing `.godot` cache.
-
 ### Tests and CI
 
-The project has fast xUnit coverage for genetics, inbreeding, mutations, migration, lifecycle simulation, shop transactions, settings, roster operations, race performance, deterministic race simulation and multiplayer application behavior.
+The project has fast xUnit coverage for genetics, inbreeding, mutations, migration, lifecycle simulation, shop transactions, settings, roster operations, profile/lineage projections, race performance, deterministic race simulation and multiplayer application behavior.
 
 Race tests characterize:
 
-- current demo course geometry/terrain;
+- every authored course's geometry/terrain;
 - finish order/event equivalence across different elapsed-time chunk sizes;
 - normal progression versus fast-forward equivalence;
 - cheer as a simulation command;
-- simulation-owned auto-completion/placement.
+- simulation-owned auto-completion/placement;
+- immutable course identity in `RaceEntry`.
 
-CI performs the build/test/import/runtime sequence plus focused presentation/network smoke probes. Relevant gates include:
+Profile-projection tests characterize inherited potential versus trained progression, archive-backed mutation founder names, active burden versus historical marks, immutable snapshots, active-roster filtering and the absence of offspring-probability fields.
+
+CI performs the build/test/import/runtime sequence plus focused presentation/network smoke probes. Relevant gates are:
 
 1. game/test restore and Release build;
 2. architecture boundary enforcement;
-3. domain/application tests;
+3. Domain/Application tests;
 4. Debug build for Godot editor-side C# integration;
 5. blocking Godot `--import` resource import;
 6. committed localization-source validation;
 7. actual headless main-scene runtime smoke test;
-8. canonical Voidling visual pipeline smoke test;
-9. trade-panel interaction smoke test;
-10. two-process LAN connectivity and negotiated trade smoke tests.
+8. trade-panel interaction smoke test;
+9. two-process LAN connectivity smoke test;
+10. two-process durable negotiated trade smoke test.
 
-CI rejects Godot references in Domain/Application, rejects `GameRules` access from standalone `Scripts/Presentation/**`, forbids `GameSession.Instance` throughout `Scripts/**`, and rejects direct base/swim Voidling atlas paths from C# consumers. The visual smoke resolves world directions, race run/swim states, shared UI portrait construction, geometry and mutation anchors through `VoidlingVisualFactory`.
+CI rejects Godot references in Domain/Application, rejects `GameRules` access from standalone `Scripts/Presentation/**`, forbids `GameSession.Instance` throughout `Scripts/**`, rejects direct base/swim Voidling atlas paths from C# consumers and requires the canonical visual definition resource.
+
+The active unified branch is included in the push trigger so exact-head CI can run independently of pull-request event delivery.
 
 ## Intentionally transitional code
 
@@ -184,26 +192,21 @@ These files are **not** examples for new feature architecture.
 
 ### `GameSession`
 
-`Scripts/Services/GameSession*.cs` remains a Godot-owned compatibility/lifetime facade because legacy world/UI code already calls its public API. Most mutable gameplay operations delegate to Application use cases, but it still owns compatibility responsibilities such as:
-
-- save timing/event forwarding;
-- initial demo state/spawn placement;
-- presentation toast wording;
-- compatibility seed/ID allocation.
+`Scripts/Services/GameSession*.cs` remains a Godot-owned compatibility/lifetime facade because legacy world/UI code already calls its public API. Most mutable gameplay operations delegate to Application use cases, but it still owns compatibility responsibilities such as save timing/event forwarding, initial demo state/spawn placement, presentation toast wording and compatibility seed/ID allocation.
 
 It no longer provides global/static access. Do not add new feature rules here; new deterministic behavior belongs in Domain and player-action sequencing belongs in Application.
 
 ### `GameRules`
 
-`Scripts/Core/GameRules.cs` is now narrower. Player-facing stat labels/colors have moved to Presentation. It still exposes compatibility accessors for existing gameplay values/formulas, stable IDs, tint conversion and mutation lookup.
+`Scripts/Core/GameRules.cs` is narrower. Player-facing stat labels/colors/rank names used by newly migrated UI have moved to Presentation catalogs/read models. It still exposes compatibility accessors for existing gameplay values/formulas and some legacy callers.
 
 Do not add new deterministic formulas or presentation catalogs to `GameRules`. Move remaining responsibilities inward/outward as their callers migrate.
 
 ### `MainController`
 
-The root object is now primarily navigation, persistent garden HUD coordination, race handoff and a few legacy modal flows. Settings, Shop, Breeding, Race Picker, Inventory and Details no longer own their rendering inside the controller.
+The root object is primarily navigation, persistent garden HUD coordination, race handoff and a few legacy modal flows. Settings, Shop, Breeding, Race Picker, Inventory and Details no longer own their rendering inside the controller.
 
-Family Tree, goodbye/reset confirmation and the persistent selected-Voidling HUD remain legacy code. Extract them when those features are next substantially modified rather than performing a visual rewrite solely for symmetry.
+The selected-Voidling HUD still renders inside `MainController`, but its stat/DNA values now come from `VoidlingProfileProjectionService` rather than direct genetics/stat traversal. Family Tree uses the Application lineage projection. Goodbye/reset confirmations remain legacy controller-owned presentation and can be extracted when next substantially modified.
 
 ### Garden
 
@@ -211,68 +214,50 @@ Family Tree, goodbye/reset confirmation and the persistent selected-Voidling HUD
 
 Its session dependency is explicit; there is no static service-locator access.
 
-## Completed major migration phases
-
-### Phase B — deterministic domain seams
-
-Completed for the current demo feature set. Genetics, breeding-related rules, stats and racing now have focused pure-C# collaborators/characterization tests.
-
-### Phase C — persistence/application seams
-
-Completed for the current demo's high-churn operations. Persistence is behind a repository port and migrations/use cases are testable without scenes.
-
-### Phase D — composition/service-locator removal
-
-Completed for the current demo. Bootstrap is explicit, `GameSession.Instance` has been deleted, and CI prevents it from being reintroduced. Current scene/root controllers use explicit node-owned references while standalone Presentation components receive view state and emit intent.
-
-### Phase E — race simulation extraction
-
-Completed for the demo race:
-
-```text
-immutable RaceEntry / participant snapshots
-  → pure RaceCourse + RaceSimulation
-  → RaceState snapshots / RaceEvents
-  → Godot RaceScreen presentation
-  → placement event
-  → Application race reward handoff
-```
-
-There is one result-authoritative simulator. Animation, camera and VFX edits cannot consume its outcome RNG or change finish order. Headless batch/fast-forward simulation is possible.
-
-### Phase F — UI decomposition/localization foundation
-
-Completed to the intended foundation level:
-
-- shared `ModalHost` with signal-safe deferred disposal;
-- standalone Settings, Shop, Breeding, Race Picker, Inventory and Details screens;
-- committed gettext localization/project registration with clean-clone validation;
-- Presentation boundary enforcement;
-- stat presentation catalog separated from gameplay rules;
-- shared Voidling ground/shadow visual metrics across garden and race presentation.
-
-Phase F deliberately does **not** require every legacy panel to be rewritten before feature work can continue. Future screens should follow these reference components.
-
-### Phase G — active designer Resources
-
-Completed for rules/content that currently have a real designer-authored source. `GameBalanceResource`/`Resources/Balance/demo_balance.tres` provide active gameplay tuning, while `VoidlingVisualDefinition`/`Resources/Presentation/Voidlings/DefaultVoidlingVisual.tres` provide presentation-only art authoring. Gameplay Resources are converted before entering Domain/Application; presentation Resources remain on the Godot presentation edge.
-
-Do not create speculative Resource classes for roadmap systems before those systems consume authored data. Add focused Resources alongside the first concrete feature that requires them.
+## Completed implementation-plan work packages
 
 ### WP0 — centralized Voidling visual pipeline
 
-Implemented on `agent/contextualized-implementation-plan`, pending exact-head CI before merge. The required consumer migrations, validation, no-bypass CI rule and dedicated headless visual smoke are present. No save/network schema change was needed because all current Voidlings still resolve the same semantic default visual definition.
+Implemented on `agent/implementation-plan`. Garden, remote Garden, race and portraits resolve through the canonical visual definition/factory. The static no-bypass CI guard remains; the extra dedicated visual smoke command was removed as unnecessary maintenance overhead.
+
+### WP1 — genetics data model reconciliation
+
+Implemented for confirmed v1 rules: exactly two visible ability-DNA profiles, parent-only ordinary inheritance, stable deterministic substreams and a rare breakthrough capped to one rank above parental potential. Deeper ancestry is not used to resurrect ordinary stat alleles.
+
+### WP2 — pedigree and inbreeding correctness
+
+Implemented with deterministic relationship fixtures, active burden/history separation, archive-safe lineage traversal and typed Application family-tree projections.
+
+### WP3 — breeding outcome orchestration
+
+Implemented with player-initiated eligibility validation, one-time frozen egg/genetic outcome creation, typed failures and rollback if persistence fails before success is presented.
+
+### WP4 — hatching/lifecycle progression
+
+Implemented/verified with explicit elapsed-duration progression, one-time deterministic state transitions, hatch-failure idempotence and regression coverage for different elapsed-time chunking. No force-hatch or unconfirmed trophy/reincarnation recipe was added.
+
+### WP5 — race progression/balance extension
+
+Implemented to the currently safe confirmed scope. `RaceCourseCatalog` owns authored course identity/data, `RaceEntry` freezes the selected definition, the player can choose the original or longer standard course, and deterministic replay/chunking coverage runs across authored courses. No personality modifier or presentation-owned outcome logic was introduced.
+
+### WP6 — player information and UX projections
+
+Implemented to the current confirmed scope. `VoidlingProfileProjectionService` supplies immutable player-information read models, UI distinguishes inherited potential from training, DNA profile ranks and lineage history are readable, and no exact offspring-genetics probability calculator was introduced.
+
+### WP7 — production art ingestion
+
+Not started as code work. WP0 has made this a content operation, but the actual production art revision should only be ingested when the intended source atlas/assets are supplied and this unified implementation branch is ready to merge/review. No consumer-specific texture override should be added.
 
 ## Next architecture migrations
 
 These are incremental follow-ups, not reasons to rewrite stable demo code:
 
-1. When Family Tree, the persistent selected-Voidling HUD, goodbye/reset flows or another legacy UI area is next substantially changed, move it behind presentation-ready view state + intent events.
-2. Move remaining presentation-only tint/mutation formatting out of `GameRules` as related legacy callers migrate; do not duplicate domain identity/rules in Presentation.
-3. Introduce additional Godot Resources only when the next roadmap feature has concrete designer-authored content/tuning that consumes them.
-4. Add ADRs for durable architecture decisions when a decision first needs history/trade-off context; do not create ceremonial ADRs for obvious local refactors.
+1. Extract goodbye/reset or other legacy controller-owned presentation when those flows are next substantially changed.
+2. Move remaining presentation-only tint/formatting compatibility helpers out of `GameRules` as their related legacy callers migrate; do not duplicate domain identity/rules in Presentation.
+3. Introduce additional Godot Resources only when a roadmap feature has concrete designer-authored content/tuning that consumes them.
+4. Add ADRs only when a durable decision needs history/trade-off context; do not create ceremonial ADRs for obvious local refactors.
 5. If multiple base Voidling visual families become a confirmed product feature, introduce a stable semantic visual-family ID and extend the existing visual catalog; do not key art selection to display names or persisted resource paths.
 
 ## Merge invariant
 
-Architecture changes must not intentionally alter current demo gameplay, race balance or persisted genetics. Before merge, the exact PR head must pass the full CI sequence above, and the PR description must reflect the actual remaining transitional boundaries.
+Architecture changes must not unintentionally alter persisted genetics, existing daily-race identity, multiplayer protocol or deterministic results for an unchanged course/ruleset. Before merge, the exact PR head must pass the full CI sequence above, and the PR description must reflect the actual remaining transitional boundaries.
