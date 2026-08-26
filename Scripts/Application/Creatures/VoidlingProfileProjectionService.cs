@@ -26,6 +26,31 @@ public sealed record VoidlingRareTraitProfileProjection(
     int GenerationFromFounder,
     bool CanTransmit);
 
+/// <summary>
+/// Immutable semantic appearance read model. UI/presentation never needs to traverse the mutable
+/// Genome to understand color/tone/pattern/shiny/coat genetics.
+/// </summary>
+public sealed record VoidlingAppearanceProfileProjection(
+    int ColorDnaProfile1,
+    int ColorDnaProfile2,
+    int ExpressedColorProfileIndex,
+    int ExpressedColorAllele,
+    int ToneDnaProfile1,
+    int ToneDnaProfile2,
+    int ExpressedToneProfileIndex,
+    AppearanceTone Tone,
+    int PatternDnaProfile1,
+    int PatternDnaProfile2,
+    int ExpressedPatternProfileIndex,
+    int PatternAllele,
+    int ShinyDnaProfile1,
+    int ShinyDnaProfile2,
+    bool Shiny,
+    int CoatDnaProfile1,
+    int CoatDnaProfile2,
+    int ExpressedCoatProfileIndex,
+    int CoatAllele);
+
 public sealed record VoidlingProfileProjection(
     string CreatureId,
     string DisplayName,
@@ -40,18 +65,20 @@ public sealed record VoidlingProfileProjection(
     int ColorDnaProfile2,
     int ExpressedColorProfileIndex,
     IReadOnlyList<VoidlingStatProfileProjection> Stats,
-    IReadOnlyList<VoidlingRareTraitProfileProjection> RareTraits);
+    IReadOnlyList<VoidlingRareTraitProfileProjection> RareTraits,
+    VoidlingAppearanceProfileProjection Appearance);
 
 /// <summary>
 /// Builds immutable player-information read models from the mutable save aggregate. UI receives
-/// explicit DNA-profile values, trained progression and lineage labels without traversing Genome,
-/// TrainingPoints, RareTraits or lineage collections itself. This intentionally reports current
-/// facts only; it does not calculate exact offspring probabilities.
+/// explicit DNA-profile values, trained progression, semantic appearance and lineage labels without
+/// traversing Genome, TrainingPoints, RareTraits or lineage collections itself. This intentionally
+/// reports current facts only; it does not calculate exact offspring probabilities.
 /// </summary>
 public sealed class VoidlingProfileProjectionService
 {
     private readonly IReadOnlyList<string> _statIds;
     private readonly StatCalculator _stats;
+    private readonly AppearancePhenotypeResolver _appearance;
     private readonly LineageArchiveService _lineage = new();
 
     public VoidlingProfileProjectionService(GameBalanceRules rules)
@@ -59,6 +86,7 @@ public sealed class VoidlingProfileProjectionService
         ArgumentNullException.ThrowIfNull(rules);
         _statIds = rules.Genetics.StatIds;
         _stats = new StatCalculator(rules.Stats);
+        _appearance = new AppearancePhenotypeResolver(rules.Appearance);
     }
 
     public VoidlingProfileProjection? Create(GameStateData state, string creatureId)
@@ -116,6 +144,28 @@ public sealed class VoidlingProfileProjectionService
         var otherMutationCount = rareTraits.Count(trait =>
             !string.Equals(trait.TraitId, MutationIds.Angel, StringComparison.OrdinalIgnoreCase));
 
+        var phenotype = _appearance.Resolve(creature.Genome);
+        var appearance = new VoidlingAppearanceProfileProjection(
+            creature.Genome.ColorAlleleA,
+            creature.Genome.ColorAlleleB,
+            creature.Genome.ExpressedColorIndex,
+            phenotype.ColorAllele,
+            creature.Genome.ToneAlleleA,
+            creature.Genome.ToneAlleleB,
+            creature.Genome.ExpressedToneIndex,
+            phenotype.Tone,
+            creature.Genome.PatternAlleleA,
+            creature.Genome.PatternAlleleB,
+            creature.Genome.ExpressedPatternIndex,
+            phenotype.PatternAllele,
+            creature.Genome.ShinyAlleleA,
+            creature.Genome.ShinyAlleleB,
+            phenotype.Shiny,
+            creature.Genome.CoatAlleleA,
+            creature.Genome.CoatAlleleB,
+            creature.Genome.ExpressedCoatIndex,
+            phenotype.CoatAllele);
+
         return new VoidlingProfileProjection(
             creature.Id,
             creature.Name,
@@ -130,7 +180,8 @@ public sealed class VoidlingProfileProjectionService
             creature.Genome.ColorAlleleB,
             creature.Genome.ExpressedColorIndex,
             stats,
-            rareTraits);
+            rareTraits,
+            appearance);
     }
 
     private IReadOnlyDictionary<string, string> BuildLineageNameIndex(GameStateData state)
