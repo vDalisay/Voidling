@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using Voidling.Application.Multiplayer.Trading;
+using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Multiplayer;
@@ -98,11 +99,8 @@ public partial class TradeNegotiationPanel : VBoxContainer
                 var selected = trade.LocalOffer != null &&
                                string.Equals(trade.LocalOffer.AssetId, choice.AssetId, StringComparison.Ordinal);
                 var captured = choice;
-                var cardContainer = UiFactory.CreateVoidlingCard(
-                    choice.DisplayName,
-                    UiFactory.ParseTint(choice.TintHex),
-                    choice.HasAngelMutation,
-                    choice.OtherMutationCount,
+                var cardContainer = CreateChoiceCard(
+                    choice,
                     pressed =>
                     {
                         if (pressed)
@@ -151,6 +149,38 @@ public partial class TradeNegotiationPanel : VBoxContainer
         AddChild(statusLabel);
     }
 
+    private static VBoxContainer CreateChoiceCard(
+        TradeVoidlingChoiceView choice,
+        Action<bool> toggled,
+        out Button card)
+    {
+        var entry = new VBoxContainer { CustomMinimumSize = new Vector2(84, 78) };
+        entry.AddThemeConstantOverride("separation", 1);
+
+        card = UiFactory.CreateButton(string.Empty);
+        card.CustomMinimumSize = new Vector2(80, 58);
+        card.ToggleMode = true;
+        card.KeepPressedOutside = true;
+        var portrait = VoidlingAppearancePresenter.CreatePortrait(
+            choice.TintHex,
+            choice.Appearance,
+            choice.HasAngelMutation,
+            choice.OtherMutationCount,
+            new Vector2(48, 48));
+        portrait.Position = new Vector2(16, 4);
+        portrait.Size = new Vector2(48, 48);
+        card.AddChild(portrait);
+        card.Toggled += pressed => toggled(pressed);
+        entry.AddChild(card);
+
+        var label = UiFactory.CreateLabel(choice.DisplayName, 6);
+        label.HorizontalAlignment = HorizontalAlignment.Center;
+        label.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        label.AddThemeColorOverride("font_color", Color.FromHtml("#2F4437"));
+        entry.AddChild(label);
+        return entry;
+    }
+
     private Control BuildOfferSlot(
         string titleText,
         TradeVoidlingChoiceView? offer,
@@ -177,8 +207,9 @@ public partial class TradeNegotiationPanel : VBoxContainer
         }
         else
         {
-            var portrait = UiFactory.CreatePortrait(
-                UiFactory.ParseTint(offer.TintHex),
+            var portrait = VoidlingAppearancePresenter.CreatePortrait(
+                offer.TintHex,
+                offer.Appearance,
                 offer.HasAngelMutation,
                 offer.OtherMutationCount,
                 new Vector2(46, 46));
