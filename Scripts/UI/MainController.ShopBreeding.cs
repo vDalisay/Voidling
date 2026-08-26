@@ -98,7 +98,8 @@ public partial class MainController : Node
         => new(
             Id: profile.CreatureId,
             Name: profile.DisplayName,
-            TintColor: ParseProfileTint(profile.TintHex),
+            TintHex: profile.TintHex,
+            Appearance: ToAppearancePhenotype(profile.Appearance),
             HasAngelMutation: profile.HasAngelMutation,
             OtherMutationCount: profile.OtherMutationCount);
 
