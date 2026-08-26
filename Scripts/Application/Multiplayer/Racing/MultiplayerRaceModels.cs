@@ -9,6 +9,7 @@ using System.Text.Json;
 using Voidling.Application.Multiplayer.Challenges;
 using Voidling.Application.Ports.Multiplayer;
 using Voidling.Application.Racing;
+using Voidling.Domain.Genetics;
 using Voidling.Domain.Racing;
 using Voidling.Domain.Rules;
 using VoidlingGame;
@@ -20,7 +21,8 @@ public sealed record MultiplayerRaceEntrant(
     string OwnedCreatureId,
     RaceParticipantSnapshot Participant,
     bool HasAngelMutation,
-    int OtherMutationCount);
+    int OtherMutationCount,
+    AppearancePhenotype? Appearance = null);
 
 public sealed record MultiplayerRaceStartPayload(
     int StartVersion,
@@ -46,14 +48,19 @@ public sealed record MultiplayerRaceOperationResult(bool Success, string? Error)
 /// <summary>
 /// Creates the immutable race participant selected from local ownership. The network participant ID
 /// is namespaced by Steam identity so two peers cannot collide by using the same local creature ID.
+/// Cosmetic appearance is frozen as semantic phenotype only and never affects lockstep simulation.
 /// </summary>
 public sealed class MultiplayerRaceSelectionFactory
 {
     private readonly RaceParticipantSnapshotFactory _snapshots;
+    private readonly AppearancePhenotypeResolver _appearance;
 
     public MultiplayerRaceSelectionFactory(GameBalanceRules rules)
-        => _snapshots = new RaceParticipantSnapshotFactory(
-            rules ?? throw new ArgumentNullException(nameof(rules)));
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+        _snapshots = new RaceParticipantSnapshotFactory(rules);
+        _appearance = new AppearancePhenotypeResolver(rules.Appearance);
+    }
 
     public bool TryCreate(
         GameStateData state,
@@ -99,7 +106,8 @@ public sealed class MultiplayerRaceSelectionFactory
             creature.Id,
             snapshot,
             hasAngel,
-            otherMutations);
+            otherMutations,
+            _appearance.Resolve(creature.Genome));
         return true;
     }
 }
@@ -192,7 +200,8 @@ public sealed class MultiplayerRaceEntryFactory
             .Select(value => new RaceEntrant(
                 value.Participant,
                 value.HasAngelMutation,
-                value.OtherMutationCount))
+                value.OtherMutationCount,
+                value.Appearance))
             .ToArray();
         race = new ResolvedMultiplayerRace(
             payload,
@@ -344,6 +353,16 @@ public static class MultiplayerRaceValidation
             !IsFiniteNonNegative(participant.Stamina))
         {
             error = "Multiplayer race entrant snapshot is invalid.";
+            return false;
+        }
+
+        if (entrant.Appearance is { } appearance &&
+            (appearance.ColorAllele < 0 ||
+             !Enum.IsDefined(appearance.Tone) ||
+             appearance.PatternAllele < 0 ||
+             appearance.CoatAllele < 0))
+        {
+            error = "Multiplayer race appearance metadata is invalid.";
             return false;
         }
 
