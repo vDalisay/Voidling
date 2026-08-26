@@ -11,7 +11,8 @@ namespace Voidling.Application.Racing;
 public sealed record RaceEntrant(
     RaceParticipantSnapshot Participant,
     bool HasAngelMutation,
-    int OtherMutationCount);
+    int OtherMutationCount,
+    AppearancePhenotype? Appearance = null);
 
 public sealed record RaceEntry(
     ulong SimulationSeed,
@@ -25,6 +26,8 @@ public sealed record RaceEntry(
 /// Creates the complete immutable race entry before presentation starts. The live race therefore
 /// never reads mutable owned-creature state and CPU generation cannot depend on Godot frame/VFX
 /// behavior. CPU generation intentionally preserves the demo's existing seed/name/genome rules.
+/// Appearance is frozen alongside the entrant but remains presentation-only and is never consumed
+/// by RaceSimulation.
 /// </summary>
 public sealed class RaceEntryFactory
 {
@@ -34,6 +37,7 @@ public sealed class RaceEntryFactory
     private readonly RaceParticipantSnapshotFactory _snapshotFactory;
     private readonly GenomeFactory _genomeFactory;
     private readonly ColorPhenotypeResolver _colorResolver;
+    private readonly AppearancePhenotypeResolver _appearanceResolver;
 
     public RaceEntryFactory(GameBalanceRules rules)
     {
@@ -41,6 +45,7 @@ public sealed class RaceEntryFactory
         _snapshotFactory = new RaceParticipantSnapshotFactory(rules);
         _genomeFactory = new GenomeFactory(rules.Genetics);
         _colorResolver = new ColorPhenotypeResolver(rules.Appearance);
+        _appearanceResolver = new AppearancePhenotypeResolver(rules.Appearance);
     }
 
     public RaceEntry Create(VoidlingData selected, ulong simulationSeed)
@@ -90,7 +95,11 @@ public sealed class RaceEntryFactory
                 TintHex = _colorResolver.ResolveTint(genome),
                 TrainingPoints = _rules.Genetics.StatIds.ToDictionary(id => id, _ => 0)
             };
-            entrants.Add(new RaceEntrant(_snapshotFactory.Create(cpu), false, 0));
+            entrants.Add(new RaceEntrant(
+                _snapshotFactory.Create(cpu),
+                false,
+                0,
+                _appearanceResolver.Resolve(genome)));
         }
 
         return new RaceEntry(simulationSeed, _rules.Racing, entrants.AsReadOnly())
@@ -111,6 +120,7 @@ public sealed class RaceEntryFactory
         return new RaceEntrant(
             _snapshotFactory.Create(selected),
             hasAngel,
-            otherMutationCount);
+            otherMutationCount,
+            _appearanceResolver.Resolve(selected.Genome));
     }
 }
