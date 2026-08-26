@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using Godot;
 using Voidling.Application.Multiplayer.Challenges;
 using Voidling.Application.Multiplayer.Racing;
+using Voidling.Domain.Genetics;
+using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Multiplayer;
@@ -10,7 +12,8 @@ namespace Voidling.Presentation.UI.Multiplayer;
 public sealed record MultiplayerRaceSetupVoidlingView(
     string Id,
     string Name,
-    Color TintColor,
+    string TintHex,
+    AppearancePhenotype Appearance,
     bool HasAngelMutation,
     int OtherMutationCount,
     string StatSummary);
@@ -122,21 +125,39 @@ public partial class MultiplayerRaceSetupPanel : VBoxContainer
         foreach (var creature in state.Voidlings)
         {
             var captured = creature;
-            var entry = UiFactory.CreateVoidlingCard(
-                creature.Name,
-                creature.TintColor,
+            var entry = new VBoxContainer { CustomMinimumSize = new Vector2(84, 78) };
+            entry.AddThemeConstantOverride("separation", 1);
+
+            var card = UiFactory.CreateButton(string.Empty);
+            card.CustomMinimumSize = new Vector2(80, 58);
+            card.ToggleMode = true;
+            card.KeepPressedOutside = true;
+            var portrait = VoidlingAppearancePresenter.CreatePortrait(
+                creature.TintHex,
+                creature.Appearance,
                 creature.HasAngelMutation,
                 creature.OtherMutationCount,
-                pressed =>
-                {
-                    if (!pressed)
-                        return;
-                    selectedId = captured.Id;
-                    stats.Text = captured.StatSummary;
-                    foreach (var pair in cardButtons)
-                        pair.Value.ButtonPressed = pair.Key == captured.Id;
-                },
-                out var card);
+                new Vector2(48, 48));
+            portrait.Position = new Vector2(16, 4);
+            portrait.Size = new Vector2(48, 48);
+            card.AddChild(portrait);
+            card.Toggled += pressed =>
+            {
+                if (!pressed)
+                    return;
+                selectedId = captured.Id;
+                stats.Text = captured.StatSummary;
+                foreach (var pair in cardButtons)
+                    pair.Value.ButtonPressed = pair.Key == captured.Id;
+            };
+            entry.AddChild(card);
+
+            var label = UiFactory.CreateLabel(creature.Name, 6);
+            label.HorizontalAlignment = HorizontalAlignment.Center;
+            label.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+            label.AddThemeColorOverride("font_color", Color.FromHtml("#2F4437"));
+            entry.AddChild(label);
+
             card.ButtonPressed = creature.Id == selectedId;
             cardButtons[creature.Id] = card;
             cards.AddChild(entry);
