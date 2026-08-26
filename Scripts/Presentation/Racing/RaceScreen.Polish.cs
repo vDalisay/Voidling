@@ -13,6 +13,7 @@ public partial class RaceScreen
 
     public override void _EnterTree()
     {
+        BeginAppearanceBinding();
         AddChild(new RaceScreenPolishDriver
         {
             Name = "PresentationPolishDriver",
