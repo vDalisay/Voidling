@@ -7,15 +7,10 @@ public partial class RaceScreen
 {
     private int _appearanceEntrantIndex;
 
-    public override void _EnterTree()
+    private void BeginAppearanceBinding()
     {
         _appearanceEntrantIndex = 0;
         ChildEnteredTree += ApplyAppearanceToEntrantSprite;
-    }
-
-    public override void _ExitTree()
-    {
-        ChildEnteredTree -= ApplyAppearanceToEntrantSprite;
     }
 
     private void ApplyAppearanceToEntrantSprite(Node child)
