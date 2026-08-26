@@ -21,6 +21,9 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "0,1,0.01")]
     public float HigherAlleleExpressionChance { get; set; } = 0.70f;
 
+    [Export(PropertyHint.Range, "0,0.1,0.001")]
+    public float AbilityRankBreakthroughChance { get; set; } = 0.01f;
+
     [Export(PropertyHint.Range, "0,0.1,0.0001")]
     public float RareFounderTraitChance { get; set; } = 0.0005f;
 
@@ -66,6 +69,7 @@ public partial class GameBalanceResource : Resource
             Genetics = defaults.Genetics with
             {
                 HigherAlleleExpressionChance = Probability(HigherAlleleExpressionChance),
+                AbilityRankBreakthroughChance = Probability(AbilityRankBreakthroughChance),
                 RareFounderTraitChance = Probability(RareFounderTraitChance),
                 RareTraitTransmissionChance = Probability(RareTraitTransmissionChance),
                 RelatedAncestorDepth = Math.Max(1, RelatedAncestorDepth)
