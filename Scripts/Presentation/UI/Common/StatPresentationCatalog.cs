@@ -6,7 +6,7 @@ namespace Voidling.Presentation.UI.Common;
 
 /// <summary>
 /// Presentation identity for the five stable gameplay stats. Gameplay stat IDs and formulas
-/// remain domain-owned; this catalog only maps those IDs to player-facing labels and colors.
+/// remain domain-owned; this catalog only maps semantic values to player-facing labels/colors.
 /// </summary>
 public static class StatPresentationCatalog
 {
@@ -35,4 +35,14 @@ public static class StatPresentationCatalog
 
     public static Color ColorFor(string statId)
         => IdentityColors.TryGetValue(statId, out var color) ? color : Colors.White;
+
+    public static string RankFor(int rank) => Math.Clamp(rank, 0, 5) switch
+    {
+        0 => "E",
+        1 => "D",
+        2 => "C",
+        3 => "B",
+        4 => "A",
+        _ => "S"
+    };
 }
