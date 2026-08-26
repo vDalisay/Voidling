@@ -9,6 +9,7 @@ namespace Voidling.Presentation.Voidlings;
 [GlobalClass]
 public partial class VoidlingVisualDefinition : Resource
 {
+    [ExportGroup("Identity / Assets")]
     [Export]
     public string DefinitionId { get; set; } = "default";
 
@@ -18,6 +19,7 @@ public partial class VoidlingVisualDefinition : Resource
     [Export]
     public Texture2D SwimAtlas { get; set; } = null!;
 
+    [ExportGroup("Atlas Layout")]
     [Export(PropertyHint.Range, "1,512,1")]
     public int FrameWidth { get; set; } = 48;
 
@@ -66,20 +68,15 @@ public partial class VoidlingVisualDefinition : Resource
     [Export]
     public int PortraitRow { get; set; } = 0;
 
+    [ExportGroup("World Geometry")]
     [Export(PropertyHint.Range, "0.01,4,0.01")]
     public float AdultWorldScale { get; set; } = 0.62f;
 
     [Export(PropertyHint.Range, "0.01,4,0.01")]
     public float ChildWorldScale { get; set; } = 0.31f;
 
-    [Export(PropertyHint.Range, "0.01,4,0.01")]
-    public float RaceScale { get; set; } = 0.72f;
-
     [Export]
     public float WorldSpriteCenterYOffsetAtScaleOne { get; set; } = -8.0f;
-
-    [Export]
-    public float RaceSpriteCenterYOffset { get; set; } = -8.0f;
 
     [Export]
     public Vector2 AdultHitboxSize { get; set; } = new(23.0f, 27.0f);
@@ -98,4 +95,24 @@ public partial class VoidlingVisualDefinition : Resource
 
     [Export]
     public float ShadowCenterYOffset { get; set; } = 0.8f;
+
+    [ExportGroup("Race Geometry")]
+    [Export(PropertyHint.Range, "0.01,4,0.01")]
+    public float RaceScale { get; set; } = 0.72f;
+
+    [Export]
+    public float RaceSpriteCenterYOffset { get; set; } = -8.0f;
+
+    [ExportGroup("Mutation Anchors")]
+    [Export]
+    public float MutationAdultCenterYOffset { get; set; } = -17.0f;
+
+    [Export]
+    public float MutationCompactCenterYOffset { get; set; } = -8.0f;
+
+    [Export(PropertyHint.Range, "0.01,4,0.01")]
+    public float MutationCompactScaleThreshold { get; set; } = 0.5f;
+
+    [Export(PropertyHint.Range, "1,512,1")]
+    public float PortraitMutationCompactPixelThreshold { get; set; } = 28.0f;
 }
