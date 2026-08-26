@@ -55,7 +55,8 @@ public partial class MainController
                 return new MultiplayerRaceSetupVoidlingView(
                     view.Id,
                     view.Name,
-                    view.TintColor,
+                    view.TintHex,
+                    view.Appearance,
                     view.HasAngelMutation,
                     view.OtherMutationCount,
                     view.StatSummary);
