@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Voidling.Domain.Racing;
@@ -21,6 +22,85 @@ public sealed class RaceSimulationTests
         Assert.Equal(RaceTerrain.Glide, Course.TerrainAt(1150.0f, false));
         Assert.Equal(RaceTerrain.FailedGlideSwim, Course.TerrainAt(1150.0f, true));
         Assert.Equal(new[] { 340.0f, 890.0f, 1510.0f, 1660.0f }, Course.Obstacles);
+        Assert.Same(RaceCourseCatalog.Demo.Course, Course);
+    }
+
+    [Fact]
+    public void RaceCourseCatalog_ProvidesStableSemanticIdsAndLongerStandardContent()
+    {
+        Assert.True(RaceCourseCatalog.TryGet("demo", 1, out var demo));
+        Assert.Same(RaceCourseCatalog.Demo, demo);
+        Assert.True(RaceCourseCatalog.TryGet("long-standard", 1, out var longer));
+        Assert.Same(RaceCourseCatalog.LongStandard, longer);
+        Assert.False(RaceCourseCatalog.TryGet("long-standard", 2, out _));
+
+        Assert.True(longer.Course.EndX > demo.Course.EndX);
+        Assert.True(longer.Course.Segments.Count > demo.Course.Segments.Count);
+        Assert.True(longer.Course.Obstacles.Count > demo.Course.Obstacles.Count);
+        Assert.Equal(2, longer.Course.Segments.Count(segment => segment.Kind == RaceSegmentKind.Swim));
+        Assert.Equal(1, longer.Course.Segments.Count(segment => segment.Kind == RaceSegmentKind.Glide));
+    }
+
+    [Fact]
+    public void RaceCourse_CanonicalizesSegmentAndObstacleAuthoringOrder()
+    {
+        var course = new RaceCourse(
+            startX: 0.0f,
+            endX: 300.0f,
+            glideLaunchStartX: 180.0f,
+            segments: new[]
+            {
+                new RaceCourseSegment("finish", 240.0f, 300.0f, RaceSegmentKind.Ground),
+                new RaceCourseSegment("glide", 200.0f, 240.0f, RaceSegmentKind.Glide),
+                new RaceCourseSegment("start", 0.0f, 100.0f, RaceSegmentKind.Ground),
+                new RaceCourseSegment("swim", 100.0f, 200.0f, RaceSegmentKind.Swim)
+            },
+            obstacles: new[] { 275.0f, 25.0f, 160.0f });
+
+        Assert.Equal(new[] { "start", "swim", "glide", "finish" }, course.Segments.Select(segment => segment.Id));
+        Assert.Equal(new[] { 25.0f, 160.0f, 275.0f }, course.Obstacles);
+    }
+
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public void RaceCourse_RejectsInvalidResultAffectingGeometry(
+        bool createGap,
+        bool createOverlap,
+        bool duplicateIds)
+    {
+        var secondStart = createGap ? 110.0f : createOverlap ? 90.0f : 100.0f;
+        var secondId = duplicateIds ? "first" : "second";
+
+        Assert.Throws<ArgumentException>(() => new RaceCourse(
+            startX: 0.0f,
+            endX: 200.0f,
+            glideLaunchStartX: 50.0f,
+            segments: new[]
+            {
+                new RaceCourseSegment("first", 0.0f, 100.0f, RaceSegmentKind.Ground),
+                new RaceCourseSegment(secondId, secondStart, 200.0f, RaceSegmentKind.Ground)
+            },
+            obstacles: Array.Empty<float>()));
+    }
+
+    [Fact]
+    public void RaceCourse_RejectsMultipleGlideSegmentsUntilSimulatorSupportsThemExplicitly()
+    {
+        Assert.Throws<ArgumentException>(() => new RaceCourse(
+            startX: 0.0f,
+            endX: 300.0f,
+            glideLaunchStartX: 80.0f,
+            segments: new[]
+            {
+                new RaceCourseSegment("ground", 0.0f, 100.0f, RaceSegmentKind.Ground),
+                new RaceCourseSegment("glide-a", 100.0f, 150.0f, RaceSegmentKind.Glide),
+                new RaceCourseSegment("middle", 150.0f, 200.0f, RaceSegmentKind.Ground),
+                new RaceCourseSegment("glide-b", 200.0f, 250.0f, RaceSegmentKind.Glide),
+                new RaceCourseSegment("finish", 250.0f, 300.0f, RaceSegmentKind.Ground)
+            },
+            obstacles: Array.Empty<float>()));
     }
 
     [Fact]
@@ -43,6 +123,31 @@ public sealed class RaceSimulationTests
             Assert.Equal(fineState.CurrentStamina, coarseState.CurrentStamina, 3);
             Assert.True(fineState.Finished);
             Assert.True(coarseState.Finished);
+        }
+    }
+
+    [Fact]
+    public void EveryAuthoredCourse_ReplaysIdenticallyAcrossElapsedChunking()
+    {
+        foreach (var definition in RaceCourseCatalog.All)
+        {
+            var fine = new RaceSimulation(definition.Course, Rules, Participants(), 7331UL);
+            var coarse = new RaceSimulation(definition.Course, Rules, Participants(), 7331UL);
+
+            var fineEvents = RunWithElapsedChunks(fine, RaceSimulation.FixedStepSeconds);
+            var coarseEvents = RunWithElapsedChunks(coarse, 0.137);
+
+            Assert.Equal(fine.FinishOrder, coarse.FinishOrder);
+            Assert.Equal(fineEvents, coarseEvents);
+            Assert.Equal(fine.FixedStepCount, coarse.FixedStepCount);
+            foreach (var participant in Participants())
+            {
+                var fineState = fine.GetDeterministicStateSnapshot().Participants
+                    .Single(value => value.ParticipantId == participant.CreatureId);
+                var coarseState = coarse.GetDeterministicStateSnapshot().Participants
+                    .Single(value => value.ParticipantId == participant.CreatureId);
+                Assert.Equal(fineState, coarseState);
+            }
         }
     }
 
