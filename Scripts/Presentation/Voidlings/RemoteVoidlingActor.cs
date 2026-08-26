@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using Godot;
 using Voidling.Application.Multiplayer;
-using Voidling.Domain.Genetics;
 using VoidlingGame;
 
 namespace Voidling.Presentation.Voidlings;
@@ -67,13 +66,15 @@ public partial class RemoteVoidlingActor : Node2D
         _sprite.Position = new Vector2(0, VoidlingGroundVisualMetrics.SpriteCenterYOffset(_baseScale));
 
         // Connected-zone packets carry phenotype only, never the owner's save Genome or any asset
-        // path. A local transient homozygous render genome lets the same centralized visual factory
-        // apply the phenotype without duplicating dominance or shader selection in multiplayer UI.
-        var renderGenome = CreateRenderGenome(snapshot);
-        VoidlingVisualFactory.ApplyAppearance(
+        // path. Reuse the presentation adapter so remote Garden rendering follows the same semantic
+        // appearance-to-material path as every other projected/networked Voidling surface.
+        VoidlingAppearanceVisualAdapter.Apply(
             _sprite,
-            renderGenome,
             snapshot.TintHex,
+            snapshot.AppearanceTone,
+            snapshot.PatternAllele,
+            snapshot.Shiny,
+            snapshot.CoatAllele,
             VoidlingAppearanceContext.World);
 
         var rareTraits = snapshot.RareTraitIds ?? Array.Empty<string>();
@@ -129,27 +130,6 @@ public partial class RemoteVoidlingActor : Node2D
             new Vector2(0, VoidlingGroundVisualMetrics.ShadowCenterYOffset),
             shadowRadii,
             new Color(0.20f, 0.24f, 0.20f, 0.16f));
-    }
-
-    private static GenomeData CreateRenderGenome(SharedVoidlingSnapshot snapshot)
-    {
-        var tone = snapshot.AppearanceTone == AppearanceAlleles.MonoTone
-            ? AppearanceAlleles.MonoTone
-            : AppearanceAlleles.TwoTone;
-        var shiny = snapshot.Shiny ? AppearanceAlleles.Shiny : AppearanceAlleles.NonShiny;
-        var pattern = Math.Max(0, snapshot.PatternAllele);
-        var coat = Math.Max(0, snapshot.CoatAllele);
-        return new GenomeData
-        {
-            ToneAlleleA = tone,
-            ToneAlleleB = tone,
-            PatternAlleleA = pattern,
-            PatternAlleleB = pattern,
-            ShinyAlleleA = shiny,
-            ShinyAlleleB = shiny,
-            CoatAlleleA = coat,
-            CoatAlleleB = coat
-        };
     }
 
     private void DrawEllipse(Vector2 center, Vector2 radii, Color color, int points = 20)
