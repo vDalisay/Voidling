@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.Voidlings;
 
 namespace VoidlingGame;
 
@@ -16,9 +17,6 @@ public static class UiFactory
 
     private static readonly Texture2D IconTexture =
         GD.Load<Texture2D>(UiRoot + "Icons/All Icons.png");
-
-    private static readonly Texture2D CharacterTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
 
     private static readonly Font PixelFont = GD.Load<Font>(
         "res://Assets/Sprout Lands - UI Pack - Basic pack/fonts/pixelFont-7-8x14-sproutLands.ttf");
@@ -109,15 +107,9 @@ public static class UiFactory
         int otherMutationCount,
         Vector2 minimumSize)
     {
-        var atlas = new AtlasTexture
-        {
-            Atlas = CharacterTexture,
-            Region = new Rect2(0, 0, 48, 48)
-        };
-
         var portrait = new TextureRect
         {
-            Texture = atlas,
+            Texture = VoidlingVisualFactory.CreatePortraitTexture(),
             CustomMinimumSize = minimumSize,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
