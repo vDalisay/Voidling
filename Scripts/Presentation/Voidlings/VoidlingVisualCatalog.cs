@@ -16,7 +16,7 @@ public static class VoidlingVisualCatalog
 
     private const int PipFrameWidth = 32;
     private const int PipFrameHeight = 32;
-    private const int PipFrameCount = 7;
+    private const int PipFrameCount = 9;
 
     private static readonly Texture2D LegacyTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
