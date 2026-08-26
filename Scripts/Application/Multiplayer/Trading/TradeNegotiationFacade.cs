@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Voidling.Application.Ports.Multiplayer;
+using Voidling.Domain.Genetics;
 using VoidlingGame;
 
 namespace Voidling.Application.Multiplayer.Trading;
@@ -13,7 +14,8 @@ public sealed record TradeVoidlingChoiceView(
     string DisplayName,
     string TintHex,
     bool HasAngelMutation,
-    int OtherMutationCount);
+    int OtherMutationCount,
+    AppearancePhenotype? Appearance = null);
 
 public sealed record TradeInviteView(string NegotiationId, string FromDisplayName);
 
@@ -134,7 +136,8 @@ public sealed class TradeNegotiationFacade
                 selected.DisplayName,
                 selected.TintHex,
                 selected.HasAngelMutation,
-                selected.OtherMutationCount);
+                selected.OtherMutationCount,
+                selected.Appearance);
         if (!_previews.Publish(negotiationId, preview))
         {
             return TradeNegotiationOperationResult.Failed(
@@ -236,7 +239,8 @@ public sealed class TradeNegotiationFacade
                     localPreview.DisplayName,
                     localPreview.TintHex,
                     localPreview.HasAngelMutation,
-                    localPreview.OtherMutationCount);
+                    localPreview.OtherMutationCount,
+                    localPreview.Appearance);
             }
         }
 
@@ -250,7 +254,8 @@ public sealed class TradeNegotiationFacade
                 preview.DisplayName,
                 preview.TintHex,
                 preview.HasAngelMutation,
-                preview.OtherMutationCount);
+                preview.OtherMutationCount,
+                preview.Appearance);
         }
 
         return new TradeNegotiationView(
@@ -281,7 +286,8 @@ public sealed class TradeNegotiationFacade
                     voidling.Name,
                     voidling.TintHex,
                     hasAngel,
-                    Math.Max(0, voidling.RareTraits.Count - (hasAngel ? 1 : 0)));
+                    Math.Max(0, voidling.RareTraits.Count - (hasAngel ? 1 : 0)),
+                    AppearancePhenotypeResolver.ResolveSemantic(voidling.Genome));
             })
             .ToArray();
 
