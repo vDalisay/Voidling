@@ -255,20 +255,25 @@ public sealed class TradeTransferService
             return false;
         }
 
-        var incomingIds = new HashSet<(TradeAssetKind Kind, string Id)>();
+        // Egg IDs become creature IDs when they hatch, so every incoming asset shares one stable
+        // identity namespace regardless of asset kind. This prevents a trade from creating a save
+        // that can later contain two different objects with the same durable ID.
+        var incomingAssetIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var creature in voidlings)
         {
             if (!IsValidIncomingCreature(creature) ||
-                !incomingIds.Add((TradeAssetKind.Voidling, creature.Id)))
+                !incomingAssetIds.Add(creature.Id))
             {
-                error = "Incoming trade contains an invalid or duplicate Voidling.";
+                error = "Incoming trade contains an invalid or duplicate Voidling identity.";
                 return false;
             }
 
             if (state.Voidlings.Any(v => v.Id == creature.Id) ||
-                state.DepartedVoidlings.Any(v => v.Id == creature.Id))
+                state.DepartedVoidlings.Any(v => v.Id == creature.Id) ||
+                state.OwnedEggs.Any(e => e.Id == creature.Id) ||
+                state.StoreEggs.Any(e => e.Id == creature.Id))
             {
-                error = $"Voidling '{creature.Id}' already exists in this save.";
+                error = $"Asset identity '{creature.Id}' already exists in this save.";
                 return false;
             }
         }
@@ -276,16 +281,19 @@ public sealed class TradeTransferService
         foreach (var egg in eggs)
         {
             if (!IsValidIncomingEgg(egg) ||
-                !incomingIds.Add((TradeAssetKind.Egg, egg.Id)))
+                !incomingAssetIds.Add(egg.Id))
             {
-                error = "Incoming trade contains an invalid or duplicate egg.";
+                error = "Incoming trade contains an invalid or duplicate egg identity.";
                 return false;
             }
 
             if (state.OwnedEggs.Any(e => e.Id == egg.Id) ||
-                state.StoreEggs.Any(e => e.Id == egg.Id))
+                state.StoreEggs.Any(e => e.Id == egg.Id) ||
+                state.Voidlings.Any(v => v.Id == egg.Id) ||
+                state.DepartedVoidlings.Any(v => v.Id == egg.Id) ||
+                state.LineageArchive.Any(entry => entry.CreatureId == egg.Id))
             {
-                error = $"Egg '{egg.Id}' already exists in this save.";
+                error = $"Asset identity '{egg.Id}' already exists in this save.";
                 return false;
             }
         }
@@ -294,6 +302,16 @@ public sealed class TradeTransferService
             .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.CreatureId))
             .GroupBy(entry => entry.CreatureId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
+        foreach (var entry in lineageById.Values)
+        {
+            if (state.OwnedEggs.Any(egg => egg.Id == entry.CreatureId) ||
+                state.StoreEggs.Any(egg => egg.Id == entry.CreatureId))
+            {
+                error = $"Incoming lineage identity '{entry.CreatureId}' conflicts with an existing egg.";
+                return false;
+            }
+        }
 
         foreach (var creature in voidlings)
         {
@@ -307,6 +325,11 @@ public sealed class TradeTransferService
 
         foreach (var egg in eggs)
         {
+            if (lineageById.ContainsKey(egg.Id))
+            {
+                error = $"Incoming egg identity '{egg.Id}' conflicts with a creature lineage identity.";
+                return false;
+            }
             if (!HasLineageRoot(lineageById, egg.ParentAId) ||
                 !HasLineageRoot(lineageById, egg.ParentBId))
             {
