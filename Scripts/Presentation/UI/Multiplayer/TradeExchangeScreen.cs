@@ -1,5 +1,7 @@
 using System;
 using Godot;
+using Voidling.Domain.Genetics;
+using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Multiplayer;
@@ -9,7 +11,8 @@ public sealed record TradeExchangeAssetView(
     bool IsEgg,
     string TintHex,
     bool HasAngelMutation,
-    int OtherMutationCount);
+    int OtherMutationCount,
+    AppearancePhenotype? Appearance = null);
 
 public sealed record TradeExchangeScreenState(
     TradeExchangeAssetView? Outgoing,
@@ -192,8 +195,9 @@ public partial class TradeExchangeScreen : Control
     {
         if (!asset.IsEgg)
         {
-            var portrait = UiFactory.CreatePortrait(
-                ParseTint(asset.TintHex),
+            var portrait = VoidlingAppearancePresenter.CreatePortrait(
+                asset.TintHex,
+                asset.Appearance,
                 asset.HasAngelMutation,
                 asset.OtherMutationCount,
                 new Vector2(68, 68));
@@ -208,12 +212,6 @@ public partial class TradeExchangeScreen : Control
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered
         };
-    }
-
-    private static Color ParseTint(string tintHex)
-    {
-        try { return Color.FromHtml(tintHex); }
-        catch { return Color.FromHtml("#F6F0C9"); }
     }
 
     private static Vector2[] BuildCircle(float radius, int points)
