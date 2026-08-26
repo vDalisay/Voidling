@@ -97,8 +97,7 @@ jobs:
           fi
 
       # Start the actual main scene after imports. Godot can return zero for some editor scan
-      # errors, so inspect the runtime log as well as the process exit code. The default Garden
-      # constructs VoidlingVisualFactory, which validates the canonical base/run/swim atlas layout.
+      # errors, so inspect the runtime log as well as the process exit code.
       - name: Runtime smoke test
         shell: bash
         run: |
@@ -106,6 +105,23 @@ jobs:
           timeout 20s godot --headless --path . --quit-after 30 2>&1 | tee godot-runtime.log
           if grep -E '^(ERROR|SCRIPT ERROR):' godot-runtime.log; then
             echo 'Godot runtime emitted an error.'
+            exit 1
+          fi
+
+      # Exercise the canonical presentation factory itself. This resolves world direction frames,
+      # race run/swim frames, the shared UiFactory portrait path, art-authored geometry and mutation
+      # anchors from DefaultVoidlingVisual.tres. A malformed incoming art revision must fail here.
+      - name: Voidling visual pipeline smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 20s godot --headless --path . -- --voidling-visual-smoke 2>&1 | tee voidling-visual-smoke.log
+          if ! grep -q 'VOIDLING_VISUAL_SMOKE_SUCCESS' voidling-visual-smoke.log; then
+            echo 'Canonical Voidling visual definition did not resolve every required presentation state.'
+            exit 1
+          fi
+          if grep -E '^(ERROR|SCRIPT ERROR):' voidling-visual-smoke.log; then
+            echo 'Voidling visual smoke emitted a Godot error.'
             exit 1
           fi
 
