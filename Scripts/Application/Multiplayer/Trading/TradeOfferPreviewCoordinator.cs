@@ -2,20 +2,23 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using Voidling.Application.Ports.Multiplayer;
+using Voidling.Domain.Genetics;
 
 namespace Voidling.Application.Multiplayer.Trading;
 
 /// <summary>
 /// Presentation-only snapshot for the Voidling currently placed into a trading-room slot. The
 /// authoritative durable trade still uses TradeAssetReference; none of these cosmetic fields are
-/// trusted for ownership, lineage, persistence, or commit validation.
+/// trusted for ownership, lineage, persistence, or commit validation. Appearance is semantic only
+/// so a peer never receives another player's mutable genome or presentation asset paths.
 /// </summary>
 public sealed record TradeVoidlingOfferPreview(
     string AssetId,
     string DisplayName,
     string TintHex,
     bool HasAngelMutation,
-    int OtherMutationCount);
+    int OtherMutationCount,
+    AppearancePhenotype? Appearance = null);
 
 public sealed class TradeOfferPreviewCoordinator
 {
@@ -235,11 +238,23 @@ public sealed class TradeOfferPreviewCoordinator
     }
 
     private static bool IsValidPreview(TradeVoidlingOfferPreview? preview)
-        => preview == null ||
-           (!string.IsNullOrWhiteSpace(preview.AssetId) && preview.AssetId.Length <= 128 &&
-            !string.IsNullOrWhiteSpace(preview.DisplayName) && preview.DisplayName.Length <= 64 &&
-            !string.IsNullOrWhiteSpace(preview.TintHex) && preview.TintHex.Length <= 32 &&
-            preview.OtherMutationCount is >= 0 and <= 64);
+    {
+        if (preview == null)
+            return true;
+        if (string.IsNullOrWhiteSpace(preview.AssetId) || preview.AssetId.Length > 128 ||
+            string.IsNullOrWhiteSpace(preview.DisplayName) || preview.DisplayName.Length > 64 ||
+            string.IsNullOrWhiteSpace(preview.TintHex) || preview.TintHex.Length > 32 ||
+            preview.OtherMutationCount is < 0 or > 64)
+        {
+            return false;
+        }
+
+        return preview.Appearance is not { } appearance ||
+               (appearance.ColorAllele >= 0 &&
+                Enum.IsDefined(appearance.Tone) &&
+                appearance.PatternAllele >= 0 &&
+                appearance.CoatAllele >= 0);
+    }
 
     private sealed class PreviewWire
     {
