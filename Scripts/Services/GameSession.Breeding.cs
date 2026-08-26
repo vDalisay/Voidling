@@ -35,34 +35,44 @@ public partial class GameSession
 
     public bool TryBreed(string parentAId, string parentBId, Vector2 eggWorldPosition)
     {
-        var preview = GetBreedingPreviewData(parentAId, parentBId);
-        if (!preview.CanBreed)
-        {
-            if (preview.Failure == BreedingFailure.ParentNotAdult)
-                ToastRequested?.Invoke("Both parents must be adults.");
-            else if (preview.Failure == BreedingFailure.ParentOnCooldown)
-                ToastRequested?.Invoke("A parent is still on breeding cooldown.");
-            return false;
-        }
-
         var parentAName = NameFor(parentAId);
         var parentBName = NameFor(parentBId);
-        var result = _breeding!.Execute(
+        var previousSeedCounter = State.SeedCounter;
+        var result = _breeding!.ExecuteAndPersist(
             State,
             parentAId,
             parentBId,
             NextSeed(),
             NewId(),
             eggWorldPosition.X,
-            eggWorldPosition.Y);
+            eggWorldPosition.Y,
+            _stateRepository!);
 
         if (!result.Succeeded)
+        {
+            // Seed allocation is part of the durable breeding transaction. Failed validation or a
+            // failed save must not consume an authoritative RNG seed that never produced an egg.
+            State.SeedCounter = previousSeedCounter;
+            ToastRequested?.Invoke(result.Failure switch
+            {
+                BreedingFailure.SameParent => "Choose two different Voidlings.",
+                BreedingFailure.ParentNotAdult => "Both parents must be adults.",
+                BreedingFailure.ParentOnCooldown => "A parent is still on breeding cooldown.",
+                BreedingFailure.PersistenceFailed => "Could not save the new egg. Breeding was rolled back.",
+                BreedingFailure.DuplicateAssetId => "Could not create a unique egg. Please try again.",
+                BreedingFailure.InvalidEggId => "Could not create a valid egg. Please try again.",
+                _ => "Choose two adults."
+            });
             return false;
+        }
 
+        // ExecuteAndPersist has already durably written this exact state. Only now may presentation
+        // observe/celebrate the new egg; animation remains downstream of authoritative state.
+        StateChanged?.Invoke();
         var warning = result.Related
             ? $" Egg carries level {result.ChildBurden} inbreeding risk ({result.HatchFailurePercent}%)."
             : "";
-        SaveAndNotify($"Breeding produced an egg.{warning}");
+        ToastRequested?.Invoke($"Breeding produced an egg.{warning}");
         RaiseGardenEvent($"{parentAName} and {parentBName} produced a new egg.");
         return true;
     }
