@@ -39,9 +39,13 @@ public partial class VoidlingActor : Node2D
             SpriteFrames = VoidlingVisualFactory.GetWorldFrames(),
             Scale = Vector2.One * _baseScale,
             Position = new Vector2(0, _baseSpriteY),
-            Modulate = GameRules.TintColor(data.TintHex),
             ZIndex = 2
         };
+        VoidlingVisualFactory.ApplyAppearance(
+            _sprite,
+            data.Genome,
+            data.TintHex,
+            VoidlingAppearanceContext.World);
         AddChild(_sprite);
         _sprite.Play("walk_down");
 
