@@ -82,7 +82,9 @@ public sealed record GameBalanceRules(
             GradeWeights: Array.AsReadOnly(new[] { 10, 24, 34, 21, 9, 2 }),
             HigherAlleleExpressionChance: 0.70,
             AbilityRankBreakthroughChance: 0.01,
-            ColorAlleleCount: 10,
+            // Chao-style appearance baseline: 14 stable colour alleles. Existing Voidling palette
+            // indices 0-9 are preserved; four new colours are appended so old saves do not shift.
+            ColorAlleleCount: 14,
             RareFounderTraitChance: 0.0005,
             RareTraitTransmissionChance: 0.10,
             FounderTraitIds: Array.AsReadOnly(new[] { "Lustrous", "Prismatic", "Aurora" }),
@@ -98,7 +100,11 @@ public sealed record GameBalanceRules(
             "#D4A7E8",
             "#E9B690",
             "#AFCB7A",
-            "#D9D1C6"
+            "#D9D1C6",
+            "#E56B63",
+            "#78CBE8",
+            "#8E6C56",
+            "#343941"
         })),
         Breeding: new BreedingRules(
             CooldownSeconds: 8.0f,
