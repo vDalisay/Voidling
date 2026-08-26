@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Voidling.Domain.Breeding;
+using Voidling.Domain.Genetics;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
 using VoidlingGame;
@@ -32,6 +33,8 @@ public sealed record LineageMemberProjection(
     bool InbreedingHistoryFlag,
     int? ActiveInbreedingBurden,
     LineageMemberPresence Presence,
+    bool HasAngelMutation,
+    int OtherMutationCount,
     IReadOnlyList<LineageStatProjection> Stats,
     IReadOnlyList<string> RareTraitIds);
 
@@ -41,7 +44,8 @@ public sealed record LineageTreeProjection(
 
 /// <summary>
 /// Builds immutable, presentation-ready lineage snapshots. Presentation never needs to traverse
-/// mutable save DTOs to discover parents, departed members or archive-only ancestors.
+/// mutable save DTOs to discover parents, departed members, mutation adornments or archive-only
+/// ancestors.
 /// </summary>
 public sealed class LineageTreeProjectionService
 {
@@ -113,6 +117,8 @@ public sealed class LineageTreeProjectionService
             archive.InbreedingHistoryFlag,
             ActiveInbreedingBurden: null,
             LineageMemberPresence.Archived,
+            HasAngelMutation: false,
+            OtherMutationCount: 0,
             Array.Empty<LineageStatProjection>(),
             Array.Empty<string>());
     }
@@ -133,6 +139,10 @@ public sealed class LineageTreeProjectionService
             .Where(trait => !string.IsNullOrWhiteSpace(trait.TraitId))
             .Select(trait => trait.TraitId)
             .ToArray() ?? Array.Empty<string>();
+        var hasAngel = rareTraitIds.Any(traitId =>
+            string.Equals(traitId, MutationIds.Angel, StringComparison.OrdinalIgnoreCase));
+        var otherMutationCount = rareTraitIds.Count(traitId =>
+            !string.Equals(traitId, MutationIds.Angel, StringComparison.OrdinalIgnoreCase));
 
         return new LineageMemberProjection(
             creature.Id,
@@ -144,6 +154,8 @@ public sealed class LineageTreeProjectionService
             creature.InbreedingHistoryFlag,
             Math.Max(0, creature.InbreedingBurdenLevel),
             presence,
+            hasAngel,
+            otherMutationCount,
             stats,
             rareTraitIds);
     }
