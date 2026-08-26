@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Application.Breeding;
 
 namespace VoidlingGame;
 
@@ -12,13 +13,11 @@ public partial class FamilyTreeView : Control
     private static readonly Vector2 ViewportSize = new(425, 252);
     private readonly Dictionary<string, Rect2> _baseCardRects = new(StringComparer.Ordinal);
     private readonly Dictionary<string, PanelContainer> _cardPanels = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, VoidlingData> _membersById = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _departedIds = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _archivedIds = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, LineageMemberProjection> _membersById = new(StringComparer.Ordinal);
     private readonly List<string> _visibleMemberIds = new();
 
-    private string _selectedId = "";
-    private string _highlightedConnectionKey = "";
+    private string _selectedId = string.Empty;
+    private string _highlightedConnectionKey = string.Empty;
     private Vector2 _panOffset;
     private Vector2 _contentSize;
     private bool _panning;
@@ -37,9 +36,9 @@ public partial class FamilyTreeView : Control
 
     private sealed class ConnectionPath
     {
-        public string Key { get; init; } = "";
-        public string ParentId { get; init; } = "";
-        public string ChildId { get; init; } = "";
+        public string Key { get; init; } = string.Empty;
+        public string ParentId { get; init; } = string.Empty;
+        public string ChildId { get; init; } = string.Empty;
         public List<ConnectionSegment> Segments { get; } = new();
     }
 
@@ -51,54 +50,33 @@ public partial class FamilyTreeView : Control
         MouseFilter = MouseFilterEnum.Stop;
     }
 
-    public void Build(
-        string selectedId,
-        IReadOnlyList<VoidlingData> activeVoidlings,
-        IReadOnlyList<VoidlingData> departedVoidlings)
-        => Build(selectedId, activeVoidlings, departedVoidlings, Array.Empty<VoidlingData>());
-
-    private void Build(
-        string selectedId,
-        IReadOnlyList<VoidlingData> activeVoidlings,
-        IReadOnlyList<VoidlingData> departedVoidlings,
-        IReadOnlyList<VoidlingData> archivedVoidlings)
+    public void Build(LineageTreeProjection projection)
     {
+        ArgumentNullException.ThrowIfNull(projection);
+
         foreach (var child in GetChildren())
             child.QueueFree();
 
         _baseCardRects.Clear();
         _cardPanels.Clear();
         _membersById.Clear();
-        _departedIds.Clear();
-        _archivedIds.Clear();
         _visibleMemberIds.Clear();
-        _selectedId = selectedId;
-        _highlightedConnectionKey = "";
+        _selectedId = projection.SelectedCreatureId;
+        _highlightedConnectionKey = string.Empty;
 
-        foreach (var member in activeVoidlings)
-            _membersById[member.Id] = member;
-        foreach (var member in departedVoidlings)
-        {
-            _membersById[member.Id] = member;
-            _departedIds.Add(member.Id);
-        }
-        foreach (var member in archivedVoidlings)
-        {
-            _membersById[member.Id] = member;
-            _archivedIds.Add(member.Id);
-        }
+        foreach (var member in projection.Members)
+            _membersById[member.CreatureId] = member;
 
-        if (!_membersById.ContainsKey(selectedId))
+        if (!_membersById.ContainsKey(_selectedId))
             return;
 
-        var allMembers = _membersById.Values.ToList();
-        var connectedIds = CollectConnectedFamily(selectedId, allMembers, _membersById);
+        var connectedIds = CollectConnectedFamily(_selectedId, projection.Members, _membersById);
         var members = connectedIds.Select(id => _membersById[id]).ToList();
         _visibleMemberIds.AddRange(connectedIds);
 
         var groups = members
-            .GroupBy(v => v.FamilyGeneration)
-            .OrderBy(g => g.Key)
+            .GroupBy(member => member.FamilyGeneration)
+            .OrderBy(group => group.Key)
             .ToList();
 
         const float cardWidth = 108.0f;
@@ -107,9 +85,13 @@ public partial class FamilyTreeView : Control
         const float verticalGap = 50.0f;
         const float margin = 28.0f;
 
-        var widest = groups.Count == 0 ? 1 : groups.Max(g => g.Count());
-        var contentWidth = Math.Max(ViewportSize.X, margin * 2 + widest * cardWidth + Math.Max(0, widest - 1) * horizontalGap);
-        var contentHeight = Math.Max(ViewportSize.Y, margin * 2 + groups.Count * cardHeight + Math.Max(0, groups.Count - 1) * verticalGap);
+        var widest = groups.Count == 0 ? 1 : groups.Max(group => group.Count());
+        var contentWidth = Math.Max(
+            ViewportSize.X,
+            margin * 2 + widest * cardWidth + Math.Max(0, widest - 1) * horizontalGap);
+        var contentHeight = Math.Max(
+            ViewportSize.Y,
+            margin * 2 + groups.Count * cardHeight + Math.Max(0, groups.Count - 1) * verticalGap);
         _contentSize = new Vector2(contentWidth, contentHeight);
 
         for (var generationIndex = 0; generationIndex < groups.Count; generationIndex++)
@@ -122,10 +104,11 @@ public partial class FamilyTreeView : Control
                 var comparison = leftAnchor.CompareTo(rightAnchor);
                 return comparison != 0
                     ? comparison
-                    : string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase);
+                    : string.Compare(left.DisplayName, right.DisplayName, StringComparison.OrdinalIgnoreCase);
             });
 
-            var rowWidth = generationMembers.Count * cardWidth + Math.Max(0, generationMembers.Count - 1) * horizontalGap;
+            var rowWidth = generationMembers.Count * cardWidth +
+                           Math.Max(0, generationMembers.Count - 1) * horizontalGap;
             var startX = (contentWidth - rowWidth) * 0.5f;
             var y = margin + generationIndex * (cardHeight + verticalGap);
 
@@ -135,12 +118,8 @@ public partial class FamilyTreeView : Control
                 var rect = new Rect2(
                     new Vector2(startX + i * (cardWidth + horizontalGap), y),
                     new Vector2(cardWidth, cardHeight));
-                _baseCardRects[member.Id] = rect;
-                AddCard(
-                    member,
-                    rect,
-                    _departedIds.Contains(member.Id),
-                    _archivedIds.Contains(member.Id));
+                _baseCardRects[member.CreatureId] = rect;
+                AddCard(member, rect);
             }
         }
 
@@ -153,7 +132,7 @@ public partial class FamilyTreeView : Control
     public void SetSelectedMember(string memberId)
     {
         _selectedId = memberId;
-        _highlightedConnectionKey = "";
+        _highlightedConnectionKey = string.Empty;
         ApplySelectionState();
         QueueRedraw();
     }
@@ -207,8 +186,6 @@ public partial class FamilyTreeView : Control
         var paths = BuildConnectionPaths();
         var lineColor = Color.FromHtml("#E0DDC5");
 
-        // Paint the neutral genealogy first, then selected routes last. Drawing the
-        // highlight last with a dark outline keeps it legible at crossings/overlaps.
         foreach (var path in paths)
             DrawConnectionPath(path, lineColor, 2.0f);
 
@@ -227,13 +204,21 @@ public partial class FamilyTreeView : Control
         {
             if (!_membersById.TryGetValue(childId, out var child) ||
                 !_baseCardRects.TryGetValue(childId, out var childBase))
+            {
                 continue;
+            }
 
             var parents = new List<(string Id, Rect2 Rect)>();
-            if (!string.IsNullOrWhiteSpace(child.ParentAId) && _baseCardRects.TryGetValue(child.ParentAId, out var parentA))
+            if (!string.IsNullOrWhiteSpace(child.ParentAId) &&
+                _baseCardRects.TryGetValue(child.ParentAId, out var parentA))
+            {
                 parents.Add((child.ParentAId, Offset(parentA)));
-            if (!string.IsNullOrWhiteSpace(child.ParentBId) && _baseCardRects.TryGetValue(child.ParentBId, out var parentB))
+            }
+            if (!string.IsNullOrWhiteSpace(child.ParentBId) &&
+                _baseCardRects.TryGetValue(child.ParentBId, out var parentB))
+            {
                 parents.Add((child.ParentBId, Offset(parentB)));
+            }
 
             if (parents.Count == 0)
                 continue;
@@ -241,7 +226,8 @@ public partial class FamilyTreeView : Control
             var childRect = Offset(childBase);
             var childTop = new Vector2(childRect.GetCenter().X, childRect.Position.Y);
             var highestParentBottom = parents.Max(parent => parent.Rect.End.Y);
-            var junctionY = highestParentBottom + Math.Max(12.0f, (childTop.Y - highestParentBottom) * 0.46f);
+            var junctionY = highestParentBottom +
+                            Math.Max(12.0f, (childTop.Y - highestParentBottom) * 0.46f);
 
             if (parents.Count == 1)
             {
@@ -249,7 +235,9 @@ public partial class FamilyTreeView : Control
                 var parentBottom = new Vector2(parent.Rect.GetCenter().X, parent.Rect.End.Y);
                 var path = NewPath(parent.Id, childId);
                 path.Segments.Add(new ConnectionSegment(parentBottom, new Vector2(parentBottom.X, junctionY)));
-                path.Segments.Add(new ConnectionSegment(new Vector2(parentBottom.X, junctionY), new Vector2(childTop.X, junctionY)));
+                path.Segments.Add(new ConnectionSegment(
+                    new Vector2(parentBottom.X, junctionY),
+                    new Vector2(childTop.X, junctionY)));
                 path.Segments.Add(new ConnectionSegment(new Vector2(childTop.X, junctionY), childTop));
                 paths.Add(path);
                 continue;
@@ -266,9 +254,15 @@ public partial class FamilyTreeView : Control
                 var parentBottom = new Vector2(parent.Rect.GetCenter().X, parent.Rect.End.Y);
                 var path = NewPath(parent.Id, childId);
                 path.Segments.Add(new ConnectionSegment(parentBottom, new Vector2(parentBottom.X, junctionY)));
-                path.Segments.Add(new ConnectionSegment(new Vector2(parentBottom.X, junctionY), new Vector2(coupleX, junctionY)));
-                path.Segments.Add(new ConnectionSegment(new Vector2(coupleX, junctionY), new Vector2(coupleX, branchY)));
-                path.Segments.Add(new ConnectionSegment(new Vector2(coupleX, branchY), new Vector2(childTop.X, branchY)));
+                path.Segments.Add(new ConnectionSegment(
+                    new Vector2(parentBottom.X, junctionY),
+                    new Vector2(coupleX, junctionY)));
+                path.Segments.Add(new ConnectionSegment(
+                    new Vector2(coupleX, junctionY),
+                    new Vector2(coupleX, branchY)));
+                path.Segments.Add(new ConnectionSegment(
+                    new Vector2(coupleX, branchY),
+                    new Vector2(childTop.X, branchY)));
                 path.Segments.Add(new ConnectionSegment(new Vector2(childTop.X, branchY), childTop));
                 paths.Add(path);
             }
@@ -378,35 +372,48 @@ public partial class FamilyTreeView : Control
         }
     }
 
-    private float ParentAnchor(VoidlingData member)
+    private float ParentAnchor(LineageMemberProjection member)
     {
         var anchors = new List<float>();
-        if (!string.IsNullOrWhiteSpace(member.ParentAId) && _baseCardRects.TryGetValue(member.ParentAId, out var a))
-            anchors.Add(a.GetCenter().X);
-        if (!string.IsNullOrWhiteSpace(member.ParentBId) && _baseCardRects.TryGetValue(member.ParentBId, out var b))
-            anchors.Add(b.GetCenter().X);
+        if (!string.IsNullOrWhiteSpace(member.ParentAId) &&
+            _baseCardRects.TryGetValue(member.ParentAId, out var parentA))
+        {
+            anchors.Add(parentA.GetCenter().X);
+        }
+        if (!string.IsNullOrWhiteSpace(member.ParentBId) &&
+            _baseCardRects.TryGetValue(member.ParentBId, out var parentB))
+        {
+            anchors.Add(parentB.GetCenter().X);
+        }
         return anchors.Count == 0 ? float.MaxValue : anchors.Average();
     }
 
-    private void AddCard(VoidlingData member, Rect2 rect, bool departed, bool archived)
+    private void AddCard(LineageMemberProjection member, Rect2 rect)
     {
         var panel = UiFactory.CreatePanel(rect.Size);
         panel.Position = rect.Position;
         panel.Size = rect.Size;
         panel.MouseFilter = MouseFilterEnum.Pass;
         AddChild(panel);
-        _cardPanels[member.Id] = panel;
+        _cardPanels[member.CreatureId] = panel;
 
         var column = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
         column.AddThemeConstantOverride("separation", 0);
         panel.AddChild(column);
 
-        var portrait = UiFactory.CreatePortrait(member, new Vector2(38, 38));
-        if (departed || archived)
+        var tint = string.IsNullOrWhiteSpace(member.TintHex)
+            ? Colors.White
+            : Color.FromHtml(member.TintHex);
+        var portrait = UiFactory.CreatePortrait(
+            tint,
+            member.HasAngelMutation,
+            member.OtherMutationCount,
+            new Vector2(38, 38));
+        if (member.Presence != LineageMemberPresence.Owned)
             portrait.Modulate = new Color(0.55f, 0.55f, 0.55f, 0.72f);
         column.AddChild(portrait);
 
-        var name = UiFactory.CreateLabel(member.Name, 8);
+        var name = UiFactory.CreateLabel(member.DisplayName, 8);
         name.HorizontalAlignment = HorizontalAlignment.Center;
         name.CustomMinimumSize = new Vector2(82, 13);
         name.MouseFilter = MouseFilterEnum.Ignore;
@@ -415,17 +422,19 @@ public partial class FamilyTreeView : Control
         var generationText = member.InbreedingHistoryFlag
             ? $"G{member.FamilyGeneration} • INBRED"
             : $"G{member.FamilyGeneration}";
-        if (departed)
-            generationText += " • LEFT";
-        else if (archived)
-            generationText += " • ARCHIVED";
+        generationText += member.Presence switch
+        {
+            LineageMemberPresence.Departed => " • LEFT",
+            LineageMemberPresence.Archived => " • ARCHIVED",
+            _ => string.Empty
+        };
 
         var detail = UiFactory.CreateLabel(generationText, 6);
         detail.HorizontalAlignment = HorizontalAlignment.Center;
         detail.MouseFilter = MouseFilterEnum.Ignore;
         if (member.InbreedingHistoryFlag)
             detail.AddThemeColorOverride("font_color", Color.FromHtml("#A75D55"));
-        else if (departed || archived)
+        else if (member.Presence != LineageMemberPresence.Owned)
             detail.AddThemeColorOverride("font_color", Color.FromHtml("#7A7267"));
         column.AddChild(detail);
 
@@ -443,7 +452,7 @@ public partial class FamilyTreeView : Control
         var click = new Button
         {
             Flat = true,
-            Text = "",
+            Text = string.Empty,
             Position = Vector2.Zero,
             Size = rect.Size,
             FocusMode = FocusModeEnum.None,
@@ -451,29 +460,33 @@ public partial class FamilyTreeView : Control
         };
         click.Pressed += () =>
         {
-            _selectedId = member.Id;
-            _highlightedConnectionKey = "";
+            _selectedId = member.CreatureId;
+            _highlightedConnectionKey = string.Empty;
             ApplySelectionState();
             QueueRedraw();
-            MemberSelected?.Invoke(member.Id);
+            MemberSelected?.Invoke(member.CreatureId);
         };
         panel.AddChild(click);
     }
 
-    private string ParentSummary(VoidlingData member)
+    private string ParentSummary(LineageMemberProjection member)
     {
         if (string.IsNullOrWhiteSpace(member.ParentAId) && string.IsNullOrWhiteSpace(member.ParentBId))
-            return "";
+            return string.Empty;
 
-        var first = _membersById.TryGetValue(member.ParentAId, out var a) ? a.Name : "?";
-        var second = _membersById.TryGetValue(member.ParentBId, out var b) ? b.Name : "?";
+        var first = _membersById.TryGetValue(member.ParentAId, out var parentA)
+            ? parentA.DisplayName
+            : "?";
+        var second = _membersById.TryGetValue(member.ParentBId, out var parentB)
+            ? parentB.DisplayName
+            : "?";
         return $"P: {first} + {second}";
     }
 
     private static HashSet<string> CollectConnectedFamily(
         string selectedId,
-        IReadOnlyList<VoidlingData> allVoidlings,
-        IReadOnlyDictionary<string, VoidlingData> byId)
+        IReadOnlyList<LineageMemberProjection> allMembers,
+        IReadOnlyDictionary<string, LineageMemberProjection> byId)
     {
         var result = new HashSet<string>(StringComparer.Ordinal);
         var queue = new Queue<string>();
@@ -490,10 +503,10 @@ public partial class FamilyTreeView : Control
             if (!string.IsNullOrWhiteSpace(current.ParentBId) && byId.ContainsKey(current.ParentBId))
                 queue.Enqueue(current.ParentBId);
 
-            foreach (var child in allVoidlings)
+            foreach (var child in allMembers)
             {
                 if (child.ParentAId == id || child.ParentBId == id)
-                    queue.Enqueue(child.Id);
+                    queue.Enqueue(child.CreatureId);
             }
         }
 
