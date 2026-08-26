@@ -2,6 +2,7 @@ using System.Linq;
 using System.Text.Json;
 using Voidling.Application.Breeding;
 using Voidling.Domain.Breeding;
+using Voidling.Domain.Genetics;
 using Voidling.Domain.Rules;
 using VoidlingGame;
 using Xunit;
@@ -34,6 +35,8 @@ public sealed class LineageTreeProjectionServiceTests
         var archived = Assert.Single(projection.Members.Where(member => member.CreatureId == "archived-parent"));
         Assert.Equal(LineageMemberPresence.Archived, archived.Presence);
         Assert.Null(archived.ActiveInbreedingBurden);
+        Assert.False(archived.HasAngelMutation);
+        Assert.Equal(0, archived.OtherMutationCount);
         Assert.Empty(archived.Stats);
         Assert.DoesNotContain(state.Voidlings, creature => creature.Id == archived.CreatureId);
         Assert.DoesNotContain(state.DepartedVoidlings, creature => creature.Id == archived.CreatureId);
@@ -53,6 +56,23 @@ public sealed class LineageTreeProjectionServiceTests
 
         Assert.Equal(0, member.ActiveInbreedingBurden);
         Assert.True(member.InbreedingHistoryFlag);
+    }
+
+    [Fact]
+    public void Projection_ProjectsPortraitMutationMetadataWithoutUiInterpretation()
+    {
+        var state = new GameStateData();
+        var creature = CreateCreature("mutated", "", "", generation: 0);
+        creature.RareTraits.Add(new RareTraitData { TraitId = MutationIds.Angel });
+        creature.RareTraits.Add(new RareTraitData { TraitId = "Lustrous" });
+        creature.RareTraits.Add(new RareTraitData { TraitId = "Prismatic" });
+        state.Voidlings.Add(creature);
+
+        var projection = new LineageTreeProjectionService(Rules).Create(state, creature.Id);
+        var member = Assert.Single(projection.Members);
+
+        Assert.True(member.HasAngelMutation);
+        Assert.Equal(2, member.OtherMutationCount);
     }
 
     [Fact]
