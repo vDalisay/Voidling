@@ -19,16 +19,29 @@ public partial class FamilyTreeView
 
         var activeSnapshots = new List<VoidlingData>();
         var departedSnapshots = new List<VoidlingData>();
+        var archivedSnapshots = new List<VoidlingData>();
         foreach (var member in projection.Members)
         {
             var snapshot = MaterializeSnapshot(member);
-            if (member.Presence == LineageMemberPresence.Departed)
-                departedSnapshots.Add(snapshot);
-            else
-                activeSnapshots.Add(snapshot);
+            switch (member.Presence)
+            {
+                case LineageMemberPresence.Departed:
+                    departedSnapshots.Add(snapshot);
+                    break;
+                case LineageMemberPresence.Archived:
+                    archivedSnapshots.Add(snapshot);
+                    break;
+                default:
+                    activeSnapshots.Add(snapshot);
+                    break;
+            }
         }
 
-        Build(projection.SelectedCreatureId, activeSnapshots, departedSnapshots);
+        Build(
+            projection.SelectedCreatureId,
+            activeSnapshots,
+            departedSnapshots,
+            archivedSnapshots);
     }
 
     private static VoidlingData MaterializeSnapshot(LineageMemberProjection member)
