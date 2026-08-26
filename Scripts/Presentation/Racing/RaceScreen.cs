@@ -6,6 +6,7 @@ using Voidling.Application.Multiplayer.Racing;
 using Voidling.Application.Racing;
 using Voidling.Domain.Racing;
 using Voidling.Presentation.UI.Multiplayer;
+using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.Racing;
@@ -29,10 +30,6 @@ public partial class RaceScreen : Node2D
     private const int MaxCatchUpStepsPerFrame = 30;
 
     private static readonly RaceCourse Course = RaceCourse.Demo;
-    private static readonly Texture2D CharacterTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
-    private static readonly Texture2D SwimmingTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Sorry pack/Early Access/Ocean Pack/swimming.png");
     private static readonly Texture2D WaterTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Tilesets/Water.png");
     private static readonly Texture2D FenceTexture = GD.Load<Texture2D>(
@@ -260,21 +257,26 @@ public partial class RaceScreen : Node2D
         {
             var entrant = entrants[i];
             var baseY = TrackY + _racerOffsets[Math.Min(i, _racerOffsets.Length - 1)];
+            var raceScale = VoidlingVisualFactory.RaceScale;
 
             var shadow = new Polygon2D
             {
-                Polygon = BuildEllipsePoints(9.0f, 3.4f, 18),
+                Polygon = VoidlingVisualFactory.BuildShadowPolygon(raceScale, 18),
                 Color = new Color(0.15f, 0.18f, 0.16f, 0.34f),
-                Position = new Vector2(Course.StartX, baseY + 2.0f),
+                Position = new Vector2(
+                    Course.StartX,
+                    baseY + VoidlingVisualFactory.ShadowCenterYOffset),
                 ZIndex = 7 + i
             };
             AddChild(shadow);
 
             var sprite = new AnimatedSprite2D
             {
-                SpriteFrames = BuildRaceFrames(),
-                Position = new Vector2(Course.StartX, baseY - 8.0f),
-                Scale = new Vector2(0.72f, 0.72f),
+                SpriteFrames = VoidlingVisualFactory.GetRaceFrames(),
+                Position = new Vector2(
+                    Course.StartX,
+                    baseY + VoidlingVisualFactory.RaceSpriteCenterYOffset()),
+                Scale = Vector2.One * raceScale,
                 Modulate = ParseTint(entrant.Participant.TintHex),
                 ZIndex = 10 + i
             };
@@ -454,8 +456,12 @@ public partial class RaceScreen : Node2D
             visual.Sprite.Rotation = 0.0f;
         }
 
-        visual.Sprite.Position = new Vector2(state.X, visual.BaseY - 8.0f + yOffset);
-        visual.Shadow.Position = new Vector2(state.X, visual.BaseY + 2.0f);
+        visual.Sprite.Position = new Vector2(
+            state.X,
+            visual.BaseY + VoidlingVisualFactory.RaceSpriteCenterYOffset() + yOffset);
+        visual.Shadow.Position = new Vector2(
+            state.X,
+            visual.BaseY + VoidlingVisualFactory.ShadowCenterYOffset);
         visual.Shadow.Scale = shadowScale;
         var shadowColor = visual.Shadow.Color;
         shadowColor.A = shadowAlpha;
@@ -979,47 +985,4 @@ public partial class RaceScreen : Node2D
 
     private static Color ParseTint(string html)
         => string.IsNullOrWhiteSpace(html) ? Colors.White : Color.FromHtml(html);
-
-    private static Vector2[] BuildEllipsePoints(float radiusX, float radiusY, int count)
-    {
-        var points = new Vector2[count];
-        for (var i = 0; i < count; i++)
-        {
-            var angle = Mathf.Tau * i / count;
-            points[i] = new Vector2(Mathf.Cos(angle) * radiusX, Mathf.Sin(angle) * radiusY);
-        }
-        return points;
-    }
-
-    private static SpriteFrames BuildRaceFrames()
-    {
-        var frames = new SpriteFrames();
-        frames.RemoveAnimation("default");
-
-        frames.AddAnimation("run");
-        frames.SetAnimationLoop("run", true);
-        frames.SetAnimationSpeed("run", 8.0);
-        for (var column = 0; column < 4; column++)
-        {
-            frames.AddFrame("run", new AtlasTexture
-            {
-                Atlas = CharacterTexture,
-                Region = new Rect2(column * 48, 3 * 48, 48, 48)
-            });
-        }
-
-        frames.AddAnimation("swim");
-        frames.SetAnimationLoop("swim", true);
-        frames.SetAnimationSpeed("swim", 10.0);
-        for (var column = 0; column < 8; column++)
-        {
-            frames.AddFrame("swim", new AtlasTexture
-            {
-                Atlas = SwimmingTexture,
-                Region = new Rect2(column * 48, 3 * 48, 48, 48)
-            });
-        }
-
-        return frames;
-    }
 }

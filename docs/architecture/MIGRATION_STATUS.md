@@ -1,10 +1,10 @@
 # Architecture migration status
 
-**Branch:** `architecture/futureproof-foundation`  
+**Branch:** current `main` plus active architecture/feature branches  
 **Baseline:** post-demo `main`  
 **Purpose:** current truth for what has actually moved behind the architecture boundaries.
 
-`ARCHITECTURE.md` defines the durable target and rules. `RESTRUCTURING_PLAN.md` records the research and migration strategy. This file records implementation status so humans and coding agents do not need to infer it from old checklist boxes.
+`ARCHITECTURE.md` defines the durable target and rules. `RESTRUCTURING_PLAN.md` records the original research and migration strategy. `docs/AGENT_HANDOFF_IMPLEMENTATION_PLAN.md` is the current execution contract for remaining product work. This file records implementation status so humans and coding agents do not need to infer it from old checklist boxes.
 
 ## Completed foundation
 
@@ -91,13 +91,31 @@ Standalone Presentation components now include:
 - `ModalHost` for overlay/window lifetime;
 - `RaceScreen`, a Godot-only shell over the pure `RaceSimulation`;
 - `StatPresentationCatalog` for player-facing stat labels/colors;
-- `VoidlingGroundVisualMetrics` for shared sprite-ground pivot/shadow proportions across garden and challenge presentation.
+- `VoidlingGroundVisualMetrics` for shared sprite-ground pivot/shadow proportions across world/challenge presentation;
+- `VoidlingVisualDefinition` + `VoidlingVisualFactory` for the canonical base Voidling art contract.
 
 These components receive presentation-ready snapshots and emit intent where interaction is needed. They do not reach through `GameSession` or the `GameRules` compatibility facade; CI enforces that boundary for `Scripts/Presentation/**`.
 
-`RaceScreen` receives an immutable `RaceEntry`, maps simulation snapshots/events to sprites/camera/HUD/minimap/podium, sends cheer through `RaceSimulation.TryCheer`, and uses the simulator's fast-forward path. VFX has a separate non-authoritative RNG, so particle timing can no longer perturb race outcomes.
+#### Centralized Voidling visual/art pipeline
 
-Garden and race Voidlings now derive their ground pivot and compact ellipse-shadow dimensions from the same shared presentation metrics. Challenge presentation should extend this shared convention rather than inventing a separate footprint system.
+WP0 of the contextualized handoff is implemented on the active visual-pipeline branch.
+
+`Resources/Presentation/Voidlings/DefaultVoidlingVisual.tres` is now the single authoring source for base Voidling presentation. It owns the base/swim atlas references plus art-dependent layout and geometry: frame dimensions and rows, animation rates, portrait crop, adult/child/race scale, feet offsets, hitboxes, held offset, shadow geometry and mutation anchors.
+
+`VoidlingVisualFactory` validates that definition and caches the shared world/race `SpriteFrames`. The following consumers no longer load or slice the base creature atlas themselves:
+
+- local Garden `VoidlingActor`;
+- connected/remote Garden `RemoteVoidlingActor`;
+- single-player and multiplayer `RaceScreen` presentation;
+- `UiFactory` portraits/cards, which transitively covers breeding, race picking/results, details/inspection, trade screens, family tree and other portrait consumers.
+
+`VoidlingGroundVisualMetrics` and `VoidlingMutationVisualMetrics` now derive silhouette-dependent geometry/anchors from the same definition rather than preserving a second set of art constants.
+
+The migration intentionally keeps the existing Sprout Lands textures referenced by the default `.tres`, so it changes architecture without changing the currently visible creature art. A production-art replacement can now update the resource (and source PNGs) without editing each consumer. `Assets/Voidlings/README.md` documents the artist workflow.
+
+The old `voidling-cats` branch was reviewed rather than copied wholesale. Its central-catalog idea was useful, but its display-name-keyed Pip/Mallow overrides and hard-coded asset rules are not part of the production architecture. Future multiple visual families require a stable semantic ID, not a creature name or texture path in saves.
+
+`RaceScreen` receives an immutable `RaceEntry`, maps simulation snapshots/events to sprites/camera/HUD/minimap/podium, sends cheer through `RaceSimulation.TryCheer`, and uses the simulator's fast-forward path. VFX has a separate non-authoritative RNG, so particle timing can no longer perturb race outcomes.
 
 Result presentation is also presentation-only: podium pop/tilt animations, confetti and the fourth-place embarrassment drop do not affect simulation state or result RNG.
 
@@ -113,9 +131,9 @@ Stat display names/colors have moved out of `GameRules` into `StatPresentationCa
 
 ### Localization
 
-Godot's native translation pipeline is registered through the committed gettext catalog `Localization/en.po`.
+Godot's native translation pipeline is registered through the committed gettext catalogs.
 
-`project.godot` registers that source file directly. It intentionally does **not** reference an importer-generated `.translation` file: generated translation artifacts may not exist yet when Godot first reads project settings on a clean checkout.
+`project.godot` registers source translation files directly. It intentionally does **not** reference importer-generated `.translation` files: generated translation artifacts may not exist yet when Godot first reads project settings on a clean checkout.
 
 Migrated representative UI includes:
 
@@ -126,7 +144,8 @@ Migrated representative UI includes:
 - Race Picker;
 - Inventory;
 - Details Stats/DNA/Visual tabs and explanatory labels;
-- race result/placement messages introduced by the presentation polish pass.
+- race result/placement messages introduced by the presentation polish pass;
+- multiplayer/trade presentation introduced by the later multiplayer foundation.
 
 Use semantic keys (`UI_*`) for new player-facing presentation text. User-created Voidling names remain literal.
 
@@ -134,7 +153,7 @@ The direct Windows launcher still performs a blocking Godot import phase for ord
 
 ### Tests and CI
 
-The architecture branch has fast xUnit coverage for genetics, inbreeding, mutations, migration, lifecycle simulation, shop transactions, settings, roster operations, race performance and deterministic race simulation.
+The project has fast xUnit coverage for genetics, inbreeding, mutations, migration, lifecycle simulation, shop transactions, settings, roster operations, race performance, deterministic race simulation and multiplayer application behavior.
 
 Race tests characterize:
 
@@ -144,19 +163,20 @@ Race tests characterize:
 - cheer as a simulation command;
 - simulation-owned auto-completion/placement.
 
-CI performs:
+CI performs the build/test/import/runtime sequence plus focused presentation/network smoke probes. Relevant gates include:
 
-1. game restore;
-2. test restore;
-3. Release build;
-4. architecture boundary enforcement;
-5. domain/application tests;
-6. Debug build for Godot editor-side C# integration;
-7. blocking Godot `--import` resource import;
-8. verification that the committed gettext localization source is registered and no generated translation path is configured;
-9. actual headless main-scene runtime smoke test with runtime errors treated as failures.
+1. game/test restore and Release build;
+2. architecture boundary enforcement;
+3. domain/application tests;
+4. Debug build for Godot editor-side C# integration;
+5. blocking Godot `--import` resource import;
+6. committed localization-source validation;
+7. actual headless main-scene runtime smoke test;
+8. canonical Voidling visual pipeline smoke test;
+9. trade-panel interaction smoke test;
+10. two-process LAN connectivity and negotiated trade smoke tests.
 
-CI rejects Godot references in Domain/Application, rejects `GameRules` access from standalone `Scripts/Presentation/**`, and forbids `GameSession.Instance` throughout `Scripts/**`.
+CI rejects Godot references in Domain/Application, rejects `GameRules` access from standalone `Scripts/Presentation/**`, forbids `GameSession.Instance` throughout `Scripts/**`, and rejects direct base/swim Voidling atlas paths from C# consumers. The visual smoke resolves world directions, race run/swim states, shared UI portrait construction, geometry and mutation anchors through `VoidlingVisualFactory`.
 
 ## Intentionally transitional code
 
@@ -235,9 +255,13 @@ Phase F deliberately does **not** require every legacy panel to be rewritten bef
 
 ### Phase G — active designer Resources
 
-Completed for rules that currently have a real designer-authored source. `GameBalanceResource` and `Resources/Balance/demo_balance.tres` expose only actively consumed tuning values and convert once to immutable domain rules at Bootstrap.
+Completed for rules/content that currently have a real designer-authored source. `GameBalanceResource`/`Resources/Balance/demo_balance.tres` provide active gameplay tuning, while `VoidlingVisualDefinition`/`Resources/Presentation/Voidlings/DefaultVoidlingVisual.tres` provide presentation-only art authoring. Gameplay Resources are converted before entering Domain/Application; presentation Resources remain on the Godot presentation edge.
 
 Do not create speculative Resource classes for roadmap systems before those systems consume authored data. Add focused Resources alongside the first concrete feature that requires them.
+
+### WP0 — centralized Voidling visual pipeline
+
+Implemented on `agent/contextualized-implementation-plan`, pending exact-head CI before merge. The required consumer migrations, validation, no-bypass CI rule and dedicated headless visual smoke are present. No save/network schema change was needed because all current Voidlings still resolve the same semantic default visual definition.
 
 ## Next architecture migrations
 
@@ -247,7 +271,8 @@ These are incremental follow-ups, not reasons to rewrite stable demo code:
 2. Move remaining presentation-only tint/mutation formatting out of `GameRules` as related legacy callers migrate; do not duplicate domain identity/rules in Presentation.
 3. Introduce additional Godot Resources only when the next roadmap feature has concrete designer-authored content/tuning that consumes them.
 4. Add ADRs for durable architecture decisions when a decision first needs history/trade-off context; do not create ceremonial ADRs for obvious local refactors.
+5. If multiple base Voidling visual families become a confirmed product feature, introduce a stable semantic visual-family ID and extend the existing visual catalog; do not key art selection to display names or persisted resource paths.
 
 ## Merge invariant
 
-This architecture work must not intentionally alter current demo gameplay, race balance or persisted genetics. Before merge, the exact PR head must pass the full CI sequence above, the PR description must reflect the actual remaining transitional boundaries, and PR #2 remains draft until the user decides the architecture work is complete.
+Architecture changes must not intentionally alter current demo gameplay, race balance or persisted genetics. Before merge, the exact PR head must pass the full CI sequence above, and the PR description must reflect the actual remaining transitional boundaries.

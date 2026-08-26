@@ -2,15 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
-using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.Racing;
 
 public partial class RaceScreen
 {
-    private const float RaceSpriteScale = 0.72f;
-    private bool _finalShadowCorrectionApplied;
     private bool _resultPresentationPolished;
     private bool _coursePresentationPolished;
 
@@ -31,40 +28,10 @@ public partial class RaceScreen
             ReplaceSegmentedRampWithUnifiedRamp();
         }
 
-        if (_running)
-        {
-            ApplyUnifiedVoidlingGroundMetrics();
-            _finalShadowCorrectionApplied = false;
-        }
-        else if (!_finalShadowCorrectionApplied && _visuals.Count > 0)
-        {
-            ApplyUnifiedVoidlingGroundMetrics();
-            _finalShadowCorrectionApplied = true;
-        }
-
         if (_resultsShown && !_resultPresentationPolished)
         {
             _resultPresentationPolished = true;
             PolishResultPresentation();
-        }
-    }
-
-    private void ApplyUnifiedVoidlingGroundMetrics()
-    {
-        var desiredSpriteBaseOffset = VoidlingGroundVisualMetrics.SpriteCenterYOffset(RaceSpriteScale);
-        var correctedShadowPolygon = VoidlingGroundVisualMetrics.BuildShadowPolygon(RaceSpriteScale, 20);
-
-        foreach (var visual in _visuals.Values)
-        {
-            var animatedYOffset = visual.Sprite.Position.Y - (visual.BaseY - 8.0f);
-            visual.Sprite.Position = new Vector2(
-                visual.Sprite.Position.X,
-                visual.BaseY + desiredSpriteBaseOffset + animatedYOffset);
-
-            visual.Shadow.Polygon = correctedShadowPolygon;
-            visual.Shadow.Position = new Vector2(
-                visual.Shadow.Position.X,
-                visual.BaseY + VoidlingGroundVisualMetrics.ShadowCenterYOffset);
         }
     }
 

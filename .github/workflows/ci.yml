@@ -6,6 +6,7 @@ on:
       - main
       - feature/demo-mvp
       - architecture/futureproof-foundation
+      - agent/contextualized-implementation-plan
   pull_request:
 
 jobs:
@@ -55,6 +56,21 @@ jobs:
             echo 'GameSession.Instance is forbidden. Resolve or pass explicit session/use-case dependencies instead of reintroducing a service locator.'
             exit 1
           fi
+
+          # Base Voidling artwork is authored once in DefaultVoidlingVisual.tres. Garden, remote
+          # Garden, race and portrait code must consume VoidlingVisualFactory instead of loading
+          # those atlases directly and silently creating another visual source of truth.
+          if grep -R -n -F 'Basic Charakter Spritesheet.png' Scripts --include='*.cs'; then
+            echo 'Base Voidling atlas paths are forbidden in C# consumers. Configure DefaultVoidlingVisual.tres and use VoidlingVisualFactory.'
+            exit 1
+          fi
+
+          if grep -R -n -F 'Early Access/Ocean Pack/swimming.png' Scripts --include='*.cs'; then
+            echo 'Voidling swim atlas paths are forbidden in C# consumers. Configure DefaultVoidlingVisual.tres and use VoidlingVisualFactory.'
+            exit 1
+          fi
+
+          test -f Resources/Presentation/Voidlings/DefaultVoidlingVisual.tres
 
       - name: Domain and application tests
         run: dotnet test Tests/Voidling.Tests.csproj --configuration Release --no-restore
