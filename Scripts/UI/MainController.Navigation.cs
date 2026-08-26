@@ -3,7 +3,6 @@ using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
 using Voidling.Application.Creatures;
-using Voidling.Domain.Genetics;
 using Voidling.Domain.Racing;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Details;
@@ -188,14 +187,10 @@ public partial class MainController : Node
             heading.AddChild(dismiss);
             inspectorBox.AddChild(heading);
 
-            var hasAngel = member.RareTraitIds.Any(traitId =>
-                string.Equals(traitId, MutationIds.Angel, StringComparison.OrdinalIgnoreCase));
-            var otherMutations = member.RareTraitIds.Count(traitId =>
-                !string.Equals(traitId, MutationIds.Angel, StringComparison.OrdinalIgnoreCase));
             var portrait = UiFactory.CreatePortrait(
                 ParseProfileTint(member.TintHex),
-                hasAngel,
-                otherMutations,
+                member.HasAngelMutation,
+                member.OtherMutationCount,
                 new Vector2(60, 60));
             if (member.Presence != LineageMemberPresence.Owned)
                 portrait.Modulate = new Color(0.55f, 0.55f, 0.55f, 0.72f);
