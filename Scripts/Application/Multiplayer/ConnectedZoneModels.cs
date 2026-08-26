@@ -11,6 +11,8 @@ public readonly record struct SharedVoidlingKey(PlatformUserId OwnerId, string C
 /// <summary>
 /// Minimal network-facing creature data required to render and identify a Voidling in a connected
 /// Garden. This is deliberately not a save DTO and is never inserted into another player's save.
+/// Cosmetic appearance phenotype is included as stable semantic values, never textures or masks.
+/// The trailing defaults preserve compatibility with snapshots produced before layered appearance.
 /// </summary>
 public sealed record SharedVoidlingSnapshot(
     string CreatureId,
@@ -21,7 +23,11 @@ public sealed record SharedVoidlingSnapshot(
     int FamilyGeneration,
     string[] RareTraitIds,
     float ZoneX,
-    float ZoneY)
+    float ZoneY,
+    int AppearanceTone = 0,
+    int PatternAllele = 0,
+    bool Shiny = false,
+    int CoatAllele = 0)
 {
     public SharedVoidlingKey Key => new(OwnerId, CreatureId);
 }
@@ -220,6 +226,8 @@ public static class ConnectedZoneValidation
     public const int MaxDisplayNameLength = 64;
     public const int MaxTintLength = 16;
     public const int MaxRareTraits = 32;
+    public const int MaxPatternAllele = 1024;
+    public const int MaxCoatAllele = 64;
 
     public static bool IsValidSharedVoidling(SharedVoidlingSnapshot? snapshot)
     {
@@ -233,7 +241,10 @@ public static class ConnectedZoneValidation
             snapshot.TintHex.Length > MaxTintLength ||
             !float.IsFinite(snapshot.ZoneX) ||
             !float.IsFinite(snapshot.ZoneY) ||
-            snapshot.FamilyGeneration < 0)
+            snapshot.FamilyGeneration < 0 ||
+            snapshot.AppearanceTone is < 0 or > 1 ||
+            snapshot.PatternAllele is < 0 or > MaxPatternAllele ||
+            snapshot.CoatAllele is < 0 or > MaxCoatAllele)
         {
             return false;
         }
