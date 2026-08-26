@@ -26,6 +26,23 @@ public sealed class RacingArchitectureTests
     }
 
     [Fact]
+    public void RaceEntry_FreezesAuthoredCourseIdentityWithParticipantSnapshot()
+    {
+        var creature = CreateCreature();
+        var factory = new RaceEntryFactory(Rules);
+
+        var entry = factory.Create(creature, 12345UL, RaceCourseCatalog.LongStandard);
+        var frozenRun = entry.Entrants[0].Participant.Run;
+
+        creature.TrainingPoints["run"] = 120;
+
+        Assert.Same(RaceCourseCatalog.LongStandard, entry.CourseDefinition);
+        Assert.Same(RaceCourseCatalog.LongStandard.Course, entry.CourseDefinition.Course);
+        Assert.Equal(frozenRun, entry.Entrants[0].Participant.Run);
+        Assert.True(new RaceParticipantSnapshotFactory(Rules).Create(creature).Run > frozenRun);
+    }
+
+    [Fact]
     public void PerformanceModel_PreservesMvpGroundAndSwimFormulas()
     {
         var participant = new RaceParticipantSnapshot("id", "name", "#FFFFFF", 50, 40, 30, 20, 60);
