@@ -5,6 +5,7 @@ using Voidling.Application.Breeding;
 using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
+using Voidling.Domain.Care;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
 using VoidlingGame;
@@ -18,10 +19,11 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 10;
+    public const int CurrentSaveVersion = 11;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
+    private readonly CreatureNeedsService _needs = new();
     private readonly StatCalculator _stats;
 
     public GameStateMigrationService(GameBalanceRules rules)
@@ -77,6 +79,12 @@ public sealed class GameStateMigrationService
             }
 
             creature.RareTraits ??= new List<RareTraitData>();
+
+            // Version 11 persists current care/condition state. Older saves use the deterministic
+            // neutral defaults from CreatureNeedsState; malformed/newer partial values are bounded
+            // rather than converted into progression or rerolled from genetics.
+            creature.Needs ??= new CreatureNeedsState();
+            _needs.Normalize(creature.Needs);
         }
 
         foreach (var egg in state.OwnedEggs.Concat(state.StoreEggs))
