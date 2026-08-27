@@ -31,10 +31,7 @@ public partial class MainController : Node
             return;
         }
 
-        var sameCreature = string.Equals(
-            _profileProgressCreatureId,
-            profile.CreatureId,
-            StringComparison.Ordinal);
+        var sameCreature = string.Equals(_profileProgressCreatureId, profile.CreatureId, StringComparison.Ordinal);
         if (!sameCreature)
         {
             _profileDisplayedProgress.Clear();
@@ -45,11 +42,9 @@ public partial class MainController : Node
             _detailsPanel.QueueFree();
         _detailsPanel = null;
 
-        _detailsPanel = UiFactory.CreatePanel(new Vector2(226, 294));
-        _detailsPanel.Position = new Vector2(
-            sameCreature ? DetailsPanelRestX : DetailsPanelHiddenX,
-            57);
-        _detailsPanel.Size = new Vector2(226, 294);
+        _detailsPanel = UiFactory.CreatePanel(new Vector2(226, 318));
+        _detailsPanel.Position = new Vector2(sameCreature ? DetailsPanelRestX : DetailsPanelHiddenX, 33);
+        _detailsPanel.Size = new Vector2(226, 318);
         _uiRoot.AddChild(_detailsPanel);
 
         var box = new VBoxContainer();
@@ -73,7 +68,6 @@ public partial class MainController : Node
         nameButton.AddThemeColorOverride("font_hover_color", Color.FromHtml("#263B31"));
         nameButton.AddThemeColorOverride("font_pressed_color", Color.FromHtml("#263B31"));
         heading.AddChild(nameButton);
-
         nameButton.Pressed += () => BeginInlineRename(heading, nameButton, data);
 
         var follow = UiFactory.CreateButton("◉");
@@ -98,6 +92,7 @@ public partial class MainController : Node
             ? "Adult"
             : $"Child • {Math.Max(0, (int)Math.Ceiling(GameRules.ChildToAdultSeconds - data.AgeSeconds))}s to adult";
         box.AddChild(UiFactory.CreateLabel(stage, 7));
+        box.AddChild(CreatePassiveTrainingRow(data));
 
         foreach (var stat in profile.Stats)
             box.AddChild(CreateProfileStatBlock(stat, sameCreature));
@@ -134,6 +129,44 @@ public partial class MainController : Node
 
         if (!sameCreature)
             SlideInDetailsPanel(_detailsPanel);
+    }
+
+    private Control CreatePassiveTrainingRow(VoidlingData data)
+    {
+        var row = new HBoxContainer { CustomMinimumSize = new Vector2(194, 22) };
+        row.AddThemeConstantOverride("separation", 4);
+
+        var label = UiFactory.CreateLabel("Passive", 7);
+        label.CustomMinimumSize = new Vector2(52, 20);
+        label.TooltipText = "Slow open-game training. Active treats remain faster.";
+        row.AddChild(label);
+
+        var selector = new OptionButton
+        {
+            CustomMinimumSize = new Vector2(138, 20),
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Choose one stat to train slowly while the game remains open."
+        };
+        UiFactory.ApplyPixelFont(selector, 7);
+        selector.AddItem("Off");
+        var selected = 0;
+        for (var i = 0; i < GameRules.StatIds.Count; i++)
+        {
+            var statId = GameRules.StatIds[i];
+            selector.AddItem(StatPresentationCatalog.NameFor(statId));
+            if (string.Equals(data.PassiveTrainingStatId, statId, StringComparison.Ordinal))
+                selected = i + 1;
+        }
+        selector.Select(selected);
+        selector.ItemSelected += index =>
+        {
+            var selectedIndex = (int)index;
+            var statId = selectedIndex <= 0 ? string.Empty : GameRules.StatIds[selectedIndex - 1];
+            if (_session.SetPassiveTraining(data.Id, statId))
+                RebuildDetailsPanel();
+        };
+        row.AddChild(selector);
+        return row;
     }
 
     private void SlideInDetailsPanel(PanelContainer panel)
@@ -246,11 +279,7 @@ public partial class MainController : Node
         return container;
     }
 
-    private ProgressBar CreateStatProgressBar(
-        string statId,
-        double target,
-        Vector2 size,
-        bool animateProgress)
+    private ProgressBar CreateStatProgressBar(string statId, double target, Vector2 size, bool animateProgress)
     {
         var start = animateProgress && _profileDisplayedProgress.TryGetValue(statId, out var previous)
             ? previous
@@ -317,8 +346,6 @@ public partial class MainController : Node
         screen.DiscardFailedEggRequested += eggId =>
         {
             _session.DiscardFailedEgg(eggId);
-            // Reopen on the next idle frame: the current signal emitter belongs to the modal
-            // subtree and ModalHost intentionally defers freeing that subtree until dispatch ends.
             CallDeferred(nameof(ShowInventory));
         };
         box.AddChild(screen);

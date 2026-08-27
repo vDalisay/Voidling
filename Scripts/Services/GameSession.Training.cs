@@ -25,8 +25,6 @@ public partial class GameSession
         if (creature == null)
             return;
 
-        // Validate before allocating a persistent seed. Failed UI actions must not shift
-        // later deterministic genetics/training/race streams.
         var failure = _training!.ValidateTrainingItem(State, creatureId, statId);
         if (failure == TrainingFailure.NoItemOwned)
         {
@@ -46,6 +44,26 @@ public partial class GameSession
             return;
 
         SaveAndNotify($"{creature.Name} gained +{result.Gain} {DisplayStatId(statId)} training.");
+    }
+
+    public bool SetPassiveTraining(string creatureId, string statId)
+    {
+        var creature = FindVoidling(creatureId);
+        if (creature == null)
+            return false;
+
+        var result = _training!.SetPassiveTraining(State, creatureId, statId);
+        if (!result.Succeeded)
+            return false;
+        if (!result.Changed)
+            return true;
+
+        var message = string.IsNullOrEmpty(result.StatId)
+            ? $"{creature.Name} stopped passive training."
+            : $"{creature.Name} started passive {DisplayStatId(result.StatId)} training.";
+        SaveAndNotify(message);
+        RaiseGardenEvent(message);
+        return true;
     }
 
     private static string DisplayStatId(string statId)
