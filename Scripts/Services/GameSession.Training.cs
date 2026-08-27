@@ -43,7 +43,9 @@ public partial class GameSession
         if (!result.Succeeded)
             return;
 
-        SaveAndNotify($"{creature.Name} gained +{result.Gain} {DisplayStatId(statId)} training.");
+        var message = $"{creature.Name} gained +{result.Gain} {DisplayStatId(statId)} training.";
+        SaveAndNotify(message);
+        RaiseGardenEvent(message);
     }
 
     public bool SetPassiveTraining(string creatureId, string statId)

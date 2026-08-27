@@ -118,6 +118,12 @@ public partial class GameSession : Node
                     RaiseGardenEvent(message);
                     break;
                 }
+                case CreaturePassiveTrainingCappedEvent capped:
+                {
+                    var message = $"{capped.Name} finished passive {DisplayStatId(capped.StatId)} training at their current DNA cap.";
+                    RaiseGardenEvent(message);
+                    break;
+                }
                 case CreatureHatchedEvent hatched:
                 {
                     var message = $"An egg hatched and {hatched.Name} was born!";
