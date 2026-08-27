@@ -49,7 +49,7 @@ public sealed class CreatureNeedsPersistenceTests
         Assert.Equal(0.0f, creature.Needs.Stress);
         Assert.Equal(100.0f, creature.Needs.Nourishment);
         Assert.Equal(100.0f, creature.Needs.Condition);
-        Assert.Equal(75.0f, creature.Needs.Happiness);
+        Assert.Equal(0.0f, creature.Needs.Happiness);
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class CreatureNeedsPersistenceTests
         Assert.NotNull(missing.Needs);
         Assert.Equal(0.0f, missing.Needs.Hunger);
         Assert.Equal(100.0f, missing.Needs.Energy);
-        Assert.Equal(75.0f, missing.Needs.Happiness);
+        Assert.Equal(0.0f, missing.Needs.Happiness);
         Assert.Equal(100.0f, malformed.Needs.Hunger);
         Assert.Equal(0.0f, malformed.Needs.Energy);
         Assert.Equal(0.0f, malformed.Needs.Fatigue);
