@@ -104,6 +104,20 @@ public partial class GameSession : Node
                     RaiseGardenEvent(message);
                     break;
                 }
+                case CreatureReincarnatedEvent reincarnated:
+                {
+                    var message = $"{reincarnated.Name} reincarnated and began a new life.";
+                    ToastRequested?.Invoke(message);
+                    RaiseGardenEvent(message);
+                    break;
+                }
+                case CreatureDiedEvent died:
+                {
+                    var message = $"{died.Name} reached the end of their life.";
+                    ToastRequested?.Invoke(message);
+                    RaiseGardenEvent(message);
+                    break;
+                }
                 case CreatureHatchedEvent hatched:
                 {
                     var message = $"An egg hatched and {hatched.Name} was born!";

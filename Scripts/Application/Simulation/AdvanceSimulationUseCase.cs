@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Voidling.Domain.Care;
 using Voidling.Domain.Evolution;
+using Voidling.Domain.Lifecycle;
 using Voidling.Domain.Rules;
 using VoidlingGame;
 
@@ -15,6 +16,11 @@ public sealed record CreatureBecameAdultEvent(
     string PromotedStatId,
     int PreviousRank,
     int NewRank) : GameSimulationEvent;
+public sealed record CreatureReincarnatedEvent(
+    string CreatureId,
+    string Name,
+    int ReincarnationCount) : GameSimulationEvent;
+public sealed record CreatureDiedEvent(string CreatureId, string Name) : GameSimulationEvent;
 public sealed record CreatureHatchedEvent(string EggId, string CreatureId, string Name) : GameSimulationEvent;
 public sealed record EggFailedEvent(string EggId) : GameSimulationEvent;
 
@@ -29,6 +35,7 @@ public sealed class AdvanceSimulationUseCase
 {
     private readonly GameBalanceRules _rules;
     private readonly CreatureNeedsService _needs = new();
+    private readonly ReincarnationService _reincarnation = new();
 
     public AdvanceSimulationUseCase(GameBalanceRules rules)
     {
@@ -43,6 +50,7 @@ public sealed class AdvanceSimulationUseCase
 
         var changed = AdvanceGardenIncome(state, elapsedSeconds);
         var events = new List<GameSimulationEvent>();
+        var deathQueue = new List<VoidlingData>();
 
         foreach (var creature in state.Voidlings)
         {
@@ -54,23 +62,66 @@ public sealed class AdvanceSimulationUseCase
                 changed = true;
             }
 
-            if (creature.Stage != LifeStage.Child)
+            var adultElapsedThisStep = 0.0f;
+            if (creature.Stage == LifeStage.Child)
+            {
+                var childToAdultSeconds = Math.Max(0.1f, _rules.Lifecycle.ChildToAdultSeconds);
+                creature.AgeSeconds = Math.Max(0.0f, creature.AgeSeconds) + elapsedSeconds;
+                changed = true;
+                if (creature.AgeSeconds < childToAdultSeconds)
+                    continue;
+
+                adultElapsedThisStep = Math.Max(0.0f, creature.AgeSeconds - childToAdultSeconds);
+                var evolution = EvolutionService.ResolveFirstEvolution(creature, _rules);
+                creature.Stage = LifeStage.Adult;
+                events.Add(new CreatureBecameAdultEvent(
+                    creature.Id,
+                    creature.Name,
+                    evolution.Specialization,
+                    evolution.PromotedStatId,
+                    evolution.PreviousRank,
+                    evolution.NewRank));
+            }
+            else if (creature.Stage == LifeStage.Adult)
+            {
+                adultElapsedThisStep = elapsedSeconds;
+            }
+
+            if (adultElapsedThisStep > 0.0f)
+            {
+                creature.AdultAgeSeconds = Math.Max(0.0f, creature.AdultAgeSeconds) + adultElapsedThisStep;
+                changed = true;
+            }
+
+            var adultLifespanSeconds = Math.Max(0.1f, _rules.Reincarnation.AdultLifespanSeconds);
+            if (creature.Stage != LifeStage.Adult || creature.AdultAgeSeconds < adultLifespanSeconds)
                 continue;
 
-            creature.AgeSeconds += elapsedSeconds;
+            var decision = _reincarnation.Decide(creature, _rules.Reincarnation);
+            if (decision.Outcome == LifecycleEndOutcome.Reincarnate)
+            {
+                _reincarnation.ApplyReincarnation(creature, _rules.Reincarnation);
+                events.Add(new CreatureReincarnatedEvent(
+                    creature.Id,
+                    creature.Name,
+                    creature.ReincarnationCount));
+                changed = true;
+                continue;
+            }
+
+            creature.DepartureReason = CreatureDepartureReason.Death;
+            deathQueue.Add(creature);
+            events.Add(new CreatureDiedEvent(creature.Id, creature.Name));
             changed = true;
-            if (creature.AgeSeconds < _rules.Lifecycle.ChildToAdultSeconds)
+        }
+
+        foreach (var creature in deathQueue)
+        {
+            if (!state.Voidlings.Remove(creature))
                 continue;
 
-            var evolution = EvolutionService.ResolveFirstEvolution(creature, _rules);
-            creature.Stage = LifeStage.Adult;
-            events.Add(new CreatureBecameAdultEvent(
-                creature.Id,
-                creature.Name,
-                evolution.Specialization,
-                evolution.PromotedStatId,
-                evolution.PreviousRank,
-                evolution.NewRank));
+            if (!state.DepartedVoidlings.Contains(creature))
+                state.DepartedVoidlings.Add(creature);
         }
 
         var hatchQueue = new List<EggData>();

@@ -1,5 +1,6 @@
 using System.Linq;
 using Voidling.Application.Simulation;
+using Voidling.Domain.Care;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Rules;
 using VoidlingGame;
@@ -29,6 +30,7 @@ public sealed class SimulationArchitectureTests
 
         Assert.True(result.Changed);
         Assert.Equal(LifeStage.Adult, child.Stage);
+        Assert.Equal(0.25f, child.AdultAgeSeconds, 4);
         Assert.Equal(0.0f, child.BreedCooldownSeconds);
         var transition = Assert.Single(result.Events);
         var adult = Assert.IsType<CreatureBecameAdultEvent>(transition);
@@ -55,6 +57,84 @@ public sealed class SimulationArchitectureTests
         Assert.Single(first.Events.OfType<CreatureBecameAdultEvent>());
         Assert.Empty(second.Events.OfType<CreatureBecameAdultEvent>());
         Assert.Equal(LifeStage.Adult, child.Stage);
+    }
+
+    [Fact]
+    public void Advance_EligibleAdultReincarnatesExactlyOnce()
+    {
+        var rules = Rules with
+        {
+            Reincarnation = Rules.Reincarnation with
+            {
+                AdultLifespanSeconds = 1.0f,
+                MinimumHappiness = 5.0f,
+                MaximumStress = 70.0f,
+                RetainedTrainingFraction = 0.10f
+            }
+        };
+        var adult = new VoidlingData
+        {
+            Id = "reincarnate",
+            Name = "Mallow",
+            Stage = LifeStage.Adult,
+            AdultAgeSeconds = 0.9f,
+            Needs = new CreatureNeedsState { Happiness = 20.0f, Stress = 10.0f }
+        };
+        adult.TrainingPoints["run"] = 50;
+        var state = new GameStateData();
+        state.Voidlings.Add(adult);
+        var simulation = new AdvanceSimulationUseCase(rules);
+
+        var first = simulation.Advance(state, 0.2f);
+        var second = simulation.Advance(state, 0.2f);
+
+        var reincarnated = Assert.IsType<CreatureReincarnatedEvent>(
+            Assert.Single(first.Events.OfType<CreatureReincarnatedEvent>()));
+        Assert.Equal("reincarnate", reincarnated.CreatureId);
+        Assert.Equal(1, reincarnated.ReincarnationCount);
+        Assert.Equal(LifeStage.Child, adult.Stage);
+        Assert.Equal(1, adult.ReincarnationCount);
+        Assert.Equal(0.0f, adult.AdultAgeSeconds);
+        Assert.Equal(5, adult.TrainingPoints["run"]);
+        Assert.Equal(CreatureDepartureReason.None, adult.DepartureReason);
+        Assert.Same(adult, Assert.Single(state.Voidlings));
+        Assert.Empty(state.DepartedVoidlings);
+        Assert.Empty(second.Events.OfType<CreatureReincarnatedEvent>());
+    }
+
+    [Fact]
+    public void Advance_IneligibleAdultDiesAndMovesToLineageExactlyOnce()
+    {
+        var rules = Rules with
+        {
+            Reincarnation = Rules.Reincarnation with
+            {
+                AdultLifespanSeconds = 1.0f,
+                MinimumHappiness = 5.0f,
+                MaximumStress = 70.0f
+            }
+        };
+        var adult = new VoidlingData
+        {
+            Id = "death",
+            Name = "Pip",
+            Stage = LifeStage.Adult,
+            AdultAgeSeconds = 0.9f,
+            Needs = new CreatureNeedsState { Happiness = 0.0f, Stress = 10.0f }
+        };
+        var state = new GameStateData();
+        state.Voidlings.Add(adult);
+        var simulation = new AdvanceSimulationUseCase(rules);
+
+        var first = simulation.Advance(state, 0.2f);
+        var second = simulation.Advance(state, 5.0f);
+
+        var died = Assert.IsType<CreatureDiedEvent>(Assert.Single(first.Events.OfType<CreatureDiedEvent>()));
+        Assert.Equal("death", died.CreatureId);
+        Assert.Empty(state.Voidlings);
+        Assert.Same(adult, Assert.Single(state.DepartedVoidlings));
+        Assert.Equal(CreatureDepartureReason.Death, adult.DepartureReason);
+        Assert.Empty(second.Events.OfType<CreatureDiedEvent>());
     }
 
     [Fact]
@@ -174,6 +254,7 @@ public sealed class SimulationArchitectureTests
         var secondCreature = Assert.Single(secondState.Voidlings);
         Assert.Equal(firstCreature.Stage, secondCreature.Stage);
         Assert.Equal(firstCreature.AgeSeconds, secondCreature.AgeSeconds, 4);
+        Assert.Equal(firstCreature.AdultAgeSeconds, secondCreature.AdultAgeSeconds, 4);
         Assert.Equal(firstCreature.BreedCooldownSeconds, secondCreature.BreedCooldownSeconds, 4);
         Assert.Equal(firstState.OwnedEggs[0].IncubationSeconds, secondState.OwnedEggs[0].IncubationSeconds, 4);
         Assert.Equal(firstState.OwnedEggs[0].State, secondState.OwnedEggs[0].State);
