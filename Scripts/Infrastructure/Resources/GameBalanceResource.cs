@@ -75,6 +75,19 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "0,1,0.01")]
     public float EvolutionSpecializationThreshold { get; set; } = 0.50f;
 
+    [ExportGroup("Lifecycle / Reincarnation")]
+    [Export(PropertyHint.Range, "30,86400,1")]
+    public float AdultLifespanSeconds { get; set; } = 900.0f;
+
+    [Export(PropertyHint.Range, "0,100,0.5")]
+    public float ReincarnationMinimumHappiness { get; set; } = 10.0f;
+
+    [Export(PropertyHint.Range, "0,100,0.5")]
+    public float ReincarnationMaximumStress { get; set; } = 70.0f;
+
+    [Export(PropertyHint.Range, "0,1,0.01")]
+    public float ReincarnationRetainedTrainingFraction { get; set; } = 0.10f;
+
     [ExportGroup("Care / Needs")]
     [Export(PropertyHint.Range, "0,10,0.05")]
     public float HungerGainPerMinute { get; set; } = 0.75f;
@@ -163,6 +176,13 @@ public partial class GameBalanceResource : Resource
             Evolution = defaults.Evolution with
             {
                 SpecializationThreshold = Math.Clamp(EvolutionSpecializationThreshold, 0.0f, 1.0f)
+            },
+            Reincarnation = defaults.Reincarnation with
+            {
+                AdultLifespanSeconds = Math.Max(1.0f, AdultLifespanSeconds),
+                MinimumHappiness = Math.Clamp(ReincarnationMinimumHappiness, 0.0f, 100.0f),
+                MaximumStress = Math.Clamp(ReincarnationMaximumStress, 0.0f, 100.0f),
+                RetainedTrainingFraction = Math.Clamp(ReincarnationRetainedTrainingFraction, 0.0f, 1.0f)
             },
             Needs = defaults.Needs with
             {
