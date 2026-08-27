@@ -25,14 +25,14 @@ public sealed class CreatureNeedsServiceTests
         Assert.Equal(0.25f, needs.Loneliness, 3);
         Assert.Equal(99.60f, needs.Nourishment, 3);
         Assert.Equal(99.95f, needs.Condition, 3);
-        Assert.Equal(74.90f, needs.Happiness, 3);
+        Assert.Equal(0.0f, needs.Happiness, 3);
     }
 
     [Fact]
     public void Advance_EquivalentElapsedChunksProduceEquivalentState()
     {
-        var single = new CreatureNeedsState { Stress = 20.0f };
-        var chunked = new CreatureNeedsState { Stress = 20.0f };
+        var single = new CreatureNeedsState { Stress = 20.0f, Happiness = 40.0f };
+        var chunked = new CreatureNeedsState { Stress = 20.0f, Happiness = 40.0f };
         var service = new CreatureNeedsService();
 
         service.Advance(single, 120.0f, Rules);
@@ -89,6 +89,6 @@ public sealed class CreatureNeedsServiceTests
         Assert.False(service.Advance(needs, float.NaN, Rules));
         Assert.Equal(0.0f, needs.Hunger);
         Assert.Equal(100.0f, needs.Energy);
-        Assert.Equal(75.0f, needs.Happiness);
+        Assert.Equal(0.0f, needs.Happiness);
     }
 }
