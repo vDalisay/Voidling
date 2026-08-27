@@ -340,13 +340,25 @@ public partial class MainController : Node
                 string.Format(Tr("UI_INVENTORY_FAILED_EGG"), index + 1)))
             .ToList();
 
+        var eggShells = _session.State.EggShells
+            .Select((shell, index) => new EggShellViewState(
+                shell.Id,
+                $"Eggshell {index + 1}",
+                GameRules.EggShellSalePrice))
+            .ToList();
+
         var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(380, 292));
         var screen = new InventoryScreen();
-        screen.Configure(new InventoryScreenState(items, failedEggs));
+        screen.Configure(new InventoryScreenState(items, failedEggs, eggShells));
         screen.DiscardFailedEggRequested += eggId =>
         {
             _session.DiscardFailedEgg(eggId);
             CallDeferred(nameof(ShowInventory));
+        };
+        screen.SellEggShellRequested += shellId =>
+        {
+            if (_session.SellEggShell(shellId))
+                CallDeferred(nameof(ShowInventory));
         };
         box.AddChild(screen);
     }

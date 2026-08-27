@@ -34,4 +34,14 @@ public partial class GameSession
         SaveAndNotify("Bought a mystery egg.");
         RaiseGardenEvent("A mystery egg was placed in the garden.");
     }
+
+    public bool SellEggShell(string shellId)
+    {
+        var result = _shop!.SellEggShell(State, shellId);
+        if (!result.Succeeded)
+            return false;
+
+        SaveAndNotify($"Sold an eggshell for {result.CoinsGained} sprouts.");
+        return true;
+    }
 }

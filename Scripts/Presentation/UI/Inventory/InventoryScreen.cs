@@ -12,18 +12,21 @@ public readonly record struct InventoryItemViewState(
     bool UsesEggIcon = false);
 
 public readonly record struct FailedEggViewState(string EggId, string DisplayName);
+public readonly record struct EggShellViewState(string ShellId, string DisplayName, int SaleValue);
 
 public sealed record InventoryScreenState(
     IReadOnlyList<InventoryItemViewState> Items,
-    IReadOnlyList<FailedEggViewState> FailedEggs);
+    IReadOnlyList<FailedEggViewState> FailedEggs,
+    IReadOnlyList<EggShellViewState> EggShells);
 
 /// <summary>
-/// Inventory view over a supplied snapshot. It emits cleanup intent for failed eggs rather than
-/// reaching into GameSession itself.
+/// Inventory view over a supplied snapshot. It emits cleanup/sale intent rather than reaching
+/// into GameSession itself.
 /// </summary>
 public partial class InventoryScreen : VBoxContainer
 {
     public event Action<string>? DiscardFailedEggRequested;
+    public event Action<string>? SellEggShellRequested;
 
     private static readonly Texture2D EggTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
@@ -61,6 +64,13 @@ public partial class InventoryScreen : VBoxContainer
 
         foreach (var item in _state.Items)
             list.AddChild(CreateInventoryRow(CreateItemIcon(item), item.DisplayName, item.Count));
+
+        if (_state.EggShells.Count > 0)
+        {
+            list.AddChild(UiFactory.CreateLabel("EGGSHELLS", 8));
+            foreach (var shell in _state.EggShells)
+                list.AddChild(CreateEggShellRow(shell));
+        }
 
         if (_state.FailedEggs.Count <= 0)
             return;
@@ -104,6 +114,25 @@ public partial class InventoryScreen : VBoxContainer
         amount.HorizontalAlignment = HorizontalAlignment.Right;
         amount.VerticalAlignment = VerticalAlignment.Center;
         row.AddChild(amount);
+        return panel;
+    }
+
+    private Control CreateEggShellRow(EggShellViewState shell)
+    {
+        var panel = CreateRowPanel();
+        var row = CreateRow(panel);
+        row.AddChild(CreateRowIcon(CreateEggTexture()));
+
+        var name = UiFactory.CreateLabel(shell.DisplayName, 8);
+        name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        name.VerticalAlignment = VerticalAlignment.Center;
+        row.AddChild(name);
+
+        var sell = UiFactory.CreateButton($"Sell +{shell.SaleValue}");
+        sell.CustomMinimumSize = new Vector2(76, 22);
+        UiFactory.ApplyPixelFont(sell, 7);
+        sell.Pressed += () => SellEggShellRequested?.Invoke(shell.ShellId);
+        row.AddChild(sell);
         return panel;
     }
 
