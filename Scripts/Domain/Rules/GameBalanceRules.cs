@@ -45,6 +45,17 @@ public sealed record StatGrowthRules(int TrainingPointsPerLevel, int MaxLevel, i
 
 public sealed record LifecycleRules(float ChildToAdultSeconds);
 
+/// <summary>
+/// Prototype lifecycle/reincarnation tuning. The existence of hidden-Happiness-gated
+/// reincarnation is a product rule; these numerical thresholds/durations are intentionally
+/// authorable until the dedicated lifecycle balance pass locks them.
+/// </summary>
+public sealed record ReincarnationRules(
+    float AdultLifespanSeconds,
+    float MinimumHappiness,
+    float MaximumStress,
+    float RetainedTrainingFraction);
+
 public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice);
 
 /// <summary>
@@ -132,6 +143,11 @@ public sealed record GameBalanceRules(
     RaceRules Racing)
 {
     public EvolutionRules Evolution { get; init; } = new(SpecializationThreshold: 0.50f);
+    public ReincarnationRules Reincarnation { get; init; } = new(
+        AdultLifespanSeconds: 900.0f,
+        MinimumHappiness: 10.0f,
+        MaximumStress: 70.0f,
+        RetainedTrainingFraction: 0.10f);
     public EconomyRules Economy { get; init; } = new(GardenCoinsPerMinute: 1.0f);
     public NeedsRules Needs { get; init; } = new(
         HungerGainPerMinute: 0.75f,
