@@ -41,18 +41,18 @@ public sealed class VoidlingData
     public string TintHex { get; set; } = "#F6F0C9";
     public List<RareTraitData> RareTraits { get; set; } = new();
 
-    // Current care/condition state is persistent but separate from inherited DNA and training.
-    // It advances only when explicit simulation elapsed time is supplied by the running game.
     public CreatureNeedsState Needs { get; set; } = new();
 
-    // Hidden raising influence is persisted independently from trained performance. It determines
-    // first-evolution specialization but is never read by race simulation as a substitute stat.
+    // Semantic passive-training assignment. This deliberately does not encode Garden geometry or
+    // a scene-node/module ID, so the future modular Garden UI can move without save-shape churn.
+    public string PassiveTrainingStatId { get; set; } = "";
+    public double PassiveTrainingPointRemainder { get; set; }
+
     public float SwimFlyInfluence { get; set; }
     public float RunPowerInfluence { get; set; }
     public EvolutionSpecialization EvolutionSpecialization { get; set; } = EvolutionSpecialization.None;
     public float EvolutionMagnitude { get; set; }
 
-    // Initial/world placement. Normal wandering does not continuously write to the save.
     public float WorldX { get; set; }
     public float WorldY { get; set; }
 }

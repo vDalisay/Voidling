@@ -5,14 +5,8 @@ using Voidling.Domain.Rules;
 namespace Voidling.Infrastructure.Resources;
 
 /// <summary>
-/// Godot Inspector authoring surface for balance values that are already consumed by live
-/// gameplay. The Resource never crosses the infrastructure boundary: Bootstrap converts it once
-/// into immutable plain-C# GameBalanceRules consumed by Application and Domain.
-///
-/// Stable IDs, palettes, inbreeding failure tiers, reward tables, and race tuning remain in the
-/// domain defaults until the live code consuming them has moved behind the corresponding pure
-/// domain/application seam. Do not expose an Inspector knob before it is the real source used by
-/// gameplay; that would create competing configuration systems.
+/// Godot Inspector authoring surface for balance values consumed by live gameplay.
+/// Bootstrap converts this Resource once into immutable plain-C# rules.
 /// </summary>
 [GlobalClass]
 public partial class GameBalanceResource : Resource
@@ -20,54 +14,42 @@ public partial class GameBalanceResource : Resource
     [ExportGroup("Genetics")]
     [Export(PropertyHint.Range, "0,1,0.01")]
     public float HigherAlleleExpressionChance { get; set; } = 0.70f;
-
     [Export(PropertyHint.Range, "0,0.1,0.001")]
     public float AbilityRankBreakthroughChance { get; set; } = 0.01f;
-
     [Export(PropertyHint.Range, "0,0.1,0.0001")]
     public float RareFounderTraitChance { get; set; } = 0.0005f;
-
     [Export(PropertyHint.Range, "0,1,0.01")]
     public float RareTraitTransmissionChance { get; set; } = 0.10f;
-
     [Export(PropertyHint.Range, "1,8,1")]
     public int RelatedAncestorDepth { get; set; } = 3;
 
     [ExportGroup("Breeding / Hatching")]
     [Export(PropertyHint.Range, "0,300,0.5")]
     public float BreedCooldownSeconds { get; set; } = 8.0f;
-
     [Export(PropertyHint.Range, "1,600,0.5")]
     public float EggIncubationSeconds { get; set; } = 22.0f;
 
     [ExportGroup("Growth")]
     [Export(PropertyHint.Range, "1,100,1")]
     public int TrainingPointsPerLevel { get; set; } = 12;
-
     [Export(PropertyHint.Range, "1,999,1")]
     public int MaxStatLevel { get; set; } = 99;
-
     [Export(PropertyHint.Range, "1,10000,1")]
     public int MaxTrainingPoints { get; set; } = 120;
-
     [Export(PropertyHint.Range, "0,10000,1")]
     public int RankETrainingCap { get; set; } = 20;
-
     [Export(PropertyHint.Range, "0,10000,1")]
     public int RankDTrainingCap { get; set; } = 40;
-
     [Export(PropertyHint.Range, "0,10000,1")]
     public int RankCTrainingCap { get; set; } = 60;
-
     [Export(PropertyHint.Range, "0,10000,1")]
     public int RankBTrainingCap { get; set; } = 80;
-
     [Export(PropertyHint.Range, "0,10000,1")]
     public int RankATrainingCap { get; set; } = 100;
-
     [Export(PropertyHint.Range, "0,10000,1")]
     public int RankSTrainingCap { get; set; } = 120;
-
+    [Export(PropertyHint.Range, "0,60,0.1")]
+    public float PassiveTrainingPointsPerMinute { get; set; } = 1.0f;
     [Export(PropertyHint.Range, "1,3600,1")]
     public float ChildToAdultSeconds { get; set; } = 45.0f;
 
@@ -78,53 +60,38 @@ public partial class GameBalanceResource : Resource
     [ExportGroup("Lifecycle / Reincarnation")]
     [Export(PropertyHint.Range, "30,86400,1")]
     public float AdultLifespanSeconds { get; set; } = 900.0f;
-
     [Export(PropertyHint.Range, "0,100,0.5")]
     public float ReincarnationMinimumHappiness { get; set; } = 10.0f;
-
     [Export(PropertyHint.Range, "0,100,0.5")]
     public float ReincarnationMaximumStress { get; set; } = 70.0f;
-
     [Export(PropertyHint.Range, "0,1,0.01")]
     public float ReincarnationRetainedTrainingFraction { get; set; } = 0.10f;
 
     [ExportGroup("Care / Needs")]
     [Export(PropertyHint.Range, "0,10,0.05")]
     public float HungerGainPerMinute { get; set; } = 0.75f;
-
     [Export(PropertyHint.Range, "0,10,0.05")]
     public float EnergyLossPerMinute { get; set; } = 0.45f;
-
     [Export(PropertyHint.Range, "0,10,0.05")]
     public float FatigueGainPerMinute { get; set; } = 0.35f;
-
     [Export(PropertyHint.Range, "0,10,0.05")]
     public float StressRecoveryPerMinute { get; set; } = 0.20f;
-
     [Export(PropertyHint.Range, "0,10,0.05")]
     public float BoredomGainPerMinute { get; set; } = 0.50f;
-
     [Export(PropertyHint.Range, "0,10,0.05")]
     public float LonelinessGainPerMinute { get; set; } = 0.25f;
-
     [Export(PropertyHint.Range, "0,10,0.05")]
     public float NourishmentLossPerMinute { get; set; } = 0.40f;
-
     [Export(PropertyHint.Range, "0,10,0.05")]
     public float ConditionLossPerMinute { get; set; } = 0.05f;
-
     [Export(PropertyHint.Range, "0,10,0.05")]
     public float HappinessLossPerMinute { get; set; } = 0.10f;
-
     [Export(PropertyHint.Range, "0,100,0.5")]
     public float TreatHungerReduction { get; set; } = 12.0f;
-
     [Export(PropertyHint.Range, "0,100,0.5")]
     public float TreatEnergyGain { get; set; } = 2.0f;
-
     [Export(PropertyHint.Range, "0,100,0.5")]
     public float TreatNourishmentGain { get; set; } = 8.0f;
-
     [Export(PropertyHint.Range, "0,100,0.5")]
     public float TreatHappinessGain { get; set; } = 2.0f;
 
@@ -135,7 +102,6 @@ public partial class GameBalanceResource : Resource
     [ExportGroup("Shop")]
     [Export(PropertyHint.Range, "0,10000,1")]
     public int StoreEggPrice { get; set; } = 30;
-
     [Export(PropertyHint.Range, "0,10000,1")]
     public int TrainingItemPrice { get; set; } = 8;
 
@@ -154,14 +120,8 @@ public partial class GameBalanceResource : Resource
                 RareTraitTransmissionChance = Probability(RareTraitTransmissionChance),
                 RelatedAncestorDepth = Math.Max(1, RelatedAncestorDepth)
             },
-            Breeding = defaults.Breeding with
-            {
-                CooldownSeconds = Math.Max(0.0f, BreedCooldownSeconds)
-            },
-            Hatching = defaults.Hatching with
-            {
-                IncubationSeconds = Math.Max(0.1f, EggIncubationSeconds)
-            },
+            Breeding = defaults.Breeding with { CooldownSeconds = Math.Max(0.0f, BreedCooldownSeconds) },
+            Hatching = defaults.Hatching with { IncubationSeconds = Math.Max(0.1f, EggIncubationSeconds) },
             Stats = defaults.Stats with
             {
                 TrainingPointsPerLevel = Math.Max(1, TrainingPointsPerLevel),
@@ -169,10 +129,11 @@ public partial class GameBalanceResource : Resource
                 MaxTrainingPoints = maxTrainingPoints,
                 RankCaps = BuildRankCaps(maxTrainingPoints)
             },
-            Lifecycle = defaults.Lifecycle with
+            PassiveTraining = defaults.PassiveTraining with
             {
-                ChildToAdultSeconds = Math.Max(0.1f, ChildToAdultSeconds)
+                PointsPerMinute = NonNegative(PassiveTrainingPointsPerMinute)
             },
+            Lifecycle = defaults.Lifecycle with { ChildToAdultSeconds = Math.Max(0.1f, ChildToAdultSeconds) },
             Evolution = defaults.Evolution with
             {
                 SpecializationThreshold = Math.Clamp(EvolutionSpecializationThreshold, 0.0f, 1.0f)
@@ -200,10 +161,7 @@ public partial class GameBalanceResource : Resource
                 TreatNourishmentGain = NonNegative(TreatNourishmentGain),
                 TreatHappinessGain = NonNegative(TreatHappinessGain)
             },
-            Economy = defaults.Economy with
-            {
-                GardenCoinsPerMinute = Math.Max(0.0f, GardenCoinsPerMinute)
-            },
+            Economy = defaults.Economy with { GardenCoinsPerMinute = NonNegative(GardenCoinsPerMinute) },
             Shop = defaults.Shop with
             {
                 StoreEggPrice = Math.Max(0, StoreEggPrice),

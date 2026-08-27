@@ -14,12 +14,10 @@ namespace Voidling.Application.Persistence;
 
 /// <summary>
 /// Owns backward-compatible normalization of the serialized game-state aggregate.
-/// Keep migrations explicit and monotonic: loading an old save may fill deterministic
-/// defaults, but must never reroll existing genetics, eggs, lineage, or race data.
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 11;
+    public const int CurrentSaveVersion = 12;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -48,7 +46,6 @@ public sealed class GameStateMigrationService
         state.AppliedMultiplayerRaceIds ??= new List<string>();
         state.DailyRaceAttempts ??= new List<DailyRaceAttemptData>();
 
-        // Version 4 introduced persisted audio and race auto-finish settings.
         if (previousVersion < 4)
         {
             state.MasterVolume = 1.0f;
@@ -69,9 +66,6 @@ public sealed class GameStateMigrationService
                 if (!creature.TrainingPoints.ContainsKey(statId))
                     creature.TrainingPoints[statId] = 0;
 
-                // Version 9 makes the DNA rank the actual hard training ceiling. Clamp legacy
-                // over-cap data once rather than preserving banked points that could become active
-                // after a later evolution rank promotion.
                 creature.TrainingPoints[statId] = Math.Clamp(
                     creature.TrainingPoints[statId],
                     0,
@@ -79,24 +73,29 @@ public sealed class GameStateMigrationService
             }
 
             creature.RareTraits ??= new List<RareTraitData>();
-
-            // Version 11 persists current care/condition state. Older saves use the deterministic
-            // neutral defaults from CreatureNeedsState; malformed/newer partial values are bounded
-            // rather than converted into progression or rerolled from genetics.
             creature.Needs ??= new CreatureNeedsState();
             _needs.Normalize(creature.Needs);
+
+            // Version 12 stores only a semantic passive-training stat and fractional point remainder.
+            // Unknown assignments from malformed/newer saves are disabled rather than remapped.
+            if (!_rules.Genetics.StatIds.Contains(creature.PassiveTrainingStatId ?? string.Empty))
+            {
+                creature.PassiveTrainingStatId = string.Empty;
+                creature.PassiveTrainingPointRemainder = 0.0;
+            }
+            else if (!double.IsFinite(creature.PassiveTrainingPointRemainder) ||
+                     creature.PassiveTrainingPointRemainder < 0.0 ||
+                     creature.PassiveTrainingPointRemainder >= 1.0)
+            {
+                creature.PassiveTrainingPointRemainder = 0.0;
+            }
         }
 
         foreach (var egg in state.OwnedEggs.Concat(state.StoreEggs))
             egg.RareTraits ??= new List<RareTraitData>();
 
-        // Version 5 introduced a minimal persistent ancestry graph. Populate it from every full
-        // creature record already known locally, while preserving archive-only ancestors imported
-        // through multiplayer trades. This is deterministic and never changes genes or IDs.
         _lineage.EnsureCurrentEntries(state);
 
-        // Version 6 adds only empty trade durability collections to old saves. Pending journals and
-        // applied transaction IDs are local data; loading a save never contacts Steam or a peer.
         state.PendingTradeJournal.RemoveAll(entry =>
             entry == null || string.IsNullOrWhiteSpace(entry.TradeId));
         state.AppliedTradeIds = state.AppliedTradeIds
@@ -104,8 +103,6 @@ public sealed class GameStateMigrationService
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
-        // Version 7 keeps the multiplayer-win total and a bounded local dedupe history. Both are
-        // purely local persistence; normalization never queries Steam or attempts leaderboard IO.
         state.MultiplayerWins = Math.Max(0, state.MultiplayerWins);
         state.AppliedMultiplayerRaceIds = state.AppliedMultiplayerRaceIds
             .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -113,22 +110,14 @@ public sealed class GameStateMigrationService
             .TakeLast(256)
             .ToList();
 
-        // Version 8 persists local daily-race attempts. Keep at most one structurally valid attempt
-        // per UTC day and retain old rules-version attempts instead of erasing them: an incompatible
-        // update may prevent resume, but must not accidentally grant a second attempt that day.
         state.DailyRaceAttempts = state.DailyRaceAttempts
-            .Where(attempt => DailyFriendRaceService.IsStructurallyValid(
-                attempt,
-                requireCurrentRules: false,
-                out _))
+            .Where(attempt => DailyFriendRaceService.IsStructurallyValid(attempt, requireCurrentRules: false, out _))
             .GroupBy(attempt => attempt.DailyKey, StringComparer.Ordinal)
             .Select(group => group.Last())
             .OrderBy(attempt => attempt.DailyKey, StringComparer.Ordinal)
             .TakeLast(DailyFriendRaceService.MaxAttemptHistory)
             .ToList();
 
-        // Version 10 adds only fractional open-game Garden income progress. Old saves naturally
-        // start at zero; malformed values are discarded rather than being converted into currency.
         if (!double.IsFinite(state.GardenIncomeCoinRemainder) ||
             state.GardenIncomeCoinRemainder < 0.0 ||
             state.GardenIncomeCoinRemainder >= 1.0)

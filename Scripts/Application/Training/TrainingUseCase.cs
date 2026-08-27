@@ -19,6 +19,13 @@ public enum TrainingFailure
     StatAtCap
 }
 
+public enum PassiveTrainingFailure
+{
+    None,
+    UnknownStat,
+    CreatureNotFound
+}
+
 public readonly record struct TrainingPurchaseResult(TrainingFailure Failure)
 {
     public bool Succeeded => Failure == TrainingFailure.None;
@@ -29,12 +36,17 @@ public readonly record struct TrainingApplicationResult(TrainingFailure Failure,
     public bool Succeeded => Failure == TrainingFailure.None;
 }
 
+public readonly record struct PassiveTrainingAssignmentResult(
+    PassiveTrainingFailure Failure,
+    string StatId,
+    bool Changed)
+{
+    public bool Succeeded => Failure == PassiveTrainingFailure.None;
+}
+
 /// <summary>
-/// Coordinates training inventory and stat progression without UI, persistence or Godot APIs.
-/// The caller owns seed allocation and persistence so both remain explicit side effects.
-/// Child training also feeds deterministic hidden evolution influence; it never mutates ability
-/// DNA directly. The expressed DNA rank supplies the hard training ceiling. Successfully eating a
-/// training treat also applies its current-care side effects; failed actions mutate neither state.
+/// Coordinates active training inventory and persistent passive-training assignments without UI,
+/// persistence or Godot APIs. Both training paths share the same DNA-rank hard ceiling.
 /// </summary>
 public sealed class TrainingUseCase
 {
@@ -98,5 +110,27 @@ public sealed class TrainingUseCase
         EvolutionService.ApplyTrainingInfluence(creature, statId, appliedGain, _rules.Stats);
         _needs.ApplyTrainingTreat(creature.Needs, _rules.Needs);
         return new TrainingApplicationResult(TrainingFailure.None, appliedGain);
+    }
+
+    public PassiveTrainingAssignmentResult SetPassiveTraining(GameStateData state, string creatureId, string? statId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var requested = statId ?? string.Empty;
+        if (requested.Length > 0 && !_rules.Genetics.StatIds.Contains(requested))
+            return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.UnknownStat, string.Empty, false);
+
+        var creature = state.Voidlings.FirstOrDefault(v => v.Id == creatureId);
+        if (creature == null)
+            return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.CreatureNotFound, string.Empty, false);
+
+        var changed = !string.Equals(creature.PassiveTrainingStatId, requested, StringComparison.Ordinal) ||
+                      creature.PassiveTrainingPointRemainder != 0.0;
+        if (changed)
+        {
+            creature.PassiveTrainingStatId = requested;
+            creature.PassiveTrainingPointRemainder = 0.0;
+        }
+
+        return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.None, requested, changed);
     }
 }

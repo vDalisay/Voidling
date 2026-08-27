@@ -4,6 +4,7 @@ using Voidling.Domain.Care;
 using Voidling.Domain.Evolution;
 using Voidling.Domain.Lifecycle;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Training;
 using VoidlingGame;
 
 namespace Voidling.Application.Simulation;
@@ -16,11 +17,9 @@ public sealed record CreatureBecameAdultEvent(
     string PromotedStatId,
     int PreviousRank,
     int NewRank) : GameSimulationEvent;
-public sealed record CreatureReincarnatedEvent(
-    string CreatureId,
-    string Name,
-    int ReincarnationCount) : GameSimulationEvent;
+public sealed record CreatureReincarnatedEvent(string CreatureId, string Name, int ReincarnationCount) : GameSimulationEvent;
 public sealed record CreatureDiedEvent(string CreatureId, string Name) : GameSimulationEvent;
+public sealed record CreaturePassiveTrainingCappedEvent(string CreatureId, string Name, string StatId) : GameSimulationEvent;
 public sealed record CreatureHatchedEvent(string EggId, string CreatureId, string Name) : GameSimulationEvent;
 public sealed record EggFailedEvent(string EggId) : GameSimulationEvent;
 
@@ -28,14 +27,14 @@ public sealed record SimulationStepResult(bool Changed, IReadOnlyList<GameSimula
 
 /// <summary>
 /// Advances persistent garden simulation from an explicit elapsed duration. This contains no
-/// Godot frame, scene, UI, persistence, or wall-clock dependency, so lifecycle/hatching/economy/care
-/// can be tested and reused from any runtime host without changing presentation code.
+/// Godot frame, scene, UI, persistence, or wall-clock dependency.
 /// </summary>
 public sealed class AdvanceSimulationUseCase
 {
     private readonly GameBalanceRules _rules;
     private readonly CreatureNeedsService _needs = new();
     private readonly ReincarnationService _reincarnation = new();
+    private readonly PassiveTrainingService _passiveTraining = new();
 
     public AdvanceSimulationUseCase(GameBalanceRules rules)
     {
@@ -55,6 +54,11 @@ public sealed class AdvanceSimulationUseCase
         foreach (var creature in state.Voidlings)
         {
             changed |= _needs.Advance(creature.Needs, elapsedSeconds, _rules.Needs);
+
+            var passiveResult = _passiveTraining.Advance(creature, elapsedSeconds, _rules);
+            changed |= passiveResult.Changed;
+            if (passiveResult.ReachedCap)
+                events.Add(new CreaturePassiveTrainingCappedEvent(creature.Id, creature.Name, passiveResult.StatId));
 
             if (creature.BreedCooldownSeconds > 0.0f)
             {
@@ -101,10 +105,7 @@ public sealed class AdvanceSimulationUseCase
             if (decision.Outcome == LifecycleEndOutcome.Reincarnate)
             {
                 _reincarnation.ApplyReincarnation(creature, _rules.Reincarnation);
-                events.Add(new CreatureReincarnatedEvent(
-                    creature.Id,
-                    creature.Name,
-                    creature.ReincarnationCount));
+                events.Add(new CreatureReincarnatedEvent(creature.Id, creature.Name, creature.ReincarnationCount));
                 changed = true;
                 continue;
             }
@@ -119,7 +120,6 @@ public sealed class AdvanceSimulationUseCase
         {
             if (!state.Voidlings.Remove(creature))
                 continue;
-
             if (!state.DepartedVoidlings.Contains(creature))
                 state.DepartedVoidlings.Add(creature);
         }
@@ -159,8 +159,7 @@ public sealed class AdvanceSimulationUseCase
         if (coinsPerMinute <= 0.0f)
             return false;
 
-        var totalCoins = state.GardenIncomeCoinRemainder +
-                         elapsedSeconds * (double)coinsPerMinute / 60.0;
+        var totalCoins = state.GardenIncomeCoinRemainder + elapsedSeconds * (double)coinsPerMinute / 60.0;
         if (!double.IsFinite(totalCoins) || totalCoins < 0.0)
             return false;
 

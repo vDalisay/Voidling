@@ -20,6 +20,7 @@ RankCTrainingCap = 60
 RankBTrainingCap = 80
 RankATrainingCap = 100
 RankSTrainingCap = 120
+PassiveTrainingPointsPerMinute = 1.0
 ChildToAdultSeconds = 45.0
 EvolutionSpecializationThreshold = 0.5
 AdultLifespanSeconds = 900.0

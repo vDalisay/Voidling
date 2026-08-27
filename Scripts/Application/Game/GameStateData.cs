@@ -12,7 +12,7 @@ namespace VoidlingGame;
 /// </summary>
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 11;
+    public int SaveVersion { get; set; } = 12;
     public int Coins { get; set; } = 120;
     public double GardenIncomeCoinRemainder { get; set; }
     public long SeedCounter { get; set; } = 1;
@@ -23,21 +23,12 @@ public sealed class GameStateData
     public List<EggData> StoreEggs { get; set; } = new();
     public Dictionary<string, int> TrainingItems { get; set; } = new();
 
-    // Multiplayer transaction durability. These remain harmless empty collections for players who
-    // never use multiplayer and do not make Steam/network access part of save loading.
     public List<PendingTradeJournalEntry> PendingTradeJournal { get; set; } = new();
     public List<string> AppliedTradeIds { get; set; } = new();
-
-    // Local multiplayer progress is authoritative locally. Steam leaderboards are only a projection
-    // of this data and can be rebuilt/retried if Steam is unavailable.
     public int MultiplayerWins { get; set; }
     public List<string> AppliedMultiplayerRaceIds { get; set; } = new();
-
-    // The daily race is also local-first. Starting an attempt is persisted before the race begins;
-    // Steam receives only a completed time for the friends leaderboard when available.
     public List<DailyRaceAttemptData> DailyRaceAttempts { get; set; } = new();
 
-    // Settings remain in the existing save payload during migration for compatibility.
     public float MasterVolume { get; set; } = 1.0f;
     public bool AutoFinishRaces { get; set; } = true;
     public bool EdgePanning { get; set; } = true;
