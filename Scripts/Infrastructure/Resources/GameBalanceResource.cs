@@ -75,6 +75,34 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "0,1,0.01")]
     public float EvolutionSpecializationThreshold { get; set; } = 0.50f;
 
+    [ExportGroup("Care / Needs")]
+    [Export(PropertyHint.Range, "0,10,0.05")]
+    public float HungerGainPerMinute { get; set; } = 0.75f;
+
+    [Export(PropertyHint.Range, "0,10,0.05")]
+    public float EnergyLossPerMinute { get; set; } = 0.45f;
+
+    [Export(PropertyHint.Range, "0,10,0.05")]
+    public float FatigueGainPerMinute { get; set; } = 0.35f;
+
+    [Export(PropertyHint.Range, "0,10,0.05")]
+    public float StressRecoveryPerMinute { get; set; } = 0.20f;
+
+    [Export(PropertyHint.Range, "0,10,0.05")]
+    public float BoredomGainPerMinute { get; set; } = 0.50f;
+
+    [Export(PropertyHint.Range, "0,10,0.05")]
+    public float LonelinessGainPerMinute { get; set; } = 0.25f;
+
+    [Export(PropertyHint.Range, "0,10,0.05")]
+    public float NourishmentLossPerMinute { get; set; } = 0.40f;
+
+    [Export(PropertyHint.Range, "0,10,0.05")]
+    public float ConditionLossPerMinute { get; set; } = 0.05f;
+
+    [Export(PropertyHint.Range, "0,10,0.05")]
+    public float HappinessLossPerMinute { get; set; } = 0.10f;
+
     [ExportGroup("Economy")]
     [Export(PropertyHint.Range, "0,100,0.1")]
     public float GardenCoinsPerMinute { get; set; } = 1.0f;
@@ -124,6 +152,18 @@ public partial class GameBalanceResource : Resource
             {
                 SpecializationThreshold = Math.Clamp(EvolutionSpecializationThreshold, 0.0f, 1.0f)
             },
+            Needs = defaults.Needs with
+            {
+                HungerGainPerMinute = NonNegative(HungerGainPerMinute),
+                EnergyLossPerMinute = NonNegative(EnergyLossPerMinute),
+                FatigueGainPerMinute = NonNegative(FatigueGainPerMinute),
+                StressRecoveryPerMinute = NonNegative(StressRecoveryPerMinute),
+                BoredomGainPerMinute = NonNegative(BoredomGainPerMinute),
+                LonelinessGainPerMinute = NonNegative(LonelinessGainPerMinute),
+                NourishmentLossPerMinute = NonNegative(NourishmentLossPerMinute),
+                ConditionLossPerMinute = NonNegative(ConditionLossPerMinute),
+                HappinessLossPerMinute = NonNegative(HappinessLossPerMinute)
+            },
             Economy = defaults.Economy with
             {
                 GardenCoinsPerMinute = Math.Max(0.0f, GardenCoinsPerMinute)
@@ -148,4 +188,5 @@ public partial class GameBalanceResource : Resource
     }
 
     private static double Probability(float value) => Math.Clamp((double)value, 0.0, 1.0);
+    private static float NonNegative(float value) => float.IsFinite(value) ? Math.Max(0.0f, value) : 0.0f;
 }
