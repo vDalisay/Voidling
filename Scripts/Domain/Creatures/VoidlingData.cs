@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Voidling.Domain.Care;
 using Voidling.Domain.Evolution;
 
 namespace VoidlingGame;
@@ -29,6 +30,10 @@ public sealed class VoidlingData
     public bool InbreedingHistoryFlag { get; set; }
     public string TintHex { get; set; } = "#F6F0C9";
     public List<RareTraitData> RareTraits { get; set; } = new();
+
+    // Current care/condition state is persistent but separate from inherited DNA and training.
+    // It advances only when explicit simulation elapsed time is supplied by the running game.
+    public CreatureNeedsState Needs { get; set; } = new();
 
     // Hidden raising influence is persisted independently from trained performance. It determines
     // first-evolution specialization but is never read by race simulation as a substitute stat.
