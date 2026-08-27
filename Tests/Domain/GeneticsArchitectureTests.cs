@@ -1,3 +1,4 @@
+using System;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Hatching;
@@ -43,11 +44,12 @@ public sealed class GeneticsArchitectureTests
     }
 
     [Fact]
-    public void ChildGenome_GetsOneAbilityAlleleFromEachParent()
+    public void ChildGenome_GetsOneAbilityAlleleFromEachSelectedParent()
     {
         var parentA = CreateParent("a", 0, 1);
         var parentB = CreateParent("b", 4, 5);
-        var inheritance = new GenomeInheritanceService(Rules.Genetics);
+        var inheritance = new GenomeInheritanceService(
+            Rules.Genetics with { AbilityRankBreakthroughChance = 0.0 });
 
         for (ulong seed = 1; seed <= 100; seed++)
         {
@@ -59,6 +61,101 @@ public sealed class GeneticsArchitectureTests
                 Assert.Contains(gene.AlleleB, new[] { 4, 5 });
             }
         }
+    }
+
+    [Fact]
+    public void ChildGenome_DoesNotUseTrainingPointsAsInheritedPotential()
+    {
+        var parentA = CreateParent("a", 0, 0);
+        var parentB = CreateParent("b", 0, 0);
+        foreach (var statId in Rules.Genetics.StatIds)
+        {
+            parentA.TrainingPoints[statId] = 10_000;
+            parentB.TrainingPoints[statId] = 10_000;
+        }
+
+        var inheritance = new GenomeInheritanceService(
+            Rules.Genetics with { AbilityRankBreakthroughChance = 0.0 });
+        var child = inheritance.CreateChild(parentA, parentB, 123UL);
+
+        foreach (var statId in Rules.Genetics.StatIds)
+        {
+            Assert.Equal(0, child.AbilityGenes[statId].AlleleA);
+            Assert.Equal(0, child.AbilityGenes[statId].AlleleB);
+        }
+    }
+
+    [Fact]
+    public void ChildGenome_DoesNotResurrectNormalStatsFromDeeperAncestry()
+    {
+        var parentA = CreateParent("a", 1, 1, "ancestor-a", "ancestor-b");
+        var parentB = CreateParent("b", 1, 1, "ancestor-c", "ancestor-d");
+        var inheritance = new GenomeInheritanceService(
+            Rules.Genetics with { AbilityRankBreakthroughChance = 0.0 });
+
+        var child = inheritance.CreateChild(parentA, parentB, 456UL);
+
+        foreach (var statId in Rules.Genetics.StatIds)
+        {
+            Assert.Equal(1, child.AbilityGenes[statId].AlleleA);
+            Assert.Equal(1, child.AbilityGenes[statId].AlleleB);
+        }
+    }
+
+    [Fact]
+    public void AbilityRankBreakthrough_ChangesAtMostOneStatByExactlyOneRank()
+    {
+        const int parentalBest = 3; // B
+        var parentA = CreateParent("a", parentalBest, parentalBest);
+        var parentB = CreateParent("b", parentalBest, parentalBest);
+        var inheritance = new GenomeInheritanceService(
+            Rules.Genetics with { AbilityRankBreakthroughChance = 1.0 });
+
+        var child = inheritance.CreateChild(parentA, parentB, 987654UL);
+        var breakthroughStats = 0;
+
+        foreach (var statId in Rules.Genetics.StatIds)
+        {
+            var gene = child.AbilityGenes[statId];
+            var childBest = Math.Max(gene.AlleleA, gene.AlleleB);
+            Assert.InRange(childBest, parentalBest, parentalBest + 1);
+            if (childBest == parentalBest + 1)
+                breakthroughStats++;
+        }
+
+        Assert.Equal(1, breakthroughStats);
+    }
+
+    [Fact]
+    public void AbilityRankBreakthrough_NeverExceedsS()
+    {
+        var maxGrade = Rules.Genetics.GradeWeights.Count - 1;
+        var parentA = CreateParent("a", maxGrade, maxGrade);
+        var parentB = CreateParent("b", maxGrade, maxGrade);
+        var inheritance = new GenomeInheritanceService(
+            Rules.Genetics with { AbilityRankBreakthroughChance = 1.0 });
+
+        var child = inheritance.CreateChild(parentA, parentB, 11UL);
+
+        foreach (var statId in Rules.Genetics.StatIds)
+        {
+            Assert.Equal(maxGrade, child.AbilityGenes[statId].AlleleA);
+            Assert.Equal(maxGrade, child.AbilityGenes[statId].AlleleB);
+        }
+    }
+
+    [Fact]
+    public void ChildGenome_WithBreakthroughRule_RemainsDeterministicForSeed()
+    {
+        var parentA = CreateParent("a", 2, 3);
+        var parentB = CreateParent("b", 2, 3);
+        var inheritance = new GenomeInheritanceService(
+            Rules.Genetics with { AbilityRankBreakthroughChance = 1.0 });
+
+        var first = inheritance.CreateChild(parentA, parentB, 123456UL);
+        var second = inheritance.CreateChild(parentA, parentB, 123456UL);
+
+        AssertGenomeEqual(first, second);
     }
 
     [Fact]
