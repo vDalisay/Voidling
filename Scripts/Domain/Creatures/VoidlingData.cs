@@ -10,6 +10,13 @@ public enum LifeStage
     Adult
 }
 
+public enum CreatureDepartureReason
+{
+    None,
+    Goodbye,
+    Death
+}
+
 /// <summary>
 /// Persisted creature state. The legacy namespace is intentionally retained during the
 /// architecture migration so existing scenes/controllers and save serialization remain stable.
@@ -22,6 +29,9 @@ public sealed class VoidlingData
     public Dictionary<string, int> TrainingPoints { get; set; } = new();
     public LifeStage Stage { get; set; } = LifeStage.Child;
     public float AgeSeconds { get; set; }
+    public float AdultAgeSeconds { get; set; }
+    public int ReincarnationCount { get; set; }
+    public CreatureDepartureReason DepartureReason { get; set; }
     public float BreedCooldownSeconds { get; set; }
     public string ParentAId { get; set; } = "";
     public string ParentBId { get; set; } = "";
