@@ -12,7 +12,7 @@ namespace VoidlingGame;
 /// </summary>
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 13;
+    public int SaveVersion { get; set; } = 14;
     public int Coins { get; set; } = 120;
     public double GardenIncomeCoinRemainder { get; set; }
     public long SeedCounter { get; set; } = 1;
@@ -31,6 +31,8 @@ public sealed class GameStateData
     public List<DailyRaceAttemptData> DailyRaceAttempts { get; set; } = new();
 
     public float MasterVolume { get; set; } = 1.0f;
+    public float SoundEffectVolume { get; set; } = 1.0f;
+    public float UiSoundVolume { get; set; } = 1.0f;
     public bool AutoFinishRaces { get; set; } = true;
     public bool EdgePanning { get; set; } = true;
 }

@@ -6,6 +6,8 @@ namespace Voidling.Presentation.UI.Settings;
 
 public readonly record struct SettingsScreenState(
     float MasterVolume,
+    float SoundEffectVolume,
+    float UiSoundVolume,
     bool EdgePanning,
     bool AutoFinishRaces);
 
@@ -16,6 +18,8 @@ public readonly record struct SettingsScreenState(
 public partial class SettingsScreen : VBoxContainer
 {
     public event Action<float>? MasterVolumeChanged;
+    public event Action<float>? SoundEffectVolumeChanged;
+    public event Action<float>? UiSoundVolumeChanged;
     public event Action<bool>? EdgePanningChanged;
     public event Action<bool>? AutoFinishRacesChanged;
 
@@ -40,7 +44,21 @@ public partial class SettingsScreen : VBoxContainer
         SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 
         AddChild(UiFactory.CreateLabel(Tr("UI_SETTINGS_AUDIO"), 9));
-        AddChild(BuildVolumeRow());
+        AddChild(BuildVolumeRow("Master", _state.MasterVolume, value =>
+        {
+            _state = _state with { MasterVolume = value };
+            MasterVolumeChanged?.Invoke(value);
+        }));
+        AddChild(BuildVolumeRow("SFX", _state.SoundEffectVolume, value =>
+        {
+            _state = _state with { SoundEffectVolume = value };
+            SoundEffectVolumeChanged?.Invoke(value);
+        }));
+        AddChild(BuildVolumeRow("UI", _state.UiSoundVolume, value =>
+        {
+            _state = _state with { UiSoundVolume = value };
+            UiSoundVolumeChanged?.Invoke(value);
+        }));
 
         AddChild(UiFactory.CreateLabel(Tr("UI_SETTINGS_CAMERA"), 9));
         AddChild(BuildEdgePanButton());
@@ -51,13 +69,17 @@ public partial class SettingsScreen : VBoxContainer
         AddChild(UiFactory.CreateLabel(Tr("UI_SETTINGS_HINT"), 6));
     }
 
-    private Control BuildVolumeRow()
+    private Control BuildVolumeRow(string channelName, float currentValue, Action<float> changed)
     {
         var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 8);
+        row.AddThemeConstantOverride("separation", 6);
 
-        var volumeLabel = UiFactory.CreateLabel(FormatVolume(_state.MasterVolume * 100.0f), 7);
-        volumeLabel.CustomMinimumSize = new Vector2(90, 22);
+        var channel = UiFactory.CreateLabel(channelName, 7);
+        channel.CustomMinimumSize = new Vector2(46, 22);
+        row.AddChild(channel);
+
+        var volumeLabel = UiFactory.CreateLabel(FormatVolume(currentValue * 100.0f), 7);
+        volumeLabel.CustomMinimumSize = new Vector2(82, 22);
         row.AddChild(volumeLabel);
 
         var volume = new HSlider
@@ -65,16 +87,15 @@ public partial class SettingsScreen : VBoxContainer
             MinValue = 0,
             MaxValue = 100,
             Step = 5,
-            Value = _state.MasterVolume * 100.0f,
-            CustomMinimumSize = new Vector2(220, 22),
+            Value = currentValue * 100.0f,
+            CustomMinimumSize = new Vector2(210, 22),
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
         };
         volume.ValueChanged += value =>
         {
             var normalized = (float)value / 100.0f;
-            _state = _state with { MasterVolume = normalized };
             volumeLabel.Text = FormatVolume((float)value);
-            MasterVolumeChanged?.Invoke(normalized);
+            changed(normalized);
         };
         row.AddChild(volume);
         return row;

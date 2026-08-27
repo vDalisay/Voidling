@@ -7,15 +7,23 @@ namespace Voidling.Tests.Application;
 public sealed class SettingsArchitectureTests
 {
     [Fact]
-    public void MasterVolume_ClampsIntoPersistedRange()
+    public void AudioVolumes_ClampIntoPersistedRangeIndependently()
     {
         var settings = new SettingsUseCase();
-        var state = new GameStateData { MasterVolume = 0.5f };
+        var state = new GameStateData
+        {
+            MasterVolume = 0.5f,
+            SoundEffectVolume = 0.4f,
+            UiSoundVolume = 0.3f
+        };
 
         Assert.True(settings.SetMasterVolume(state, 2.0f));
+        Assert.True(settings.SetSoundEffectVolume(state, -0.5f));
+        Assert.True(settings.SetUiSoundVolume(state, 0.75f));
+
         Assert.Equal(1.0f, state.MasterVolume);
-        Assert.True(settings.SetMasterVolume(state, -0.5f));
-        Assert.Equal(0.0f, state.MasterVolume);
+        Assert.Equal(0.0f, state.SoundEffectVolume);
+        Assert.Equal(0.75f, state.UiSoundVolume);
     }
 
     [Fact]
@@ -25,11 +33,15 @@ public sealed class SettingsArchitectureTests
         var state = new GameStateData
         {
             MasterVolume = 0.5f,
+            SoundEffectVolume = 0.6f,
+            UiSoundVolume = 0.7f,
             AutoFinishRaces = true,
             EdgePanning = true
         };
 
         Assert.False(settings.SetMasterVolume(state, 0.5f));
+        Assert.False(settings.SetSoundEffectVolume(state, 0.6f));
+        Assert.False(settings.SetUiSoundVolume(state, 0.7f));
         Assert.False(settings.SetAutoFinishRaces(state, true));
         Assert.False(settings.SetEdgePanning(state, true));
     }
@@ -41,6 +53,8 @@ public sealed class SettingsArchitectureTests
         var state = new GameStateData
         {
             MasterVolume = 0.4f,
+            SoundEffectVolume = 0.3f,
+            UiSoundVolume = 0.2f,
             AutoFinishRaces = true,
             EdgePanning = true
         };
@@ -51,5 +65,7 @@ public sealed class SettingsArchitectureTests
         Assert.False(state.AutoFinishRaces);
         Assert.False(state.EdgePanning);
         Assert.Equal(0.4f, state.MasterVolume);
+        Assert.Equal(0.3f, state.SoundEffectVolume);
+        Assert.Equal(0.2f, state.UiSoundVolume);
     }
 }

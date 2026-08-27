@@ -5,20 +5,18 @@ namespace Voidling.Application.Settings;
 
 /// <summary>
 /// Applies persisted player settings without Godot APIs. Platform side effects such as changing
-/// an AudioServer bus remain in Infrastructure and are invoked by the presentation/lifetime shell.
+/// AudioServer buses remain in Infrastructure and are invoked by the lifetime shell.
 /// </summary>
 public sealed class SettingsUseCase
 {
     public bool SetMasterVolume(GameStateData state, float value)
-    {
-        ArgumentNullException.ThrowIfNull(state);
-        var clamped = Math.Clamp(value, 0.0f, 1.0f);
-        if (Math.Abs(state.MasterVolume - clamped) < 0.0001f)
-            return false;
+        => SetVolume(state, value, static current => current.MasterVolume, static (current, volume) => current.MasterVolume = volume);
 
-        state.MasterVolume = clamped;
-        return true;
-    }
+    public bool SetSoundEffectVolume(GameStateData state, float value)
+        => SetVolume(state, value, static current => current.SoundEffectVolume, static (current, volume) => current.SoundEffectVolume = volume);
+
+    public bool SetUiSoundVolume(GameStateData state, float value)
+        => SetVolume(state, value, static current => current.UiSoundVolume, static (current, volume) => current.UiSoundVolume = volume);
 
     public bool SetAutoFinishRaces(GameStateData state, bool enabled)
     {
@@ -35,6 +33,21 @@ public sealed class SettingsUseCase
         if (state.EdgePanning == enabled)
             return false;
         state.EdgePanning = enabled;
+        return true;
+    }
+
+    private static bool SetVolume(
+        GameStateData state,
+        float value,
+        Func<GameStateData, float> read,
+        Action<GameStateData, float> write)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var clamped = Math.Clamp(value, 0.0f, 1.0f);
+        if (Math.Abs(read(state) - clamped) < 0.0001f)
+            return false;
+
+        write(state, clamped);
         return true;
     }
 }

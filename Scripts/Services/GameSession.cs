@@ -156,10 +156,6 @@ public partial class GameSession : Node
         RaiseGardenEvent("The garden was reset.");
     }
 
-    /// <summary>
-    /// Notifies existing presentation that an external Application service already mutated and
-    /// persisted this exact State instance. This intentionally does not save again.
-    /// </summary>
     public void NotifyExternallyPersistedStateChanged()
         => StateChanged?.Invoke();
 
@@ -225,6 +221,8 @@ public partial class GameSession : Node
             Coins = 120,
             SeedCounter = DateTime.UtcNow.Ticks,
             MasterVolume = 1.0f,
+            SoundEffectVolume = 1.0f,
+            UiSoundVolume = 1.0f,
             AutoFinishRaces = true
         };
 
@@ -290,7 +288,11 @@ public partial class GameSession : Node
     }
 
     private void ApplyAudioSettings()
-        => _audioSettings!.ApplyMasterVolume(State.MasterVolume);
+    {
+        _audioSettings!.ApplyMasterVolume(State.MasterVolume);
+        _audioSettings.ApplySoundEffectVolume(State.SoundEffectVolume);
+        _audioSettings.ApplyUiSoundVolume(State.UiSoundVolume);
+    }
 
     private Vector2 NextNestPosition() => NestPosition(State.OwnedEggs.Count);
 

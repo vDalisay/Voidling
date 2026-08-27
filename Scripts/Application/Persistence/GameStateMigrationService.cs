@@ -17,7 +17,7 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 13;
+    public const int CurrentSaveVersion = 14;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -53,6 +53,16 @@ public sealed class GameStateMigrationService
             state.AutoFinishRaces = true;
         }
 
+        if (previousVersion < 14)
+        {
+            state.SoundEffectVolume = 1.0f;
+            state.UiSoundVolume = 1.0f;
+        }
+
+        state.MasterVolume = NormalizeVolume(state.MasterVolume);
+        state.SoundEffectVolume = NormalizeVolume(state.SoundEffectVolume);
+        state.UiSoundVolume = NormalizeVolume(state.UiSoundVolume);
+
         foreach (var statId in _rules.Genetics.StatIds)
         {
             if (!state.TrainingItems.ContainsKey(statId))
@@ -77,8 +87,6 @@ public sealed class GameStateMigrationService
             creature.Needs ??= new CreatureNeedsState();
             _needs.Normalize(creature.Needs);
 
-            // Version 12 stores only a semantic passive-training stat and fractional point remainder.
-            // Unknown assignments from malformed/newer saves are disabled rather than remapped.
             if (!_rules.Genetics.StatIds.Contains(creature.PassiveTrainingStatId ?? string.Empty))
             {
                 creature.PassiveTrainingStatId = string.Empty;
@@ -128,4 +136,7 @@ public sealed class GameStateMigrationService
 
         state.SaveVersion = CurrentSaveVersion;
     }
+
+    private static float NormalizeVolume(float volume)
+        => float.IsFinite(volume) ? Math.Clamp(volume, 0.0f, 1.0f) : 1.0f;
 }

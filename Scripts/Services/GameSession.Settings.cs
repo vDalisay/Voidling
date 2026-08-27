@@ -13,7 +13,25 @@ public partial class GameSession
         if (!_settings!.SetMasterVolume(State, value))
             return;
 
-        ApplyAudioSettings();
+        _audioSettings!.ApplyMasterVolume(State.MasterVolume);
+        Save();
+    }
+
+    public void SetSoundEffectVolume(float value)
+    {
+        if (!_settings!.SetSoundEffectVolume(State, value))
+            return;
+
+        _audioSettings!.ApplySoundEffectVolume(State.SoundEffectVolume);
+        Save();
+    }
+
+    public void SetUiSoundVolume(float value)
+    {
+        if (!_settings!.SetUiSoundVolume(State, value))
+            return;
+
+        _audioSettings!.ApplyUiSoundVolume(State.UiSoundVolume);
         Save();
     }
 
