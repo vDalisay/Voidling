@@ -43,7 +43,7 @@ public sealed record ReincarnationRules(
     float MinimumHappiness,
     float MaximumStress,
     float RetainedTrainingFraction);
-public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice);
+public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice, int EggShellSalePrice);
 public sealed record EconomyRules(float GardenCoinsPerMinute);
 
 public sealed record NeedsRules(
@@ -149,7 +149,7 @@ public sealed record GameBalanceRules(
         Hatching: new HatchingRules(IncubationSeconds: 22.0f),
         Stats: new StatGrowthRules(TrainingPointsPerLevel: 12, MaxLevel: 99, MaxTrainingPoints: 120),
         Lifecycle: new LifecycleRules(ChildToAdultSeconds: 45.0f),
-        Shop: new ShopRules(StoreEggPrice: 30, TrainingItemPrice: 8),
+        Shop: new ShopRules(StoreEggPrice: 30, TrainingItemPrice: 8, EggShellSalePrice: 5),
         Racing: new RaceRules(
             BaseStamina: 72.0f,
             StaminaPerPoint: 1.05f,

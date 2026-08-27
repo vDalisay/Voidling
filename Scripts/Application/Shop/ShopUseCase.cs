@@ -10,6 +10,7 @@ public enum ShopFailure
 {
     None,
     EggNotFound,
+    EggShellNotFound,
     NotEnoughCurrency
 }
 
@@ -18,10 +19,16 @@ public sealed record StoreEggPurchaseResult(ShopFailure Failure, EggData? Purcha
     public bool Succeeded => Failure == ShopFailure.None && PurchasedEgg != null && ReplacementEgg != null;
 }
 
+public readonly record struct EggShellSaleResult(ShopFailure Failure, int CoinsGained)
+{
+    public bool Succeeded => Failure == ShopFailure.None;
+}
+
 /// <summary>
-/// Coordinates the store transaction while preserving the product rule that a store egg is a
+/// Coordinates store transactions while preserving the product rule that a store egg is a
 /// specific pre-rolled object. Purchase moves that same EggData into ownership and creates the
-/// next pre-rolled store listing from an explicit ID/seed.
+/// next pre-rolled store listing from an explicit ID/seed. Shell sale consumes one persisted
+/// hatch output and awards the authorable fixed base value.
 /// </summary>
 public sealed class ShopUseCase
 {
@@ -75,5 +82,21 @@ public sealed class ShopUseCase
         state.StoreEggs.Add(replacement);
 
         return new StoreEggPurchaseResult(ShopFailure.None, purchasedEgg, replacement);
+    }
+
+    public EggShellSaleResult SellEggShell(GameStateData state, string shellId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var shell = state.EggShells.FirstOrDefault(candidate => candidate.Id == shellId);
+        if (shell == null)
+            return new EggShellSaleResult(ShopFailure.EggShellNotFound, 0);
+
+        var saleValue = Math.Max(0, _rules.Shop.EggShellSalePrice);
+        var availableCoinCapacity = Math.Max(0L, (long)int.MaxValue - state.Coins);
+        var awarded = (int)Math.Min(saleValue, availableCoinCapacity);
+
+        state.EggShells.Remove(shell);
+        state.Coins += awarded;
+        return new EggShellSaleResult(ShopFailure.None, awarded);
     }
 }

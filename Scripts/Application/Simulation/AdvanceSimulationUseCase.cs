@@ -202,6 +202,12 @@ public sealed class AdvanceSimulationUseCase
             creature.TrainingPoints[statId] = 0;
 
         state.Voidlings.Add(creature);
+        state.EggShells.Add(new EggShellData
+        {
+            Id = egg.Id,
+            Source = egg.Source,
+            TintHex = egg.TintHex
+        });
         state.OwnedEggs.Remove(egg);
         return creature;
     }

@@ -33,6 +33,7 @@ public sealed class ApplicationArchitectureTests
             DepartedVoidlings = null!,
             OwnedEggs = null!,
             StoreEggs = null!,
+            EggShells = null!,
             TrainingItems = null!
         };
 
@@ -47,6 +48,7 @@ public sealed class ApplicationArchitectureTests
         Assert.Empty(state.DepartedVoidlings);
         Assert.Empty(state.OwnedEggs);
         Assert.Empty(state.StoreEggs);
+        Assert.Empty(state.EggShells);
 
         foreach (var statId in Rules.Genetics.StatIds)
         {

@@ -12,7 +12,7 @@ namespace VoidlingGame;
 /// </summary>
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 12;
+    public int SaveVersion { get; set; } = 13;
     public int Coins { get; set; } = 120;
     public double GardenIncomeCoinRemainder { get; set; }
     public long SeedCounter { get; set; } = 1;
@@ -21,6 +21,7 @@ public sealed class GameStateData
     public List<LineageArchiveEntry> LineageArchive { get; set; } = new();
     public List<EggData> OwnedEggs { get; set; } = new();
     public List<EggData> StoreEggs { get; set; } = new();
+    public List<EggShellData> EggShells { get; set; } = new();
     public Dictionary<string, int> TrainingItems { get; set; } = new();
 
     public List<PendingTradeJournalEntry> PendingTradeJournal { get; set; } = new();

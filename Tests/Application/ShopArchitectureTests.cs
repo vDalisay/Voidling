@@ -1,3 +1,4 @@
+using System.Linq;
 using Voidling.Application.Shop;
 using Voidling.Domain.Hatching;
 using Voidling.Domain.Rules;
@@ -69,5 +70,26 @@ public sealed class ShopArchitectureTests
         Assert.Empty(state.OwnedEggs);
         Assert.Same(listing, Assert.Single(state.StoreEggs));
         Assert.Equal(Rules.Shop.StoreEggPrice - 1, state.Coins);
+    }
+
+    [Fact]
+    public void SellEggShell_ConsumesExactlyOnePersistedShellAndAwardsBaseValue()
+    {
+        var shop = new ShopUseCase(Rules);
+        var state = new GameStateData { Coins = 10 };
+        state.EggShells.Add(new EggShellData { Id = "shell-a", Source = EggSource.Bred, TintHex = "#ABCDEF" });
+        state.EggShells.Add(new EggShellData { Id = "shell-b", Source = EggSource.Store, TintHex = "#123456" });
+
+        var result = shop.SellEggShell(state, "shell-a");
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(Rules.Shop.EggShellSalePrice, result.CoinsGained);
+        Assert.Equal(10 + Rules.Shop.EggShellSalePrice, state.Coins);
+        Assert.Single(state.EggShells);
+        Assert.Equal("shell-b", state.EggShells.Single().Id);
+
+        var second = shop.SellEggShell(state, "shell-a");
+        Assert.Equal(ShopFailure.EggShellNotFound, second.Failure);
+        Assert.Equal(10 + Rules.Shop.EggShellSalePrice, state.Coins);
     }
 }
