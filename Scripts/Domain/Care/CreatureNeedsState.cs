@@ -18,7 +18,8 @@ public sealed class CreatureNeedsState
     public float Loneliness { get; set; } = 0.0f;
     public float Nourishment { get; set; } = 100.0f;
     public float Condition { get; set; } = 100.0f;
-    public float Happiness { get; set; } = 75.0f;
+    // Player-facing design fixes the starting value at zero and keeps Happiness completely hidden.
+    public float Happiness { get; set; } = 0.0f;
 }
 
 /// <summary>
