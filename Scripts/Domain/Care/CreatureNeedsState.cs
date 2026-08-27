@@ -23,9 +23,9 @@ public sealed class CreatureNeedsState
 }
 
 /// <summary>
-/// Deterministically advances current needs from an explicit elapsed duration. The service has no
-/// wall-clock or presentation dependency: closed-game time cannot punish a creature, and equivalent
-/// elapsed chunks produce equivalent need state apart from ordinary float precision.
+/// Deterministic current-care rules. The service has no wall-clock or presentation dependency:
+/// closed-game time cannot punish a creature, and care effects stay independent from genetics and
+/// race simulation.
 /// </summary>
 public sealed class CreatureNeedsService
 {
@@ -56,6 +56,28 @@ public sealed class CreatureNeedsService
             state.Condition - rules.ConditionLossPerMinute * minutes);
         changed |= Set(state.Happiness, value => state.Happiness = value,
             state.Happiness - rules.HappinessLossPerMinute * minutes);
+        return changed;
+    }
+
+    /// <summary>
+    /// Applies the care side of an already-successful active training treat. Training still owns the
+    /// stat mutation and inventory transaction; this only updates current feeding/care state. Exact
+    /// magnitudes are authorable prototype balance values.
+    /// </summary>
+    public bool ApplyTrainingTreat(CreatureNeedsState state, NeedsRules rules)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(rules);
+
+        var changed = false;
+        changed |= Set(state.Hunger, value => state.Hunger = value,
+            state.Hunger - rules.TreatHungerReduction);
+        changed |= Set(state.Energy, value => state.Energy = value,
+            state.Energy + rules.TreatEnergyGain);
+        changed |= Set(state.Nourishment, value => state.Nourishment = value,
+            state.Nourishment + rules.TreatNourishmentGain);
+        changed |= Set(state.Happiness, value => state.Happiness = value,
+            state.Happiness + rules.TreatHappinessGain);
         return changed;
     }
 
