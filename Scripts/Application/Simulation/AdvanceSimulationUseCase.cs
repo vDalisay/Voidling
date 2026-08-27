@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Voidling.Domain.Care;
 using Voidling.Domain.Evolution;
 using Voidling.Domain.Rules;
 using VoidlingGame;
@@ -21,12 +22,13 @@ public sealed record SimulationStepResult(bool Changed, IReadOnlyList<GameSimula
 
 /// <summary>
 /// Advances persistent garden simulation from an explicit elapsed duration. This contains no
-/// Godot frame, scene, UI, persistence, or wall-clock dependency, so lifecycle/hatching/economy can
-/// be tested and reused from any runtime host without changing presentation code.
+/// Godot frame, scene, UI, persistence, or wall-clock dependency, so lifecycle/hatching/economy/care
+/// can be tested and reused from any runtime host without changing presentation code.
 /// </summary>
 public sealed class AdvanceSimulationUseCase
 {
     private readonly GameBalanceRules _rules;
+    private readonly CreatureNeedsService _needs = new();
 
     public AdvanceSimulationUseCase(GameBalanceRules rules)
     {
@@ -44,6 +46,8 @@ public sealed class AdvanceSimulationUseCase
 
         foreach (var creature in state.Voidlings)
         {
+            changed |= _needs.Advance(creature.Needs, elapsedSeconds, _rules.Needs);
+
             if (creature.BreedCooldownSeconds > 0.0f)
             {
                 creature.BreedCooldownSeconds = Math.Max(0.0f, creature.BreedCooldownSeconds - elapsedSeconds);
@@ -139,6 +143,7 @@ public sealed class AdvanceSimulationUseCase
             InbreedingHistoryFlag = egg.InbreedingHistoryFlag,
             TintHex = egg.TintHex,
             RareTraits = egg.RareTraits,
+            Needs = new CreatureNeedsState(),
             WorldX = egg.WorldX,
             WorldY = egg.WorldY
         };
