@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Voidling.Domain.Care;
 using Voidling.Domain.Evolution;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shared;
@@ -32,12 +33,14 @@ public readonly record struct TrainingApplicationResult(TrainingFailure Failure,
 /// Coordinates training inventory and stat progression without UI, persistence or Godot APIs.
 /// The caller owns seed allocation and persistence so both remain explicit side effects.
 /// Child training also feeds deterministic hidden evolution influence; it never mutates ability
-/// DNA directly. The expressed DNA rank supplies the hard training ceiling.
+/// DNA directly. The expressed DNA rank supplies the hard training ceiling. Successfully eating a
+/// training treat also applies its current-care side effects; failed actions mutate neither state.
 /// </summary>
 public sealed class TrainingUseCase
 {
     private readonly GameBalanceRules _rules;
     private readonly StatCalculator _stats;
+    private readonly CreatureNeedsService _needs = new();
 
     public TrainingUseCase(GameBalanceRules rules)
     {
@@ -93,6 +96,7 @@ public sealed class TrainingUseCase
         creature.TrainingPoints[statId] = updated;
 
         EvolutionService.ApplyTrainingInfluence(creature, statId, appliedGain, _rules.Stats);
+        _needs.ApplyTrainingTreat(creature.Needs, _rules.Needs);
         return new TrainingApplicationResult(TrainingFailure.None, appliedGain);
     }
 }
