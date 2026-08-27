@@ -80,6 +80,45 @@ public sealed class CreatureNeedsServiceTests
     }
 
     [Fact]
+    public void ApplyTrainingTreat_ImprovesCurrentCareAndHiddenHappiness()
+    {
+        var needs = new CreatureNeedsState
+        {
+            Hunger = 50.0f,
+            Energy = 50.0f,
+            Nourishment = 50.0f,
+            Happiness = 0.0f
+        };
+
+        var changed = new CreatureNeedsService().ApplyTrainingTreat(needs, Rules);
+
+        Assert.True(changed);
+        Assert.Equal(38.0f, needs.Hunger, 3);
+        Assert.Equal(52.0f, needs.Energy, 3);
+        Assert.Equal(58.0f, needs.Nourishment, 3);
+        Assert.Equal(2.0f, needs.Happiness, 3);
+    }
+
+    [Fact]
+    public void ApplyTrainingTreat_ClampsAtCareBounds()
+    {
+        var needs = new CreatureNeedsState
+        {
+            Hunger = 1.0f,
+            Energy = 99.0f,
+            Nourishment = 99.0f,
+            Happiness = 99.0f
+        };
+
+        new CreatureNeedsService().ApplyTrainingTreat(needs, Rules);
+
+        Assert.Equal(0.0f, needs.Hunger);
+        Assert.Equal(100.0f, needs.Energy);
+        Assert.Equal(100.0f, needs.Nourishment);
+        Assert.Equal(100.0f, needs.Happiness);
+    }
+
+    [Fact]
     public void Advance_ZeroOrInvalidElapsedTimeIsNoOp()
     {
         var needs = new CreatureNeedsState();
