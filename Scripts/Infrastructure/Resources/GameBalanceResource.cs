@@ -103,6 +103,18 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "0,10,0.05")]
     public float HappinessLossPerMinute { get; set; } = 0.10f;
 
+    [Export(PropertyHint.Range, "0,100,0.5")]
+    public float TreatHungerReduction { get; set; } = 12.0f;
+
+    [Export(PropertyHint.Range, "0,100,0.5")]
+    public float TreatEnergyGain { get; set; } = 2.0f;
+
+    [Export(PropertyHint.Range, "0,100,0.5")]
+    public float TreatNourishmentGain { get; set; } = 8.0f;
+
+    [Export(PropertyHint.Range, "0,100,0.5")]
+    public float TreatHappinessGain { get; set; } = 2.0f;
+
     [ExportGroup("Economy")]
     [Export(PropertyHint.Range, "0,100,0.1")]
     public float GardenCoinsPerMinute { get; set; } = 1.0f;
@@ -162,7 +174,11 @@ public partial class GameBalanceResource : Resource
                 LonelinessGainPerMinute = NonNegative(LonelinessGainPerMinute),
                 NourishmentLossPerMinute = NonNegative(NourishmentLossPerMinute),
                 ConditionLossPerMinute = NonNegative(ConditionLossPerMinute),
-                HappinessLossPerMinute = NonNegative(HappinessLossPerMinute)
+                HappinessLossPerMinute = NonNegative(HappinessLossPerMinute),
+                TreatHungerReduction = NonNegative(TreatHungerReduction),
+                TreatEnergyGain = NonNegative(TreatEnergyGain),
+                TreatNourishmentGain = NonNegative(TreatNourishmentGain),
+                TreatHappinessGain = NonNegative(TreatHappinessGain)
             },
             Economy = defaults.Economy with
             {
