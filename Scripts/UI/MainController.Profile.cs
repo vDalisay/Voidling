@@ -150,7 +150,7 @@ public partial class MainController : Node
         UiFactory.ApplyPixelFont(selector, 7);
         selector.AddItem("Off");
         var selected = 0;
-        for (var i = 0; i < GameRules.StatIds.Count; i++)
+        for (var i = 0; i < GameRules.StatIds.Length; i++)
         {
             var statId = GameRules.StatIds[i];
             selector.AddItem(StatPresentationCatalog.NameFor(statId));
