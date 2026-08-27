@@ -55,9 +55,10 @@ public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice);
 public sealed record EconomyRules(float GardenCoinsPerMinute);
 
 /// <summary>
-/// Current-care drift while the Garden simulation is actually advancing. All values are prototype
-/// balance knobs. Closing the game supplies no elapsed simulation time, so these rates never create
-/// offline neglect punishment.
+/// Current-care drift and treat effects. Exact values remain prototype balance knobs. Closing the
+/// game supplies no elapsed simulation time, so drift never creates offline neglect punishment.
+/// Happiness is intentionally hidden from player-facing projections even though care actions can
+/// change it for later lifecycle decisions.
 /// </summary>
 public sealed record NeedsRules(
     float HungerGainPerMinute,
@@ -68,7 +69,11 @@ public sealed record NeedsRules(
     float LonelinessGainPerMinute,
     float NourishmentLossPerMinute,
     float ConditionLossPerMinute,
-    float HappinessLossPerMinute);
+    float HappinessLossPerMinute,
+    float TreatHungerReduction,
+    float TreatEnergyGain,
+    float TreatNourishmentGain,
+    float TreatHappinessGain);
 
 /// <summary>
 /// First-evolution tuning. Raising influence is normalized against MaxTrainingPoints, so the
@@ -137,7 +142,11 @@ public sealed record GameBalanceRules(
         LonelinessGainPerMinute: 0.25f,
         NourishmentLossPerMinute: 0.40f,
         ConditionLossPerMinute: 0.05f,
-        HappinessLossPerMinute: 0.10f);
+        HappinessLossPerMinute: 0.10f,
+        TreatHungerReduction: 12.0f,
+        TreatEnergyGain: 2.0f,
+        TreatNourishmentGain: 8.0f,
+        TreatHappinessGain: 2.0f);
 
     public static GameBalanceRules DemoDefaults { get; } = new(
         Genetics: new GeneticsRules(
