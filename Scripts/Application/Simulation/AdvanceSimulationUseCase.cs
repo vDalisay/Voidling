@@ -17,6 +17,7 @@ public sealed record CreatureBecameAdultEvent(
     string PromotedStatId,
     int PreviousRank,
     int NewRank) : GameSimulationEvent;
+public sealed record CreatureEnteredCocoonEvent(string CreatureId, string Name, bool WillReincarnate) : GameSimulationEvent;
 public sealed record CreatureReincarnatedEvent(string CreatureId, string Name, int ReincarnationCount) : GameSimulationEvent;
 public sealed record CreatureDiedEvent(string CreatureId, string Name) : GameSimulationEvent;
 public sealed record CreatureCareRiskEvent(string CreatureId, string Name) : GameSimulationEvent;
@@ -171,7 +172,10 @@ public sealed class AdvanceSimulationUseCase
             }
 
             var decision = _reincarnation.Decide(creature, _rules.Reincarnation);
-            if (decision.Outcome == LifecycleEndOutcome.Reincarnate)
+            var willReincarnate = decision.Outcome == LifecycleEndOutcome.Reincarnate;
+            events.Add(new CreatureEnteredCocoonEvent(creature.Id, creature.Name, willReincarnate));
+
+            if (willReincarnate)
             {
                 _reincarnation.ApplyReincarnation(creature, _rules.Reincarnation);
                 events.Add(new CreatureReincarnatedEvent(creature.Id, creature.Name, creature.ReincarnationCount));

@@ -24,6 +24,7 @@ public partial class GameSession : Node
     public event Action? StateChanged;
     public event Action<string>? ToastRequested;
     public event Action<string>? GardenEventRaised;
+    public event Action<string, bool>? LifecycleCocoonRequested;
     public event Action<bool>? SaveFeedbackRequested;
 
     public GameStateData State { get; private set; } = new();
@@ -103,6 +104,15 @@ public partial class GameSession : Node
                     var message = $"{adult.Name} grew into an adult.";
                     ToastRequested?.Invoke(message);
                     RaiseGardenEvent(message);
+                    break;
+                }
+                case CreatureEnteredCocoonEvent cocoon:
+                {
+                    var message = cocoon.WillReincarnate
+                        ? $"{cocoon.Name} entered a bright cocoon."
+                        : $"{cocoon.Name} entered a fading cocoon.";
+                    RaiseGardenEvent(message);
+                    LifecycleCocoonRequested?.Invoke(cocoon.CreatureId, cocoon.WillReincarnate);
                     break;
                 }
                 case CreatureReincarnatedEvent reincarnated:

@@ -12,6 +12,7 @@ public partial class GardenController
         // have already been resolved by GardenController._Ready().
         CallDeferred(nameof(InstallLmbGroundPan));
         CallDeferred(nameof(InstallGardenEnvironmentPresentation));
+        CallDeferred(nameof(InstallLifecyclePresentation));
     }
 
     private void InstallLmbGroundPan()
