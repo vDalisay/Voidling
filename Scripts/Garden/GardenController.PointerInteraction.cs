@@ -44,7 +44,6 @@ public partial class GardenController
             return;
 
         ClearPendingGrab();
-        Select(creatureId);
-        VoidlingSelected?.Invoke(creatureId);
+        HandleCompletedVoidlingClick(creatureId);
     }
 }
