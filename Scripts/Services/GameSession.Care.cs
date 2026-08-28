@@ -30,4 +30,23 @@ public partial class GameSession
         ToastRequested?.Invoke(message);
         return true;
     }
+
+    public bool MistreatVoidling(string creatureId)
+    {
+        var creature = FindVoidling(creatureId);
+        if (creature == null)
+            return false;
+
+        var result = _care.Mistreat(State, creatureId);
+        if (!result.Succeeded)
+            return false;
+
+        if (!result.Changed)
+            return true;
+
+        Save(showFeedback: true);
+        StateChanged?.Invoke();
+        RaiseGardenEvent($"{creature.Name} disliked being thrown around.");
+        return true;
+    }
 }

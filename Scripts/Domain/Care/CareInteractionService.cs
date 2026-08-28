@@ -4,8 +4,8 @@ using Voidling.Domain.Rules;
 namespace Voidling.Domain.Care;
 
 /// <summary>
-/// Pure care-interaction rules. Petting changes only current care state; it never mutates genetics,
-/// training potential, appearance, or race state.
+/// Pure care-interaction rules. Care actions change only current care state; they never mutate
+/// genetics, training potential, appearance, or race state.
 /// </summary>
 public sealed class CareInteractionService
 {
@@ -23,6 +23,19 @@ public sealed class CareInteractionService
             state.Boredom - rules.PetBoredomReduction);
         changed |= Set(state.Loneliness, value => state.Loneliness = value,
             state.Loneliness - rules.PetLonelinessReduction);
+        return changed;
+    }
+
+    public bool Mistreat(CreatureNeedsState state, CareInteractionRules rules)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(rules);
+
+        var changed = false;
+        changed |= Set(state.Happiness, value => state.Happiness = value,
+            state.Happiness - rules.ThrowHappinessLoss);
+        changed |= Set(state.Stress, value => state.Stress = value,
+            state.Stress + rules.ThrowStressGain);
         return changed;
     }
 

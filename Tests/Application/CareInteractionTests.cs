@@ -8,74 +8,60 @@ namespace Voidling.Tests.Application;
 
 public sealed class CareInteractionTests
 {
-    private static readonly CareInteractionRules Rules = CareInteractionRules.DemoDefaults;
-
     [Fact]
-    public void Pet_ExistingCreatureImprovesOnlyCurrentCareState()
+    public void Mistreat_ActiveCreatureReducesHiddenHappinessAndRaisesStress()
     {
         var creature = new VoidlingData
         {
-            Id = "pet-me",
+            Id = "thrown",
             Needs = new CreatureNeedsState
             {
-                Hunger = 41.0f,
-                Energy = 63.0f,
-                Stress = 10.0f,
-                Boredom = 7.0f,
-                Loneliness = 6.0f,
-                Happiness = 9.0f
-            }
-        };
-        creature.TrainingPoints["run"] = 12;
-        var state = new GameStateData();
-        state.Voidlings.Add(creature);
-
-        var result = new CareUseCase(Rules).Pet(state, creature.Id);
-
-        Assert.True(result.Succeeded);
-        Assert.True(result.Changed);
-        Assert.Equal(11.0f, creature.Needs.Happiness, 3);
-        Assert.Equal(6.0f, creature.Needs.Stress, 3);
-        Assert.Equal(2.0f, creature.Needs.Boredom, 3);
-        Assert.Equal(0.0f, creature.Needs.Loneliness, 3);
-        Assert.Equal(41.0f, creature.Needs.Hunger);
-        Assert.Equal(63.0f, creature.Needs.Energy);
-        Assert.Equal(12, creature.TrainingPoints["run"]);
-    }
-
-    [Fact]
-    public void Pet_ClampsCareValuesToNormalizedRange()
-    {
-        var creature = new VoidlingData
-        {
-            Id = "near-limits",
-            Needs = new CreatureNeedsState
-            {
-                Happiness = 99.5f,
-                Stress = 1.0f,
-                Boredom = 2.0f,
-                Loneliness = 3.0f
+                Happiness = 20.0f,
+                Stress = 15.0f
             }
         };
         var state = new GameStateData();
         state.Voidlings.Add(creature);
 
-        var result = new CareUseCase(Rules).Pet(state, creature.Id);
+        var result = new CareUseCase(CareInteractionRules.DemoDefaults).Mistreat(state, creature.Id);
 
         Assert.True(result.Succeeded);
         Assert.True(result.Changed);
-        Assert.Equal(100.0f, creature.Needs.Happiness);
-        Assert.Equal(0.0f, creature.Needs.Stress);
-        Assert.Equal(0.0f, creature.Needs.Boredom);
-        Assert.Equal(0.0f, creature.Needs.Loneliness);
+        Assert.Equal(17.0f, creature.Needs.Happiness, 3);
+        Assert.Equal(27.0f, creature.Needs.Stress, 3);
     }
 
     [Fact]
-    public void Pet_MissingCreatureReturnsTypedFailureWithoutMutation()
+    public void Mistreat_ClampsCareStateAtValidBounds()
+    {
+        var creature = new VoidlingData
+        {
+            Id = "bounds",
+            Needs = new CreatureNeedsState
+            {
+                Happiness = 1.0f,
+                Stress = 96.0f
+            }
+        };
+        var state = new GameStateData();
+        state.Voidlings.Add(creature);
+        var care = new CareUseCase(CareInteractionRules.DemoDefaults);
+
+        var first = care.Mistreat(state, creature.Id);
+        var second = care.Mistreat(state, creature.Id);
+
+        Assert.True(first.Changed);
+        Assert.False(second.Changed);
+        Assert.Equal(0.0f, creature.Needs.Happiness);
+        Assert.Equal(100.0f, creature.Needs.Stress);
+    }
+
+    [Fact]
+    public void Mistreat_MissingCreatureDoesNotMutateState()
     {
         var state = new GameStateData();
 
-        var result = new CareUseCase(Rules).Pet(state, "missing");
+        var result = new CareUseCase(CareInteractionRules.DemoDefaults).Mistreat(state, "missing");
 
         Assert.False(result.Succeeded);
         Assert.False(result.Changed);

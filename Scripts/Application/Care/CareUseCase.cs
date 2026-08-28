@@ -32,13 +32,24 @@ public sealed class CareUseCase
     }
 
     public CareInteractionResult Pet(GameStateData state, string creatureId)
+        => Apply(state, creatureId, _care.Pet);
+
+    public CareInteractionResult Mistreat(GameStateData state, string creatureId)
+        => Apply(state, creatureId, _care.Mistreat);
+
+    private CareInteractionResult Apply(
+        GameStateData state,
+        string creatureId,
+        Func<CreatureNeedsState, CareInteractionRules, bool> interaction)
     {
         ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(interaction);
+
         var creature = state.Voidlings.FirstOrDefault(candidate => candidate.Id == creatureId);
         if (creature == null)
             return new CareInteractionResult(CareInteractionFailure.CreatureNotFound, false);
 
-        var changed = _care.Pet(creature.Needs, _rules);
+        var changed = interaction(creature.Needs, _rules);
         return new CareInteractionResult(CareInteractionFailure.None, changed);
     }
 }

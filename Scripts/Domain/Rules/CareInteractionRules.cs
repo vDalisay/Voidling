@@ -8,11 +8,15 @@ public sealed record CareInteractionRules(
     float PetHappinessGain,
     float PetStressReduction,
     float PetBoredomReduction,
-    float PetLonelinessReduction)
+    float PetLonelinessReduction,
+    float ThrowHappinessLoss,
+    float ThrowStressGain)
 {
     public static CareInteractionRules DemoDefaults { get; } = new(
         PetHappinessGain: 2.0f,
         PetStressReduction: 4.0f,
         PetBoredomReduction: 5.0f,
-        PetLonelinessReduction: 8.0f);
+        PetLonelinessReduction: 8.0f,
+        ThrowHappinessLoss: 3.0f,
+        ThrowStressGain: 12.0f);
 }
