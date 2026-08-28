@@ -49,6 +49,7 @@ public partial class MainController : Node
         BuildTopBar();
         BuildToast();
         BuildGardenEventLog();
+        BuildSaveFeedbackIndicator();
 
         _modalHost = new ModalHost { ZIndex = 100 };
         _uiRoot.AddChild(_modalHost);
@@ -74,6 +75,7 @@ public partial class MainController : Node
         if (GodotObject.IsInstanceValid(_connectedZoneBridge))
             _connectedZoneBridge.StateChanged -= OnConnectedZoneStateChanged;
 
+        DetachSaveFeedbackIndicator();
         DetachMultiplayerRacePresentation();
         DetachTradePresentation();
     }

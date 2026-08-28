@@ -24,6 +24,7 @@ public partial class GameSession : Node
     public event Action? StateChanged;
     public event Action<string>? ToastRequested;
     public event Action<string>? GardenEventRaised;
+    public event Action<bool>? SaveFeedbackRequested;
 
     public GameStateData State { get; private set; } = new();
 
@@ -157,7 +158,10 @@ public partial class GameSession : Node
     }
 
     public void NotifyExternallyPersistedStateChanged()
-        => StateChanged?.Invoke();
+    {
+        StateChanged?.Invoke();
+        SaveFeedbackRequested?.Invoke(true);
+    }
 
     private void LoadOrCreate()
     {
@@ -327,7 +331,7 @@ public partial class GameSession : Node
 
     private void SaveAndNotify(string toast)
     {
-        Save();
+        Save(showFeedback: true);
         StateChanged?.Invoke();
         ToastRequested?.Invoke(toast);
     }
@@ -335,15 +339,21 @@ public partial class GameSession : Node
     private void RaiseGardenEvent(string message)
         => GardenEventRaised?.Invoke(message);
 
-    private void Save()
+    private bool Save(bool showFeedback = false)
     {
         try
         {
             _stateRepository!.Save(State);
+            if (showFeedback)
+                SaveFeedbackRequested?.Invoke(true);
+            return true;
         }
         catch (Exception exception)
         {
             GD.PushWarning($"Could not save MVP state: {exception.Message}");
+            if (showFeedback)
+                SaveFeedbackRequested?.Invoke(false);
+            return false;
         }
     }
 }

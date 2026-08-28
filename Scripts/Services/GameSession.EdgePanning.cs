@@ -7,7 +7,7 @@ public partial class GameSession
         if (!_settings!.SetEdgePanning(State, enabled))
             return;
 
-        Save();
+        Save(showFeedback: true);
         StateChanged?.Invoke();
     }
 }

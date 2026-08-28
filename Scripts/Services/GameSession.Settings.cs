@@ -14,7 +14,7 @@ public partial class GameSession
             return;
 
         _audioSettings!.ApplyMasterVolume(State.MasterVolume);
-        Save();
+        Save(showFeedback: true);
     }
 
     public void SetSoundEffectVolume(float value)
@@ -23,7 +23,7 @@ public partial class GameSession
             return;
 
         _audioSettings!.ApplySoundEffectVolume(State.SoundEffectVolume);
-        Save();
+        Save(showFeedback: true);
     }
 
     public void SetUiSoundVolume(float value)
@@ -32,13 +32,13 @@ public partial class GameSession
             return;
 
         _audioSettings!.ApplyUiSoundVolume(State.UiSoundVolume);
-        Save();
+        Save(showFeedback: true);
     }
 
     public void SetAutoFinishRaces(bool enabled)
     {
         if (_settings!.SetAutoFinishRaces(State, enabled))
-            Save();
+            Save(showFeedback: true);
     }
 
     public ulong CreateRaceSeed()
