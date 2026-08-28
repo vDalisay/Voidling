@@ -19,6 +19,7 @@ public sealed record CreatureBecameAdultEvent(
     int NewRank) : GameSimulationEvent;
 public sealed record CreatureReincarnatedEvent(string CreatureId, string Name, int ReincarnationCount) : GameSimulationEvent;
 public sealed record CreatureDiedEvent(string CreatureId, string Name) : GameSimulationEvent;
+public sealed record CreatureCareRiskEvent(string CreatureId, string Name) : GameSimulationEvent;
 public sealed record CreaturePassiveTrainingCappedEvent(string CreatureId, string Name, string StatId) : GameSimulationEvent;
 public sealed record CreatureHatchedEvent(string EggId, string CreatureId, string Name) : GameSimulationEvent;
 public sealed record EggFailedEvent(string EggId) : GameSimulationEvent;
@@ -53,7 +54,10 @@ public sealed class AdvanceSimulationUseCase
 
         foreach (var creature in state.Voidlings)
         {
+            var careWasLifecycleSafe = IsCareLifecycleSafe(creature);
             changed |= _needs.Advance(creature.Needs, elapsedSeconds, _rules.Needs);
+            if (careWasLifecycleSafe && !IsCareLifecycleSafe(creature))
+                events.Add(new CreatureCareRiskEvent(creature.Id, creature.Name));
 
             var passiveResult = _passiveTraining.Advance(creature, elapsedSeconds, _rules);
             changed |= passiveResult.Changed;
@@ -152,6 +156,10 @@ public sealed class AdvanceSimulationUseCase
 
         return new SimulationStepResult(changed, events);
     }
+
+    private bool IsCareLifecycleSafe(VoidlingData creature)
+        => creature.Needs.Happiness >= _rules.Reincarnation.MinimumHappiness &&
+           creature.Needs.Stress <= _rules.Reincarnation.MaximumStress;
 
     private bool AdvanceGardenIncome(GameStateData state, float elapsedSeconds)
     {

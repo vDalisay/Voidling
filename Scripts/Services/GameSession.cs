@@ -119,6 +119,12 @@ public partial class GameSession : Node
                     RaiseGardenEvent(message);
                     break;
                 }
+                case CreatureCareRiskEvent risk:
+                {
+                    var message = $"{risk.Name} seems unsettled and needs more care before the end of this life.";
+                    RaiseGardenEvent(message);
+                    break;
+                }
                 case CreaturePassiveTrainingCappedEvent capped:
                 {
                     var message = $"{capped.Name} finished passive {DisplayStatId(capped.StatId)} training at their current DNA cap.";
