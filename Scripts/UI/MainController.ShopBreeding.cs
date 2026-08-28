@@ -125,11 +125,15 @@ public partial class MainController : Node
         }
         else if (preview.IsCleanOutcross)
         {
-            text = string.Format(Tr("UI_BREED_CLEAN_OUTCROSS"), preview.ChildBurden);
+            text = AppendHatchFailureRisk(
+                string.Format(Tr("UI_BREED_CLEAN_OUTCROSS"), preview.ChildBurden),
+                preview.HatchFailurePercent);
         }
         else if (preview.ChildBurden > 0)
         {
-            text = string.Format(Tr("UI_BREED_UNRELATED_BURDEN"), preview.ChildBurden);
+            text = AppendHatchFailureRisk(
+                string.Format(Tr("UI_BREED_UNRELATED_BURDEN"), preview.ChildBurden),
+                preview.HatchFailurePercent);
         }
         else
         {
@@ -137,5 +141,16 @@ public partial class MainController : Node
         }
 
         return new BreedingPreviewViewState(text, preview.CanBreed);
+    }
+
+    private static string AppendHatchFailureRisk(string text, int hatchFailurePercent)
+    {
+        if (hatchFailurePercent <= 0)
+            return text;
+
+        var prefix = text.TrimEnd();
+        if (prefix.EndsWith(".", StringComparison.Ordinal))
+            prefix = prefix[..^1];
+        return $"{prefix} • {hatchFailurePercent}% hatch-failure risk.";
     }
 }

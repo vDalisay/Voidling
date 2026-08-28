@@ -1,6 +1,7 @@
 using System.Linq;
 using Voidling.Application.Simulation;
 using Voidling.Domain.Care;
+using Voidling.Domain.Evolution;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Rules;
 using VoidlingGame;
@@ -30,6 +31,7 @@ public sealed class SimulationArchitectureTests
 
         Assert.True(result.Changed);
         Assert.Equal(LifeStage.Adult, child.Stage);
+        Assert.Equal(Rules.Lifecycle.ChildToAdultSeconds, child.AgeSeconds, 4);
         Assert.Equal(0.25f, child.AdultAgeSeconds, 4);
         Assert.Equal(0.0f, child.BreedCooldownSeconds);
         var transition = Assert.Single(result.Events);
@@ -95,6 +97,7 @@ public sealed class SimulationArchitectureTests
         Assert.Equal(LifeStage.Child, adult.Stage);
         Assert.Equal(1, adult.ReincarnationCount);
         Assert.Equal(0.0f, adult.AdultAgeSeconds);
+        Assert.Equal(0.1f, adult.AgeSeconds, 3);
         Assert.Equal(5, adult.TrainingPoints["run"]);
         Assert.Equal(CreatureDepartureReason.None, adult.DepartureReason);
         Assert.Same(adult, Assert.Single(state.Voidlings));
@@ -135,6 +138,67 @@ public sealed class SimulationArchitectureTests
         Assert.Same(adult, Assert.Single(state.DepartedVoidlings));
         Assert.Equal(CreatureDepartureReason.Death, adult.DepartureReason);
         Assert.Empty(second.Events.OfType<CreatureDiedEvent>());
+    }
+
+    [Fact]
+    public void Advance_LifecycleBoundaryUsesOnlyCareAccumulatedBeforeTheBoundary()
+    {
+        var rules = Rules with
+        {
+            Reincarnation = Rules.Reincarnation with
+            {
+                AdultLifespanSeconds = 1.0f,
+                MinimumHappiness = 5.0f,
+                MaximumStress = 100.0f
+            },
+            Needs = Rules.Needs with { HappinessLossPerMinute = 6.0f }
+        };
+        var oneChunk = CreateNearLifecycleState();
+        var twoChunks = CreateNearLifecycleState();
+        var simulation = new AdvanceSimulationUseCase(rules);
+
+        simulation.Advance(oneChunk, 0.2f);
+        simulation.Advance(twoChunks, 0.1f);
+        simulation.Advance(twoChunks, 0.1f);
+
+        var first = Assert.Single(oneChunk.Voidlings);
+        var second = Assert.Single(twoChunks.Voidlings);
+        Assert.Empty(oneChunk.DepartedVoidlings);
+        Assert.Empty(twoChunks.DepartedVoidlings);
+        Assert.Equal(1, first.ReincarnationCount);
+        Assert.Equal(first.ReincarnationCount, second.ReincarnationCount);
+        Assert.Equal(LifeStage.Child, first.Stage);
+        Assert.Equal(first.Stage, second.Stage);
+        Assert.Equal(first.AgeSeconds, second.AgeSeconds, 4);
+        Assert.Equal(first.Needs.Happiness, second.Needs.Happiness, 4);
+        Assert.Equal(first.Needs.Stress, second.Needs.Stress, 4);
+    }
+
+    [Fact]
+    public void Advance_PostAdultPassiveTrainingCannotRetroactivelyChangeEvolution()
+    {
+        var rules = Rules with
+        {
+            PassiveTraining = Rules.PassiveTraining with { PointsPerMinute = 60.0f },
+            Evolution = Rules.Evolution with { SpecializationThreshold = 0.005f }
+        };
+        var oneChunk = CreateNearAdultPassiveTrainingState(rules);
+        var twoChunks = CreateNearAdultPassiveTrainingState(rules);
+        var simulation = new AdvanceSimulationUseCase(rules);
+
+        simulation.Advance(oneChunk, 0.2f);
+        simulation.Advance(twoChunks, 0.1f);
+        simulation.Advance(twoChunks, 0.1f);
+
+        var first = Assert.Single(oneChunk.Voidlings);
+        var second = Assert.Single(twoChunks.Voidlings);
+        Assert.Equal(LifeStage.Adult, first.Stage);
+        Assert.Equal(EvolutionSpecialization.Generalist, first.EvolutionSpecialization);
+        Assert.Equal(first.EvolutionSpecialization, second.EvolutionSpecialization);
+        Assert.Equal(first.TrainingPoints["run"], second.TrainingPoints["run"]);
+        Assert.Equal(1, first.TrainingPoints["run"]);
+        Assert.Equal(first.RunPowerInfluence, second.RunPowerInfluence, 5);
+        Assert.Equal(0.0f, first.RunPowerInfluence, 5);
     }
 
     [Fact]
@@ -261,6 +325,17 @@ public sealed class SimulationArchitectureTests
     }
 
     [Fact]
+    public void Advance_EmptyGardenReportsFractionalIncomeProgressAsAChange()
+    {
+        var state = new GameStateData { GardenIncomeCoinRemainder = 0.0 };
+
+        var result = new AdvanceSimulationUseCase(Rules).Advance(state, 30.0f);
+
+        Assert.True(result.Changed);
+        Assert.Equal(0.5, state.GardenIncomeCoinRemainder, 6);
+    }
+
+    [Fact]
     public void Advance_ZeroElapsedTimeIsAStableNoOp()
     {
         var state = new GameStateData();
@@ -272,6 +347,44 @@ public sealed class SimulationArchitectureTests
         Assert.False(result.Changed);
         Assert.Empty(result.Events);
         Assert.Equal(5.0f, child.AgeSeconds);
+    }
+
+    private static GameStateData CreateNearLifecycleState()
+    {
+        var state = new GameStateData();
+        state.Voidlings.Add(new VoidlingData
+        {
+            Id = "boundary-life",
+            Name = "Boundary",
+            Stage = LifeStage.Adult,
+            AdultAgeSeconds = 0.9f,
+            Needs = new CreatureNeedsState
+            {
+                Happiness = 5.015f,
+                Stress = 0.0f
+            }
+        });
+        return state;
+    }
+
+    private static GameStateData CreateNearAdultPassiveTrainingState(GameBalanceRules rules)
+    {
+        var creature = new VoidlingData
+        {
+            Id = "boundary-adult",
+            Name = "Boundary",
+            Stage = LifeStage.Child,
+            AgeSeconds = rules.Lifecycle.ChildToAdultSeconds - 0.1f,
+            Genome = new GenomeFactory(rules.Genetics).CreateRandom(991UL),
+            PassiveTrainingStatId = "run",
+            PassiveTrainingPointRemainder = 0.85
+        };
+        foreach (var statId in rules.Genetics.StatIds)
+            creature.TrainingPoints[statId] = 0;
+
+        var state = new GameStateData();
+        state.Voidlings.Add(creature);
+        return state;
     }
 
     private static GameStateData CreateChunkingState()
