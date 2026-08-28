@@ -11,6 +11,7 @@ public partial class GardenController
         // Install after the scene's normal _Ready pass so the camera and actor roots
         // have already been resolved by GardenController._Ready().
         CallDeferred(nameof(InstallLmbGroundPan));
+        CallDeferred(nameof(InstallGardenEnvironmentPresentation));
     }
 
     private void InstallLmbGroundPan()
