@@ -41,8 +41,8 @@ public sealed class RaceSimulationTelemetryTests
         Assert.True(metric.ObstacleFailures >= 0);
         Assert.Equal(1, metric.CheerActivations);
         Assert.Equal(simulation.FixedStepCount, telemetry.FixedStepCount);
-        Assert.Equal(new[] { participant.CreatureId }, simulation.FinishOrder);
-        Assert.Equal(new[] { participant.CreatureId }, deterministic.FinishOrder);
+        Assert.Equal(participant.CreatureId, Assert.Single(simulation.FinishOrder));
+        Assert.Equal(participant.CreatureId, Assert.Single(deterministic.FinishOrder));
     }
 
     [Fact]
@@ -63,7 +63,19 @@ public sealed class RaceSimulationTelemetryTests
             observed.AdvanceFixedSteps(17);
         }
 
-        Assert.Equal(baseline.FinishOrder, observed.FinishOrder);
-        Assert.Equal(baseline.GetDeterministicStateSnapshot(), observed.GetDeterministicStateSnapshot());
+        var baselineState = baseline.GetDeterministicStateSnapshot();
+        var observedState = observed.GetDeterministicStateSnapshot();
+
+        Assert.Equal(baseline.FinishOrder.Count, observed.FinishOrder.Count);
+        for (var i = 0; i < baseline.FinishOrder.Count; i++)
+            Assert.Equal(baseline.FinishOrder[i], observed.FinishOrder[i]);
+
+        Assert.Equal(baselineState.FinishOrder.Count, observedState.FinishOrder.Count);
+        for (var i = 0; i < baselineState.FinishOrder.Count; i++)
+            Assert.Equal(baselineState.FinishOrder[i], observedState.FinishOrder[i]);
+
+        Assert.Equal(baselineState.Participants.Count, observedState.Participants.Count);
+        for (var i = 0; i < baselineState.Participants.Count; i++)
+            Assert.Equal(baselineState.Participants[i], observedState.Participants[i]);
     }
 }
