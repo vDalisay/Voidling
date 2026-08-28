@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using Godot;
 using Voidling.Domain.Racing;
@@ -36,7 +37,8 @@ public partial class RaceScreen
                 ? metric.FinishFixedStep * RaceSimulation.FixedStepSeconds
                 : 0.0;
             var safeName = participant.DisplayName.Replace('"', '\'');
-            var line = FormattableString.Invariant(
+            var line = string.Create(
+                CultureInfo.InvariantCulture,
                 $"[race-telemetry] seed={_entry.SimulationSeed} steps={telemetry.FixedStepCount} " +
                 $"participant={participant.CreatureId} name=\"{safeName}\" player={(participant.CreatureId == _playerId ? 1 : 0)} " +
                 $"placement={metric.Placement} finish_s={finishSeconds:0.000} " +
