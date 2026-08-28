@@ -231,21 +231,19 @@ public sealed class AdvanceSimulationUseCase
         if (coinsPerMinute <= 0.0f)
             return false;
 
-        var previousRemainder = state.GardenIncomeCoinRemainder;
-        var totalCoins = previousRemainder + elapsedSeconds * (double)coinsPerMinute / 60.0;
+        var totalCoins = state.GardenIncomeCoinRemainder + elapsedSeconds * (double)coinsPerMinute / 60.0;
         if (!double.IsFinite(totalCoins) || totalCoins < 0.0)
             return false;
 
         var wholeCoins = Math.Floor(totalCoins);
         state.GardenIncomeCoinRemainder = totalCoins - wholeCoins;
-        var changed = !previousRemainder.Equals(state.GardenIncomeCoinRemainder);
         if (wholeCoins < 1.0)
-            return changed;
+            return false;
 
         var available = Math.Max(0L, (long)int.MaxValue - state.Coins);
         var awarded = Math.Min((long)wholeCoins, available);
         if (awarded <= 0)
-            return changed;
+            return false;
 
         state.Coins += (int)awarded;
         return true;

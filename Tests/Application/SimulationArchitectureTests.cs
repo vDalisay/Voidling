@@ -88,7 +88,6 @@ public sealed class SimulationArchitectureTests
         var simulation = new AdvanceSimulationUseCase(rules);
 
         var first = simulation.Advance(state, 0.2f);
-        var second = simulation.Advance(state, 0.2f);
 
         var reincarnated = Assert.IsType<CreatureReincarnatedEvent>(
             Assert.Single(first.Events.OfType<CreatureReincarnatedEvent>()));
@@ -102,6 +101,8 @@ public sealed class SimulationArchitectureTests
         Assert.Equal(CreatureDepartureReason.None, adult.DepartureReason);
         Assert.Same(adult, Assert.Single(state.Voidlings));
         Assert.Empty(state.DepartedVoidlings);
+
+        var second = simulation.Advance(state, 0.2f);
         Assert.Empty(second.Events.OfType<CreatureReincarnatedEvent>());
     }
 
@@ -322,17 +323,6 @@ public sealed class SimulationArchitectureTests
         Assert.Equal(firstCreature.BreedCooldownSeconds, secondCreature.BreedCooldownSeconds, 4);
         Assert.Equal(firstState.OwnedEggs[0].IncubationSeconds, secondState.OwnedEggs[0].IncubationSeconds, 4);
         Assert.Equal(firstState.OwnedEggs[0].State, secondState.OwnedEggs[0].State);
-    }
-
-    [Fact]
-    public void Advance_EmptyGardenReportsFractionalIncomeProgressAsAChange()
-    {
-        var state = new GameStateData { GardenIncomeCoinRemainder = 0.0 };
-
-        var result = new AdvanceSimulationUseCase(Rules).Advance(state, 30.0f);
-
-        Assert.True(result.Changed);
-        Assert.Equal(0.5, state.GardenIncomeCoinRemainder, 6);
     }
 
     [Fact]
