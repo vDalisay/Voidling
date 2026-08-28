@@ -155,9 +155,24 @@ public partial class GameSession : Node
         StateChanged?.Invoke();
     }
 
+    public bool ShouldStartTutorial()
+        => !State.TutorialCompleted;
+
+    public void CompleteTutorial()
+    {
+        if (State.TutorialCompleted)
+            return;
+
+        State.TutorialCompleted = true;
+        Save();
+        StateChanged?.Invoke();
+    }
+
     public void ResetDemo()
     {
+        var tutorialCompleted = State.TutorialCompleted;
         State = CreateFreshState();
+        State.TutorialCompleted = tutorialCompleted;
         ApplyAudioSettings();
         SaveAndNotify("Demo save reset.");
         RaiseGardenEvent("The garden was reset.");
@@ -233,7 +248,8 @@ public partial class GameSession : Node
             MasterVolume = 1.0f,
             SoundEffectVolume = 1.0f,
             UiSoundVolume = 1.0f,
-            AutoFinishRaces = true
+            AutoFinishRaces = true,
+            TutorialCompleted = false
         };
 
         foreach (var statId in GameRules.StatIds)

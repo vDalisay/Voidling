@@ -61,6 +61,7 @@ public partial class MainController : Node
         _session.GardenEventRaised += AppendGardenEvent;
         _gardenEventLog.Append(Tr("UI_GARDEN_LOG_STARTED"));
         RefreshUi();
+        Callable.From(StartFirstLaunchTutorialIfNeeded).CallDeferred();
     }
 
     public override void _ExitTree()
@@ -267,6 +268,7 @@ public partial class MainController : Node
 
         _selectedId = creatureId;
         RefreshUi();
+        OnTutorialVoidlingSelected();
     }
 
     private void DeselectVoidling()

@@ -29,6 +29,7 @@ public sealed class ApplicationArchitectureTests
             SaveVersion = 3,
             MasterVolume = 0.25f,
             AutoFinishRaces = false,
+            TutorialCompleted = false,
             Voidlings = new List<VoidlingData> { creature },
             DepartedVoidlings = null!,
             OwnedEggs = null!,
@@ -42,6 +43,7 @@ public sealed class ApplicationArchitectureTests
         Assert.Equal(GameStateMigrationService.CurrentSaveVersion, state.SaveVersion);
         Assert.Equal(1.0f, state.MasterVolume);
         Assert.True(state.AutoFinishRaces);
+        Assert.True(state.TutorialCompleted);
         Assert.Same(genome, creature.Genome);
         Assert.Equal(7, creature.TrainingPoints["run"]);
         Assert.NotNull(creature.RareTraits);
@@ -64,13 +66,15 @@ public sealed class ApplicationArchitectureTests
         {
             SaveVersion = GameStateMigrationService.CurrentSaveVersion,
             MasterVolume = 0.35f,
-            AutoFinishRaces = false
+            AutoFinishRaces = false,
+            TutorialCompleted = false
         };
 
         new GameStateMigrationService(Rules).Normalize(state);
 
         Assert.Equal(0.35f, state.MasterVolume);
         Assert.False(state.AutoFinishRaces);
+        Assert.False(state.TutorialCompleted);
     }
 
     [Fact]

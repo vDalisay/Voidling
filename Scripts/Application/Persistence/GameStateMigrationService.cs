@@ -17,7 +17,7 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 14;
+    public const int CurrentSaveVersion = 15;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -57,6 +57,13 @@ public sealed class GameStateMigrationService
         {
             state.SoundEffectVolume = 1.0f;
             state.UiSoundVolume = 1.0f;
+        }
+
+        if (previousVersion < 15)
+        {
+            // The tutorial is a first-launch experience. Existing saves predate that launch moment,
+            // so migrate them as completed instead of interrupting established players after update.
+            state.TutorialCompleted = true;
         }
 
         state.MasterVolume = NormalizeVolume(state.MasterVolume);

@@ -12,7 +12,7 @@ namespace VoidlingGame;
 /// </summary>
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 14;
+    public int SaveVersion { get; set; } = 15;
     public int Coins { get; set; } = 120;
     public double GardenIncomeCoinRemainder { get; set; }
     public long SeedCounter { get; set; } = 1;
@@ -35,4 +35,8 @@ public sealed class GameStateData
     public float UiSoundVolume { get; set; } = 1.0f;
     public bool AutoFinishRaces { get; set; } = true;
     public bool EdgePanning { get; set; } = true;
+
+    // New installs begin with the lightweight guided tour. Migration marks pre-tutorial saves as
+    // completed so an update never surprises existing players with first-launch onboarding.
+    public bool TutorialCompleted { get; set; }
 }
