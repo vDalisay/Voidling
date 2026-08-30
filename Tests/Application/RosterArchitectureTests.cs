@@ -54,7 +54,8 @@ public sealed class RosterArchitectureTests
 
         Assert.True(result.Succeeded);
         Assert.Empty(state.Voidlings);
-        Assert.Single(state.DepartedVoidlings);
+        var departed = Assert.Single(state.DepartedVoidlings);
+        Assert.Equal(CreatureDepartureReason.Goodbye, departed.DepartureReason);
         Assert.True(roster.IsDeparted(state, "creature"));
         Assert.Equal("Pip", roster.FindLineage(state, "creature")?.Name);
     }

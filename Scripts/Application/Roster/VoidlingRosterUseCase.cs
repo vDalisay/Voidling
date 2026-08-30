@@ -103,6 +103,7 @@ public sealed class VoidlingRosterUseCase
         if (creature == null)
             return new GoodbyeResult(false, string.Empty);
 
+        creature.DepartureReason = CreatureDepartureReason.Goodbye;
         state.Voidlings.Remove(creature);
         state.DepartedVoidlings.Add(creature);
         return new GoodbyeResult(true, creature.Name);
