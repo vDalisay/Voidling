@@ -33,6 +33,7 @@ public sealed record LineageMemberProjection(
     bool InbreedingHistoryFlag,
     int? ActiveInbreedingBurden,
     LineageMemberPresence Presence,
+    CreatureDepartureReason DepartureReason,
     bool HasAngelMutation,
     int OtherMutationCount,
     IReadOnlyList<LineageStatProjection> Stats,
@@ -117,6 +118,7 @@ public sealed class LineageTreeProjectionService
             archive.InbreedingHistoryFlag,
             ActiveInbreedingBurden: null,
             LineageMemberPresence.Archived,
+            CreatureDepartureReason.None,
             HasAngelMutation: false,
             OtherMutationCount: 0,
             Array.Empty<LineageStatProjection>(),
@@ -143,6 +145,9 @@ public sealed class LineageTreeProjectionService
             string.Equals(traitId, MutationIds.Angel, StringComparison.OrdinalIgnoreCase));
         var otherMutationCount = rareTraitIds.Count(traitId =>
             !string.Equals(traitId, MutationIds.Angel, StringComparison.OrdinalIgnoreCase));
+        var departureReason = presence == LineageMemberPresence.Departed
+            ? creature.DepartureReason
+            : CreatureDepartureReason.None;
 
         return new LineageMemberProjection(
             creature.Id,
@@ -154,6 +159,7 @@ public sealed class LineageTreeProjectionService
             creature.InbreedingHistoryFlag,
             Math.Max(0, creature.InbreedingBurdenLevel),
             presence,
+            departureReason,
             hasAngel,
             otherMutationCount,
             stats,

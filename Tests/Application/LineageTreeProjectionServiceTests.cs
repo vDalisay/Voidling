@@ -34,12 +34,38 @@ public sealed class LineageTreeProjectionServiceTests
 
         var archived = Assert.Single(projection.Members.Where(member => member.CreatureId == "archived-parent"));
         Assert.Equal(LineageMemberPresence.Archived, archived.Presence);
+        Assert.Equal(CreatureDepartureReason.None, archived.DepartureReason);
         Assert.Null(archived.ActiveInbreedingBurden);
         Assert.False(archived.HasAngelMutation);
         Assert.Equal(0, archived.OtherMutationCount);
         Assert.Empty(archived.Stats);
         Assert.DoesNotContain(state.Voidlings, creature => creature.Id == archived.CreatureId);
         Assert.DoesNotContain(state.DepartedVoidlings, creature => creature.Id == archived.CreatureId);
+    }
+
+    [Fact]
+    public void Projection_PreservesDepartureReasonForDepartedLineageMembers()
+    {
+        var state = new GameStateData();
+        var child = CreateCreature("child", "goodbye-parent", "dead-parent", generation: 1);
+        var goodbyeParent = CreateCreature("goodbye-parent", "", "", generation: 0);
+        goodbyeParent.DepartureReason = CreatureDepartureReason.Goodbye;
+        var deadParent = CreateCreature("dead-parent", "", "", generation: 0);
+        deadParent.DepartureReason = CreatureDepartureReason.Death;
+        state.Voidlings.Add(child);
+        state.DepartedVoidlings.Add(goodbyeParent);
+        state.DepartedVoidlings.Add(deadParent);
+
+        var projection = new LineageTreeProjectionService(Rules).Create(state, child.Id);
+
+        var active = Assert.Single(projection.Members.Where(member => member.CreatureId == child.Id));
+        var goodbye = Assert.Single(projection.Members.Where(member => member.CreatureId == goodbyeParent.Id));
+        var dead = Assert.Single(projection.Members.Where(member => member.CreatureId == deadParent.Id));
+        Assert.Equal(CreatureDepartureReason.None, active.DepartureReason);
+        Assert.Equal(LineageMemberPresence.Departed, goodbye.Presence);
+        Assert.Equal(CreatureDepartureReason.Goodbye, goodbye.DepartureReason);
+        Assert.Equal(LineageMemberPresence.Departed, dead.Presence);
+        Assert.Equal(CreatureDepartureReason.Death, dead.DepartureReason);
     }
 
     [Fact]

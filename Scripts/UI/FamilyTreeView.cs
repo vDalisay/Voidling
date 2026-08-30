@@ -424,7 +424,12 @@ public partial class FamilyTreeView : Control
             : $"G{member.FamilyGeneration}";
         generationText += member.Presence switch
         {
-            LineageMemberPresence.Departed => " • LEFT",
+            LineageMemberPresence.Departed => member.DepartureReason switch
+            {
+                CreatureDepartureReason.Goodbye => " • GOODBYE",
+                CreatureDepartureReason.Death => " • DIED",
+                _ => " • LEFT"
+            },
             LineageMemberPresence.Archived => " • ARCHIVED",
             _ => string.Empty
         };
