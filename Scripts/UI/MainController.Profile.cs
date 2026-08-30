@@ -92,6 +92,16 @@ public partial class MainController : Node
             ? "Adult"
             : $"Child • {Math.Max(0, (int)Math.Ceiling(GameRules.ChildToAdultSeconds - data.AgeSeconds))}s to adult";
         box.AddChild(UiFactory.CreateLabel(stage, 7));
+
+        var demeanor = UiFactory.CreateLabel(
+            profile.CareDemeanor == VoidlingCareDemeanor.Settled
+                ? "Seems content and at ease."
+                : "Seems restless and could use some attention.",
+            6);
+        demeanor.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        demeanor.CustomMinimumSize = new Vector2(194, 15);
+        box.AddChild(demeanor);
+
         box.AddChild(CreatePassiveTrainingRow(data));
 
         foreach (var stat in profile.Stats)

@@ -10,6 +10,12 @@ using VoidlingGame;
 
 namespace Voidling.Application.Creatures;
 
+public enum VoidlingCareDemeanor
+{
+    Settled,
+    NeedsCare
+}
+
 public sealed record VoidlingStatProfileProjection(
     string StatId,
     int DnaProfile1Rank,
@@ -69,17 +75,21 @@ public sealed record VoidlingProfileProjection(
     int ExpressedColorProfileIndex,
     IReadOnlyList<VoidlingStatProfileProjection> Stats,
     IReadOnlyList<VoidlingRareTraitProfileProjection> RareTraits,
-    VoidlingAppearanceProfileProjection Appearance);
+    VoidlingAppearanceProfileProjection Appearance)
+{
+    public VoidlingCareDemeanor CareDemeanor { get; init; } = VoidlingCareDemeanor.NeedsCare;
+}
 
 /// <summary>
 /// Builds immutable player-information read models from the mutable save aggregate. UI receives
 /// explicit DNA-profile values, trained progression/caps, semantic evolution/appearance and lineage
 /// labels without traversing Genome, TrainingPoints, RareTraits or lineage collections itself. This
-/// intentionally reports current facts only; it does not calculate exact offspring probabilities
-/// or expose hidden evolution influence values.
+/// intentionally reports current facts only; it does not calculate exact offspring probabilities,
+/// expose hidden evolution influence values, or reveal hidden happiness/stress numbers.
 /// </summary>
 public sealed class VoidlingProfileProjectionService
 {
+    private readonly GameBalanceRules _rules;
     private readonly IReadOnlyList<string> _statIds;
     private readonly StatCalculator _stats;
     private readonly AppearancePhenotypeResolver _appearance;
@@ -88,6 +98,7 @@ public sealed class VoidlingProfileProjectionService
     public VoidlingProfileProjectionService(GameBalanceRules rules)
     {
         ArgumentNullException.ThrowIfNull(rules);
+        _rules = rules;
         _statIds = rules.Genetics.StatIds;
         _stats = new StatCalculator(rules.Stats);
         _appearance = new AppearancePhenotypeResolver(rules.Appearance);
@@ -187,8 +198,17 @@ public sealed class VoidlingProfileProjectionService
             creature.Genome.ExpressedColorIndex,
             stats,
             rareTraits,
-            appearance);
+            appearance)
+        {
+            CareDemeanor = ResolveCareDemeanor(creature)
+        };
     }
+
+    private VoidlingCareDemeanor ResolveCareDemeanor(VoidlingData creature)
+        => creature.Needs.Happiness >= _rules.Reincarnation.MinimumHappiness &&
+           creature.Needs.Stress <= _rules.Reincarnation.MaximumStress
+            ? VoidlingCareDemeanor.Settled
+            : VoidlingCareDemeanor.NeedsCare;
 
     private IReadOnlyDictionary<string, string> BuildLineageNameIndex(GameStateData state)
         => _lineage.GetEffectiveLineage(state)
