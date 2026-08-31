@@ -18,6 +18,7 @@ public sealed record AppearanceRules(IReadOnlyList<string> PaletteHex);
 public sealed record BreedingRules(float CooldownSeconds, IReadOnlyList<int> HatchFailurePercentByBurden);
 public sealed record HatchingRules(float IncubationSeconds);
 public sealed record GardenRules(int MaxPopulation);
+public sealed record DailyLoginRules(IReadOnlyList<int> CoinRewards);
 
 public sealed record RankTrainingCaps(int E, int D, int C, int B, int A, int S)
 {
@@ -108,6 +109,10 @@ public sealed record GameBalanceRules(
     // Product requires a hard Garden population cap, but its final number is still tuning data.
     // Keep the prototype default authorable instead of baking the value into any use case or UI.
     public GardenRules Garden { get; init; } = new(MaxPopulation: 8);
+
+    // Daily-chain values are prototype balance only. The chain/cadence is the system contract; the
+    // actual reward table stays authorable so product tuning can replace these values without code.
+    public DailyLoginRules DailyLogin { get; init; } = new(Array.AsReadOnly(new[] { 5, 7, 9, 12, 15, 20, 30 }));
     public PassiveTrainingRules PassiveTraining { get; init; } = new(PointsPerMinute: 1.0f);
     public EvolutionRules Evolution { get; init; } = new(SpecializationThreshold: 0.50f);
     public ReincarnationRules Reincarnation { get; init; } = new(

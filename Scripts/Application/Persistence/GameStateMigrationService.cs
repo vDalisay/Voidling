@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Voidling.Application.Breeding;
+using Voidling.Application.Daily;
 using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
@@ -17,7 +18,7 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 15;
+    public const int CurrentSaveVersion = 16;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -46,6 +47,7 @@ public sealed class GameStateMigrationService
         state.AppliedTradeIds ??= new List<string>();
         state.AppliedMultiplayerRaceIds ??= new List<string>();
         state.DailyRaceAttempts ??= new List<DailyRaceAttemptData>();
+        state.DailyLogin ??= new DailyLoginStateData();
 
         if (previousVersion < 4)
         {
@@ -133,6 +135,11 @@ public sealed class GameStateMigrationService
             .OrderBy(attempt => attempt.DailyKey, StringComparer.Ordinal)
             .TakeLast(DailyFriendRaceService.MaxAttemptHistory)
             .ToList();
+
+        state.DailyLogin.LastClaimDayNumber = Math.Max(0, state.DailyLogin.LastClaimDayNumber);
+        state.DailyLogin.Streak = Math.Max(0, state.DailyLogin.Streak);
+        if (state.DailyLogin.LastClaimDayNumber == 0)
+            state.DailyLogin.Streak = 0;
 
         if (!double.IsFinite(state.GardenIncomeCoinRemainder) ||
             state.GardenIncomeCoinRemainder < 0.0 ||

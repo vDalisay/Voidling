@@ -31,8 +31,9 @@ public partial class MainController : Node
                 Price: GameRules.StoreEggPrice))
             .ToArray();
 
-        var box = OpenModal(Tr("UI_SHOP_TITLE"), new Vector2(558, 320));
+        var box = OpenModal(Tr("UI_SHOP_TITLE"), new Vector2(558, 344));
         box.AddThemeConstantOverride("separation", 4);
+        box.AddChild(CreateDailyLoginPanel());
 
         var screen = new ShopScreen();
         screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs));

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Voidling.Application.Daily;
 using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
@@ -12,7 +13,7 @@ namespace VoidlingGame;
 /// </summary>
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 15;
+    public int SaveVersion { get; set; } = 16;
     public int Coins { get; set; } = 120;
     public double GardenIncomeCoinRemainder { get; set; }
     public long SeedCounter { get; set; } = 1;
@@ -29,6 +30,7 @@ public sealed class GameStateData
     public int MultiplayerWins { get; set; }
     public List<string> AppliedMultiplayerRaceIds { get; set; } = new();
     public List<DailyRaceAttemptData> DailyRaceAttempts { get; set; } = new();
+    public DailyLoginStateData DailyLogin { get; set; } = new();
 
     public float MasterVolume { get; set; } = 1.0f;
     public float SoundEffectVolume { get; set; } = 1.0f;

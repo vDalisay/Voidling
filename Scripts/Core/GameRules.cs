@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Rules;
@@ -31,6 +32,8 @@ public static class GameRules
     public static int RelatedAncestorDepth => _balance.Genetics.RelatedAncestorDepth;
     public static int TrainingPointsPerLevel => _balance.Stats.TrainingPointsPerLevel;
     public static int MaxStatLevel => _balance.Stats.MaxLevel;
+    public static int GardenMaxPopulation => Math.Max(1, _balance.Garden.MaxPopulation);
+    public static IReadOnlyList<int> DailyLoginCoinRewards => _balance.DailyLogin.CoinRewards;
 
     public static readonly string[] StatIds = { "run", "swim", "fly", "power", "stamina" };
 
