@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Voidling.Domain.Care;
 using Voidling.Domain.Evolution;
+using Voidling.Domain.Hatching;
 using Voidling.Domain.Lifecycle;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Training;
@@ -42,10 +43,12 @@ public sealed class AdvanceSimulationUseCase
     private readonly CreatureNeedsService _needs = new();
     private readonly ReincarnationService _reincarnation = new();
     private readonly PassiveTrainingService _passiveTraining = new();
+    private readonly StoreEggFactory _storeEggFactory;
 
     public AdvanceSimulationUseCase(GameBalanceRules rules)
     {
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
+        _storeEggFactory = new StoreEggFactory(rules);
     }
 
     public SimulationStepResult Advance(GameStateData state, float elapsedSeconds)
@@ -55,6 +58,7 @@ public sealed class AdvanceSimulationUseCase
             return new SimulationStepResult(false, Array.Empty<GameSimulationEvent>());
 
         var changed = AdvanceGardenIncome(state, elapsedSeconds);
+        changed |= AdvanceShopEggRotation(state, elapsedSeconds);
         var events = new List<GameSimulationEvent>();
         var deathQueue = new List<VoidlingData>();
 
@@ -271,6 +275,48 @@ public sealed class AdvanceSimulationUseCase
 
         state.Coins += (int)awarded;
         return true;
+    }
+
+    private bool AdvanceShopEggRotation(GameStateData state, float elapsedSeconds)
+    {
+        var interval = Math.Max(1.0, _rules.Shop.EggRotationIntervalSeconds);
+        var previousElapsed = state.ShopEggRotationElapsedSeconds;
+        var totalElapsed = previousElapsed + elapsedSeconds;
+        if (!double.IsFinite(totalElapsed) || totalElapsed < 0.0)
+        {
+            state.ShopEggRotationElapsedSeconds = 0.0;
+            return previousElapsed != 0.0;
+        }
+
+        var rotations = (long)Math.Floor(totalElapsed / interval);
+        var remainder = totalElapsed - rotations * interval;
+        state.ShopEggRotationElapsedSeconds = remainder;
+        var changed = !previousElapsed.Equals(remainder);
+        if (rotations <= 0)
+            return changed;
+
+        RefreshStoreEggInventory(state, rotations);
+        return true;
+    }
+
+    private void RefreshStoreEggInventory(GameStateData state, long rotations)
+    {
+        var slotCount = Math.Max(1, state.StoreEggs.Count);
+        var baseCounter = state.SeedCounter;
+        var allocations = unchecked(rotations * (long)slotCount);
+        var firstFinalOffset = unchecked((rotations - 1L) * slotCount);
+        var replacements = new List<EggData>(slotCount);
+
+        for (var slot = 0; slot < slotCount; slot++)
+        {
+            var counterValue = unchecked(baseCounter + firstFinalOffset + slot + 1L);
+            var seed = unchecked((ulong)counterValue);
+            replacements.Add(_storeEggFactory.Create($"shop-{seed:x16}", seed));
+        }
+
+        state.SeedCounter = unchecked(baseCounter + allocations);
+        state.StoreEggs.Clear();
+        state.StoreEggs.AddRange(replacements);
     }
 
     private VoidlingData Hatch(GameStateData state, EggData egg)

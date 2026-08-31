@@ -23,6 +23,7 @@ public static class GameRules
     public static int StoreEggPrice => _balance.Shop.StoreEggPrice;
     public static int TrainingItemPrice => _balance.Shop.TrainingItemPrice;
     public static int EggShellSalePrice => _balance.Shop.EggShellSalePrice;
+    public static float ShopEggRotationIntervalSeconds => Math.Max(1.0f, _balance.Shop.EggRotationIntervalSeconds);
     public static float EggIncubationSeconds => _balance.Hatching.IncubationSeconds;
     public static float ChildToAdultSeconds => _balance.Lifecycle.ChildToAdultSeconds;
     public static float BreedCooldownSeconds => _balance.Breeding.CooldownSeconds;

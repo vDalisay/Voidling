@@ -21,7 +21,8 @@ public readonly record struct ShopEggViewState(
 public sealed record ShopScreenState(
     int Coins,
     IReadOnlyList<ShopTrainingItemViewState> TrainingItems,
-    IReadOnlyList<ShopEggViewState> Eggs);
+    IReadOnlyList<ShopEggViewState> Eggs,
+    int EggRotationSecondsRemaining);
 
 /// <summary>
 /// Standalone shop view. It renders a supplied snapshot and emits player purchase intent.
@@ -67,8 +68,11 @@ public partial class ShopScreen : VBoxContainer
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 8);
 
-        var welcome = UiFactory.CreateLabel(Tr("UI_SHOP_WELCOME"), 8);
+        var welcome = UiFactory.CreateLabel(
+            $"{Tr("UI_SHOP_WELCOME")}  •  Mystery eggs rotate in {FormatRotation(state.EggRotationSecondsRemaining)}",
+            7);
         welcome.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        welcome.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
         row.AddChild(welcome);
 
         var wallet = UiFactory.CreatePanel(new Vector2(128, 24));
@@ -79,6 +83,15 @@ public partial class ShopScreen : VBoxContainer
         wallet.AddChild(walletLabel);
         row.AddChild(wallet);
         return row;
+    }
+
+    private static string FormatRotation(int secondsRemaining)
+    {
+        var safeSeconds = Math.Max(0, secondsRemaining);
+        var time = TimeSpan.FromSeconds(safeSeconds);
+        return time.TotalHours >= 1.0
+            ? $"{(int)time.TotalHours}:{time.Minutes:00}:{time.Seconds:00}"
+            : $"{time.Minutes}:{time.Seconds:00}";
     }
 
     private static Control BuildAwning()

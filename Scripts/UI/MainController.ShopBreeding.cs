@@ -31,12 +31,16 @@ public partial class MainController : Node
                 Price: GameRules.StoreEggPrice))
             .ToArray();
 
+        var rotationRemaining = (int)Math.Ceiling(Math.Max(
+            0.0,
+            GameRules.ShopEggRotationIntervalSeconds - state.ShopEggRotationElapsedSeconds));
+
         var box = OpenModal(Tr("UI_SHOP_TITLE"), new Vector2(558, 344));
         box.AddThemeConstantOverride("separation", 4);
         box.AddChild(CreateDailyLoginPanel());
 
         var screen = new ShopScreen();
-        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs));
+        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rotationRemaining));
         screen.TrainingItemPurchaseRequested += statId =>
         {
             _session.BuyTrainingItem(statId);

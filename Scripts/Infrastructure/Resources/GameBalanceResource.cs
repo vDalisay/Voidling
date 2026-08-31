@@ -104,6 +104,8 @@ public partial class GameBalanceResource : Resource
     public int StoreEggPrice { get; set; } = 30;
     [Export(PropertyHint.Range, "0,10000,1")]
     public int TrainingItemPrice { get; set; } = 8;
+    [Export(PropertyHint.Range, "60,86400,60")]
+    public float EggRotationIntervalSeconds { get; set; } = 3600.0f;
 
     public GameBalanceRules ToDomainRules()
     {
@@ -165,7 +167,8 @@ public partial class GameBalanceResource : Resource
             Shop = defaults.Shop with
             {
                 StoreEggPrice = Math.Max(0, StoreEggPrice),
-                TrainingItemPrice = Math.Max(0, TrainingItemPrice)
+                TrainingItemPrice = Math.Max(0, TrainingItemPrice),
+                EggRotationIntervalSeconds = Math.Max(1.0f, EggRotationIntervalSeconds)
             }
         };
     }

@@ -43,3 +43,4 @@ TreatHappinessGain = 2.0
 GardenCoinsPerMinute = 1.0
 StoreEggPrice = 30
 TrainingItemPrice = 8
+EggRotationIntervalSeconds = 3600.0

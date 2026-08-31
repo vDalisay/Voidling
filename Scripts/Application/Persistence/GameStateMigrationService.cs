@@ -18,7 +18,7 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 17;
+    public const int CurrentSaveVersion = 18;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -154,6 +154,16 @@ public sealed class GameStateMigrationService
             state.GardenIncomeCoinRemainder >= 1.0)
         {
             state.GardenIncomeCoinRemainder = 0.0;
+        }
+
+        var rotationInterval = Math.Max(1.0, _rules.Shop.EggRotationIntervalSeconds);
+        if (!double.IsFinite(state.ShopEggRotationElapsedSeconds) || state.ShopEggRotationElapsedSeconds < 0.0)
+        {
+            state.ShopEggRotationElapsedSeconds = 0.0;
+        }
+        else if (state.ShopEggRotationElapsedSeconds >= rotationInterval)
+        {
+            state.ShopEggRotationElapsedSeconds %= rotationInterval;
         }
 
         state.SaveVersion = CurrentSaveVersion;

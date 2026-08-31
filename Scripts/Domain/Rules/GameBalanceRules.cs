@@ -65,7 +65,13 @@ public sealed record ReincarnationRules(
     float MinimumHappiness,
     float MaximumStress,
     float RetainedTrainingFraction);
-public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice, int EggShellSalePrice);
+
+public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice, int EggShellSalePrice)
+{
+    // Prototype cadence only. Product explicitly leaves exact rotation timing open for tuning.
+    public float EggRotationIntervalSeconds { get; init; } = 3600.0f;
+}
+
 public sealed record EconomyRules(float GardenCoinsPerMinute);
 
 public sealed record NeedsRules(
