@@ -108,7 +108,7 @@ public partial class GameSession
         if (creature == null)
             return false;
 
-        var result = _training!.SetPassiveTraining(State, creatureId, statId);
+        var result = _training!.SetPassiveTrainingFromPlacedModule(State, creatureId, statId);
         if (!result.Succeeded)
         {
             if (result.Failure == PassiveTrainingFailure.NoPlacedModule)

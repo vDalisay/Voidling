@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Voidling.Application.Garden;
 using Voidling.Application.Persistence;
 using Voidling.Application.Training;
@@ -57,7 +56,7 @@ public sealed class GardenModuleTrainingTests
         state.GardenModules.Add(new GardenModuleData { Id = "run-module", StatId = "run", Level = 1, SlotIndex = 0 });
         var useCase = new TrainingUseCase(rules);
 
-        Assert.True(useCase.SetPassiveTraining(state, creature.Id, "run").Succeeded);
+        Assert.True(useCase.SetPassiveTrainingFromPlacedModule(state, creature.Id, "run").Succeeded);
         Assert.Equal(1.0f, creature.PassiveTrainingPointsPerMinute);
 
         var upgrade = useCase.UpgradeGardenModule(state, "run-module");
@@ -79,7 +78,7 @@ public sealed class GardenModuleTrainingTests
         var useCase = new TrainingUseCase(rules);
         var passive = new PassiveTrainingService();
 
-        Assert.True(useCase.SetPassiveTraining(state, creature.Id, "run").Succeeded);
+        Assert.True(useCase.SetPassiveTrainingFromPlacedModule(state, creature.Id, "run").Succeeded);
         var activeStep = passive.Advance(creature, 60.0f, rules);
         Assert.Equal(2, activeStep.PointsGained);
         Assert.Equal(2, creature.TrainingPoints["run"]);
@@ -93,7 +92,7 @@ public sealed class GardenModuleTrainingTests
     }
 
     [Fact]
-    public void SetPassiveTraining_ChoosesStrongestPlacedModuleForRequestedStat()
+    public void SetPassiveTrainingFromPlacedModule_ChoosesStrongestPlacedModuleForRequestedStat()
     {
         var rules = Rules();
         var creature = CreateCreature("v1");
@@ -103,7 +102,7 @@ public sealed class GardenModuleTrainingTests
         state.GardenModules.Add(new GardenModuleData { Id = "strong", StatId = "run", Level = 3, SlotIndex = 1 });
         var useCase = new TrainingUseCase(rules);
 
-        var result = useCase.SetPassiveTraining(state, creature.Id, "run");
+        var result = useCase.SetPassiveTrainingFromPlacedModule(state, creature.Id, "run");
 
         Assert.True(result.Succeeded);
         Assert.Equal("strong", creature.PassiveTrainingModuleId);

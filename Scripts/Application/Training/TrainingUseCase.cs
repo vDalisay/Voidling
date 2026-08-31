@@ -203,6 +203,10 @@ public sealed class TrainingUseCase
         return new GardenModuleMutationResult(GardenModuleFailure.None, true, cost);
     }
 
+    /// <summary>
+    /// Compatibility/direct assignment retained for pre-module saves and pure Application callers.
+    /// Player-facing UI should call SetPassiveTrainingFromPlacedModule instead.
+    /// </summary>
     public PassiveTrainingAssignmentResult SetPassiveTraining(GameStateData state, string creatureId, string? statId)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -213,7 +217,37 @@ public sealed class TrainingUseCase
         var creature = state.Voidlings.FirstOrDefault(v => v.Id == creatureId);
         if (creature == null)
             return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.CreatureNotFound, string.Empty, false);
+        if (requested.Length == 0)
+            return ClearPassiveTraining(creature);
 
+        var changed = !string.Equals(creature.PassiveTrainingStatId, requested, StringComparison.Ordinal) ||
+                      creature.PassiveTrainingModuleId.Length > 0 ||
+                      creature.PassiveTrainingPointsPerMinute != 0.0f ||
+                      creature.PassiveTrainingPointRemainder != 0.0;
+        if (changed)
+        {
+            creature.PassiveTrainingStatId = requested;
+            creature.PassiveTrainingModuleId = string.Empty;
+            creature.PassiveTrainingPointsPerMinute = 0.0f;
+            creature.PassiveTrainingPointRemainder = 0.0;
+        }
+
+        return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.None, requested, changed);
+    }
+
+    public PassiveTrainingAssignmentResult SetPassiveTrainingFromPlacedModule(
+        GameStateData state,
+        string creatureId,
+        string? statId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var requested = statId ?? string.Empty;
+        if (requested.Length > 0 && !_rules.Genetics.StatIds.Contains(requested))
+            return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.UnknownStat, string.Empty, false);
+
+        var creature = state.Voidlings.FirstOrDefault(v => v.Id == creatureId);
+        if (creature == null)
+            return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.CreatureNotFound, string.Empty, false);
         if (requested.Length == 0)
             return ClearPassiveTraining(creature);
 
