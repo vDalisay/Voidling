@@ -1,4 +1,5 @@
 using Voidling.Application.Shop;
+using Voidling.Domain.Rules;
 
 namespace VoidlingGame;
 
@@ -31,6 +32,7 @@ public partial class GameSession
         if (!result.Succeeded)
             return;
 
+        RecordDailyMissionEvent(DailyMissionEventKind.PurchaseShopItem);
         SaveAndNotify("Bought a mystery egg.");
         RaiseGardenEvent("A mystery egg was placed in the garden.");
     }

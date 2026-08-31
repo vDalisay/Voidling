@@ -1,6 +1,7 @@
 using System;
 using Voidling.Application.Racing;
 using Voidling.Domain.Racing;
+using Voidling.Domain.Rules;
 
 namespace VoidlingGame;
 
@@ -54,6 +55,7 @@ public partial class GameSession
             throw new InvalidOperationException("RaceResultUseCase was not configured by Bootstrap.");
 
         var result = _raceResults.AwardPlacement(State, placement);
+        RecordDailyMissionEvent(DailyMissionEventKind.CompleteStandardRace);
         SaveAndNotify($"Race reward: +{result.Reward} sprouts.");
         return result.Reward;
     }

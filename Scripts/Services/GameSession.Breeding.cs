@@ -1,5 +1,6 @@
 using Godot;
 using Voidling.Application.Breeding;
+using Voidling.Domain.Rules;
 
 namespace VoidlingGame;
 
@@ -66,8 +67,11 @@ public partial class GameSession
             return false;
         }
 
-        // ExecuteAndPersist has already durably written this exact state. Only now may presentation
-        // observe/celebrate the new egg; animation remains downstream of authoritative state.
+        // ExecuteAndPersist has already durably written the egg. Mission progress is ancillary to
+        // that transaction; record it after success and immediately persist the updated aggregate.
+        if (RecordDailyMissionEvent(DailyMissionEventKind.BreedEgg))
+            Save();
+
         StateChanged?.Invoke();
         var warning = result.Related
             ? $" Egg carries level {result.ChildBurden} inbreeding risk ({result.HatchFailurePercent}%)."

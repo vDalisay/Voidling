@@ -19,12 +19,14 @@ public partial class GameSession
         if (!result.Succeeded)
             return false;
 
+        var missionChanged = RecordDailyMissionEvent(DailyMissionEventKind.PetVoidling);
         var message = $"{creature.Name} enjoyed some attention.";
-        if (result.Changed)
+        if (result.Changed || missionChanged)
         {
             Save(showFeedback: true);
             StateChanged?.Invoke();
-            RaiseGardenEvent(message);
+            if (result.Changed)
+                RaiseGardenEvent(message);
         }
 
         ToastRequested?.Invoke(message);

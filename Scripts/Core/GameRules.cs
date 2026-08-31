@@ -34,6 +34,7 @@ public static class GameRules
     public static int MaxStatLevel => _balance.Stats.MaxLevel;
     public static int GardenMaxPopulation => Math.Max(1, _balance.Garden.MaxPopulation);
     public static IReadOnlyList<int> DailyLoginCoinRewards => _balance.DailyLogin.CoinRewards;
+    public static DailyMissionRules DailyMissionRules => _balance.DailyMissions;
 
     public static readonly string[] StatIds = { "run", "swim", "fly", "power", "stamina" };
 

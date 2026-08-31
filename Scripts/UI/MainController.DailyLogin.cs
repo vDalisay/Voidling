@@ -8,8 +8,8 @@ public partial class MainController
     private Control CreateDailyLoginPanel()
     {
         var status = _session.GetDailyLoginStatus();
-        var panel = UiFactory.CreatePanel(new Vector2(518, 50));
-        panel.CustomMinimumSize = new Vector2(518, 50);
+        var panel = UiFactory.CreatePanel(new Vector2(518, 52));
+        panel.CustomMinimumSize = new Vector2(518, 52);
 
         var column = new VBoxContainer();
         column.AddThemeConstantOverride("separation", 2);
@@ -38,13 +38,24 @@ public partial class MainController
         };
         row.AddChild(claim);
 
+        var lowerRow = new HBoxContainer();
+        lowerRow.AddThemeConstantOverride("separation", 8);
+        column.AddChild(lowerRow);
+
         var cycle = string.Join("  •  ", status.RewardCycle.Select(reward => $"+{reward}"));
         var upcoming = UiFactory.CreateLabel(
             $"Reward cycle: {cycle}    Next: +{status.NextReward}",
             6);
+        upcoming.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         upcoming.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
         upcoming.TooltipText = "Prototype reward values are balance data and may change before release.";
-        column.AddChild(upcoming);
+        lowerRow.AddChild(upcoming);
+
+        var missions = UiFactory.CreateButton("Missions");
+        missions.CustomMinimumSize = new Vector2(82, 19);
+        UiFactory.ApplyPixelFont(missions, 6);
+        missions.Pressed += ShowDailyMissions;
+        lowerRow.AddChild(missions);
 
         return panel;
     }

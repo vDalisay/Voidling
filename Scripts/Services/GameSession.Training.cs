@@ -1,5 +1,6 @@
 using System;
 using Voidling.Application.Training;
+using Voidling.Domain.Rules;
 
 namespace VoidlingGame;
 
@@ -11,6 +12,7 @@ public partial class GameSession
         switch (result.Failure)
         {
             case TrainingFailure.None:
+                RecordDailyMissionEvent(DailyMissionEventKind.PurchaseShopItem);
                 SaveAndNotify($"Bought a {DisplayStatId(statId)} treat.");
                 break;
             case TrainingFailure.NotEnoughCurrency:
@@ -43,6 +45,7 @@ public partial class GameSession
         if (!result.Succeeded)
             return;
 
+        RecordDailyMissionEvent(DailyMissionEventKind.UseTrainingTreat);
         var message = $"{creature.Name} gained +{result.Gain} {DisplayStatId(statId)} training.";
         SaveAndNotify(message);
         RaiseGardenEvent(message);

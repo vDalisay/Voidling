@@ -20,6 +20,26 @@ public sealed record HatchingRules(float IncubationSeconds);
 public sealed record GardenRules(int MaxPopulation);
 public sealed record DailyLoginRules(IReadOnlyList<int> CoinRewards);
 
+public enum DailyMissionEventKind
+{
+    PetVoidling,
+    UseTrainingTreat,
+    BreedEgg,
+    HatchEgg,
+    CompleteStandardRace,
+    PurchaseShopItem
+}
+
+public sealed record DailyMissionDefinition(
+    string Id,
+    DailyMissionEventKind EventKind,
+    int Target,
+    int CoinReward);
+
+public sealed record DailyMissionRules(
+    int MissionsPerDay,
+    IReadOnlyList<DailyMissionDefinition> Definitions);
+
 public sealed record RankTrainingCaps(int E, int D, int C, int B, int A, int S)
 {
     public int ForRank(int rank) => rank switch
@@ -113,6 +133,21 @@ public sealed record GameBalanceRules(
     // Daily-chain values are prototype balance only. The chain/cadence is the system contract; the
     // actual reward table stays authorable so product tuning can replace these values without code.
     public DailyLoginRules DailyLogin { get; init; } = new(Array.AsReadOnly(new[] { 5, 7, 9, 12, 15, 20, 30 }));
+
+    // Mission IDs/event semantics are stable gameplay data; targets/rewards are prototype tuning.
+    // Player-facing mission wording belongs to Presentation rather than authoritative Domain rules.
+    public DailyMissionRules DailyMissions { get; init; } = new(
+        MissionsPerDay: 3,
+        Definitions: Array.AsReadOnly(new[]
+        {
+            new DailyMissionDefinition("pet-2", DailyMissionEventKind.PetVoidling, 2, 8),
+            new DailyMissionDefinition("train-1", DailyMissionEventKind.UseTrainingTreat, 1, 10),
+            new DailyMissionDefinition("breed-1", DailyMissionEventKind.BreedEgg, 1, 12),
+            new DailyMissionDefinition("hatch-1", DailyMissionEventKind.HatchEgg, 1, 15),
+            new DailyMissionDefinition("race-1", DailyMissionEventKind.CompleteStandardRace, 1, 12),
+            new DailyMissionDefinition("shop-1", DailyMissionEventKind.PurchaseShopItem, 1, 8)
+        }));
+
     public PassiveTrainingRules PassiveTraining { get; init; } = new(PointsPerMinute: 1.0f);
     public EvolutionRules Evolution { get; init; } = new(SpecializationThreshold: 0.50f);
     public ReincarnationRules Reincarnation { get; init; } = new(

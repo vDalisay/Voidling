@@ -18,7 +18,7 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 16;
+    public const int CurrentSaveVersion = 17;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -48,6 +48,8 @@ public sealed class GameStateMigrationService
         state.AppliedMultiplayerRaceIds ??= new List<string>();
         state.DailyRaceAttempts ??= new List<DailyRaceAttemptData>();
         state.DailyLogin ??= new DailyLoginStateData();
+        state.DailyMissions ??= new DailyMissionStateData();
+        state.DailyMissions.Missions ??= new List<DailyMissionProgressData>();
 
         if (previousVersion < 4)
         {
@@ -140,6 +142,12 @@ public sealed class GameStateMigrationService
         state.DailyLogin.Streak = Math.Max(0, state.DailyLogin.Streak);
         if (state.DailyLogin.LastClaimDayNumber == 0)
             state.DailyLogin.Streak = 0;
+
+        state.DailyMissions.DayNumber = Math.Max(0, state.DailyMissions.DayNumber);
+        state.DailyMissions.Missions.RemoveAll(mission =>
+            mission == null || string.IsNullOrWhiteSpace(mission.MissionId));
+        foreach (var mission in state.DailyMissions.Missions)
+            mission.Progress = Math.Max(0, mission.Progress);
 
         if (!double.IsFinite(state.GardenIncomeCoinRemainder) ||
             state.GardenIncomeCoinRemainder < 0.0 ||
