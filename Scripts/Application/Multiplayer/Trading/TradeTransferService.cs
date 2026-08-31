@@ -134,6 +134,8 @@ public sealed class TradeTransferService
             return TradeLocalOperationResult.Failed(error!);
         if (!ValidateIncomingBundle(state, incomingBundle, out error))
             return TradeLocalOperationResult.Failed(error!);
+        if (!ValidateGardenCapacity(state, outgoingAssets, incomingBundle, out error))
+            return TradeLocalOperationResult.Failed(error!);
 
         state.PendingTradeJournal.Add(new PendingTradeJournalEntry(
             tradeId,
@@ -168,6 +170,8 @@ public sealed class TradeTransferService
         if (!ValidateOutgoingReferences(state, journal.OutgoingAssets, tradeId, out var error))
             return TradeLocalOperationResult.Failed(error!);
         if (!ValidateIncomingBundle(state, journal.IncomingBundle, out error))
+            return TradeLocalOperationResult.Failed(error!);
+        if (!ValidateGardenCapacity(state, journal.OutgoingAssets, journal.IncomingBundle, out error))
             return TradeLocalOperationResult.Failed(error!);
 
         // Every mutation that can fail is validated above. Merge ancestry before inserting assets;
@@ -339,6 +343,26 @@ public sealed class TradeTransferService
         }
 
         return _lineage.CanMerge(state, lineage, out error);
+    }
+
+    private bool ValidateGardenCapacity(
+        GameStateData state,
+        IReadOnlyCollection<TradeAssetReference> outgoingAssets,
+        TradeTransferBundle incomingBundle,
+        out string? error)
+    {
+        var maxPopulation = Math.Max(1, _rules.Garden.MaxPopulation);
+        var outgoingVoidlings = outgoingAssets.Count(asset => asset.Kind == TradeAssetKind.Voidling);
+        var incomingVoidlings = incomingBundle.Voidlings?.Length ?? 0;
+        var resultingPopulation = state.Voidlings.Count - outgoingVoidlings + incomingVoidlings;
+        if (resultingPopulation <= maxPopulation)
+        {
+            error = null;
+            return true;
+        }
+
+        error = $"The Garden is full. Make room before receiving more Voidlings (maximum {maxPopulation}).";
+        return false;
     }
 
     private bool ValidateOutgoingReferences(

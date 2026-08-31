@@ -24,6 +24,7 @@ public sealed record CreatureCareRiskEvent(string CreatureId, string Name) : Gam
 public sealed record CreaturePassiveTrainingCappedEvent(string CreatureId, string Name, string StatId) : GameSimulationEvent;
 public sealed record CreatureHatchedEvent(string EggId, string CreatureId, string Name) : GameSimulationEvent;
 public sealed record EggFailedEvent(string EggId) : GameSimulationEvent;
+public sealed record EggWaitingForGardenSpaceEvent(string EggId) : GameSimulationEvent;
 
 public sealed record SimulationStepResult(bool Changed, IReadOnlyList<GameSimulationEvent> Events);
 
@@ -75,6 +76,11 @@ public sealed class AdvanceSimulationUseCase
         var hatchQueue = new List<EggData>();
         foreach (var egg in state.OwnedEggs)
         {
+            if (egg.State == EggState.WaitingForSpace)
+            {
+                hatchQueue.Add(egg);
+                continue;
+            }
             if (egg.State != EggState.Incubating)
                 continue;
 
@@ -90,11 +96,25 @@ public sealed class AdvanceSimulationUseCase
             {
                 egg.State = EggState.Failed;
                 egg.FailureResolved = true;
+                changed = true;
                 events.Add(new EggFailedEvent(egg.Id));
                 continue;
             }
 
+            var maxPopulation = Math.Max(1, _rules.Garden.MaxPopulation);
+            if (state.Voidlings.Count >= maxPopulation)
+            {
+                if (egg.State != EggState.WaitingForSpace)
+                {
+                    egg.State = EggState.WaitingForSpace;
+                    changed = true;
+                    events.Add(new EggWaitingForGardenSpaceEvent(egg.Id));
+                }
+                continue;
+            }
+
             var creature = Hatch(state, egg);
+            changed = true;
             events.Add(new CreatureHatchedEvent(egg.Id, creature.Id, creature.Name));
         }
 

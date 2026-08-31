@@ -10,8 +10,9 @@ public enum EggSource
 
 public enum EggState
 {
-    Incubating,
-    Failed
+    Incubating = 0,
+    Failed = 1,
+    WaitingForSpace = 2
 }
 
 public sealed class EggData

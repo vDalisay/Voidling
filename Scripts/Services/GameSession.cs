@@ -155,6 +155,13 @@ public partial class GameSession : Node
                     RaiseGardenEvent(message);
                     break;
                 }
+                case EggWaitingForGardenSpaceEvent:
+                {
+                    const string message = "The Garden is full. Say goodbye to a Voidling before this egg can hatch.";
+                    ToastRequested?.Invoke(message);
+                    RaiseGardenEvent(message);
+                    break;
+                }
             }
         }
 
