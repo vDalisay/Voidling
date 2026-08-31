@@ -43,7 +43,8 @@ public sealed class SettingsUseCase
         Action<GameStateData, float> write)
     {
         ArgumentNullException.ThrowIfNull(state);
-        var clamped = Math.Clamp(value, 0.0f, 1.0f);
+        // Match save migration: a non-finite external value must never poison the live state.
+        var clamped = float.IsFinite(value) ? Math.Clamp(value, 0.0f, 1.0f) : 1.0f;
         if (Math.Abs(read(state) - clamped) < 0.0001f)
             return false;
 

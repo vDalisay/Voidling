@@ -46,14 +46,15 @@ public sealed record GardenModuleRules(
     IReadOnlyList<int> UpgradeCosts,
     IReadOnlyList<float> PointsPerMinuteByLevel)
 {
-    public int MaxLevel => Math.Max(1, PointsPerMinuteByLevel.Count);
+    // A level above the available upgrade-cost table would otherwise become a silent free upgrade.
+    public int MaxLevel => Math.Max(1, Math.Min(PointsPerMinuteByLevel.Count, UpgradeCosts.Count + 1));
 
     public float PointsPerMinuteForLevel(int level)
     {
         if (PointsPerMinuteByLevel.Count == 0)
             return 0.0f;
 
-        var index = Math.Clamp(level, 1, PointsPerMinuteByLevel.Count) - 1;
+        var index = Math.Clamp(level, 1, MaxLevel) - 1;
         return Math.Max(0.0f, PointsPerMinuteByLevel[index]);
     }
 
@@ -65,7 +66,7 @@ public sealed record GardenModuleRules(
 
         var index = targetLevel - 2;
         if (index < 0 || index >= UpgradeCosts.Count)
-            return 0;
+            return -1;
         return Math.Max(0, UpgradeCosts[index]);
     }
 }
@@ -98,8 +99,9 @@ public sealed record ReincarnationRules(
 
 public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice, int EggShellSalePrice)
 {
-    // Prototype cadence only. Product explicitly leaves exact rotation timing open for tuning.
+    // Prototype cadence/slot count only. Product explicitly leaves exact shop tuning open.
     public float EggRotationIntervalSeconds { get; init; } = 3600.0f;
+    public int StoreEggSlotCount { get; init; } = 3;
 }
 
 public sealed record EconomyRules(float GardenCoinsPerMinute);
@@ -163,23 +165,20 @@ public sealed record GameBalanceRules(
     RaceRules Racing)
 {
     // Product requires a hard Garden population cap, but its final number is still tuning data.
-    // Keep the prototype default authorable instead of baking the value into any use case or UI.
     public GardenRules Garden { get; init; } = new(MaxPopulation: 8);
 
     // Exact Garden geometry/rates/costs remain unresolved. These prototype values exist so the
-    // purchase/place/upgrade contract can ship without turning tuning guesses into code constants.
+    // purchase/place/upgrade contract can ship without turning tuning guesses into use-case constants.
     public GardenModuleRules GardenModules { get; init; } = new(
         SlotCount: 4,
         PurchaseCost: 40,
         UpgradeCosts: Array.AsReadOnly(new[] { 25, 50 }),
         PointsPerMinuteByLevel: Array.AsReadOnly(new[] { 1.0f, 1.5f, 2.0f }));
 
-    // Daily-chain values are prototype balance only. The chain/cadence is the system contract; the
-    // actual reward table stays authorable so product tuning can replace these values without code.
+    // Daily-chain values are prototype balance only. The system contract is stable; reward values
+    // remain replaceable through the configured balance resource.
     public DailyLoginRules DailyLogin { get; init; } = new(Array.AsReadOnly(new[] { 5, 7, 9, 12, 15, 20, 30 }));
 
-    // Mission IDs/event semantics are stable gameplay data; targets/rewards are prototype tuning.
-    // Player-facing mission wording belongs to Presentation rather than authoritative Domain rules.
     public DailyMissionRules DailyMissions { get; init; } = new(
         MissionsPerDay: 3,
         Definitions: Array.AsReadOnly(new[]
@@ -216,6 +215,7 @@ public sealed record GameBalanceRules(
         TreatEnergyGain: 2.0f,
         TreatNourishmentGain: 8.0f,
         TreatHappinessGain: 2.0f);
+    public CareInteractionRules CareInteractions { get; init; } = CareInteractionRules.DemoDefaults;
 
     public static GameBalanceRules DemoDefaults { get; } = new(
         Genetics: new GeneticsRules(

@@ -27,6 +27,26 @@ public sealed class SettingsArchitectureTests
     }
 
     [Fact]
+    public void AudioVolumes_NormalizeNonFiniteInputWithoutPoisoningLiveState()
+    {
+        var settings = new SettingsUseCase();
+        var state = new GameStateData
+        {
+            MasterVolume = 0.25f,
+            SoundEffectVolume = 0.5f,
+            UiSoundVolume = 0.75f
+        };
+
+        Assert.True(settings.SetMasterVolume(state, float.NaN));
+        Assert.True(settings.SetSoundEffectVolume(state, float.PositiveInfinity));
+        Assert.True(settings.SetUiSoundVolume(state, float.NegativeInfinity));
+
+        Assert.Equal(1.0f, state.MasterVolume);
+        Assert.Equal(1.0f, state.SoundEffectVolume);
+        Assert.Equal(1.0f, state.UiSoundVolume);
+    }
+
+    [Fact]
     public void Settings_SameValueIsANoOp()
     {
         var settings = new SettingsUseCase();

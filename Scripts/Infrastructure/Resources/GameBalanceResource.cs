@@ -53,6 +53,10 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "1,3600,1")]
     public float ChildToAdultSeconds { get; set; } = 45.0f;
 
+    [ExportGroup("Garden")]
+    [Export(PropertyHint.Range, "1,64,1")]
+    public int GardenMaxPopulation { get; set; } = 8;
+
     [ExportGroup("Garden Modules")]
     [Export(PropertyHint.Range, "1,12,1")]
     public int GardenModuleSlotCount { get; set; } = 4;
@@ -84,44 +88,58 @@ public partial class GameBalanceResource : Resource
     public float ReincarnationRetainedTrainingFraction { get; set; } = 0.10f;
 
     [ExportGroup("Care / Needs")]
-    [Export(PropertyHint.Range, "0,10,0.05")]
-    public float HungerGainPerMinute { get; set; } = 0.75f;
-    [Export(PropertyHint.Range, "0,10,0.05")]
-    public float EnergyLossPerMinute { get; set; } = 0.45f;
-    [Export(PropertyHint.Range, "0,10,0.05")]
-    public float FatigueGainPerMinute { get; set; } = 0.35f;
-    [Export(PropertyHint.Range, "0,10,0.05")]
-    public float StressRecoveryPerMinute { get; set; } = 0.20f;
-    [Export(PropertyHint.Range, "0,10,0.05")]
-    public float BoredomGainPerMinute { get; set; } = 0.50f;
-    [Export(PropertyHint.Range, "0,10,0.05")]
-    public float LonelinessGainPerMinute { get; set; } = 0.25f;
-    [Export(PropertyHint.Range, "0,10,0.05")]
-    public float NourishmentLossPerMinute { get; set; } = 0.40f;
-    [Export(PropertyHint.Range, "0,10,0.05")]
-    public float ConditionLossPerMinute { get; set; } = 0.05f;
-    [Export(PropertyHint.Range, "0,10,0.05")]
-    public float HappinessLossPerMinute { get; set; } = 0.10f;
-    [Export(PropertyHint.Range, "0,100,0.5")]
-    public float TreatHungerReduction { get; set; } = 12.0f;
-    [Export(PropertyHint.Range, "0,100,0.5")]
-    public float TreatEnergyGain { get; set; } = 2.0f;
-    [Export(PropertyHint.Range, "0,100,0.5")]
-    public float TreatNourishmentGain { get; set; } = 8.0f;
-    [Export(PropertyHint.Range, "0,100,0.5")]
-    public float TreatHappinessGain { get; set; } = 2.0f;
+    [Export(PropertyHint.Range, "0,10,0.05")] public float HungerGainPerMinute { get; set; } = 0.75f;
+    [Export(PropertyHint.Range, "0,10,0.05")] public float EnergyLossPerMinute { get; set; } = 0.45f;
+    [Export(PropertyHint.Range, "0,10,0.05")] public float FatigueGainPerMinute { get; set; } = 0.35f;
+    [Export(PropertyHint.Range, "0,10,0.05")] public float StressRecoveryPerMinute { get; set; } = 0.20f;
+    [Export(PropertyHint.Range, "0,10,0.05")] public float BoredomGainPerMinute { get; set; } = 0.50f;
+    [Export(PropertyHint.Range, "0,10,0.05")] public float LonelinessGainPerMinute { get; set; } = 0.25f;
+    [Export(PropertyHint.Range, "0,10,0.05")] public float NourishmentLossPerMinute { get; set; } = 0.40f;
+    [Export(PropertyHint.Range, "0,10,0.05")] public float ConditionLossPerMinute { get; set; } = 0.05f;
+    [Export(PropertyHint.Range, "0,10,0.05")] public float HappinessLossPerMinute { get; set; } = 0.10f;
+    [Export(PropertyHint.Range, "0,100,0.5")] public float TreatHungerReduction { get; set; } = 12.0f;
+    [Export(PropertyHint.Range, "0,100,0.5")] public float TreatEnergyGain { get; set; } = 2.0f;
+    [Export(PropertyHint.Range, "0,100,0.5")] public float TreatNourishmentGain { get; set; } = 8.0f;
+    [Export(PropertyHint.Range, "0,100,0.5")] public float TreatHappinessGain { get; set; } = 2.0f;
+    [Export(PropertyHint.Range, "0,100,0.5")] public float PetHappinessGain { get; set; } = 2.0f;
+    [Export(PropertyHint.Range, "0,100,0.5")] public float PetStressReduction { get; set; } = 4.0f;
+    [Export(PropertyHint.Range, "0,100,0.5")] public float PetBoredomReduction { get; set; } = 5.0f;
+    [Export(PropertyHint.Range, "0,100,0.5")] public float PetLonelinessReduction { get; set; } = 8.0f;
+    [Export(PropertyHint.Range, "0,100,0.5")] public float ThrowHappinessLoss { get; set; } = 3.0f;
+    [Export(PropertyHint.Range, "0,100,0.5")] public float ThrowStressGain { get; set; } = 12.0f;
 
     [ExportGroup("Economy")]
     [Export(PropertyHint.Range, "0,100,0.1")]
     public float GardenCoinsPerMinute { get; set; } = 1.0f;
 
+    [ExportGroup("Daily Rewards")]
+    [Export(PropertyHint.Range, "0,10000,1")] public int DailyLoginDay1Reward { get; set; } = 5;
+    [Export(PropertyHint.Range, "0,10000,1")] public int DailyLoginDay2Reward { get; set; } = 7;
+    [Export(PropertyHint.Range, "0,10000,1")] public int DailyLoginDay3Reward { get; set; } = 9;
+    [Export(PropertyHint.Range, "0,10000,1")] public int DailyLoginDay4Reward { get; set; } = 12;
+    [Export(PropertyHint.Range, "0,10000,1")] public int DailyLoginDay5Reward { get; set; } = 15;
+    [Export(PropertyHint.Range, "0,10000,1")] public int DailyLoginDay6Reward { get; set; } = 20;
+    [Export(PropertyHint.Range, "0,10000,1")] public int DailyLoginDay7Reward { get; set; } = 30;
+    [Export(PropertyHint.Range, "1,6,1")] public int DailyMissionsPerDay { get; set; } = 3;
+    [Export(PropertyHint.Range, "1,100,1")] public int DailyPetTarget { get; set; } = 2;
+    [Export(PropertyHint.Range, "0,10000,1")] public int DailyPetReward { get; set; } = 8;
+    [Export(PropertyHint.Range, "1,100,1")] public int DailyTrainTarget { get; set; } = 1;
+    [Export(PropertyHint.Range, "0,10000,1")] public int DailyTrainReward { get; set; } = 10;
+    [Export(PropertyHint.Range, "1,100,1")] public int DailyBreedTarget { get; set; } = 1;
+    [Export(PropertyHint.Range, "0,10000,1")] public int DailyBreedReward { get; set; } = 12;
+    [Export(PropertyHint.Range, "1,100,1")] public int DailyHatchTarget { get; set; } = 1;
+    [Export(PropertyHint.Range, "0,10000,1")] public int DailyHatchReward { get; set; } = 15;
+    [Export(PropertyHint.Range, "1,100,1")] public int DailyRaceTarget { get; set; } = 1;
+    [Export(PropertyHint.Range, "0,10000,1")] public int DailyRaceReward { get; set; } = 12;
+    [Export(PropertyHint.Range, "1,100,1")] public int DailyShopTarget { get; set; } = 1;
+    [Export(PropertyHint.Range, "0,10000,1")] public int DailyShopReward { get; set; } = 8;
+
     [ExportGroup("Shop")]
-    [Export(PropertyHint.Range, "0,10000,1")]
-    public int StoreEggPrice { get; set; } = 30;
-    [Export(PropertyHint.Range, "0,10000,1")]
-    public int TrainingItemPrice { get; set; } = 8;
-    [Export(PropertyHint.Range, "60,86400,60")]
-    public float EggRotationIntervalSeconds { get; set; } = 3600.0f;
+    [Export(PropertyHint.Range, "1,12,1")] public int StoreEggSlotCount { get; set; } = 3;
+    [Export(PropertyHint.Range, "0,10000,1")] public int StoreEggPrice { get; set; } = 30;
+    [Export(PropertyHint.Range, "0,10000,1")] public int TrainingItemPrice { get; set; } = 8;
+    [Export(PropertyHint.Range, "0,10000,1")] public int EggShellSalePrice { get; set; } = 5;
+    [Export(PropertyHint.Range, "60,86400,60")] public float EggRotationIntervalSeconds { get; set; } = 3600.0f;
 
     public GameBalanceRules ToDomainRules()
     {
@@ -138,8 +156,8 @@ public partial class GameBalanceResource : Resource
                 RareTraitTransmissionChance = Probability(RareTraitTransmissionChance),
                 RelatedAncestorDepth = Math.Max(1, RelatedAncestorDepth)
             },
-            Breeding = defaults.Breeding with { CooldownSeconds = Math.Max(0.0f, BreedCooldownSeconds) },
-            Hatching = defaults.Hatching with { IncubationSeconds = Math.Max(0.1f, EggIncubationSeconds) },
+            Breeding = defaults.Breeding with { CooldownSeconds = NonNegative(BreedCooldownSeconds) },
+            Hatching = defaults.Hatching with { IncubationSeconds = Positive(EggIncubationSeconds, 0.1f) },
             Stats = defaults.Stats with
             {
                 TrainingPointsPerLevel = Math.Max(1, TrainingPointsPerLevel),
@@ -147,35 +165,26 @@ public partial class GameBalanceResource : Resource
                 MaxTrainingPoints = maxTrainingPoints,
                 RankCaps = BuildRankCaps(maxTrainingPoints)
             },
-            PassiveTraining = defaults.PassiveTraining with
-            {
-                PointsPerMinute = NonNegative(PassiveTrainingPointsPerMinute)
-            },
+            PassiveTraining = defaults.PassiveTraining with { PointsPerMinute = NonNegative(PassiveTrainingPointsPerMinute) },
+            Garden = defaults.Garden with { MaxPopulation = Math.Clamp(GardenMaxPopulation, 1, 64) },
             GardenModules = new GardenModuleRules(
-                SlotCount: Math.Max(1, GardenModuleSlotCount),
+                SlotCount: Math.Clamp(GardenModuleSlotCount, 1, 12),
                 PurchaseCost: Math.Max(0, GardenModulePurchaseCost),
-                UpgradeCosts: Array.AsReadOnly(new[]
-                {
-                    Math.Max(0, GardenModuleLevel2UpgradeCost),
-                    Math.Max(0, GardenModuleLevel3UpgradeCost)
-                }),
+                UpgradeCosts: Array.AsReadOnly(new[] { Math.Max(0, GardenModuleLevel2UpgradeCost), Math.Max(0, GardenModuleLevel3UpgradeCost) }),
                 PointsPerMinuteByLevel: Array.AsReadOnly(new[]
                 {
                     NonNegative(GardenModuleLevel1PointsPerMinute),
                     NonNegative(GardenModuleLevel2PointsPerMinute),
                     NonNegative(GardenModuleLevel3PointsPerMinute)
                 })),
-            Lifecycle = defaults.Lifecycle with { ChildToAdultSeconds = Math.Max(0.1f, ChildToAdultSeconds) },
-            Evolution = defaults.Evolution with
-            {
-                SpecializationThreshold = Math.Clamp(EvolutionSpecializationThreshold, 0.0f, 1.0f)
-            },
+            Lifecycle = defaults.Lifecycle with { ChildToAdultSeconds = Positive(ChildToAdultSeconds, 0.1f) },
+            Evolution = defaults.Evolution with { SpecializationThreshold = ClampFinite(EvolutionSpecializationThreshold, 0.0f, 1.0f, 0.50f) },
             Reincarnation = defaults.Reincarnation with
             {
-                AdultLifespanSeconds = Math.Max(1.0f, AdultLifespanSeconds),
-                MinimumHappiness = Math.Clamp(ReincarnationMinimumHappiness, 0.0f, 100.0f),
-                MaximumStress = Math.Clamp(ReincarnationMaximumStress, 0.0f, 100.0f),
-                RetainedTrainingFraction = Math.Clamp(ReincarnationRetainedTrainingFraction, 0.0f, 1.0f)
+                AdultLifespanSeconds = Positive(AdultLifespanSeconds, 1.0f),
+                MinimumHappiness = ClampFinite(ReincarnationMinimumHappiness, 0.0f, 100.0f, 10.0f),
+                MaximumStress = ClampFinite(ReincarnationMaximumStress, 0.0f, 100.0f, 70.0f),
+                RetainedTrainingFraction = ClampFinite(ReincarnationRetainedTrainingFraction, 0.0f, 1.0f, 0.10f)
             },
             Needs = defaults.Needs with
             {
@@ -193,12 +202,37 @@ public partial class GameBalanceResource : Resource
                 TreatNourishmentGain = NonNegative(TreatNourishmentGain),
                 TreatHappinessGain = NonNegative(TreatHappinessGain)
             },
+            CareInteractions = new CareInteractionRules(
+                NonNegative(PetHappinessGain),
+                NonNegative(PetStressReduction),
+                NonNegative(PetBoredomReduction),
+                NonNegative(PetLonelinessReduction),
+                NonNegative(ThrowHappinessLoss),
+                NonNegative(ThrowStressGain)),
             Economy = defaults.Economy with { GardenCoinsPerMinute = NonNegative(GardenCoinsPerMinute) },
+            DailyLogin = new DailyLoginRules(Array.AsReadOnly(new[]
+            {
+                Math.Max(0, DailyLoginDay1Reward), Math.Max(0, DailyLoginDay2Reward), Math.Max(0, DailyLoginDay3Reward),
+                Math.Max(0, DailyLoginDay4Reward), Math.Max(0, DailyLoginDay5Reward), Math.Max(0, DailyLoginDay6Reward), Math.Max(0, DailyLoginDay7Reward)
+            })),
+            DailyMissions = new DailyMissionRules(
+                MissionsPerDay: Math.Clamp(DailyMissionsPerDay, 1, 6),
+                Definitions: Array.AsReadOnly(new[]
+                {
+                    new DailyMissionDefinition("pet-2", DailyMissionEventKind.PetVoidling, Math.Max(1, DailyPetTarget), Math.Max(0, DailyPetReward)),
+                    new DailyMissionDefinition("train-1", DailyMissionEventKind.UseTrainingTreat, Math.Max(1, DailyTrainTarget), Math.Max(0, DailyTrainReward)),
+                    new DailyMissionDefinition("breed-1", DailyMissionEventKind.BreedEgg, Math.Max(1, DailyBreedTarget), Math.Max(0, DailyBreedReward)),
+                    new DailyMissionDefinition("hatch-1", DailyMissionEventKind.HatchEgg, Math.Max(1, DailyHatchTarget), Math.Max(0, DailyHatchReward)),
+                    new DailyMissionDefinition("race-1", DailyMissionEventKind.CompleteStandardRace, Math.Max(1, DailyRaceTarget), Math.Max(0, DailyRaceReward)),
+                    new DailyMissionDefinition("shop-1", DailyMissionEventKind.PurchaseShopItem, Math.Max(1, DailyShopTarget), Math.Max(0, DailyShopReward))
+                })),
             Shop = defaults.Shop with
             {
                 StoreEggPrice = Math.Max(0, StoreEggPrice),
+                StoreEggSlotCount = Math.Clamp(StoreEggSlotCount, 1, 12),
                 TrainingItemPrice = Math.Max(0, TrainingItemPrice),
-                EggRotationIntervalSeconds = Math.Max(1.0f, EggRotationIntervalSeconds)
+                EggShellSalePrice = Math.Max(0, EggShellSalePrice),
+                EggRotationIntervalSeconds = Positive(EggRotationIntervalSeconds, 1.0f)
             }
         };
     }
@@ -214,6 +248,15 @@ public partial class GameBalanceResource : Resource
         return new RankTrainingCaps(e, d, c, b, a, s);
     }
 
-    private static double Probability(float value) => Math.Clamp((double)value, 0.0, 1.0);
-    private static float NonNegative(float value) => float.IsFinite(value) ? Math.Max(0.0f, value) : 0.0f;
+    private static double Probability(float value)
+        => float.IsFinite(value) ? Math.Clamp((double)value, 0.0, 1.0) : 0.0;
+
+    private static float NonNegative(float value)
+        => float.IsFinite(value) ? Math.Max(0.0f, value) : 0.0f;
+
+    private static float Positive(float value, float minimum)
+        => float.IsFinite(value) ? Math.Max(minimum, value) : minimum;
+
+    private static float ClampFinite(float value, float minimum, float maximum, float fallback)
+        => float.IsFinite(value) ? Math.Clamp(value, minimum, maximum) : fallback;
 }

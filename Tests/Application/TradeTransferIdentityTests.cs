@@ -3,6 +3,7 @@ using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Stats;
 using VoidlingGame;
 using Xunit;
 
@@ -82,6 +83,77 @@ public sealed class TradeTransferIdentityTests
         Assert.False(result.Success);
         Assert.Contains("identity", result.Error!, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(state.PendingTradeJournal);
+    }
+
+    [Fact]
+    public void BuildTransferBundle_StripsSenderLocalPassiveTrainingStateWithoutMutatingOwnedCreature()
+    {
+        var state = new GameStateData();
+        var creature = CreateAdult("portable", 8UL);
+        creature.PassiveTrainingStatId = "run";
+        creature.PassiveTrainingModuleId = "sender-module";
+        creature.PassiveTrainingPointsPerMinute = 9.0f;
+        creature.PassiveTrainingPointRemainder = 0.75;
+        state.Voidlings.Add(creature);
+        var service = new TradeTransferService(Rules);
+
+        var built = service.TryBuildTransferBundle(
+            state,
+            new[] { new TradeAssetReference(TradeAssetKind.Voidling, creature.Id) },
+            out var bundle,
+            out var error);
+
+        Assert.True(built, error);
+        var transferred = Assert.Single(bundle.Voidlings);
+        Assert.Equal(string.Empty, transferred.PassiveTrainingStatId);
+        Assert.Equal(string.Empty, transferred.PassiveTrainingModuleId);
+        Assert.Equal(0.0f, transferred.PassiveTrainingPointsPerMinute);
+        Assert.Equal(0.0, transferred.PassiveTrainingPointRemainder);
+        Assert.Equal("sender-module", creature.PassiveTrainingModuleId);
+        Assert.Equal(9.0f, creature.PassiveTrainingPointsPerMinute);
+    }
+
+    [Fact]
+    public void CommitPrepared_NormalizesIncomingCareTrainingAndLocalGardenState()
+    {
+        var state = new GameStateData();
+        var creature = CreateAdult("incoming", 9UL);
+        creature.Needs = null!;
+        creature.TrainingPoints["run"] = int.MaxValue;
+        creature.PassiveTrainingStatId = "run";
+        creature.PassiveTrainingModuleId = "remote-module";
+        creature.PassiveTrainingPointsPerMinute = float.PositiveInfinity;
+        creature.PassiveTrainingPointRemainder = double.NaN;
+        creature.DepartureReason = CreatureDepartureReason.Death;
+        var incoming = new TradeTransferBundle(
+            new[] { creature },
+            Array.Empty<EggData>(),
+            new[] { LineageArchiveEntry.FromVoidling(creature) });
+        var service = new TradeTransferService(Rules);
+        var tradeId = Guid.NewGuid().ToString("N");
+
+        var prepared = service.Prepare(
+            state,
+            tradeId,
+            77UL,
+            999UL,
+            "terms-hash",
+            Array.Empty<TradeAssetReference>(),
+            incoming);
+        Assert.True(prepared.Success, prepared.Error);
+
+        var committed = service.CommitPrepared(state, tradeId);
+
+        Assert.True(committed.Success, committed.Error);
+        var received = Assert.Single(state.Voidlings);
+        Assert.NotNull(received.Needs);
+        Assert.Equal(CreatureDepartureReason.None, received.DepartureReason);
+        Assert.Equal(string.Empty, received.PassiveTrainingStatId);
+        Assert.Equal(string.Empty, received.PassiveTrainingModuleId);
+        Assert.Equal(0.0f, received.PassiveTrainingPointsPerMinute);
+        Assert.Equal(0.0, received.PassiveTrainingPointRemainder);
+        var cap = new StatCalculator(Rules.Stats).GetTrainingPointCap(received, "run");
+        Assert.Equal(cap, received.TrainingPoints["run"]);
     }
 
     private static TradeLocalOperationResult Prepare(GameStateData state, TradeTransferBundle incoming)

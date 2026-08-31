@@ -298,7 +298,7 @@ public sealed class AdvanceSimulationUseCase
 
     private void RefreshStoreEggInventory(GameStateData state, long rotations)
     {
-        var slotCount = Math.Max(1, state.StoreEggs.Count);
+        var slotCount = Math.Max(1, _rules.Shop.StoreEggSlotCount);
         var baseCounter = state.SeedCounter;
         var allocations = unchecked(rotations * (long)slotCount);
         var firstFinalOffset = unchecked((rotations - 1L) * slotCount);

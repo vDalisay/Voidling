@@ -21,6 +21,7 @@ public static class GameRules
     private static StatCalculator _stats = new(_balance.Stats);
 
     public static int StoreEggPrice => _balance.Shop.StoreEggPrice;
+    public static int StoreEggSlotCount => Math.Max(1, _balance.Shop.StoreEggSlotCount);
     public static int TrainingItemPrice => _balance.Shop.TrainingItemPrice;
     public static int EggShellSalePrice => _balance.Shop.EggShellSalePrice;
     public static float ShopEggRotationIntervalSeconds => Math.Max(1.0f, _balance.Shop.EggRotationIntervalSeconds);
@@ -35,6 +36,7 @@ public static class GameRules
     public static int MaxStatLevel => _balance.Stats.MaxLevel;
     public static int GardenMaxPopulation => Math.Max(1, _balance.Garden.MaxPopulation);
     public static GardenModuleRules GardenModuleRules => _balance.GardenModules;
+    public static CareInteractionRules CareInteractionRules => _balance.CareInteractions;
     public static IReadOnlyList<int> DailyLoginCoinRewards => _balance.DailyLogin.CoinRewards;
     public static DailyMissionRules DailyMissionRules => _balance.DailyMissions;
 

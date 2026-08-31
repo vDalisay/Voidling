@@ -57,6 +57,25 @@ public sealed class ShopRotationSimulationTests
     }
 
     [Fact]
+    public void Advance_RotationRepairsStoreEggCountToAuthoredSlotCount()
+    {
+        var defaults = RotationRules(10.0f);
+        var rules = defaults with
+        {
+            Shop = defaults.Shop with { StoreEggSlotCount = 4 }
+        };
+        var state = CreateState();
+        state.StoreEggs.RemoveRange(1, state.StoreEggs.Count - 1);
+
+        var result = new AdvanceSimulationUseCase(rules).Advance(state, 10.0f);
+
+        Assert.True(result.Changed);
+        Assert.Equal(4, state.StoreEggs.Count);
+        Assert.Equal(104, state.SeedCounter);
+        Assert.All(state.StoreEggs, egg => Assert.StartsWith("shop-", egg.Id));
+    }
+
+    [Fact]
     public void Advance_MultipleRotationsIsChunkInvariant()
     {
         var rules = RotationRules(10.0f);

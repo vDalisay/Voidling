@@ -5,9 +5,9 @@ namespace VoidlingGame;
 
 public partial class GameSession
 {
-    // Care currently has no save-shape or platform dependency, so its focused Application use case
-    // can remain owned by this transitional facade until the broader session facade is retired.
-    private readonly CareUseCase _care = new(CareInteractionRules.DemoDefaults);
+    // GameRules is configured from the exact same immutable balance resource before GameSession is
+    // constructed, so care interactions cannot silently drift to a separate DemoDefaults ruleset.
+    private readonly CareUseCase _care = new(GameRules.CareInteractionRules);
 
     public bool PetVoidling(string creatureId)
     {

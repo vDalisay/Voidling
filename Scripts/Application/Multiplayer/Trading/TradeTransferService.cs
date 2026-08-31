@@ -4,7 +4,9 @@ using System.Linq;
 using System.Text.Json;
 using Voidling.Application.Breeding;
 using Voidling.Domain.Breeding;
+using Voidling.Domain.Care;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Stats;
 using VoidlingGame;
 
 namespace Voidling.Application.Multiplayer.Trading;
@@ -21,9 +23,14 @@ public sealed class TradeTransferService
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
+    private readonly CreatureNeedsService _needs = new();
+    private readonly StatCalculator _stats;
 
     public TradeTransferService(GameBalanceRules rules)
-        => _rules = rules ?? throw new ArgumentNullException(nameof(rules));
+    {
+        _rules = rules ?? throw new ArgumentNullException(nameof(rules));
+        _stats = new StatCalculator(_rules.Stats);
+    }
 
     public bool TryBuildTransferBundle(
         GameStateData state,
@@ -51,7 +58,9 @@ public sealed class TradeTransferService
                 {
                     var creature = state.Voidlings.First(v =>
                         string.Equals(v.Id, asset.AssetId, StringComparison.Ordinal));
-                    voidlings.Add(Clone(creature));
+                    var transferable = Clone(creature);
+                    NormalizeTransferredCreature(transferable);
+                    voidlings.Add(transferable);
                     lineageRoots.Add(creature.Id);
                     break;
                 }
@@ -185,7 +194,7 @@ public sealed class TradeTransferService
         foreach (var incoming in journal.IncomingBundle.Voidlings)
         {
             var creature = Clone(incoming);
-            NormalizeIncomingCreature(creature);
+            NormalizeTransferredCreature(creature);
             creature.WorldX = 0;
             creature.WorldY = 0;
             state.Voidlings.Add(creature);
@@ -417,19 +426,56 @@ public sealed class TradeTransferService
         return true;
     }
 
-    private void NormalizeIncomingCreature(VoidlingData creature)
+    private void NormalizeTransferredCreature(VoidlingData creature)
     {
+        creature.Genome.AbilityGenes ??= new Dictionary<string, GenePairData>(StringComparer.Ordinal);
         creature.TrainingPoints ??= new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var statId in _rules.Genetics.StatIds)
         {
-            if (!creature.TrainingPoints.ContainsKey(statId))
-                creature.TrainingPoints[statId] = 0;
+            if (!creature.Genome.AbilityGenes.TryGetValue(statId, out var gene) || gene == null)
+            {
+                gene = new GenePairData();
+                creature.Genome.AbilityGenes[statId] = gene;
+            }
+
+            gene.AlleleA = Math.Clamp(gene.AlleleA, 0, 5);
+            gene.AlleleB = Math.Clamp(gene.AlleleB, 0, 5);
+            gene.ExpressedAlleleIndex = gene.ExpressedAlleleIndex == 1 ? 1 : 0;
+
+            creature.TrainingPoints.TryGetValue(statId, out var stored);
+            creature.TrainingPoints[statId] = Math.Clamp(stored, 0, _stats.GetTrainingPointCap(creature, statId));
         }
+
         creature.RareTraits ??= new List<RareTraitData>();
+        creature.Needs ??= new CreatureNeedsState();
+        _needs.Normalize(creature.Needs);
+        creature.Name = string.IsNullOrWhiteSpace(creature.Name) ? "Voidling" : creature.Name;
+        creature.TintHex = string.IsNullOrWhiteSpace(creature.TintHex) ? "#F6F0C9" : creature.TintHex;
+        creature.FamilyGeneration = Math.Max(0, creature.FamilyGeneration);
+        creature.InbreedingBurdenLevel = Math.Max(0, creature.InbreedingBurdenLevel);
+        creature.ReincarnationCount = Math.Max(0, creature.ReincarnationCount);
+        creature.AgeSeconds = NonNegativeFinite(creature.AgeSeconds);
+        creature.AdultAgeSeconds = NonNegativeFinite(creature.AdultAgeSeconds);
+        creature.BreedCooldownSeconds = NonNegativeFinite(creature.BreedCooldownSeconds);
+        creature.SwimFlyInfluence = FiniteOrZero(creature.SwimFlyInfluence);
+        creature.RunPowerInfluence = FiniteOrZero(creature.RunPowerInfluence);
+        creature.EvolutionMagnitude = NonNegativeFinite(creature.EvolutionMagnitude);
+        creature.DepartureReason = CreatureDepartureReason.None;
+
+        // Passive training is local Garden management state. It must never cross ownership or keep
+        // earning against a module that only exists in the sender's save.
+        creature.PassiveTrainingStatId = string.Empty;
+        creature.PassiveTrainingModuleId = string.Empty;
+        creature.PassiveTrainingPointsPerMinute = 0.0f;
+        creature.PassiveTrainingPointRemainder = 0.0;
     }
 
     private static void NormalizeIncomingEgg(EggData egg)
-        => egg.RareTraits ??= new List<RareTraitData>();
+    {
+        egg.RareTraits ??= new List<RareTraitData>();
+        egg.InbreedingBurdenLevel = Math.Max(0, egg.InbreedingBurdenLevel);
+        egg.TintHex = string.IsNullOrWhiteSpace(egg.TintHex) ? "#F6F0C9" : egg.TintHex;
+    }
 
     private static bool IsValidIncomingCreature(VoidlingData? creature)
         => creature != null &&
@@ -445,7 +491,9 @@ public sealed class TradeTransferService
            egg.Id.Length <= 128 &&
            egg.Genome != null &&
            egg.FamilyGeneration >= 0 &&
+           float.IsFinite(egg.RequiredIncubationSeconds) &&
            egg.RequiredIncubationSeconds >= 0 &&
+           float.IsFinite(egg.IncubationSeconds) &&
            egg.IncubationSeconds >= 0 &&
            Enum.IsDefined(egg.Source) &&
            Enum.IsDefined(egg.State);
@@ -498,6 +546,12 @@ public sealed class TradeTransferService
 
     private static bool IsValidTradeId(string tradeId)
         => !string.IsNullOrWhiteSpace(tradeId) && Guid.TryParse(tradeId, out _);
+
+    private static float NonNegativeFinite(float value)
+        => float.IsFinite(value) ? Math.Max(0.0f, value) : 0.0f;
+
+    private static float FiniteOrZero(float value)
+        => float.IsFinite(value) ? value : 0.0f;
 
     private static T Clone<T>(T value)
     {

@@ -53,6 +53,12 @@ public sealed class GameStateMigrationService
         state.DailyMissions ??= new DailyMissionStateData();
         state.DailyMissions.Missions ??= new List<DailyMissionProgressData>();
 
+        state.Voidlings.RemoveAll(static creature => creature is null);
+        state.DepartedVoidlings.RemoveAll(static creature => creature is null);
+        state.OwnedEggs.RemoveAll(static egg => egg is null);
+        state.StoreEggs.RemoveAll(static egg => egg is null);
+        state.EggShells.RemoveAll(static shell => shell is null);
+
         if (previousVersion < 4)
         {
             state.MasterVolume = 1.0f;
@@ -80,47 +86,25 @@ public sealed class GameStateMigrationService
         {
             if (!state.TrainingItems.ContainsKey(statId))
                 state.TrainingItems[statId] = 0;
+            state.TrainingItems[statId] = Math.Max(0, state.TrainingItems[statId]);
         }
 
         NormalizeGardenModules(state);
 
         foreach (var creature in state.Voidlings.Concat(state.DepartedVoidlings))
-        {
-            creature.TrainingPoints ??= new Dictionary<string, int>(StringComparer.Ordinal);
-            foreach (var statId in _rules.Genetics.StatIds)
-            {
-                if (!creature.TrainingPoints.ContainsKey(statId))
-                    creature.TrainingPoints[statId] = 0;
-
-                creature.TrainingPoints[statId] = Math.Clamp(
-                    creature.TrainingPoints[statId],
-                    0,
-                    _stats.GetTrainingPointCap(creature, statId));
-            }
-
-            creature.RareTraits ??= new List<RareTraitData>();
-            creature.Needs ??= new CreatureNeedsState();
-            _needs.Normalize(creature.Needs);
-
-            if (!_rules.Genetics.StatIds.Contains(creature.PassiveTrainingStatId ?? string.Empty))
-            {
-                creature.PassiveTrainingStatId = string.Empty;
-                creature.PassiveTrainingModuleId = string.Empty;
-                creature.PassiveTrainingPointsPerMinute = 0.0f;
-                creature.PassiveTrainingPointRemainder = 0.0;
-            }
-            else if (!double.IsFinite(creature.PassiveTrainingPointRemainder) ||
-                     creature.PassiveTrainingPointRemainder < 0.0 ||
-                     creature.PassiveTrainingPointRemainder >= 1.0)
-            {
-                creature.PassiveTrainingPointRemainder = 0.0;
-            }
-
-            NormalizePassiveModuleAssignment(state, creature);
-        }
+            NormalizeCreature(state, creature);
 
         foreach (var egg in state.OwnedEggs.Concat(state.StoreEggs))
+        {
+            egg.Genome ??= new GenomeData();
+            egg.Genome.AbilityGenes ??= new Dictionary<string, GenePairData>(StringComparer.Ordinal);
+            NormalizeGenome(egg.Genome);
             egg.RareTraits ??= new List<RareTraitData>();
+            egg.IncubationSeconds = NonNegativeFinite(egg.IncubationSeconds);
+            egg.RequiredIncubationSeconds = NonNegativeFinite(egg.RequiredIncubationSeconds);
+            egg.FamilyGeneration = Math.Max(0, egg.FamilyGeneration);
+            egg.InbreedingBurdenLevel = Math.Max(0, egg.InbreedingBurdenLevel);
+        }
 
         _lineage.EnsureCurrentEntries(state);
 
@@ -175,6 +159,72 @@ public sealed class GameStateMigrationService
         }
 
         state.SaveVersion = CurrentSaveVersion;
+    }
+
+    private void NormalizeCreature(GameStateData state, VoidlingData creature)
+    {
+        creature.Id ??= string.Empty;
+        creature.Name = string.IsNullOrWhiteSpace(creature.Name) ? "Voidling" : creature.Name;
+        creature.Genome ??= new GenomeData();
+        creature.Genome.AbilityGenes ??= new Dictionary<string, GenePairData>(StringComparer.Ordinal);
+        NormalizeGenome(creature.Genome);
+        creature.TrainingPoints ??= new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (var statId in _rules.Genetics.StatIds)
+        {
+            if (!creature.TrainingPoints.ContainsKey(statId))
+                creature.TrainingPoints[statId] = 0;
+
+            creature.TrainingPoints[statId] = Math.Clamp(
+                creature.TrainingPoints[statId],
+                0,
+                _stats.GetTrainingPointCap(creature, statId));
+        }
+
+        creature.RareTraits ??= new List<RareTraitData>();
+        creature.Needs ??= new CreatureNeedsState();
+        _needs.Normalize(creature.Needs);
+        creature.FamilyGeneration = Math.Max(0, creature.FamilyGeneration);
+        creature.InbreedingBurdenLevel = Math.Max(0, creature.InbreedingBurdenLevel);
+        creature.ReincarnationCount = Math.Max(0, creature.ReincarnationCount);
+        creature.AgeSeconds = NonNegativeFinite(creature.AgeSeconds);
+        creature.AdultAgeSeconds = NonNegativeFinite(creature.AdultAgeSeconds);
+        creature.BreedCooldownSeconds = NonNegativeFinite(creature.BreedCooldownSeconds);
+        creature.SwimFlyInfluence = FiniteOrZero(creature.SwimFlyInfluence);
+        creature.RunPowerInfluence = FiniteOrZero(creature.RunPowerInfluence);
+        creature.EvolutionMagnitude = NonNegativeFinite(creature.EvolutionMagnitude);
+
+        if (!_rules.Genetics.StatIds.Contains(creature.PassiveTrainingStatId ?? string.Empty))
+        {
+            creature.PassiveTrainingStatId = string.Empty;
+            creature.PassiveTrainingModuleId = string.Empty;
+            creature.PassiveTrainingPointsPerMinute = 0.0f;
+            creature.PassiveTrainingPointRemainder = 0.0;
+        }
+        else if (!double.IsFinite(creature.PassiveTrainingPointRemainder) ||
+                 creature.PassiveTrainingPointRemainder < 0.0 ||
+                 creature.PassiveTrainingPointRemainder >= 1.0)
+        {
+            creature.PassiveTrainingPointRemainder = 0.0;
+        }
+
+        NormalizePassiveModuleAssignment(state, creature);
+    }
+
+    private void NormalizeGenome(GenomeData genome)
+    {
+        foreach (var statId in _rules.Genetics.StatIds)
+        {
+            if (!genome.AbilityGenes.TryGetValue(statId, out var gene) || gene == null)
+            {
+                gene = new GenePairData();
+                genome.AbilityGenes[statId] = gene;
+            }
+
+            gene.AlleleA = Math.Clamp(gene.AlleleA, 0, 5);
+            gene.AlleleB = Math.Clamp(gene.AlleleB, 0, 5);
+            gene.ExpressedAlleleIndex = gene.ExpressedAlleleIndex == 1 ? 1 : 0;
+        }
     }
 
     private void NormalizeGardenModules(GameStateData state)
@@ -242,4 +292,10 @@ public sealed class GameStateMigrationService
 
     private static float NormalizeVolume(float volume)
         => float.IsFinite(volume) ? Math.Clamp(volume, 0.0f, 1.0f) : 1.0f;
+
+    private static float NonNegativeFinite(float value)
+        => float.IsFinite(value) ? Math.Max(0.0f, value) : 0.0f;
+
+    private static float FiniteOrZero(float value)
+        => float.IsFinite(value) ? value : 0.0f;
 }

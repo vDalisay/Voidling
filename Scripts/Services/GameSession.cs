@@ -250,7 +250,10 @@ public partial class GameSession : Node
             }
         }
 
-        while (State.StoreEggs.Count < 3)
+        var storeEggSlotCount = GameRules.StoreEggSlotCount;
+        if (State.StoreEggs.Count > storeEggSlotCount)
+            State.StoreEggs.RemoveRange(storeEggSlotCount, State.StoreEggs.Count - storeEggSlotCount);
+        while (State.StoreEggs.Count < storeEggSlotCount)
             State.StoreEggs.Add(CreateStoreEgg());
 
         EnsureAngelMutation();
@@ -279,7 +282,7 @@ public partial class GameSession : Node
         State.Voidlings.Add(CreateStarter("Mallow", "#A9D5C0", StarterSpawnPosition(1)));
         EnsureAngelMutation();
 
-        for (var i = 0; i < 3; i++)
+        for (var i = 0; i < GameRules.StoreEggSlotCount; i++)
             State.StoreEggs.Add(CreateStoreEgg());
 
         return State;

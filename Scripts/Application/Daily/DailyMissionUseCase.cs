@@ -162,8 +162,10 @@ public sealed class DailyMissionUseCase
         for (var i = state.Missions.Count - 1; i >= 0; i--)
         {
             var mission = state.Missions[i];
-            if (mission == null || !definitions.TryGetValue(mission.MissionId ?? string.Empty, out var definition) ||
-                !seen.Add(mission.MissionId))
+            var missionId = mission?.MissionId;
+            if (mission == null || string.IsNullOrWhiteSpace(missionId) ||
+                !definitions.TryGetValue(missionId, out var definition) ||
+                !seen.Add(missionId))
             {
                 state.Missions.RemoveAt(i);
                 changed = true;

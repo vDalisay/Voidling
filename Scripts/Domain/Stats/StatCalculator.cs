@@ -14,7 +14,10 @@ public sealed class StatCalculator
     }
 
     public int GetTrainingPoints(VoidlingData data, string statId)
-        => data.TrainingPoints.TryGetValue(statId, out var points) ? points : 0;
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        return data.TrainingPoints != null && data.TrainingPoints.TryGetValue(statId, out var points) ? points : 0;
+    }
 
     public int GetTrainingPointCap(VoidlingData data, string statId)
     {
@@ -45,5 +48,15 @@ public sealed class StatCalculator
     }
 
     public static GenePairData GetGene(VoidlingData data, string statId)
-        => data.Genome.AbilityGenes.TryGetValue(statId, out var gene) ? gene : new GenePairData();
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        if (data.Genome?.AbilityGenes != null &&
+            data.Genome.AbilityGenes.TryGetValue(statId, out var gene) &&
+            gene != null)
+        {
+            return gene;
+        }
+
+        return new GenePairData();
+    }
 }
