@@ -122,8 +122,8 @@ public sealed class TradeTransferIdentityTests
         creature.TrainingPoints["run"] = int.MaxValue;
         creature.PassiveTrainingStatId = "run";
         creature.PassiveTrainingModuleId = "remote-module";
-        creature.PassiveTrainingPointsPerMinute = float.PositiveInfinity;
-        creature.PassiveTrainingPointRemainder = double.NaN;
+        creature.PassiveTrainingPointsPerMinute = 9.0f;
+        creature.PassiveTrainingPointRemainder = 0.75;
         creature.DepartureReason = CreatureDepartureReason.Death;
         var incoming = new TradeTransferBundle(
             new[] { creature },
