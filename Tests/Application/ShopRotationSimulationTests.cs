@@ -19,7 +19,10 @@ public sealed class ShopRotationSimulationTests
 
         var result = new AdvanceSimulationUseCase(rules).Advance(state, 9.0f);
 
-        Assert.True(result.Changed);
+        // Like the fractional Garden-income remainder, countdown-only progress does not advertise a
+        // meaningful simulation transition through Changed. It is persisted opportunistically with
+        // other state changes; an actual egg rotation returns Changed=true.
+        Assert.False(result.Changed);
         Assert.Equal(9.0, state.ShopEggRotationElapsedSeconds, 5);
         Assert.Equal(originalIds, state.StoreEggs.Select(egg => egg.Id).ToArray());
         Assert.Equal(100, state.SeedCounter);
@@ -39,8 +42,9 @@ public sealed class ShopRotationSimulationTests
         };
         state.OwnedEggs.Add(owned);
 
-        new AdvanceSimulationUseCase(rules).Advance(state, 10.0f);
+        var result = new AdvanceSimulationUseCase(rules).Advance(state, 10.0f);
 
+        Assert.True(result.Changed);
         Assert.Equal(0.0, state.ShopEggRotationElapsedSeconds, 5);
         Assert.Equal(103, state.SeedCounter);
         Assert.Equal(3, state.StoreEggs.Count);
