@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Voidling.Application.Daily;
+using Voidling.Application.Garden;
 using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
@@ -13,7 +14,7 @@ namespace VoidlingGame;
 /// </summary>
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 18;
+    public int SaveVersion { get; set; } = 19;
     public int Coins { get; set; } = 120;
     public double GardenIncomeCoinRemainder { get; set; }
     public double ShopEggRotationElapsedSeconds { get; set; }
@@ -25,6 +26,7 @@ public sealed class GameStateData
     public List<EggData> StoreEggs { get; set; } = new();
     public List<EggShellData> EggShells { get; set; } = new();
     public Dictionary<string, int> TrainingItems { get; set; } = new();
+    public List<GardenModuleData> GardenModules { get; set; } = new();
 
     public List<PendingTradeJournalEntry> PendingTradeJournal { get; set; } = new();
     public List<string> AppliedTradeIds { get; set; } = new();

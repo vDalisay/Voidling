@@ -39,7 +39,7 @@ public partial class MainController
         row.AddChild(claim);
 
         var lowerRow = new HBoxContainer();
-        lowerRow.AddThemeConstantOverride("separation", 8);
+        lowerRow.AddThemeConstantOverride("separation", 6);
         column.AddChild(lowerRow);
 
         var cycle = string.Join("  •  ", status.RewardCycle.Select(reward => $"+{reward}"));
@@ -51,8 +51,14 @@ public partial class MainController
         upcoming.TooltipText = "Prototype reward values are balance data and may change before release.";
         lowerRow.AddChild(upcoming);
 
+        var modules = UiFactory.CreateButton("Modules");
+        modules.CustomMinimumSize = new Vector2(70, 19);
+        UiFactory.ApplyPixelFont(modules, 6);
+        modules.Pressed += ShowGardenModules;
+        lowerRow.AddChild(modules);
+
         var missions = UiFactory.CreateButton("Missions");
-        missions.CustomMinimumSize = new Vector2(82, 19);
+        missions.CustomMinimumSize = new Vector2(74, 19);
         UiFactory.ApplyPixelFont(missions, 6);
         missions.Pressed += ShowDailyMissions;
         lowerRow.AddChild(missions);

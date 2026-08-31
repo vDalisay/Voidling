@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Voidling.Application.Garden;
 using Voidling.Domain.Care;
 using Voidling.Domain.Evolution;
 using Voidling.Domain.Rules;
@@ -23,7 +24,19 @@ public enum PassiveTrainingFailure
 {
     None,
     UnknownStat,
-    CreatureNotFound
+    CreatureNotFound,
+    NoPlacedModule
+}
+
+public enum GardenModuleFailure
+{
+    None,
+    UnknownStat,
+    DuplicateModuleId,
+    ModuleNotFound,
+    InvalidSlot,
+    NotEnoughCurrency,
+    MaxLevel
 }
 
 public readonly record struct TrainingPurchaseResult(TrainingFailure Failure)
@@ -44,8 +57,16 @@ public readonly record struct PassiveTrainingAssignmentResult(
     public bool Succeeded => Failure == PassiveTrainingFailure.None;
 }
 
+public readonly record struct GardenModuleMutationResult(
+    GardenModuleFailure Failure,
+    bool Changed,
+    int CoinsSpent = 0)
+{
+    public bool Succeeded => Failure == GardenModuleFailure.None;
+}
+
 /// <summary>
-/// Coordinates active training inventory and persistent passive-training assignments without UI,
+/// Coordinates active training inventory and Garden-backed passive training without UI,
 /// persistence or Godot APIs. Both training paths share the same DNA-rank hard ceiling.
 /// </summary>
 public sealed class TrainingUseCase
@@ -112,6 +133,76 @@ public sealed class TrainingUseCase
         return new TrainingApplicationResult(TrainingFailure.None, appliedGain);
     }
 
+    public GardenModuleMutationResult BuyGardenModule(GameStateData state, string moduleId, string statId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (!_rules.Genetics.StatIds.Contains(statId))
+            return new GardenModuleMutationResult(GardenModuleFailure.UnknownStat, false);
+        if (string.IsNullOrWhiteSpace(moduleId) || state.GardenModules.Any(module => module.Id == moduleId))
+            return new GardenModuleMutationResult(GardenModuleFailure.DuplicateModuleId, false);
+
+        var cost = Math.Max(0, _rules.GardenModules.PurchaseCost);
+        if (state.Coins < cost)
+            return new GardenModuleMutationResult(GardenModuleFailure.NotEnoughCurrency, false);
+
+        state.Coins -= cost;
+        state.GardenModules.Add(new GardenModuleData
+        {
+            Id = moduleId,
+            StatId = statId,
+            Level = 1,
+            SlotIndex = -1
+        });
+        return new GardenModuleMutationResult(GardenModuleFailure.None, true, cost);
+    }
+
+    public GardenModuleMutationResult PlaceGardenModule(GameStateData state, string moduleId, int slotIndex)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (slotIndex < -1 || slotIndex >= Math.Max(1, _rules.GardenModules.SlotCount))
+            return new GardenModuleMutationResult(GardenModuleFailure.InvalidSlot, false);
+
+        var module = state.GardenModules.FirstOrDefault(candidate => candidate.Id == moduleId);
+        if (module == null)
+            return new GardenModuleMutationResult(GardenModuleFailure.ModuleNotFound, false);
+        if (module.SlotIndex == slotIndex)
+            return new GardenModuleMutationResult(GardenModuleFailure.None, false);
+
+        if (slotIndex >= 0)
+        {
+            var occupying = state.GardenModules.FirstOrDefault(candidate =>
+                candidate.Id != module.Id && candidate.SlotIndex == slotIndex);
+            if (occupying != null)
+            {
+                occupying.SlotIndex = module.SlotIndex;
+                RefreshAssignedCreatureRates(state, occupying);
+            }
+        }
+
+        module.SlotIndex = slotIndex;
+        RefreshAssignedCreatureRates(state, module);
+        return new GardenModuleMutationResult(GardenModuleFailure.None, true);
+    }
+
+    public GardenModuleMutationResult UpgradeGardenModule(GameStateData state, string moduleId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var module = state.GardenModules.FirstOrDefault(candidate => candidate.Id == moduleId);
+        if (module == null)
+            return new GardenModuleMutationResult(GardenModuleFailure.ModuleNotFound, false);
+
+        var cost = _rules.GardenModules.UpgradeCostForLevel(module.Level);
+        if (cost < 0)
+            return new GardenModuleMutationResult(GardenModuleFailure.MaxLevel, false);
+        if (state.Coins < cost)
+            return new GardenModuleMutationResult(GardenModuleFailure.NotEnoughCurrency, false);
+
+        state.Coins -= cost;
+        module.Level = Math.Min(_rules.GardenModules.MaxLevel, module.Level + 1);
+        RefreshAssignedCreatureRates(state, module);
+        return new GardenModuleMutationResult(GardenModuleFailure.None, true, cost);
+    }
+
     public PassiveTrainingAssignmentResult SetPassiveTraining(GameStateData state, string creatureId, string? statId)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -123,14 +214,67 @@ public sealed class TrainingUseCase
         if (creature == null)
             return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.CreatureNotFound, string.Empty, false);
 
+        if (requested.Length == 0)
+            return ClearPassiveTraining(creature);
+
+        var module = state.GardenModules
+            .Where(candidate => candidate.SlotIndex >= 0 && string.Equals(candidate.StatId, requested, StringComparison.Ordinal))
+            .OrderByDescending(candidate => candidate.Level)
+            .ThenBy(candidate => candidate.SlotIndex)
+            .ThenBy(candidate => candidate.Id, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (module == null)
+            return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.NoPlacedModule, requested, false);
+
         var changed = !string.Equals(creature.PassiveTrainingStatId, requested, StringComparison.Ordinal) ||
-                      creature.PassiveTrainingPointRemainder != 0.0;
+                      !string.Equals(creature.PassiveTrainingModuleId, module.Id, StringComparison.Ordinal) ||
+                      creature.PassiveTrainingPointRemainder != 0.0 ||
+                      !creature.PassiveTrainingPointsPerMinute.Equals(RateFor(module));
         if (changed)
         {
             creature.PassiveTrainingStatId = requested;
+            creature.PassiveTrainingModuleId = module.Id;
+            creature.PassiveTrainingPointsPerMinute = RateFor(module);
             creature.PassiveTrainingPointRemainder = 0.0;
         }
 
         return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.None, requested, changed);
     }
+
+    private PassiveTrainingAssignmentResult ClearPassiveTraining(VoidlingData creature)
+    {
+        var changed = creature.PassiveTrainingStatId.Length > 0 ||
+                      creature.PassiveTrainingModuleId.Length > 0 ||
+                      creature.PassiveTrainingPointsPerMinute != 0.0f ||
+                      creature.PassiveTrainingPointRemainder != 0.0;
+        if (changed)
+        {
+            creature.PassiveTrainingStatId = string.Empty;
+            creature.PassiveTrainingModuleId = string.Empty;
+            creature.PassiveTrainingPointsPerMinute = 0.0f;
+            creature.PassiveTrainingPointRemainder = 0.0;
+        }
+
+        return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.None, string.Empty, changed);
+    }
+
+    private void RefreshAssignedCreatureRates(GameStateData state, GardenModuleData module)
+    {
+        var rate = RateFor(module);
+        foreach (var creature in state.Voidlings)
+        {
+            if (!string.Equals(creature.PassiveTrainingModuleId, module.Id, StringComparison.Ordinal))
+                continue;
+
+            creature.PassiveTrainingStatId = module.StatId;
+            creature.PassiveTrainingPointsPerMinute = rate;
+            if (rate <= 0.0f)
+                creature.PassiveTrainingPointRemainder = 0.0;
+        }
+    }
+
+    private float RateFor(GardenModuleData module)
+        => module.SlotIndex >= 0
+            ? _rules.GardenModules.PointsPerMinuteForLevel(module.Level)
+            : 0.0f;
 }

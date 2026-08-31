@@ -43,9 +43,12 @@ public sealed class VoidlingData
 
     public CreatureNeedsState Needs { get; set; } = new();
 
-    // Semantic passive-training assignment. This deliberately does not encode Garden geometry or
-    // a scene-node/module ID, so the future modular Garden UI can move without save-shape churn.
+    // Passive-training stat remains for backward-compatible saves and presentation. New player
+    // assignments bind to a semantic Garden module ID; migration refreshes the cached rate from
+    // that module's current level/placement so balance tuning and upgrades remain authoritative.
     public string PassiveTrainingStatId { get; set; } = "";
+    public string PassiveTrainingModuleId { get; set; } = "";
+    public float PassiveTrainingPointsPerMinute { get; set; }
     public double PassiveTrainingPointRemainder { get; set; }
 
     public float SwimFlyInfluence { get; set; }

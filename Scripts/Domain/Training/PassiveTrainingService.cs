@@ -14,8 +14,8 @@ public readonly record struct PassiveTrainingStepResult(
 
 /// <summary>
 /// Advances one semantic passive-training assignment from explicit open-game elapsed time.
-/// It shares the same DNA-rank cap and child evolution influence as active training, but uses a
-/// slower designer-authored rate and never consumes inventory or consults wall-clock time.
+/// Legacy assignments use the global base rate; module-backed assignments use the cached rate
+/// refreshed by Application/migration from the authoritative module level and placement.
 /// </summary>
 public sealed class PassiveTrainingService
 {
@@ -25,9 +25,12 @@ public sealed class PassiveTrainingService
         ArgumentNullException.ThrowIfNull(rules);
 
         var statId = creature.PassiveTrainingStatId ?? string.Empty;
+        var pointsPerMinute = string.IsNullOrEmpty(creature.PassiveTrainingModuleId)
+            ? rules.PassiveTraining.PointsPerMinute
+            : creature.PassiveTrainingPointsPerMinute;
         if (!float.IsFinite(elapsedSeconds) || elapsedSeconds <= 0.0f ||
             string.IsNullOrEmpty(statId) || !ContainsStat(rules, statId) ||
-            rules.PassiveTraining.PointsPerMinute <= 0.0f)
+            !float.IsFinite(pointsPerMinute) || pointsPerMinute <= 0.0f)
         {
             return new PassiveTrainingStepResult(false, statId, 0, false);
         }
@@ -52,7 +55,7 @@ public sealed class PassiveTrainingService
         }
 
         var remainder = NormalizeRemainder(creature.PassiveTrainingPointRemainder);
-        var total = remainder + elapsedSeconds * (double)rules.PassiveTraining.PointsPerMinute / 60.0;
+        var total = remainder + elapsedSeconds * (double)pointsPerMinute / 60.0;
         if (!double.IsFinite(total) || total < 0.0)
             return new PassiveTrainingStepResult(changed, statId, 0, false);
 

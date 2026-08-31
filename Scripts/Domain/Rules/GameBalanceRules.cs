@@ -40,6 +40,36 @@ public sealed record DailyMissionRules(
     int MissionsPerDay,
     IReadOnlyList<DailyMissionDefinition> Definitions);
 
+public sealed record GardenModuleRules(
+    int SlotCount,
+    int PurchaseCost,
+    IReadOnlyList<int> UpgradeCosts,
+    IReadOnlyList<float> PointsPerMinuteByLevel)
+{
+    public int MaxLevel => Math.Max(1, PointsPerMinuteByLevel.Count);
+
+    public float PointsPerMinuteForLevel(int level)
+    {
+        if (PointsPerMinuteByLevel.Count == 0)
+            return 0.0f;
+
+        var index = Math.Clamp(level, 1, PointsPerMinuteByLevel.Count) - 1;
+        return Math.Max(0.0f, PointsPerMinuteByLevel[index]);
+    }
+
+    public int UpgradeCostForLevel(int currentLevel)
+    {
+        var targetLevel = currentLevel + 1;
+        if (targetLevel > MaxLevel)
+            return -1;
+
+        var index = targetLevel - 2;
+        if (index < 0 || index >= UpgradeCosts.Count)
+            return 0;
+        return Math.Max(0, UpgradeCosts[index]);
+    }
+}
+
 public sealed record RankTrainingCaps(int E, int D, int C, int B, int A, int S)
 {
     public int ForRank(int rank) => rank switch
@@ -136,6 +166,14 @@ public sealed record GameBalanceRules(
     // Keep the prototype default authorable instead of baking the value into any use case or UI.
     public GardenRules Garden { get; init; } = new(MaxPopulation: 8);
 
+    // Exact Garden geometry/rates/costs remain unresolved. These prototype values exist so the
+    // purchase/place/upgrade contract can ship without turning tuning guesses into code constants.
+    public GardenModuleRules GardenModules { get; init; } = new(
+        SlotCount: 4,
+        PurchaseCost: 40,
+        UpgradeCosts: Array.AsReadOnly(new[] { 25, 50 }),
+        PointsPerMinuteByLevel: Array.AsReadOnly(new[] { 1.0f, 1.5f, 2.0f }));
+
     // Daily-chain values are prototype balance only. The chain/cadence is the system contract; the
     // actual reward table stays authorable so product tuning can replace these values without code.
     public DailyLoginRules DailyLogin { get; init; } = new(Array.AsReadOnly(new[] { 5, 7, 9, 12, 15, 20, 30 }));
@@ -154,6 +192,8 @@ public sealed record GameBalanceRules(
             new DailyMissionDefinition("shop-1", DailyMissionEventKind.PurchaseShopItem, 1, 8)
         }));
 
+    // Legacy direct assignments use this base rate. New player assignments bind to placed Garden
+    // modules whose level-specific rate comes from GardenModules.
     public PassiveTrainingRules PassiveTraining { get; init; } = new(PointsPerMinute: 1.0f);
     public EvolutionRules Evolution { get; init; } = new(SpecializationThreshold: 0.50f);
     public ReincarnationRules Reincarnation { get; init; } = new(

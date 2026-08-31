@@ -53,6 +53,22 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "1,3600,1")]
     public float ChildToAdultSeconds { get; set; } = 45.0f;
 
+    [ExportGroup("Garden Modules")]
+    [Export(PropertyHint.Range, "1,12,1")]
+    public int GardenModuleSlotCount { get; set; } = 4;
+    [Export(PropertyHint.Range, "0,10000,1")]
+    public int GardenModulePurchaseCost { get; set; } = 40;
+    [Export(PropertyHint.Range, "0,10000,1")]
+    public int GardenModuleLevel2UpgradeCost { get; set; } = 25;
+    [Export(PropertyHint.Range, "0,10000,1")]
+    public int GardenModuleLevel3UpgradeCost { get; set; } = 50;
+    [Export(PropertyHint.Range, "0,60,0.1")]
+    public float GardenModuleLevel1PointsPerMinute { get; set; } = 1.0f;
+    [Export(PropertyHint.Range, "0,60,0.1")]
+    public float GardenModuleLevel2PointsPerMinute { get; set; } = 1.5f;
+    [Export(PropertyHint.Range, "0,60,0.1")]
+    public float GardenModuleLevel3PointsPerMinute { get; set; } = 2.0f;
+
     [ExportGroup("Evolution")]
     [Export(PropertyHint.Range, "0,1,0.01")]
     public float EvolutionSpecializationThreshold { get; set; } = 0.50f;
@@ -135,6 +151,20 @@ public partial class GameBalanceResource : Resource
             {
                 PointsPerMinute = NonNegative(PassiveTrainingPointsPerMinute)
             },
+            GardenModules = new GardenModuleRules(
+                SlotCount: Math.Max(1, GardenModuleSlotCount),
+                PurchaseCost: Math.Max(0, GardenModulePurchaseCost),
+                UpgradeCosts: Array.AsReadOnly(new[]
+                {
+                    Math.Max(0, GardenModuleLevel2UpgradeCost),
+                    Math.Max(0, GardenModuleLevel3UpgradeCost)
+                }),
+                PointsPerMinuteByLevel: Array.AsReadOnly(new[]
+                {
+                    NonNegative(GardenModuleLevel1PointsPerMinute),
+                    NonNegative(GardenModuleLevel2PointsPerMinute),
+                    NonNegative(GardenModuleLevel3PointsPerMinute)
+                })),
             Lifecycle = defaults.Lifecycle with { ChildToAdultSeconds = Math.Max(0.1f, ChildToAdultSeconds) },
             Evolution = defaults.Evolution with
             {

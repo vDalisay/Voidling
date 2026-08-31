@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Voidling.Application.Breeding;
 using Voidling.Application.Daily;
+using Voidling.Application.Garden;
 using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
@@ -18,7 +19,7 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 18;
+    public const int CurrentSaveVersion = 19;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -43,6 +44,7 @@ public sealed class GameStateMigrationService
         state.StoreEggs ??= new List<EggData>();
         state.EggShells ??= new List<EggShellData>();
         state.TrainingItems ??= new Dictionary<string, int>(StringComparer.Ordinal);
+        state.GardenModules ??= new List<GardenModuleData>();
         state.PendingTradeJournal ??= new List<PendingTradeJournalEntry>();
         state.AppliedTradeIds ??= new List<string>();
         state.AppliedMultiplayerRaceIds ??= new List<string>();
@@ -80,6 +82,8 @@ public sealed class GameStateMigrationService
                 state.TrainingItems[statId] = 0;
         }
 
+        NormalizeGardenModules(state);
+
         foreach (var creature in state.Voidlings.Concat(state.DepartedVoidlings))
         {
             creature.TrainingPoints ??= new Dictionary<string, int>(StringComparer.Ordinal);
@@ -101,6 +105,8 @@ public sealed class GameStateMigrationService
             if (!_rules.Genetics.StatIds.Contains(creature.PassiveTrainingStatId ?? string.Empty))
             {
                 creature.PassiveTrainingStatId = string.Empty;
+                creature.PassiveTrainingModuleId = string.Empty;
+                creature.PassiveTrainingPointsPerMinute = 0.0f;
                 creature.PassiveTrainingPointRemainder = 0.0;
             }
             else if (!double.IsFinite(creature.PassiveTrainingPointRemainder) ||
@@ -109,6 +115,8 @@ public sealed class GameStateMigrationService
             {
                 creature.PassiveTrainingPointRemainder = 0.0;
             }
+
+            NormalizePassiveModuleAssignment(state, creature);
         }
 
         foreach (var egg in state.OwnedEggs.Concat(state.StoreEggs))
@@ -167,6 +175,69 @@ public sealed class GameStateMigrationService
         }
 
         state.SaveVersion = CurrentSaveVersion;
+    }
+
+    private void NormalizeGardenModules(GameStateData state)
+    {
+        var normalized = new List<GardenModuleData>();
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var occupiedSlots = new HashSet<int>();
+        var slotCount = Math.Max(1, _rules.GardenModules.SlotCount);
+        var maxLevel = Math.Max(1, _rules.GardenModules.MaxLevel);
+
+        foreach (var module in state.GardenModules)
+        {
+            if (module == null || string.IsNullOrWhiteSpace(module.Id) ||
+                !_rules.Genetics.StatIds.Contains(module.StatId ?? string.Empty))
+            {
+                continue;
+            }
+
+            module.Id = module.Id.Trim();
+            if (!ids.Add(module.Id))
+                continue;
+
+            module.Level = Math.Clamp(module.Level, 1, maxLevel);
+            if (module.SlotIndex < -1 || module.SlotIndex >= slotCount ||
+                (module.SlotIndex >= 0 && !occupiedSlots.Add(module.SlotIndex)))
+            {
+                module.SlotIndex = -1;
+            }
+
+            normalized.Add(module);
+        }
+
+        state.GardenModules = normalized;
+    }
+
+    private void NormalizePassiveModuleAssignment(GameStateData state, VoidlingData creature)
+    {
+        creature.PassiveTrainingModuleId ??= string.Empty;
+        if (string.IsNullOrEmpty(creature.PassiveTrainingModuleId))
+        {
+            // Save versions before modules used direct stat assignments. Preserve them at the
+            // authorable legacy base rate until the player explicitly chooses a module-backed stat.
+            creature.PassiveTrainingPointsPerMinute = 0.0f;
+            return;
+        }
+
+        var module = state.GardenModules.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, creature.PassiveTrainingModuleId, StringComparison.Ordinal));
+        if (module == null)
+        {
+            creature.PassiveTrainingStatId = string.Empty;
+            creature.PassiveTrainingModuleId = string.Empty;
+            creature.PassiveTrainingPointsPerMinute = 0.0f;
+            creature.PassiveTrainingPointRemainder = 0.0;
+            return;
+        }
+
+        creature.PassiveTrainingStatId = module.StatId;
+        creature.PassiveTrainingPointsPerMinute = module.SlotIndex >= 0
+            ? _rules.GardenModules.PointsPerMinuteForLevel(module.Level)
+            : 0.0f;
+        if (creature.PassiveTrainingPointsPerMinute <= 0.0f)
+            creature.PassiveTrainingPointRemainder = 0.0;
     }
 
     private static float NormalizeVolume(float volume)

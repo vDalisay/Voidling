@@ -51,6 +51,57 @@ public partial class GameSession
         RaiseGardenEvent(message);
     }
 
+    public bool BuyGardenModule(string statId)
+    {
+        var result = _training!.BuyGardenModule(State, NewId(), statId);
+        if (!result.Succeeded)
+        {
+            if (result.Failure == GardenModuleFailure.NotEnoughCurrency)
+                ToastRequested?.Invoke("Not enough sprouts.");
+            return false;
+        }
+
+        RecordDailyMissionEvent(DailyMissionEventKind.PurchaseShopItem);
+        SaveAndNotify($"Bought a {DisplayStatId(statId)} Garden module.");
+        RaiseGardenEvent($"A {DisplayStatId(statId)} training module was added to Garden storage.");
+        return true;
+    }
+
+    public bool PlaceGardenModule(string moduleId, int slotIndex)
+    {
+        var result = _training!.PlaceGardenModule(State, moduleId, slotIndex);
+        if (!result.Succeeded)
+            return false;
+        if (!result.Changed)
+            return true;
+
+        var module = State.GardenModules.Find(candidate => candidate.Id == moduleId);
+        var message = slotIndex < 0
+            ? $"Stored the {DisplayStatId(module?.StatId ?? string.Empty)} module."
+            : $"Placed the {DisplayStatId(module?.StatId ?? string.Empty)} module in Garden slot {slotIndex + 1}.";
+        SaveAndNotify(message);
+        return true;
+    }
+
+    public bool UpgradeGardenModule(string moduleId)
+    {
+        var result = _training!.UpgradeGardenModule(State, moduleId);
+        if (!result.Succeeded)
+        {
+            ToastRequested?.Invoke(result.Failure switch
+            {
+                GardenModuleFailure.NotEnoughCurrency => "Not enough sprouts.",
+                GardenModuleFailure.MaxLevel => "That Garden module is already at its current maximum level.",
+                _ => "Could not upgrade that Garden module."
+            });
+            return false;
+        }
+
+        var module = State.GardenModules.Find(candidate => candidate.Id == moduleId);
+        SaveAndNotify($"Upgraded {DisplayStatId(module?.StatId ?? string.Empty)} module to level {module?.Level ?? 1}.");
+        return true;
+    }
+
     public bool SetPassiveTraining(string creatureId, string statId)
     {
         var creature = FindVoidling(creatureId);
@@ -59,7 +110,14 @@ public partial class GameSession
 
         var result = _training!.SetPassiveTraining(State, creatureId, statId);
         if (!result.Succeeded)
+        {
+            if (result.Failure == PassiveTrainingFailure.NoPlacedModule)
+            {
+                ToastRequested?.Invoke($"Place a {DisplayStatId(statId)} Garden module first.");
+                StateChanged?.Invoke();
+            }
             return false;
+        }
         if (!result.Changed)
             return true;
 
