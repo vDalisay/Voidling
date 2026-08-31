@@ -280,20 +280,17 @@ public sealed class AdvanceSimulationUseCase
     private bool AdvanceShopEggRotation(GameStateData state, float elapsedSeconds)
     {
         var interval = Math.Max(1.0, _rules.Shop.EggRotationIntervalSeconds);
-        var previousElapsed = state.ShopEggRotationElapsedSeconds;
-        var totalElapsed = previousElapsed + elapsedSeconds;
+        var totalElapsed = state.ShopEggRotationElapsedSeconds + elapsedSeconds;
         if (!double.IsFinite(totalElapsed) || totalElapsed < 0.0)
         {
             state.ShopEggRotationElapsedSeconds = 0.0;
-            return previousElapsed != 0.0;
+            return false;
         }
 
         var rotations = (long)Math.Floor(totalElapsed / interval);
-        var remainder = totalElapsed - rotations * interval;
-        state.ShopEggRotationElapsedSeconds = remainder;
-        var changed = !previousElapsed.Equals(remainder);
+        state.ShopEggRotationElapsedSeconds = totalElapsed - rotations * interval;
         if (rotations <= 0)
-            return changed;
+            return false;
 
         RefreshStoreEggInventory(state, rotations);
         return true;
