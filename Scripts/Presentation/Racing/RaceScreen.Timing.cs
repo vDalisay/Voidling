@@ -22,7 +22,6 @@ public partial class RaceScreen
         try
         {
             milliseconds = RaceTiming.FixedStepsToMilliseconds(fixedStep);
-            WriteBalanceTelemetryIfNeeded();
             return true;
         }
         catch (ArgumentOutOfRangeException)

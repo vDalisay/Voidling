@@ -1,13 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/MainController.cs" id="1_main"]
 [ext_resource type="PackedScene" path="res://Scenes/Garden.tscn" id="2_garden"]
-[ext_resource type="Script" path="res://Scripts/Presentation/Garden/GardenAmbienceController.cs" id="3_ambience"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_main")
 
 [node name="Garden" parent="." instance=ExtResource("2_garden")]
-
-[node name="GardenAmbience" type="Node" parent="."]
-script = ExtResource("3_ambience")
