@@ -10,6 +10,7 @@ using Voidling.Application.Settings;
 using Voidling.Application.Shop;
 using Voidling.Application.Simulation;
 using Voidling.Application.Training;
+using Voidling.Domain.Rules;
 
 namespace VoidlingGame;
 
@@ -143,6 +144,7 @@ public partial class GameSession : Node
                 }
                 case CreatureHatchedEvent hatched:
                 {
+                    RecordDailyMissionEvent(DailyMissionEventKind.HatchEgg);
                     var message = $"An egg hatched and {hatched.Name} was born!";
                     ToastRequested?.Invoke(message);
                     RaiseGardenEvent(message);
