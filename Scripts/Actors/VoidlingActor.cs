@@ -9,13 +9,18 @@ public partial class VoidlingActor : Node2D
     public event Action<string>? Clicked;
 
     public string CreatureId { get; private set; } = "";
+    public LifeStage Stage { get; private set; }
 
     private readonly RandomNumberGenerator _rng = new();
     private AnimatedSprite2D _sprite = null!;
     private Rect2 _wanderBounds;
     private Vector2 _target;
     private float _nextTargetSeconds;
+    private float _baseWalkSpeed;
     private float _walkSpeed;
+    private float _restSeconds;
+    private float _restSecondsMin = 0.20f;
+    private float _restSecondsMax = 0.60f;
     private bool _selected;
     private bool _interactionLocked;
     private bool _pickedUp;
@@ -25,9 +30,11 @@ public partial class VoidlingActor : Node2D
     public void Setup(VoidlingData data, Rect2 wanderBounds, Vector2 startPosition)
     {
         CreatureId = data.Id;
+        Stage = data.Stage;
         _wanderBounds = wanderBounds;
         Position = startPosition;
-        _walkSpeed = data.Stage == LifeStage.Adult ? 20.0f : 17.0f;
+        _baseWalkSpeed = data.Stage == LifeStage.Adult ? 20.0f : 17.0f;
+        _walkSpeed = _baseWalkSpeed;
         _rng.Seed = StableSeed(data.Id);
 
         var isAdult = data.Stage == LifeStage.Adult;
@@ -70,6 +77,15 @@ public partial class VoidlingActor : Node2D
         QueueRedraw();
     }
 
+    public void ApplyAmbientStats(float run, float stamina)
+    {
+        var behavior = VoidlingAmbientBehaviorResolver.Resolve(run, stamina);
+        _walkSpeed = _baseWalkSpeed * behavior.WalkSpeedMultiplier;
+        _restSecondsMin = behavior.RestSecondsMin;
+        _restSecondsMax = Math.Max(_restSecondsMin, behavior.RestSecondsMax);
+        _restSeconds = Math.Min(_restSeconds, _restSecondsMax);
+    }
+
     public override void _Process(double delta)
     {
         if (_selected)
@@ -79,10 +95,29 @@ public partial class VoidlingActor : Node2D
             return;
 
         var step = (float)delta;
+        if (_restSeconds > 0.0f)
+        {
+            _restSeconds = Math.Max(0.0f, _restSeconds - step);
+            if (_restSeconds > 0.0f)
+            {
+                _sprite.Stop();
+                return;
+            }
+
+            PickNewTarget();
+            _sprite.Play("walk_down");
+        }
+
         _nextTargetSeconds -= step;
         var toTarget = _target - Position;
 
-        if (_nextTargetSeconds <= 0.0f || toTarget.LengthSquared() < 9.0f)
+        if (toTarget.LengthSquared() < 9.0f)
+        {
+            BeginRest();
+            return;
+        }
+
+        if (_nextTargetSeconds <= 0.0f)
         {
             PickNewTarget();
             toTarget = _target - Position;
@@ -215,6 +250,7 @@ public partial class VoidlingActor : Node2D
             return;
         }
 
+        _restSeconds = 0.0f;
         PickNewTarget();
         _sprite.Play("walk_down");
     }
@@ -225,6 +261,12 @@ public partial class VoidlingActor : Node2D
             _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
             _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y));
         _nextTargetSeconds = _rng.RandfRange(1.5f, 4.0f);
+    }
+
+    private void BeginRest()
+    {
+        _restSeconds = _rng.RandfRange(_restSecondsMin, _restSecondsMax);
+        _sprite.Stop();
     }
 
     private void PlayForDirection(Vector2 direction)

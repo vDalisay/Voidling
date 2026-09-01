@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Application.Creatures;
 
 namespace VoidlingGame;
 
@@ -325,6 +326,8 @@ public partial class GardenController : Node2D
         var currentIds = _session.State.Voidlings
             .Select(v => v.Id)
             .ToHashSet(StringComparer.Ordinal);
+        var profiles = _session.CreateActiveVoidlingProfileProjections()
+            .ToDictionary(profile => profile.CreatureId, StringComparer.Ordinal);
 
         foreach (var staleId in _actors.Keys.Where(id => !currentIds.Contains(id)).ToArray())
         {
@@ -341,25 +344,44 @@ public partial class GardenController : Node2D
 
         foreach (var data in _session.State.Voidlings)
         {
-            if (_actors.ContainsKey(data.Id))
-                continue;
+            Vector2? replacementPosition = null;
+            if (_actors.TryGetValue(data.Id, out var existing) && existing.Stage != data.Stage)
+            {
+                replacementPosition = existing.Position;
+                existing.QueueFree();
+                _actors.Remove(data.Id);
+            }
 
-            var start = Math.Abs(data.WorldX) > 0.01f || Math.Abs(data.WorldY) > 0.01f
-                ? new Vector2(data.WorldX, data.WorldY)
-                : NextSpawnPosition();
+            if (!_actors.TryGetValue(data.Id, out var actor))
+            {
+                var start = replacementPosition ??
+                    (Math.Abs(data.WorldX) > 0.01f || Math.Abs(data.WorldY) > 0.01f
+                        ? new Vector2(data.WorldX, data.WorldY)
+                        : NextSpawnPosition());
 
-            var actor = new VoidlingActor();
-            actor.Setup(data, _wanderBounds, start);
-            actor.Clicked += OnActorPressed;
-            _actorsRoot.AddChild(actor);
-            _actors[data.Id] = actor;
+                actor = new VoidlingActor();
+                actor.Setup(data, _wanderBounds, start);
+                actor.Clicked += OnActorPressed;
+                _actorsRoot.AddChild(actor);
+                _actors[data.Id] = actor;
 
-            if (_initialRefreshComplete && data.Stage == LifeStage.Child)
-                actor.PlayHatchJump();
+                if (_initialRefreshComplete && data.Stage == LifeStage.Child && replacementPosition == null)
+                    actor.PlayHatchJump();
+            }
+
+            if (profiles.TryGetValue(data.Id, out var profile))
+                ApplyAmbientStats(actor, profile);
         }
 
         Select(_selectedId);
         RefreshEggs();
+    }
+
+    private static void ApplyAmbientStats(VoidlingActor actor, VoidlingProfileProjection profile)
+    {
+        var run = profile.Stats.FirstOrDefault(stat => string.Equals(stat.StatId, "run", StringComparison.Ordinal))?.EffectiveValue ?? 0.0f;
+        var stamina = profile.Stats.FirstOrDefault(stat => string.Equals(stat.StatId, "stamina", StringComparison.Ordinal))?.EffectiveValue ?? 0.0f;
+        actor.ApplyAmbientStats(run, stamina);
     }
 
     private void RefreshEggs()
