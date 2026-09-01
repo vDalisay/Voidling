@@ -70,6 +70,10 @@ public sealed class GenomeFactory
         genome.CoatAlleleA = appearance.CoatAllele;
         genome.CoatAlleleB = appearance.CoatAllele;
         genome.ExpressedCoatIndex = 0;
+
+        // Personality uses independent stable RNG substreams so adding the vector cannot perturb
+        // existing ability/appearance rolls for the same seed.
+        PersonalityGenetics.PopulateFounder(genome, seed);
         return genome;
     }
 

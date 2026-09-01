@@ -88,10 +88,14 @@ public partial class MainController : Node
         heading.AddChild(close);
         box.AddChild(heading);
 
+        var personalityLabel = PersonalityPresentationCatalog.LabelFor(profile.Personality);
         var stage = profile.IsAdult
-            ? "Adult"
-            : $"Child • {Math.Max(0, (int)Math.Ceiling(GameRules.ChildToAdultSeconds - data.AgeSeconds))}s to adult";
-        box.AddChild(UiFactory.CreateLabel(stage, 7));
+            ? $"Adult • {personalityLabel}"
+            : $"Child • {Math.Max(0, (int)Math.Ceiling(GameRules.ChildToAdultSeconds - data.AgeSeconds))}s • {personalityLabel}";
+        var stageLabel = UiFactory.CreateLabel(stage, 7);
+        stageLabel.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        stageLabel.TooltipText = $"Personality: {PersonalityPresentationCatalog.FlavorFor(profile.Personality)}";
+        box.AddChild(stageLabel);
 
         var demeanor = UiFactory.CreateLabel(
             profile.CareDemeanor == VoidlingCareDemeanor.Settled

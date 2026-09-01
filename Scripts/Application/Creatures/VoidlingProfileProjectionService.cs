@@ -34,6 +34,10 @@ public sealed record VoidlingRareTraitProfileProjection(
     int GenerationFromFounder,
     bool CanTransmit);
 
+public sealed record VoidlingPersonalityProfileProjection(
+    string TraitId,
+    PersonalityPolarity Polarity);
+
 /// <summary>
 /// Immutable semantic appearance read model. UI/presentation never needs to traverse the mutable
 /// Genome to understand color/tone/pattern/shiny/coat genetics.
@@ -82,14 +86,16 @@ public sealed record VoidlingProfileProjection(
     // Null until the player has actually discovered the preference. Presentation never receives the
     // hidden FavoriteFoodId through this read model before that point.
     public string? DiscoveredFavoriteFoodId { get; init; }
+
+    // Semantic only: UI receives the dominant atmospheric tendency, never raw personality numbers.
+    public VoidlingPersonalityProfileProjection Personality { get; init; } =
+        new(string.Empty, PersonalityPolarity.Neutral);
 }
 
 /// <summary>
 /// Builds immutable player-information read models from the mutable save aggregate. UI receives
-/// explicit DNA-profile values, trained progression/caps, semantic evolution/appearance and lineage
-/// labels without traversing Genome, TrainingPoints, RareTraits or lineage collections itself. This
-/// intentionally reports current facts only; it does not calculate exact offspring probabilities,
-/// expose hidden evolution influence values, or reveal hidden happiness/stress numbers.
+/// explicit DNA-profile values, trained progression/caps, semantic evolution/appearance/personality
+/// and lineage labels without traversing mutable save collections itself.
 /// </summary>
 public sealed class VoidlingProfileProjectionService
 {
@@ -185,6 +191,7 @@ public sealed class VoidlingProfileProjectionService
             creature.Genome.CoatAlleleB,
             creature.Genome.ExpressedCoatIndex,
             phenotype.CoatAllele);
+        var personality = PersonalityGenetics.ResolveDominant(creature.Genome);
 
         return new VoidlingProfileProjection(
             creature.Id,
@@ -208,7 +215,8 @@ public sealed class VoidlingProfileProjectionService
             DiscoveredFavoriteFoodId = creature.FavoriteFoodDiscovered &&
                                        _statIds.Contains(creature.FavoriteFoodId ?? string.Empty)
                 ? creature.FavoriteFoodId
-                : null
+                : null,
+            Personality = new VoidlingPersonalityProfileProjection(personality.TraitId, personality.Polarity)
         };
     }
 

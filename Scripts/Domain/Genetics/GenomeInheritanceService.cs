@@ -48,6 +48,7 @@ public sealed class GenomeInheritanceService
 
         ApplyNormalRankBreakthrough(parentA, parentB, genome, seed);
         InheritAppearance(parentA.Genome, parentB.Genome, genome, seed);
+        PersonalityGenetics.Inherit(parentA.Genome, parentB.Genome, genome, seed);
         return genome;
     }
 

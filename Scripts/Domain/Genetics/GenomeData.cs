@@ -4,9 +4,8 @@ using System.Text.Json.Serialization;
 namespace VoidlingGame;
 
 /// <summary>
-/// Persisted potential for one ability locus. AlleleA and AlleleB are the two player-visible
-/// DNA-profile values (DNA1/DNA2); ExpressedAlleleIndex selects the current phenotype value.
-/// The legacy property names are retained for save compatibility.
+/// Persisted potential for one ability/personality locus. AlleleA and AlleleB are the two inherited
+/// values; ExpressedAlleleIndex selects the currently expressed value.
 /// </summary>
 public sealed class GenePairData
 {
@@ -46,10 +45,14 @@ public static class AppearanceAlleles
 /// Appearance follows a Chao-style diploid model. Each locus carries one allele from each parent.
 /// The expressed index is the deterministic birth-time tie-breaker for equally-dominant alleles;
 /// dominance itself is resolved by AppearancePhenotypeResolver.
+///
+/// PersonalityGenes reserve the stable semantic v1 personality vector. They are atmospheric only:
+/// racing and stat calculation intentionally do not read these loci.
 /// </summary>
 public sealed class GenomeData
 {
     public Dictionary<string, GenePairData> AbilityGenes { get; set; } = new();
+    public Dictionary<string, GenePairData> PersonalityGenes { get; set; } = new();
 
     // Legacy color fields are retained verbatim for save compatibility.
     public int ColorAlleleA { get; set; }
