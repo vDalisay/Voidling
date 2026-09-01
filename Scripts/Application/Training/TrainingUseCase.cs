@@ -3,6 +3,7 @@ using System.Linq;
 using Voidling.Application.Garden;
 using Voidling.Domain.Care;
 using Voidling.Domain.Evolution;
+using Voidling.Domain.Preferences;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shared;
 using Voidling.Domain.Stats;
@@ -44,7 +45,11 @@ public readonly record struct TrainingPurchaseResult(TrainingFailure Failure)
     public bool Succeeded => Failure == TrainingFailure.None;
 }
 
-public readonly record struct TrainingApplicationResult(TrainingFailure Failure, int Gain)
+public readonly record struct TrainingApplicationResult(
+    TrainingFailure Failure,
+    int Gain,
+    bool WasFavoriteFood = false,
+    bool FavoriteFoodDiscoveredNow = false)
 {
     public bool Succeeded => Failure == TrainingFailure.None;
 }
@@ -74,6 +79,7 @@ public sealed class TrainingUseCase
     private readonly GameBalanceRules _rules;
     private readonly StatCalculator _stats;
     private readonly CreatureNeedsService _needs = new();
+    private readonly FavoriteFoodPreferenceService _favoriteFood = new();
 
     public TrainingUseCase(GameBalanceRules rules)
     {
@@ -119,18 +125,29 @@ public sealed class TrainingUseCase
             return new TrainingApplicationResult(failure, 0);
 
         var creature = state.Voidlings.First(v => v.Id == creatureId);
+        _favoriteFood.Normalize(creature, _rules.Genetics.StatIds);
+        var wasFavoriteFood = string.Equals(creature.FavoriteFoodId, statId, StringComparison.Ordinal);
+        var favoriteFoodDiscoveredNow = wasFavoriteFood && !creature.FavoriteFoodDiscovered;
+        if (favoriteFoodDiscoveredNow)
+            creature.FavoriteFoodDiscovered = true;
+
         state.TrainingItems[statId]--;
 
         var rolledGain = StableRandom.Create(seed, $"training:{creatureId}:{statId}").Next(5, 10);
+        var favoriteBonus = wasFavoriteFood ? Math.Max(0, _rules.FavoriteFood.BonusTrainingPoints) : 0;
         var current = _stats.GetTrainingPoints(creature, statId);
         var cap = _stats.GetTrainingPointCap(creature, statId);
-        var updated = Math.Min(cap, current + rolledGain);
+        var updated = Math.Min(cap, current + rolledGain + favoriteBonus);
         var appliedGain = Math.Max(0, updated - current);
         creature.TrainingPoints[statId] = updated;
 
         EvolutionService.ApplyTrainingInfluence(creature, statId, appliedGain, _rules.Stats);
         _needs.ApplyTrainingTreat(creature.Needs, _rules.Needs);
-        return new TrainingApplicationResult(TrainingFailure.None, appliedGain);
+        return new TrainingApplicationResult(
+            TrainingFailure.None,
+            appliedGain,
+            wasFavoriteFood,
+            favoriteFoodDiscoveredNow);
     }
 
     public GardenModuleMutationResult BuyGardenModule(GameStateData state, string moduleId, string statId)

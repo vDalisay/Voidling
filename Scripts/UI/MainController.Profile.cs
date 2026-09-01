@@ -102,6 +102,17 @@ public partial class MainController : Node
         demeanor.CustomMinimumSize = new Vector2(194, 15);
         box.AddChild(demeanor);
 
+        if (!string.IsNullOrWhiteSpace(profile.DiscoveredFavoriteFoodId))
+        {
+            var favoriteFood = UiFactory.CreateLabel(
+                string.Format(
+                    Tr("UI_PROFILE_FAVORITE_FOOD"),
+                    StatPresentationCatalog.NameFor(profile.DiscoveredFavoriteFoodId)),
+                6);
+            favoriteFood.CustomMinimumSize = new Vector2(194, 15);
+            box.AddChild(favoriteFood);
+        }
+
         box.AddChild(CreatePassiveTrainingRow(data));
 
         foreach (var stat in profile.Stats)

@@ -22,6 +22,7 @@ RankATrainingCap = 100
 RankSTrainingCap = 120
 PassiveTrainingPointsPerMinute = 1.0
 ChildToAdultSeconds = 45.0
+FavoriteFoodBonusTrainingPoints = 1
 GardenMaxPopulation = 8
 GardenModuleSlotCount = 4
 GardenModulePurchaseCost = 40

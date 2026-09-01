@@ -53,6 +53,10 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "1,3600,1")]
     public float ChildToAdultSeconds { get; set; } = 45.0f;
 
+    [ExportGroup("Favorite Food")]
+    [Export(PropertyHint.Range, "0,20,1")]
+    public int FavoriteFoodBonusTrainingPoints { get; set; } = 1;
+
     [ExportGroup("Garden")]
     [Export(PropertyHint.Range, "1,64,1")]
     public int GardenMaxPopulation { get; set; } = 8;
@@ -166,6 +170,7 @@ public partial class GameBalanceResource : Resource
                 RankCaps = BuildRankCaps(maxTrainingPoints)
             },
             PassiveTraining = defaults.PassiveTraining with { PointsPerMinute = NonNegative(PassiveTrainingPointsPerMinute) },
+            FavoriteFood = defaults.FavoriteFood with { BonusTrainingPoints = Math.Max(0, FavoriteFoodBonusTrainingPoints) },
             Garden = defaults.Garden with { MaxPopulation = Math.Clamp(GardenMaxPopulation, 1, 64) },
             GardenModules = new GardenModuleRules(
                 SlotCount: Math.Clamp(GardenModuleSlotCount, 1, 12),

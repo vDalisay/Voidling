@@ -46,7 +46,9 @@ public partial class GameSession
             return;
 
         RecordDailyMissionEvent(DailyMissionEventKind.UseTrainingTreat);
-        var message = $"{creature.Name} gained +{result.Gain} {DisplayStatId(statId)} training.";
+        var message = result.FavoriteFoodDiscoveredNow
+            ? $"{creature.Name} loved that {DisplayStatId(statId)} treat — favorite food discovered! +{result.Gain} training."
+            : $"{creature.Name} gained +{result.Gain} {DisplayStatId(statId)} training.";
         SaveAndNotify(message);
         RaiseGardenEvent(message);
     }

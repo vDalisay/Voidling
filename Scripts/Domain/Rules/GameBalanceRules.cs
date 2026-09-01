@@ -90,6 +90,7 @@ public sealed record StatGrowthRules(int TrainingPointsPerLevel, int MaxLevel, i
 }
 
 public sealed record PassiveTrainingRules(float PointsPerMinute);
+public sealed record FavoriteFoodRules(int BonusTrainingPoints);
 public sealed record LifecycleRules(float ChildToAdultSeconds);
 public sealed record ReincarnationRules(
     float AdultLifespanSeconds,
@@ -194,6 +195,11 @@ public sealed record GameBalanceRules(
     // Legacy direct assignments use this base rate. New player assignments bind to placed Garden
     // modules whose level-specific rate comes from GardenModules.
     public PassiveTrainingRules PassiveTraining { get; init; } = new(PointsPerMinute: 1.0f);
+
+    // Favorite-food values remain prototype tuning. The stable system contract is only that a
+    // discovered favorite gives a small active-training advantage.
+    public FavoriteFoodRules FavoriteFood { get; init; } = new(BonusTrainingPoints: 1);
+
     public EvolutionRules Evolution { get; init; } = new(SpecializationThreshold: 0.50f);
     public ReincarnationRules Reincarnation { get; init; } = new(
         AdultLifespanSeconds: 900.0f,

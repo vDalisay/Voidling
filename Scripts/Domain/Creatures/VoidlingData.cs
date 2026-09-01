@@ -43,6 +43,11 @@ public sealed class VoidlingData
 
     public CreatureNeedsState Needs { get; set; } = new();
 
+    // Core food preference travels with the Voidling across saves/trades/reincarnation. The ID is
+    // intentionally hidden from presentation until FavoriteFoodDiscovered becomes true.
+    public string FavoriteFoodId { get; set; } = "";
+    public bool FavoriteFoodDiscovered { get; set; }
+
     // Passive-training stat remains for backward-compatible saves and presentation. New player
     // assignments bind to a semantic Garden module ID; migration refreshes the cached rate from
     // that module's current level/placement so balance tuning and upgrades remain authoritative.

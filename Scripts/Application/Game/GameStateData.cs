@@ -14,7 +14,7 @@ namespace VoidlingGame;
 /// </summary>
 public sealed class GameStateData
 {
-    public int SaveVersion { get; set; } = 19;
+    public int SaveVersion { get; set; } = 20;
     public int Coins { get; set; } = 120;
     public double GardenIncomeCoinRemainder { get; set; }
     public double ShopEggRotationElapsedSeconds { get; set; }

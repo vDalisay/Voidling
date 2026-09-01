@@ -78,6 +78,10 @@ public sealed record VoidlingProfileProjection(
     VoidlingAppearanceProfileProjection Appearance)
 {
     public VoidlingCareDemeanor CareDemeanor { get; init; } = VoidlingCareDemeanor.NeedsCare;
+
+    // Null until the player has actually discovered the preference. Presentation never receives the
+    // hidden FavoriteFoodId through this read model before that point.
+    public string? DiscoveredFavoriteFoodId { get; init; }
 }
 
 /// <summary>
@@ -200,7 +204,11 @@ public sealed class VoidlingProfileProjectionService
             rareTraits,
             appearance)
         {
-            CareDemeanor = ResolveCareDemeanor(creature)
+            CareDemeanor = ResolveCareDemeanor(creature),
+            DiscoveredFavoriteFoodId = creature.FavoriteFoodDiscovered &&
+                                       _statIds.Contains(creature.FavoriteFoodId ?? string.Empty)
+                ? creature.FavoriteFoodId
+                : null
         };
     }
 

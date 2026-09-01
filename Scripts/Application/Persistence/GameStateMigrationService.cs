@@ -8,6 +8,7 @@ using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Care;
+using Voidling.Domain.Preferences;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
 using VoidlingGame;
@@ -19,11 +20,12 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 19;
+    public const int CurrentSaveVersion = 20;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
     private readonly CreatureNeedsService _needs = new();
+    private readonly FavoriteFoodPreferenceService _favoriteFood = new();
     private readonly StatCalculator _stats;
 
     public GameStateMigrationService(GameBalanceRules rules)
@@ -184,6 +186,7 @@ public sealed class GameStateMigrationService
         creature.RareTraits ??= new List<RareTraitData>();
         creature.Needs ??= new CreatureNeedsState();
         _needs.Normalize(creature.Needs);
+        _favoriteFood.Normalize(creature, _rules.Genetics.StatIds);
         creature.FamilyGeneration = Math.Max(0, creature.FamilyGeneration);
         creature.InbreedingBurdenLevel = Math.Max(0, creature.InbreedingBurdenLevel);
         creature.ReincarnationCount = Math.Max(0, creature.ReincarnationCount);
