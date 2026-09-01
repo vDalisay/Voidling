@@ -14,6 +14,14 @@ using Voidling.Domain.Rules;
 
 namespace VoidlingGame;
 
+public enum GameSessionStartupNotice
+{
+    None,
+    SaveRecoveredFromBackup,
+    SaveLoadFailed,
+    SaveUnavailable
+}
+
 /// <summary>
 /// Transitional Godot lifetime facade. Existing presentation code still calls this API,
 /// while infrastructure and deterministic rules are progressively moved behind explicit
@@ -29,9 +37,11 @@ public partial class GameSession : Node
     public event Action<bool>? SaveFeedbackRequested;
 
     public GameStateData State { get; private set; } = new();
+    public GameSessionStartupNotice StartupNotice { get; private set; }
 
     private double _simulationAccumulator;
     private IGameStateRepository? _stateRepository;
+    private IGameStateRecoveryInfo? _stateRecoveryInfo;
     private IAudioSettingsAdapter? _audioSettings;
     private GameStateMigrationService? _migrations;
     private AdvanceSimulationUseCase? _simulation;
@@ -42,6 +52,7 @@ public partial class GameSession : Node
     private VoidlingRosterUseCase? _roster;
     private RaceResultUseCase? _raceResults;
     private LineageTreeProjectionService? _lineageTreeProjection;
+    private bool _saveFailureLatched;
 
     public void Configure(
         IGameStateRepository stateRepository,
@@ -60,6 +71,7 @@ public partial class GameSession : Node
             throw new InvalidOperationException("GameSession must be configured before entering the scene tree.");
 
         _stateRepository = stateRepository ?? throw new ArgumentNullException(nameof(stateRepository));
+        _stateRecoveryInfo = stateRepository as IGameStateRecoveryInfo;
         _audioSettings = audioSettings ?? throw new ArgumentNullException(nameof(audioSettings));
         _migrations = migrations ?? throw new ArgumentNullException(nameof(migrations));
         _simulation = simulation ?? throw new ArgumentNullException(nameof(simulation));
@@ -205,11 +217,16 @@ public partial class GameSession : Node
 
     private void LoadOrCreate()
     {
+        StartupNotice = GameSessionStartupNotice.None;
+        var loadFailed = false;
         try
         {
             var loaded = _stateRepository!.Load();
             if (loaded != null)
             {
+                if (_stateRecoveryInfo?.LastLoadRecoveryStatus == GameStateRecoveryStatus.RecoveredFromBackup)
+                    StartupNotice = GameSessionStartupNotice.SaveRecoveredFromBackup;
+
                 State = loaded;
                 NormalizeState();
                 return;
@@ -217,11 +234,15 @@ public partial class GameSession : Node
         }
         catch (Exception exception)
         {
+            loadFailed = true;
             GD.PushWarning($"Could not load MVP save: {exception.Message}");
         }
 
         State = CreateFreshState();
-        Save();
+        if (!Save())
+            StartupNotice = GameSessionStartupNotice.SaveUnavailable;
+        else if (loadFailed)
+            StartupNotice = GameSessionStartupNotice.SaveLoadFailed;
     }
 
     private void NormalizeState()
@@ -257,7 +278,8 @@ public partial class GameSession : Node
             State.StoreEggs.Add(CreateStoreEgg());
 
         EnsureAngelMutation();
-        Save();
+        if (!Save())
+            StartupNotice = GameSessionStartupNotice.SaveUnavailable;
     }
 
     private GameStateData CreateFreshState()
@@ -388,6 +410,7 @@ public partial class GameSession : Node
         try
         {
             _stateRepository!.Save(State);
+            _saveFailureLatched = false;
             if (showFeedback)
                 SaveFeedbackRequested?.Invoke(true);
             return true;
@@ -395,8 +418,12 @@ public partial class GameSession : Node
         catch (Exception exception)
         {
             GD.PushWarning($"Could not save MVP state: {exception.Message}");
-            if (showFeedback)
+
+            // Explicit saves always surface feedback. Background autosaves surface the first
+            // failure in a streak, then remain quiet until a later successful save clears the latch.
+            if (showFeedback || !_saveFailureLatched)
                 SaveFeedbackRequested?.Invoke(false);
+            _saveFailureLatched = true;
             return false;
         }
     }

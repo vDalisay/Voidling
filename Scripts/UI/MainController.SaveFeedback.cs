@@ -23,6 +23,7 @@ public partial class MainController
         AddChild(_saveStatusTimer);
 
         _session.SaveFeedbackRequested += ShowSaveFeedback;
+        Callable.From(ShowStartupPersistenceNoticeIfNeeded).CallDeferred();
     }
 
     private void ShowSaveFeedback(bool succeeded)
@@ -30,12 +31,30 @@ public partial class MainController
         if (!GodotObject.IsInstanceValid(_saveStatusLabel) || !GodotObject.IsInstanceValid(_saveStatusTimer))
             return;
 
-        _saveStatusLabel.Text = succeeded ? "SAVED" : "SAVE FAILED";
+        _saveStatusLabel.Text = Tr(succeeded ? "UI_SAVE_STATUS_SAVED" : "UI_SAVE_STATUS_FAILED");
         _saveStatusLabel.AddThemeColorOverride(
             "font_color",
             Color.FromHtml(succeeded ? "#6F8068" : "#9C514B"));
         _saveStatusLabel.Visible = true;
         _saveStatusTimer.Start(succeeded ? 1.25 : 4.0);
+    }
+
+    private void ShowStartupPersistenceNoticeIfNeeded()
+    {
+        var key = _session.StartupNotice switch
+        {
+            GameSessionStartupNotice.SaveRecoveredFromBackup => "UI_SAVE_RECOVERED_BACKUP",
+            GameSessionStartupNotice.SaveLoadFailed => "UI_SAVE_LOAD_FAILED",
+            GameSessionStartupNotice.SaveUnavailable => "UI_SAVE_UNAVAILABLE",
+            _ => string.Empty
+        };
+        if (key.Length == 0)
+            return;
+
+        var message = Tr(key);
+        ShowToast(message);
+        if (GodotObject.IsInstanceValid(_gardenEventLog))
+            _gardenEventLog.Append(message);
     }
 
     private void HideSaveFeedback()

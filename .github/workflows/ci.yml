@@ -108,6 +108,23 @@ jobs:
             exit 1
           fi
 
+      # Exercise the actual user:// repository. Two successful saves establish a backup, then the
+      # probe corrupts the primary and must recover/heal from the previous backup without copying
+      # the corrupt primary over it.
+      - name: Persistence recovery smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 20s godot --headless --path . -- --voidling-persistence-recovery-smoke 2>&1 | tee persistence-recovery-smoke.log
+          if ! grep -q 'PERSISTENCE_RECOVERY_SMOKE_SUCCESS' persistence-recovery-smoke.log; then
+            echo 'Persistence repository did not recover and heal the backup as expected.'
+            exit 1
+          fi
+          if grep -E '^(ERROR|SCRIPT ERROR):' persistence-recovery-smoke.log; then
+            echo 'Persistence recovery smoke emitted a Godot error.'
+            exit 1
+          fi
+
       # Exercise the actual player-facing trade room controls. This regression gate is intentionally
       # presentation-only: it toggles a real Voidling card and presses the real Accept/Cancel buttons,
       # proving the panel emits the selected asset ID instead of merely appearing selected visually.
