@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Voidling.Application.Daily;
 using Voidling.Application.Garden;
@@ -14,6 +15,9 @@ namespace VoidlingGame;
 /// </summary>
 public sealed class GameStateData
 {
+    private Dictionary<string, int> _utilityItems = new(StringComparer.Ordinal);
+    private string _shopRareOfferItemId = string.Empty;
+
     public int SaveVersion { get; set; } = 20;
     public int Coins { get; set; } = 120;
     public double GardenIncomeCoinRemainder { get; set; }
@@ -26,6 +30,16 @@ public sealed class GameStateData
     public List<EggData> StoreEggs { get; set; } = new();
     public List<EggShellData> EggShells { get; set; } = new();
     public Dictionary<string, int> TrainingItems { get; set; } = new();
+    public Dictionary<string, int> UtilityItems
+    {
+        get => _utilityItems;
+        set => _utilityItems = value ?? new Dictionary<string, int>(StringComparer.Ordinal);
+    }
+    public string ShopRareOfferItemId
+    {
+        get => _shopRareOfferItemId;
+        set => _shopRareOfferItemId = value ?? string.Empty;
+    }
     public List<GardenModuleData> GardenModules { get; set; } = new();
 
     public List<PendingTradeJournalEntry> PendingTradeJournal { get; set; } = new();
@@ -42,7 +56,5 @@ public sealed class GameStateData
     public bool AutoFinishRaces { get; set; } = true;
     public bool EdgePanning { get; set; } = true;
 
-    // New installs begin with the lightweight guided tour. Migration marks pre-tutorial saves as
-    // completed so an update never surprises existing players with first-launch onboarding.
     public bool TutorialCompleted { get; set; }
 }

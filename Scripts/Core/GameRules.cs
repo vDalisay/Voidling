@@ -24,6 +24,8 @@ public static class GameRules
     public static int StoreEggSlotCount => Math.Max(1, _balance.Shop.StoreEggSlotCount);
     public static int TrainingItemPrice => _balance.Shop.TrainingItemPrice;
     public static int EggShellSalePrice => _balance.Shop.EggShellSalePrice;
+    public static int FullIncubationSkipPrice => Math.Max(0, _balance.Shop.FullIncubationSkipPrice);
+    public static double RareOfferAppearanceChance => Math.Clamp(_balance.Shop.RareOfferAppearanceChance, 0.0, 1.0);
     public static float ShopEggRotationIntervalSeconds => Math.Max(1.0f, _balance.Shop.EggRotationIntervalSeconds);
     public static float EggIncubationSeconds => _balance.Hatching.IncubationSeconds;
     public static float ChildToAdultSeconds => _balance.Lifecycle.ChildToAdultSeconds;

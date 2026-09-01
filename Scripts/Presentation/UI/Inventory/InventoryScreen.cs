@@ -13,20 +13,24 @@ public readonly record struct InventoryItemViewState(
 
 public readonly record struct FailedEggViewState(string EggId, string DisplayName);
 public readonly record struct EggShellViewState(string ShellId, string DisplayName, int SaleValue);
+public readonly record struct IncubatingEggViewState(string EggId, string DisplayName, int SecondsRemaining);
 
 public sealed record InventoryScreenState(
     IReadOnlyList<InventoryItemViewState> Items,
     IReadOnlyList<FailedEggViewState> FailedEggs,
-    IReadOnlyList<EggShellViewState> EggShells);
+    IReadOnlyList<EggShellViewState> EggShells,
+    int IncubationSkipCount,
+    IReadOnlyList<IncubatingEggViewState> IncubatingEggs);
 
 /// <summary>
-/// Inventory view over a supplied snapshot. It emits cleanup/sale intent rather than reaching
-/// into GameSession itself.
+/// Inventory view over a supplied snapshot. It emits cleanup/sale/utility-use intent rather than
+/// reaching into GameSession or mutating authoritative egg state itself.
 /// </summary>
 public partial class InventoryScreen : VBoxContainer
 {
     public event Action<string>? DiscardFailedEggRequested;
     public event Action<string>? SellEggShellRequested;
+    public event Action<string>? UseIncubationSkipRequested;
 
     private static readonly Texture2D EggTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
@@ -64,6 +68,20 @@ public partial class InventoryScreen : VBoxContainer
 
         foreach (var item in _state.Items)
             list.AddChild(CreateInventoryRow(CreateItemIcon(item), item.DisplayName, item.Count));
+
+        if (_state.IncubationSkipCount > 0)
+        {
+            list.AddChild(UiFactory.CreateLabel($"INCUBATION SKIPS  x{_state.IncubationSkipCount}", 8));
+            if (_state.IncubatingEggs.Count == 0)
+            {
+                list.AddChild(UiFactory.CreateLabel("No egg currently needs an incubation skip.", 6));
+            }
+            else
+            {
+                foreach (var egg in _state.IncubatingEggs)
+                    list.AddChild(CreateIncubationSkipRow(egg));
+            }
+        }
 
         if (_state.EggShells.Count > 0)
         {
@@ -114,6 +132,25 @@ public partial class InventoryScreen : VBoxContainer
         amount.HorizontalAlignment = HorizontalAlignment.Right;
         amount.VerticalAlignment = VerticalAlignment.Center;
         row.AddChild(amount);
+        return panel;
+    }
+
+    private Control CreateIncubationSkipRow(IncubatingEggViewState egg)
+    {
+        var panel = CreateRowPanel();
+        var row = CreateRow(panel);
+        row.AddChild(CreateRowIcon(CreateEggTexture()));
+
+        var name = UiFactory.CreateLabel($"{egg.DisplayName} • {egg.SecondsRemaining}s", 7);
+        name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        name.VerticalAlignment = VerticalAlignment.Center;
+        row.AddChild(name);
+
+        var use = UiFactory.CreateButton("Use Skip");
+        use.CustomMinimumSize = new Vector2(76, 22);
+        UiFactory.ApplyPixelFont(use, 7);
+        use.Pressed += () => UseIncubationSkipRequested?.Invoke(egg.EggId);
+        row.AddChild(use);
         return panel;
     }
 

@@ -3,6 +3,7 @@ using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
 using Voidling.Application.Creatures;
+using Voidling.Domain.Shop;
 using Voidling.Presentation.UI.Breeding;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Shop;
@@ -31,6 +32,17 @@ public partial class MainController : Node
                 Price: GameRules.StoreEggPrice))
             .ToArray();
 
+        ShopRareOfferViewState? rareOffer = string.Equals(
+            state.ShopRareOfferItemId,
+            ShopItemIds.FullIncubationSkip,
+            StringComparison.Ordinal)
+            ? new ShopRareOfferViewState(
+                ShopItemIds.FullIncubationSkip,
+                "RARE: INCUBATION SKIP",
+                "Completes one owned egg's incubation timer. Hatching still follows normal Garden rules.",
+                GameRules.FullIncubationSkipPrice)
+            : null;
+
         var rotationRemaining = (int)Math.Ceiling(Math.Max(
             0.0,
             GameRules.ShopEggRotationIntervalSeconds - state.ShopEggRotationElapsedSeconds));
@@ -40,7 +52,7 @@ public partial class MainController : Node
         box.AddChild(CreateDailyLoginPanel());
 
         var screen = new ShopScreen();
-        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rotationRemaining));
+        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rotationRemaining, rareOffer));
         screen.TrainingItemPurchaseRequested += statId =>
         {
             _session.BuyTrainingItem(statId);
@@ -49,6 +61,11 @@ public partial class MainController : Node
         screen.EggPurchaseRequested += eggId =>
         {
             _session.BuyStoreEgg(eggId);
+            ShowShop();
+        };
+        screen.RareOfferPurchaseRequested += itemId =>
+        {
+            _session.BuyRareShopOffer(itemId);
             ShowShop();
         };
         box.AddChild(screen);

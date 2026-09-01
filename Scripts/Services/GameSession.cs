@@ -11,6 +11,7 @@ using Voidling.Application.Shop;
 using Voidling.Application.Simulation;
 using Voidling.Application.Training;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Shop;
 
 namespace VoidlingGame;
 
@@ -306,6 +307,10 @@ public partial class GameSession : Node
 
         for (var i = 0; i < GameRules.StoreEggSlotCount; i++)
             State.StoreEggs.Add(CreateStoreEgg());
+
+        State.ShopRareOfferItemId = RareShopOfferResolver.Resolve(
+            unchecked((ulong)State.SeedCounter),
+            GameRules.RareOfferAppearanceChance);
 
         return State;
     }

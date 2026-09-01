@@ -81,3 +81,5 @@ StoreEggPrice = 30
 TrainingItemPrice = 8
 EggShellSalePrice = 5
 EggRotationIntervalSeconds = 3600.0
+RareOfferAppearanceChance = 0.2
+FullIncubationSkipPrice = 45

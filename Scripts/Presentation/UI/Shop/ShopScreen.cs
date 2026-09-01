@@ -18,11 +18,18 @@ public readonly record struct ShopEggViewState(
     int Number,
     int Price);
 
+public readonly record struct ShopRareOfferViewState(
+    string ItemId,
+    string DisplayName,
+    string Tooltip,
+    int Price);
+
 public sealed record ShopScreenState(
     int Coins,
     IReadOnlyList<ShopTrainingItemViewState> TrainingItems,
     IReadOnlyList<ShopEggViewState> Eggs,
-    int EggRotationSecondsRemaining);
+    int EggRotationSecondsRemaining,
+    ShopRareOfferViewState? RareOffer);
 
 /// <summary>
 /// Standalone shop view. It renders a supplied snapshot and emits player purchase intent.
@@ -36,6 +43,7 @@ public partial class ShopScreen : VBoxContainer
 
     public event Action<string>? TrainingItemPurchaseRequested;
     public event Action<string>? EggPurchaseRequested;
+    public event Action<string>? RareOfferPurchaseRequested;
 
     private ShopScreenState? _state;
 
@@ -66,16 +74,26 @@ public partial class ShopScreen : VBoxContainer
     private Control BuildSummary(ShopScreenState state)
     {
         var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 8);
+        row.AddThemeConstantOverride("separation", 6);
 
         var welcome = UiFactory.CreateLabel(
-            $"{Tr("UI_SHOP_WELCOME")}  •  Mystery eggs rotate in {FormatRotation(state.EggRotationSecondsRemaining)}",
+            $"{Tr("UI_SHOP_WELCOME")}  •  Rotation {FormatRotation(state.EggRotationSecondsRemaining)}",
             7);
         welcome.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         welcome.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
         row.AddChild(welcome);
 
-        var wallet = UiFactory.CreatePanel(new Vector2(128, 24));
+        if (state.RareOffer is { } offer)
+        {
+            var rare = UiFactory.CreateButton($"{offer.DisplayName}  {offer.Price}");
+            rare.CustomMinimumSize = new Vector2(154, 24);
+            rare.TooltipText = offer.Tooltip;
+            UiFactory.ApplyPixelFont(rare, 6);
+            rare.Pressed += () => RareOfferPurchaseRequested?.Invoke(offer.ItemId);
+            row.AddChild(rare);
+        }
+
+        var wallet = UiFactory.CreatePanel(new Vector2(112, 24));
         var walletLabel = UiFactory.CreateLabel(
             string.Format(Tr("UI_SHOP_WALLET"), state.Coins), 8);
         walletLabel.HorizontalAlignment = HorizontalAlignment.Center;

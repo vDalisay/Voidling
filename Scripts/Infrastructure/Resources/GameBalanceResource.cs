@@ -144,6 +144,8 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "0,10000,1")] public int TrainingItemPrice { get; set; } = 8;
     [Export(PropertyHint.Range, "0,10000,1")] public int EggShellSalePrice { get; set; } = 5;
     [Export(PropertyHint.Range, "60,86400,60")] public float EggRotationIntervalSeconds { get; set; } = 3600.0f;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float RareOfferAppearanceChance { get; set; } = 0.20f;
+    [Export(PropertyHint.Range, "0,10000,1")] public int FullIncubationSkipPrice { get; set; } = 45;
 
     public GameBalanceRules ToDomainRules()
     {
@@ -237,7 +239,9 @@ public partial class GameBalanceResource : Resource
                 StoreEggSlotCount = Math.Clamp(StoreEggSlotCount, 1, 12),
                 TrainingItemPrice = Math.Max(0, TrainingItemPrice),
                 EggShellSalePrice = Math.Max(0, EggShellSalePrice),
-                EggRotationIntervalSeconds = Positive(EggRotationIntervalSeconds, 1.0f)
+                EggRotationIntervalSeconds = Positive(EggRotationIntervalSeconds, 1.0f),
+                RareOfferAppearanceChance = Probability(RareOfferAppearanceChance),
+                FullIncubationSkipPrice = Math.Max(0, FullIncubationSkipPrice)
             }
         };
     }

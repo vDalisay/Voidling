@@ -5,6 +5,7 @@ using Voidling.Domain.Evolution;
 using Voidling.Domain.Hatching;
 using Voidling.Domain.Lifecycle;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Shop;
 using Voidling.Domain.Training;
 using VoidlingGame;
 
@@ -292,11 +293,11 @@ public sealed class AdvanceSimulationUseCase
         if (rotations <= 0)
             return false;
 
-        RefreshStoreEggInventory(state, rotations);
+        RefreshStoreInventory(state, rotations);
         return true;
     }
 
-    private void RefreshStoreEggInventory(GameStateData state, long rotations)
+    private void RefreshStoreInventory(GameStateData state, long rotations)
     {
         var slotCount = Math.Max(1, _rules.Shop.StoreEggSlotCount);
         var baseCounter = state.SeedCounter;
@@ -314,6 +315,12 @@ public sealed class AdvanceSimulationUseCase
         state.SeedCounter = unchecked(baseCounter + allocations);
         state.StoreEggs.Clear();
         state.StoreEggs.AddRange(replacements);
+
+        // Resolve only the final rotation's rare slot. The seed is the same post-egg counter a
+        // sequence of one-rotation updates would end on, preserving chunk invariance.
+        state.ShopRareOfferItemId = RareShopOfferResolver.Resolve(
+            unchecked((ulong)state.SeedCounter),
+            _rules.Shop.RareOfferAppearanceChance);
     }
 
     private VoidlingData Hatch(GameStateData state, EggData egg)
