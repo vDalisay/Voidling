@@ -25,7 +25,7 @@ public sealed record DetailsScreenState(
     string Name,
     bool IsAdult,
     int FamilyGeneration,
-    int InbreedingBurden,
+    string LineageRisk,
     Color TintColor,
     bool HasAngelMutation,
     int OtherMutationCount,
@@ -146,7 +146,7 @@ public partial class DetailsScreen : VBoxContainer
         var summary = new VBoxContainer();
         summary.AddThemeConstantOverride("separation", 2);
         summary.AddChild(UiFactory.CreateLabel(string.Format(Tr("UI_DETAILS_GENERATION"), state.FamilyGeneration), 8));
-        summary.AddChild(UiFactory.CreateLabel(string.Format(Tr("UI_DETAILS_INBREEDING"), state.InbreedingBurden), 7));
+        summary.AddChild(UiFactory.CreateLabel(string.Format(Tr("UI_DETAILS_INBREEDING"), state.LineageRisk), 7));
         summary.AddChild(UiFactory.CreateLabel(Tr("UI_DETAILS_DNA_HINT"), 6));
         intro.AddChild(summary);
         _body.AddChild(intro);

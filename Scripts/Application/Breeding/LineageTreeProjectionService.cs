@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Voidling.Application.Roster;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
@@ -48,13 +49,18 @@ public sealed class LineageTreeProjectionService
     private readonly IReadOnlyList<string> _statIds;
     private readonly StatCalculator _stats;
     private readonly LineageArchiveService _archive = new();
+    private readonly CreatureProfileProjectionService _profiles;
 
     public LineageTreeProjectionService(GameBalanceRules rules)
     {
         ArgumentNullException.ThrowIfNull(rules);
         _statIds = rules.Genetics.StatIds;
         _stats = new StatCalculator(rules.Stats);
+        _profiles = new CreatureProfileProjectionService(rules);
     }
+
+    public CreatureProfileProjection? CreateCreatureProfile(GameStateData state, string creatureId)
+        => _profiles.Create(state, creatureId);
 
     public LineageTreeProjection Create(GameStateData state, string selectedCreatureId)
     {

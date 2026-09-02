@@ -56,7 +56,7 @@ public partial class MainController : Node
 
         var parentViews = adults.Select(CreateBreedingParentView).ToArray();
         var initialPreview = parentViews.Length >= 2
-            ? CreateBreedingPreviewView(_session.GetBreedingPreviewData(parentViews[0].Id, parentViews[1].Id))
+            ? CreateBreedingPreviewView(_session.GetBreedingPairInfo(parentViews[0].Id, parentViews[1].Id))
             : new BreedingPreviewViewState(Tr("UI_BREED_NEED_TWO_ADULTS"), false);
 
         var box = OpenModal(Tr("UI_BREED_TITLE"), new Vector2(440, 270));
@@ -64,12 +64,12 @@ public partial class MainController : Node
         screen.Configure(new BreedingScreenState(parentViews, initialPreview));
         screen.PairChanged += (parentAId, parentBId) =>
         {
-            var preview = _session.GetBreedingPreviewData(parentAId, parentBId);
+            var preview = _session.GetBreedingPairInfo(parentAId, parentBId);
             screen.SetPreview(CreateBreedingPreviewView(preview));
         };
         screen.BreedRequested += (parentAId, parentBId) =>
         {
-            var preview = _session.GetBreedingPreviewData(parentAId, parentBId);
+            var preview = _session.GetBreedingPairInfo(parentAId, parentBId);
             if (!preview.CanBreed)
             {
                 screen.SetPreview(CreateBreedingPreviewView(preview));
@@ -107,7 +107,7 @@ public partial class MainController : Node
             OtherMutationCount: otherMutations);
     }
 
-    private BreedingPreviewViewState CreateBreedingPreviewView(BreedingPreview preview)
+    private BreedingPreviewViewState CreateBreedingPreviewView(BreedingPairInfoProjection preview)
     {
         string text;
         if (!preview.CanBreed)
@@ -122,18 +122,15 @@ public partial class MainController : Node
         }
         else if (preview.Related)
         {
-            text = string.Format(
-                Tr("UI_BREED_RELATED"),
-                preview.ChildBurden,
-                preview.HatchFailurePercent);
+            text = $"Related pairing • lineage risk: {LineageRiskDisplayName(preview.LineageRisk)}.";
         }
         else if (preview.IsCleanOutcross)
         {
-            text = string.Format(Tr("UI_BREED_CLEAN_OUTCROSS"), preview.ChildBurden);
+            text = $"Clean outcross • lineage risk improves to {LineageRiskDisplayName(preview.LineageRisk)}.";
         }
         else if (preview.ChildBurden > 0)
         {
-            text = string.Format(Tr("UI_BREED_UNRELATED_BURDEN"), preview.ChildBurden);
+            text = $"Unrelated pairing • lineage risk remains {LineageRiskDisplayName(preview.LineageRisk)}.";
         }
         else
         {
@@ -142,4 +139,14 @@ public partial class MainController : Node
 
         return new BreedingPreviewViewState(text, preview.CanBreed);
     }
+
+    private static string LineageRiskDisplayName(LineageRiskBand risk)
+        => risk switch
+        {
+            LineageRiskBand.None => "None",
+            LineageRiskBand.Low => "Low",
+            LineageRiskBand.Moderate => "Moderate",
+            LineageRiskBand.High => "High",
+            _ => "Critical"
+        };
 }
