@@ -1,3 +1,4 @@
+using System.Linq;
 using Voidling.Application.Simulation;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Rules;
@@ -35,6 +36,28 @@ public sealed class SimulationArchitectureTests
     }
 
     [Fact]
+    public void Advance_AdultTransitionIsEmittedExactlyOnce()
+    {
+        var child = new VoidlingData
+        {
+            Id = "child",
+            Name = "Bud",
+            Stage = LifeStage.Child,
+            AgeSeconds = Rules.Lifecycle.ChildToAdultSeconds - 0.1f
+        };
+        var state = new GameStateData();
+        state.Voidlings.Add(child);
+        var simulation = new AdvanceSimulationUseCase(Rules);
+
+        var first = simulation.Advance(state, 0.2f);
+        var second = simulation.Advance(state, 5.0f);
+
+        Assert.Single(first.Events.OfType<CreatureBecameAdultEvent>());
+        Assert.Empty(second.Events.OfType<CreatureBecameAdultEvent>());
+        Assert.Equal(LifeStage.Adult, child.Stage);
+    }
+
+    [Fact]
     public void Advance_ViableReadyEggHatchesWithoutRerollingGenome()
     {
         var genome = new GenomeFactory(Rules.Genetics).CreateRandom(123UL);
@@ -66,6 +89,30 @@ public sealed class SimulationArchitectureTests
     }
 
     [Fact]
+    public void Advance_HatchTransitionIsEmittedExactlyOnce()
+    {
+        var egg = new EggData
+        {
+            Id = "egg-once",
+            Genome = new GenomeFactory(Rules.Genetics).CreateRandom(555UL),
+            IsViable = true,
+            FailureResolved = true,
+            RequiredIncubationSeconds = 0.1f
+        };
+        var state = new GameStateData();
+        state.OwnedEggs.Add(egg);
+        var simulation = new AdvanceSimulationUseCase(Rules);
+
+        var first = simulation.Advance(state, 0.2f);
+        var second = simulation.Advance(state, 10.0f);
+
+        Assert.Single(first.Events.OfType<CreatureHatchedEvent>());
+        Assert.Empty(second.Events.OfType<CreatureHatchedEvent>());
+        Assert.Single(state.Voidlings);
+        Assert.Empty(state.OwnedEggs);
+    }
+
+    [Fact]
     public void Advance_NonViableReadyEggFailsAndRemainsPersisted()
     {
         var egg = new EggData
@@ -89,6 +136,50 @@ public sealed class SimulationArchitectureTests
     }
 
     [Fact]
+    public void Advance_FailedEggTransitionIsEmittedExactlyOnce()
+    {
+        var egg = new EggData
+        {
+            Id = "failed-once",
+            IsViable = false,
+            FailureResolved = true,
+            RequiredIncubationSeconds = 0.1f
+        };
+        var state = new GameStateData();
+        state.OwnedEggs.Add(egg);
+        var simulation = new AdvanceSimulationUseCase(Rules);
+
+        var first = simulation.Advance(state, 0.2f);
+        var second = simulation.Advance(state, 10.0f);
+
+        Assert.Single(first.Events.OfType<EggFailedEvent>());
+        Assert.Empty(second.Events.OfType<EggFailedEvent>());
+        Assert.Equal(EggState.Failed, egg.State);
+        Assert.Same(egg, Assert.Single(state.OwnedEggs));
+    }
+
+    [Fact]
+    public void Advance_EquivalentElapsedChunksReachSameLifecycleState()
+    {
+        var firstState = CreateChunkingState();
+        var secondState = CreateChunkingState();
+        var simulation = new AdvanceSimulationUseCase(Rules);
+
+        simulation.Advance(firstState, 2.0f);
+        simulation.Advance(secondState, 0.5f);
+        simulation.Advance(secondState, 0.75f);
+        simulation.Advance(secondState, 0.75f);
+
+        var firstCreature = Assert.Single(firstState.Voidlings);
+        var secondCreature = Assert.Single(secondState.Voidlings);
+        Assert.Equal(firstCreature.Stage, secondCreature.Stage);
+        Assert.Equal(firstCreature.AgeSeconds, secondCreature.AgeSeconds, 4);
+        Assert.Equal(firstCreature.BreedCooldownSeconds, secondCreature.BreedCooldownSeconds, 4);
+        Assert.Equal(firstState.OwnedEggs[0].IncubationSeconds, secondState.OwnedEggs[0].IncubationSeconds, 4);
+        Assert.Equal(firstState.OwnedEggs[0].State, secondState.OwnedEggs[0].State);
+    }
+
+    [Fact]
     public void Advance_ZeroElapsedTimeIsAStableNoOp()
     {
         var state = new GameStateData();
@@ -100,5 +191,26 @@ public sealed class SimulationArchitectureTests
         Assert.False(result.Changed);
         Assert.Empty(result.Events);
         Assert.Equal(5.0f, child.AgeSeconds);
+    }
+
+    private static GameStateData CreateChunkingState()
+    {
+        var state = new GameStateData();
+        state.Voidlings.Add(new VoidlingData
+        {
+            Id = "growing",
+            Stage = LifeStage.Child,
+            AgeSeconds = 3.0f,
+            BreedCooldownSeconds = 3.0f
+        });
+        state.OwnedEggs.Add(new EggData
+        {
+            Id = "incubating",
+            RequiredIncubationSeconds = 10.0f,
+            IncubationSeconds = 1.0f,
+            IsViable = true,
+            FailureResolved = true
+        });
+        return state;
     }
 }
