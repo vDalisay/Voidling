@@ -33,68 +33,62 @@ public partial class MainController : Node
         box.AddChild(screen);
     }
 
-    private static RacePickerVoidlingViewState CreateRacePickerView(VoidlingData creature)
+    private RacePickerVoidlingViewState CreateRacePickerView(VoidlingData creature)
     {
-        var hasAngel = GameRules.HasMutation(creature, GameRules.AngelMutationId);
-        var otherMutations = creature.RareTraits?.Count(trait =>
-            !string.Equals(trait.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
-        var statSummary = string.Join("   ", GameRules.StatIds.Select(stat =>
-            $"{StatPresentationCatalog.NameFor(stat)} {GameRules.GradeName(GameRules.GetGene(creature, stat).ExpressedValue)} {Mathf.RoundToInt(GameRules.EffectiveStat(creature, stat))}"));
+        var profile = _session.CreateCreatureProfileProjection(creature.Id)
+            ?? throw new InvalidOperationException($"Could not project race-picker data for '{creature.Id}'.");
+        var statSummary = string.Join("   ", profile.Stats.Select(stat =>
+            $"{StatPresentationCatalog.NameFor(stat.StatId)} {stat.InheritedRank} {stat.EffectiveValue}"));
 
         return new RacePickerVoidlingViewState(
-            creature.Id,
-            creature.Name,
-            GameRules.TintColor(creature.TintHex),
-            hasAngel,
-            otherMutations,
+            profile.CreatureId,
+            profile.Name,
+            GameRules.TintColor(profile.TintHex),
+            profile.HasAngelMutation,
+            profile.OtherMutationCount,
             statSummary);
     }
 
     private void ShowDetails()
     {
-        var data = _session.FindVoidling(_selectedId);
-        if (data == null)
+        var profile = _session.CreateCreatureProfileProjection(_selectedId);
+        if (profile == null)
             return;
 
-        var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
-        var otherMutations = data.RareTraits?.Count(trait =>
-            !string.Equals(trait.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
-        var stats = GameRules.StatIds.Select(statId =>
-        {
-            var gene = GameRules.GetGene(data, statId);
-            return new DetailsStatViewState(
-                StatPresentationCatalog.NameFor(statId),
-                StatPresentationCatalog.ColorFor(statId),
-                GameRules.GradeName(gene.ExpressedValue),
-                GameRules.StatLevel(data, statId),
-                Mathf.RoundToInt(GameRules.EffectiveStat(data, statId)),
-                GameRules.StatLevelProgress(data, statId),
-                GameRules.GradeName(gene.AlleleA),
-                GameRules.GradeName(gene.AlleleB));
-        }).ToArray();
-        var rareTraits = data.RareTraits?
+        var stats = profile.Stats
+            .Select(stat => new DetailsStatViewState(
+                StatPresentationCatalog.NameFor(stat.StatId),
+                StatPresentationCatalog.ColorFor(stat.StatId),
+                stat.InheritedRank,
+                stat.TrainingLevel,
+                stat.EffectiveValue,
+                stat.TrainingProgress,
+                stat.Dna1Rank,
+                stat.Dna2Rank))
+            .ToArray();
+        var rareTraits = profile.RareTraits
             .Select(trait => new DetailsRareTraitViewState(
                 trait.TraitId,
-                _session.NameFor(trait.FounderCreatureId),
+                trait.FounderName,
                 trait.GenerationFromFounder,
                 trait.CanTransmit))
-            .ToArray() ?? Array.Empty<DetailsRareTraitViewState>();
+            .ToArray();
 
         var state = new DetailsScreenState(
-            data.Name,
-            data.Stage == LifeStage.Adult,
-            data.FamilyGeneration,
-            data.InbreedingBurdenLevel,
-            GameRules.TintColor(data.TintHex),
-            hasAngel,
-            otherMutations,
-            data.Genome.ColorAlleleA,
-            data.Genome.ColorAlleleB,
-            data.Genome.ExpressedColorIndex,
+            profile.Name,
+            profile.IsAdult,
+            profile.FamilyGeneration,
+            Tr(LineageRiskTranslationKey(profile.LineageRisk)),
+            GameRules.TintColor(profile.TintHex),
+            profile.HasAngelMutation,
+            profile.OtherMutationCount,
+            profile.ColorAlleleA,
+            profile.ColorAlleleB,
+            profile.ExpressedColorIndex,
             stats,
             rareTraits);
 
-        var box = OpenModal($"{data.Name.ToUpperInvariant()} — DETAILS", new Vector2(536, 318));
+        var box = OpenModal($"{profile.Name.ToUpperInvariant()} — DETAILS", new Vector2(536, 318));
         var screen = new DetailsScreen();
         screen.Configure(state);
         box.AddChild(screen);
