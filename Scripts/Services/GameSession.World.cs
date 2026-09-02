@@ -15,7 +15,10 @@ public partial class GameSession
     {
         var result = _roster!.Rename(State, creatureId, requestedName);
         if (result.Failure == RenameFailure.CreatureNotFound)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.MissingVoidling);
             return false;
+        }
         if (result.Failure == RenameFailure.EmptyName)
         {
             ToastRequested?.Invoke("A Voidling needs a name.");

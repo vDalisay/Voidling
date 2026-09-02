@@ -9,13 +9,11 @@ public partial class GameSession
     public void BuyStoreEgg(string eggId)
     {
         var failure = _shop!.ValidateStoreEggPurchase(State, eggId);
-        if (failure == ShopFailure.NotEnoughCurrency)
+        if (failure != ShopFailure.None)
         {
-            ToastRequested?.Invoke("Not enough sprouts.");
+            ToastRequested?.Invoke(PlayerActionFailureText.ForShop(failure));
             return;
         }
-        if (failure != ShopFailure.None)
-            return;
 
         // Only allocate the replacement's persistent seed after the transaction is known to
         // be valid. Failed clicks must not shift later deterministic random streams.
@@ -31,7 +29,10 @@ public partial class GameSession
             nestPosition.Y);
 
         if (!result.Succeeded)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.ForShop(result.Failure));
             return;
+        }
 
         RecordDailyMissionEvent(DailyMissionEventKind.PurchaseShopItem);
         SaveAndNotify("Bought a mystery egg.");
@@ -41,14 +42,9 @@ public partial class GameSession
     public bool BuyRareShopOffer(string itemId)
     {
         var failure = _shop!.BuyRareOffer(State, itemId);
-        if (failure == ShopFailure.NotEnoughCurrency)
-        {
-            ToastRequested?.Invoke("Not enough sprouts.");
-            return false;
-        }
         if (failure != ShopFailure.None)
         {
-            ToastRequested?.Invoke("That rare Shop offer is no longer available.");
+            ToastRequested?.Invoke(PlayerActionFailureText.ForShop(failure));
             return false;
         }
 
@@ -65,13 +61,7 @@ public partial class GameSession
         var failure = _shop!.UseFullIncubationSkip(State, eggId);
         if (failure != ShopFailure.None)
         {
-            ToastRequested?.Invoke(failure switch
-            {
-                ShopFailure.UtilityItemNotOwned => "No incubation skips are available.",
-                ShopFailure.EggAlreadyReady => "That egg is already ready to hatch.",
-                ShopFailure.EggNotIncubating => "Choose an egg that is still incubating.",
-                _ => "The incubation skip could not be used."
-            });
+            ToastRequested?.Invoke(PlayerActionFailureText.ForShop(failure));
             return false;
         }
 
@@ -85,7 +75,10 @@ public partial class GameSession
     {
         var result = _shop!.SellEggShell(State, shellId);
         if (!result.Succeeded)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.ForShop(result.Failure));
             return false;
+        }
 
         SaveAndNotify($"Sold an eggshell for {result.CoinsGained} sprouts.");
         return true;

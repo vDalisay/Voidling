@@ -23,7 +23,10 @@ public partial class GameSession
     public void DiscardFailedEgg(string eggId)
     {
         if (!_roster!.DiscardFailedEgg(State, eggId))
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.MissingFailedEgg);
             return;
+        }
 
         SaveAndNotify("Removed the failed egg.");
         RaiseGardenEvent("A failed egg was removed from the garden.");
@@ -33,7 +36,10 @@ public partial class GameSession
     {
         var result = _roster!.SayGoodbye(State, creatureId);
         if (!result.Succeeded)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.MissingVoidling);
             return false;
+        }
 
         SaveAndNotify($"{result.Name} left the farm forever. Their family record remains.");
         RaiseGardenEvent($"{result.Name} left the garden. Their family record remains.");

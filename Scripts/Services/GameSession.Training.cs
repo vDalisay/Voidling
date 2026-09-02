@@ -9,41 +9,41 @@ public partial class GameSession
     public void BuyTrainingItem(string statId)
     {
         var result = _training!.BuyTrainingItem(State, statId);
-        switch (result.Failure)
+        if (!result.Succeeded)
         {
-            case TrainingFailure.None:
-                RecordDailyMissionEvent(DailyMissionEventKind.PurchaseShopItem);
-                SaveAndNotify($"Bought a {DisplayStatId(statId)} treat.");
-                break;
-            case TrainingFailure.NotEnoughCurrency:
-                ToastRequested?.Invoke("Not enough sprouts.");
-                break;
+            ToastRequested?.Invoke(PlayerActionFailureText.ForTraining(result.Failure, DisplayStatId(statId)));
+            return;
         }
+
+        RecordDailyMissionEvent(DailyMissionEventKind.PurchaseShopItem);
+        SaveAndNotify($"Bought a {DisplayStatId(statId)} treat.");
     }
 
     public void UseTrainingItem(string creatureId, string statId)
     {
         var creature = FindVoidling(creatureId);
         if (creature == null)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.MissingVoidling);
             return;
+        }
 
         var failure = _training!.ValidateTrainingItem(State, creatureId, statId);
-        if (failure == TrainingFailure.NoItemOwned)
-        {
-            ToastRequested?.Invoke($"Buy a {DisplayStatId(statId)} treat first.");
-            return;
-        }
-        if (failure == TrainingFailure.StatAtCap)
-        {
-            ToastRequested?.Invoke($"{creature.Name}'s {DisplayStatId(statId)} training is capped by its current DNA rank.");
-            return;
-        }
         if (failure != TrainingFailure.None)
+        {
+            var message = failure == TrainingFailure.StatAtCap
+                ? $"{creature.Name}'s {DisplayStatId(statId)} training is capped by its current DNA rank."
+                : PlayerActionFailureText.ForTraining(failure, DisplayStatId(statId));
+            ToastRequested?.Invoke(message);
             return;
+        }
 
         var result = _training.ApplyTrainingItem(State, creatureId, statId, NextSeed());
         if (!result.Succeeded)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.ForTraining(result.Failure, DisplayStatId(statId)));
             return;
+        }
 
         RecordDailyMissionEvent(DailyMissionEventKind.UseTrainingTreat);
         var message = result.FavoriteFoodDiscoveredNow
@@ -58,8 +58,7 @@ public partial class GameSession
         var result = _training!.BuyGardenModule(State, NewId(), statId);
         if (!result.Succeeded)
         {
-            if (result.Failure == GardenModuleFailure.NotEnoughCurrency)
-                ToastRequested?.Invoke("Not enough sprouts.");
+            ToastRequested?.Invoke(PlayerActionFailureText.ForGardenModule(result.Failure));
             return false;
         }
 
@@ -73,7 +72,10 @@ public partial class GameSession
     {
         var result = _training!.PlaceGardenModule(State, moduleId, slotIndex);
         if (!result.Succeeded)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.ForGardenModule(result.Failure));
             return false;
+        }
         if (!result.Changed)
             return true;
 
@@ -90,12 +92,7 @@ public partial class GameSession
         var result = _training!.UpgradeGardenModule(State, moduleId);
         if (!result.Succeeded)
         {
-            ToastRequested?.Invoke(result.Failure switch
-            {
-                GardenModuleFailure.NotEnoughCurrency => "Not enough sprouts.",
-                GardenModuleFailure.MaxLevel => "That Garden module is already at its current maximum level.",
-                _ => "Could not upgrade that Garden module."
-            });
+            ToastRequested?.Invoke(PlayerActionFailureText.ForGardenModule(result.Failure));
             return false;
         }
 
@@ -108,16 +105,17 @@ public partial class GameSession
     {
         var creature = FindVoidling(creatureId);
         if (creature == null)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.MissingVoidling);
             return false;
+        }
 
         var result = _training!.SetPassiveTrainingFromPlacedModule(State, creatureId, statId);
         if (!result.Succeeded)
         {
+            ToastRequested?.Invoke(PlayerActionFailureText.ForPassiveTraining(result.Failure, DisplayStatId(statId)));
             if (result.Failure == PassiveTrainingFailure.NoPlacedModule)
-            {
-                ToastRequested?.Invoke($"Place a {DisplayStatId(statId)} Garden module first.");
                 StateChanged?.Invoke();
-            }
             return false;
         }
         if (!result.Changed)

@@ -13,11 +13,17 @@ public partial class GameSession
     {
         var creature = FindVoidling(creatureId);
         if (creature == null)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.MissingVoidling);
             return false;
+        }
 
         var result = _care.Pet(State, creatureId);
         if (!result.Succeeded)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.MissingVoidling);
             return false;
+        }
 
         var missionChanged = RecordDailyMissionEvent(DailyMissionEventKind.PetVoidling);
         var message = $"{creature.Name} enjoyed some attention.";
@@ -37,11 +43,17 @@ public partial class GameSession
     {
         var creature = FindVoidling(creatureId);
         if (creature == null)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.MissingVoidling);
             return false;
+        }
 
         var result = _care.Mistreat(State, creatureId);
         if (!result.Succeeded)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.MissingVoidling);
             return false;
+        }
 
         if (!result.Changed)
             return true;
