@@ -8,7 +8,8 @@ public enum RaceSegmentKind
 {
     Ground,
     Swim,
-    Glide
+    Glide,
+    Climb
 }
 
 public readonly record struct RaceCourseSegment(
@@ -22,8 +23,8 @@ public readonly record struct RaceCourseSegment(
 
 /// <summary>
 /// Pure course definition for the current demo race. It contains result-affecting geometry only;
-/// decorative track rendering remains presentation-owned. Future Power/route/shortcut work can
-/// add authored segment kinds/branches without putting another rules switch in RaceController.
+/// decorative track rendering remains presentation-owned. Future route/shortcut work can add
+/// authored branches without putting result rules in RaceController.
 /// </summary>
 public sealed class RaceCourse
 {
@@ -35,7 +36,8 @@ public sealed class RaceCourse
         {
             new RaceCourseSegment("ground-start", 70.0f, 500.0f, RaceSegmentKind.Ground),
             new RaceCourseSegment("swim", 500.0f, 760.0f, RaceSegmentKind.Swim),
-            new RaceCourseSegment("ground-middle", 760.0f, 1080.0f, RaceSegmentKind.Ground),
+            new RaceCourseSegment("climb", 760.0f, 860.0f, RaceSegmentKind.Climb),
+            new RaceCourseSegment("ground-middle", 860.0f, 1080.0f, RaceSegmentKind.Ground),
             new RaceCourseSegment("glide", 1080.0f, 1370.0f, RaceSegmentKind.Glide),
             new RaceCourseSegment("ground-finish", 1370.0f, 1810.0f, RaceSegmentKind.Ground)
         },
@@ -86,6 +88,7 @@ public sealed class RaceCourse
             RaceSegmentKind.Swim => RaceTerrain.Swim,
             RaceSegmentKind.Glide when glideFailed => RaceTerrain.FailedGlideSwim,
             RaceSegmentKind.Glide => RaceTerrain.Glide,
+            RaceSegmentKind.Climb => RaceTerrain.Climb,
             _ => RaceTerrain.Ground
         };
     }
