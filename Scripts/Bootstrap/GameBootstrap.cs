@@ -71,7 +71,8 @@ public partial class GameBootstrap : Node
             new ShopUseCase(rules),
             new SettingsUseCase(),
             new VoidlingRosterUseCase(),
-            new RaceResultUseCase(rules));
+            new RaceResultUseCase(rules),
+            new LineageTreeProjectionService(rules));
         session.ConfigureRacing(new RaceEntryFactory(rules));
 
         AddChild(session);
