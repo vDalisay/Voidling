@@ -122,21 +122,15 @@ public partial class MainController : Node
         }
         else if (preview.Related)
         {
-            text = string.Format(
-                Tr("UI_BREED_RELATED"),
-                Tr(LineageRiskTranslationKey(preview.LineageRisk)));
+            text = $"Related pairing • lineage risk: {LineageRiskDisplayName(preview.LineageRisk)}.";
         }
         else if (preview.IsCleanOutcross)
         {
-            text = string.Format(
-                Tr("UI_BREED_CLEAN_OUTCROSS"),
-                Tr(LineageRiskTranslationKey(preview.LineageRisk)));
+            text = $"Clean outcross • lineage risk improves to {LineageRiskDisplayName(preview.LineageRisk)}.";
         }
         else if (preview.ChildBurden > 0)
         {
-            text = string.Format(
-                Tr("UI_BREED_UNRELATED_BURDEN"),
-                Tr(LineageRiskTranslationKey(preview.LineageRisk)));
+            text = $"Unrelated pairing • lineage risk remains {LineageRiskDisplayName(preview.LineageRisk)}.";
         }
         else
         {
@@ -146,13 +140,13 @@ public partial class MainController : Node
         return new BreedingPreviewViewState(text, preview.CanBreed);
     }
 
-    private static string LineageRiskTranslationKey(LineageRiskBand risk)
+    private static string LineageRiskDisplayName(LineageRiskBand risk)
         => risk switch
         {
-            LineageRiskBand.None => "UI_LINEAGE_RISK_NONE",
-            LineageRiskBand.Low => "UI_LINEAGE_RISK_LOW",
-            LineageRiskBand.Moderate => "UI_LINEAGE_RISK_MODERATE",
-            LineageRiskBand.High => "UI_LINEAGE_RISK_HIGH",
-            _ => "UI_LINEAGE_RISK_CRITICAL"
+            LineageRiskBand.None => "None",
+            LineageRiskBand.Low => "Low",
+            LineageRiskBand.Moderate => "Moderate",
+            LineageRiskBand.High => "High",
+            _ => "Critical"
         };
 }
