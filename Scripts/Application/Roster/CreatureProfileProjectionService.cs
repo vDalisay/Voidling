@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Voidling.Application.Breeding;
+using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
 using VoidlingGame;
 
@@ -50,7 +51,7 @@ public sealed class CreatureProfileProjectionService
     private readonly IReadOnlyList<string> _statIds;
     private readonly StatCalculator _stats;
 
-    public CreatureProfileProjectionService(Domain.Rules.GameBalanceRules rules)
+    public CreatureProfileProjectionService(GameBalanceRules rules)
     {
         ArgumentNullException.ThrowIfNull(rules);
         _statIds = rules.Genetics.StatIds;
