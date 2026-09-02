@@ -6,6 +6,7 @@ using Voidling.Application.Creatures;
 using Voidling.Domain.Shop;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Inventory;
+using Voidling.Presentation.UI.Shop;
 
 namespace VoidlingGame;
 
@@ -272,6 +273,7 @@ public partial class MainController : Node
     private Control CreateProfileStatBlock(VoidlingStatProfileProjection stat, bool animateProgress)
     {
         var statId = stat.StatId;
+        var statName = StatPresentationCatalog.NameFor(statId);
         var container = new VBoxContainer { CustomMinimumSize = new Vector2(194, 28) };
         container.AddThemeConstantOverride("separation", 1);
         var row = new HBoxContainer();
@@ -283,7 +285,7 @@ public partial class MainController : Node
         var color = StatPresentationCatalog.ColorFor(statId);
 
         var label = UiFactory.CreateLabel(
-            $"{StatPresentationCatalog.NameFor(statId).ToUpperInvariant(),-7} {StatPresentationCatalog.RankFor(stat.ExpressedPotentialRank)}  LV{level:00}  {effective:00}", 7);
+            $"{statName.ToUpperInvariant(),-7} {StatPresentationCatalog.RankFor(stat.ExpressedPotentialRank)}  LV{level:00}  {effective:00}", 7);
         label.CustomMinimumSize = new Vector2(142, 17);
         label.AddThemeColorOverride("font_color", color);
         label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
@@ -291,10 +293,11 @@ public partial class MainController : Node
         label.TooltipText = $"DNA {StatPresentationCatalog.RankFor(stat.DnaProfile1Rank)}/{StatPresentationCatalog.RankFor(stat.DnaProfile2Rank)} • training {stat.TrainingPoints}";
         row.AddChild(label);
 
-        var use = UiFactory.CreateButton($"+1 ({count})");
+        var use = UiFactory.CreateButton(TrainingItemEffectPresentation.BaseEffectText);
         use.CustomMinimumSize = new Vector2(48, 17);
         UiFactory.ApplyPixelFont(use, 6);
         use.Disabled = count <= 0;
+        use.TooltipText = TrainingItemEffectPresentation.ProfileTooltip(statName, count);
         var capturedStat = statId;
         use.Pressed += () => _session.UseTrainingItem(_selectedId, capturedStat);
         row.AddChild(use);
