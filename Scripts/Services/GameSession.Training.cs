@@ -31,10 +31,10 @@ public partial class GameSession
         var failure = _training!.ValidateTrainingItem(State, creatureId, statId);
         if (failure != TrainingFailure.None)
         {
-            var message = failure == TrainingFailure.StatAtCap
+            var failureMessage = failure == TrainingFailure.StatAtCap
                 ? $"{creature.Name}'s {DisplayStatId(statId)} training is capped by its current DNA rank."
                 : PlayerActionFailureText.ForTraining(failure, DisplayStatId(statId));
-            ToastRequested?.Invoke(message);
+            ToastRequested?.Invoke(failureMessage);
             return;
         }
 
