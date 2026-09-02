@@ -42,6 +42,27 @@ public sealed class RacingArchitectureTests
     }
 
     [Fact]
+    public void PerformanceModel_ClimbUsesPowerAndAuthoredClimbDrain()
+    {
+        var lowPower = new RaceParticipantSnapshot("low", "Low", "#FFFFFF", 100, 40, 30, 10, 60);
+        var highPower = new RaceParticipantSnapshot("high", "High", "#FFFFFF", 0, 40, 30, 90, 60);
+        var model = new RacePerformanceModel(Rules.Racing);
+        var lowMaxStamina = model.GetMaxStamina(lowPower);
+        var highMaxStamina = model.GetMaxStamina(highPower);
+
+        var lowClimb = model.GetMovement(lowPower, RaceTerrain.Climb, lowMaxStamina, lowMaxStamina, false);
+        var highClimb = model.GetMovement(highPower, RaceTerrain.Climb, highMaxStamina, highMaxStamina, false);
+        var lowGround = model.GetMovement(lowPower, RaceTerrain.Ground, lowMaxStamina, lowMaxStamina, false);
+        var highGround = model.GetMovement(highPower, RaceTerrain.Ground, highMaxStamina, highMaxStamina, false);
+
+        Assert.Equal(18.4f, lowClimb.Speed, 3);
+        Assert.Equal(45.6f, highClimb.Speed, 3);
+        Assert.Equal(3.55f, lowClimb.StaminaDrainPerSecond, 3);
+        Assert.True(highClimb.Speed > lowClimb.Speed);
+        Assert.True(lowGround.Speed > highGround.Speed);
+    }
+
+    [Fact]
     public void PerformanceModel_AppliesLowStaminaExhaustionAndCheerInStableOrder()
     {
         var participant = new RaceParticipantSnapshot("id", "name", "#FFFFFF", 50, 40, 30, 20, 60);

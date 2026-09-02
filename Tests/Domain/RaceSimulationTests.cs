@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Voidling.Domain.Racing;
@@ -18,6 +19,8 @@ public sealed class RaceSimulationTests
         Assert.Equal(1810.0f, Course.EndX, 3);
         Assert.Equal(RaceTerrain.Ground, Course.TerrainAt(340.0f, false));
         Assert.Equal(RaceTerrain.Swim, Course.TerrainAt(600.0f, false));
+        Assert.Equal(RaceTerrain.Climb, Course.TerrainAt(800.0f, false));
+        Assert.Equal(RaceTerrain.Ground, Course.TerrainAt(890.0f, false));
         Assert.Equal(RaceTerrain.Glide, Course.TerrainAt(1150.0f, false));
         Assert.Equal(RaceTerrain.FailedGlideSwim, Course.TerrainAt(1150.0f, true));
         Assert.Equal(new[] { 340.0f, 890.0f, 1510.0f, 1660.0f }, Course.Obstacles);
@@ -44,6 +47,37 @@ public sealed class RaceSimulationTests
             Assert.True(fineState.Finished);
             Assert.True(coarseState.Finished);
         }
+    }
+
+    [Fact]
+    public void ClimbProgress_IsPowerDrivenAndIndependentOfElapsedChunking()
+    {
+        var climbCourse = new RaceCourse(
+            startX: 0.0f,
+            endX: 300.0f,
+            glideLaunchStartX: 0.0f,
+            segments: new[]
+            {
+                new RaceCourseSegment("climb-only", 0.0f, 300.0f, RaceSegmentKind.Climb)
+            },
+            obstacles: Array.Empty<float>());
+        var lowPower = new RaceParticipantSnapshot("low", "Low", "#FFFFFF", 100, 40, 30, 10, 60);
+        var highPower = new RaceParticipantSnapshot("high", "High", "#FFFFFF", 0, 40, 30, 90, 60);
+        var fine = new RaceSimulation(climbCourse, Rules, new[] { highPower }, 1234UL);
+        var coarse = new RaceSimulation(climbCourse, Rules, new[] { highPower }, 1234UL);
+        var comparison = new RaceSimulation(climbCourse, Rules, new[] { lowPower, highPower }, 1234UL);
+
+        for (var i = 0; i < 4; i++)
+            fine.Advance(0.25);
+        coarse.Advance(1.0);
+        comparison.Advance(1.0);
+
+        var fineState = fine.GetState("high");
+        var coarseState = coarse.GetState("high");
+        Assert.Equal(fineState.X, coarseState.X, 3);
+        Assert.Equal(fineState.CurrentStamina, coarseState.CurrentStamina, 3);
+        Assert.Equal(RaceTerrain.Climb, fineState.Terrain);
+        Assert.True(comparison.GetState("high").X > comparison.GetState("low").X);
     }
 
     [Fact]

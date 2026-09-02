@@ -8,7 +8,8 @@ public enum RaceTerrain
     Ground,
     Swim,
     Glide,
-    FailedGlideSwim
+    FailedGlideSwim,
+    Climb
 }
 
 public readonly record struct RaceMovement(float Speed, float StaminaDrainPerSecond);
@@ -42,6 +43,7 @@ public sealed class RacePerformanceModel
             RaceTerrain.Swim => _rules.SwimBaseSpeed + participant.Swim * _rules.SwimSpeedScale,
             RaceTerrain.Glide => _rules.GlideBaseSpeed + participant.Fly * _rules.GlideSpeedScale,
             RaceTerrain.FailedGlideSwim => _rules.FailedGlideSwimBaseSpeed + participant.Swim * _rules.FailedGlideSwimSpeedScale,
+            RaceTerrain.Climb => _rules.ClimbBaseSpeed + participant.Power * _rules.ClimbPowerSpeedScale,
             _ => _rules.GroundBaseSpeed + participant.Run * _rules.GroundRunSpeedScale
         };
 
@@ -50,6 +52,7 @@ public sealed class RacePerformanceModel
             RaceTerrain.Swim => _rules.SwimExtraDrain,
             RaceTerrain.Glide => _rules.GlideExtraDrain,
             RaceTerrain.FailedGlideSwim => _rules.FailedGlideSwimExtraDrain,
+            RaceTerrain.Climb => _rules.ClimbExtraDrain,
             _ => 0.0f
         };
 
