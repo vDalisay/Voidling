@@ -179,6 +179,7 @@ public partial class ShopScreen : VBoxContainer
     private Control BuildTreatProduct(ShopTrainingItemViewState item)
     {
         var card = CreateMarketCard(new Vector2(94, 70));
+        card.TooltipText = TrainingItemEffectPresentation.Tooltip(item.DisplayName);
         var column = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         column.AddThemeConstantOverride("separation", 1);
         card.AddChild(column);
@@ -205,7 +206,8 @@ public partial class ShopScreen : VBoxContainer
         display.AddChild(packet);
         column.AddChild(display);
 
-        var name = UiFactory.CreateLabel(item.DisplayName, 7);
+        var name = UiFactory.CreateLabel(
+            $"{item.DisplayName} {TrainingItemEffectPresentation.BaseEffectText}", 6);
         name.HorizontalAlignment = HorizontalAlignment.Center;
         name.AddThemeColorOverride("font_color", item.IdentityColor.Darkened(0.35f));
         column.AddChild(name);
@@ -217,6 +219,7 @@ public partial class ShopScreen : VBoxContainer
         var buy = UiFactory.CreateButton(string.Format(Tr("UI_SHOP_BUY"), item.Price));
         buy.CustomMinimumSize = new Vector2(78, 19);
         UiFactory.ApplyPixelFont(buy, 6);
+        buy.TooltipText = card.TooltipText;
         buy.Pressed += () => TrainingItemPurchaseRequested?.Invoke(item.StatId);
         column.AddChild(buy);
         return card;
