@@ -111,7 +111,7 @@ public sealed class MultiplayerRaceSelectionFactory
 public sealed class MultiplayerRaceEntryFactory
 {
     public const string DemoCourseId = "demo";
-    public const int DemoCourseVersion = 1;
+    public const int DemoCourseVersion = 2;
     public const int CurrentStartVersion = 1;
 
     private readonly RaceRules _rules;
@@ -377,7 +377,7 @@ public static class RaceRulesFingerprint
     public static string Compute(RaceRules rules)
     {
         ArgumentNullException.ThrowIfNull(rules);
-        var builder = new StringBuilder("race-rules:v1");
+        var builder = new StringBuilder("race-rules:v2");
         Append(builder,
             rules.BaseStamina,
             rules.StaminaPerPoint,
@@ -387,6 +387,9 @@ public static class RaceRulesFingerprint
             rules.SwimBaseSpeed,
             rules.SwimSpeedScale,
             rules.SwimExtraDrain,
+            rules.ClimbBaseSpeed,
+            rules.ClimbPowerSpeedScale,
+            rules.ClimbExtraDrain,
             rules.GlideBaseSpeed,
             rules.GlideSpeedScale,
             rules.GlideExtraDrain,
@@ -428,7 +431,7 @@ public static class RaceCourseFingerprint
     public static string Compute(RaceCourse course)
     {
         ArgumentNullException.ThrowIfNull(course);
-        var builder = new StringBuilder("race-course:v1");
+        var builder = new StringBuilder("race-course:v2");
         Append(builder, course.StartX, course.EndX, course.GlideLaunchStartX);
         foreach (var segment in course.Segments)
         {
