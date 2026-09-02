@@ -28,8 +28,8 @@ public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice);
 
 /// <summary>
 /// Current race constants extracted from the MVP controller. Keeping them immutable and
-/// domain-owned lets the forthcoming headless simulator reuse exactly the same balancing
-/// while Godot presentation remains free to change independently.
+/// domain-owned lets the headless simulator reuse exactly the same balancing while Godot
+/// presentation remains free to change independently.
 /// </summary>
 public sealed record RaceRules(
     float BaseStamina,
@@ -40,6 +40,9 @@ public sealed record RaceRules(
     float SwimBaseSpeed,
     float SwimSpeedScale,
     float SwimExtraDrain,
+    float ClimbBaseSpeed,
+    float ClimbPowerSpeedScale,
+    float ClimbExtraDrain,
     float GlideBaseSpeed,
     float GlideSpeedScale,
     float GlideExtraDrain,
@@ -119,6 +122,9 @@ public sealed record GameBalanceRules(
             SwimBaseSpeed: 24.0f,
             SwimSpeedScale: 0.35f,
             SwimExtraDrain: 1.1f,
+            ClimbBaseSpeed: 15.0f,
+            ClimbPowerSpeedScale: 0.34f,
+            ClimbExtraDrain: 1.45f,
             GlideBaseSpeed: 28.0f,
             GlideSpeedScale: 0.40f,
             GlideExtraDrain: 0.85f,
