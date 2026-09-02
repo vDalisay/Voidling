@@ -13,6 +13,7 @@ public partial class MainController
         SelectedVoidling,
         Details,
         Shop,
+        Modules,
         Inventory,
         Breeding,
         Race,
@@ -67,6 +68,10 @@ public partial class MainController
                 _tutorialStep = FirstLaunchTutorialStep.Shop;
                 break;
             case FirstLaunchTutorialStep.Shop:
+                ShowGardenModules();
+                _tutorialStep = FirstLaunchTutorialStep.Modules;
+                break;
+            case FirstLaunchTutorialStep.Modules:
                 ShowInventory();
                 _tutorialStep = FirstLaunchTutorialStep.Inventory;
                 break;
@@ -138,14 +143,21 @@ public partial class MainController
                 break;
             case FirstLaunchTutorialStep.Shop:
                 _tutorialOverlay.ShowStep(
-                    "The Shop sells training treats and mystery eggs using Sprouts earned while the Garden stays open.",
+                    "The Shop sells permanent training treats and rotating mystery eggs. Daily check-ins, missions and occasional rare offers also live here.",
+                    "See Modules",
+                    true,
+                    modalHighlight);
+                break;
+            case FirstLaunchTutorialStep.Modules:
+                _tutorialOverlay.ShowStep(
+                    "Garden Modules are your slow open-game training system. Buy a stat module, place it in a logical slot, upgrade it, then assign a Voidling from its quick profile.",
                     "Next",
                     true,
                     modalHighlight);
                 break;
             case FirstLaunchTutorialStep.Inventory:
                 _tutorialOverlay.ShowStep(
-                    "Inventory shows owned treats, eggs, failed eggs and sellable eggshells.",
+                    "Inventory shows treats, eggs and eggshells. Rare convenience items such as an incubation skip are used here on the egg you choose.",
                     "Next",
                     true,
                     modalHighlight);
@@ -180,7 +192,7 @@ public partial class MainController
                 break;
             case FirstLaunchTutorialStep.Complete:
                 _tutorialOverlay.ShowStep(
-                    "That is the core loop: care for individuals, train them, breed toward goals and race the results. The rest is yours to discover.",
+                    "That is the core loop: care for individuals, train them actively or through Modules, breed toward goals and race the results. The rest is yours to discover.",
                     "Finish",
                     true,
                     null);
