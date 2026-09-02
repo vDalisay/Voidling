@@ -5,14 +5,19 @@ namespace VoidlingGame;
 
 public partial class GameSession
 {
+    private static readonly BreedingPairInfoProjectionService BreedingPairInfo = new();
+
     public BreedingPreview GetBreedingPreviewData(string parentAId, string parentBId)
         => _breeding!.Preview(State, parentAId, parentBId);
 
+    public BreedingPairInfoProjection GetBreedingPairInfo(string parentAId, string parentBId)
+        => BreedingPairInfo.Create(GetBreedingPreviewData(parentAId, parentBId));
+
     // Transitional compatibility text for legacy callers. New presentation should consume the
-    // structured BreedingPreview and own its localized wording.
+    // qualitative BreedingPairInfoProjection and own its localized wording.
     public string GetBreedingPreview(string parentAId, string parentBId)
     {
-        var preview = GetBreedingPreviewData(parentAId, parentBId);
+        var preview = GetBreedingPairInfo(parentAId, parentBId);
         if (!preview.CanBreed)
         {
             return preview.Failure switch
@@ -24,12 +29,13 @@ public partial class GameSession
             };
         }
 
+        var risk = DescribeLineageRisk(preview.LineageRisk);
         if (preview.Related)
-            return $"Related pairing • inbreeding level {preview.ChildBurden} • {preview.HatchFailurePercent}% hatch-failure risk.";
+            return $"Related pairing • {risk} lineage risk.";
         if (preview.IsCleanOutcross)
-            return $"Clean outcross • inherited burden falls to level {preview.ChildBurden}.";
+            return $"Clean outcross • lineage risk improves to {risk}.";
         return preview.ChildBurden > 0
-            ? $"Unrelated pairing • inherited burden remains level {preview.ChildBurden}."
+            ? $"Unrelated pairing • lineage risk remains {risk}."
             : "Unrelated pairing • no inbreeding penalty.";
     }
 
@@ -70,10 +76,20 @@ public partial class GameSession
         // observe/celebrate the new egg; animation remains downstream of authoritative state.
         StateChanged?.Invoke();
         var warning = result.Related
-            ? $" Egg carries level {result.ChildBurden} inbreeding risk ({result.HatchFailurePercent}%)."
+            ? $" Egg carries {DescribeLineageRisk(LineageRiskProjection.FromBurden(result.ChildBurden))} lineage risk."
             : "";
         ToastRequested?.Invoke($"Breeding produced an egg.{warning}");
         RaiseGardenEvent($"{parentAName} and {parentBName} produced a new egg.");
         return true;
     }
+
+    private static string DescribeLineageRisk(LineageRiskBand risk)
+        => risk switch
+        {
+            LineageRiskBand.None => "no",
+            LineageRiskBand.Low => "low",
+            LineageRiskBand.Moderate => "moderate",
+            LineageRiskBand.High => "high",
+            _ => "critical"
+        };
 }
