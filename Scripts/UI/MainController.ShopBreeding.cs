@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
+using Voidling.Domain.Shop;
 using Voidling.Presentation.UI.Breeding;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Shop;
@@ -31,11 +32,27 @@ public partial class MainController : Node
                 Price: GameRules.StoreEggPrice))
             .ToArray();
 
-        var box = OpenModal(Tr("UI_SHOP_TITLE"), new Vector2(558, 320));
+        ShopRareOfferViewState? rareOffer = string.Equals(
+            state.ShopRareOfferItemId,
+            ShopItemIds.FullIncubationSkip,
+            StringComparison.Ordinal)
+            ? new ShopRareOfferViewState(
+                ShopItemIds.FullIncubationSkip,
+                "RARE: INCUBATION SKIP",
+                "Completes one owned egg's incubation timer. Hatching still follows normal Garden rules.",
+                GameRules.FullIncubationSkipPrice)
+            : null;
+
+        var rotationRemaining = (int)Math.Ceiling(Math.Max(
+            0.0,
+            GameRules.ShopEggRotationIntervalSeconds - state.ShopEggRotationElapsedSeconds));
+
+        var box = OpenModal(Tr("UI_SHOP_TITLE"), new Vector2(558, 344));
         box.AddThemeConstantOverride("separation", 4);
+        box.AddChild(CreateDailyLoginPanel());
 
         var screen = new ShopScreen();
-        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs));
+        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rotationRemaining, rareOffer));
         screen.TrainingItemPurchaseRequested += statId =>
         {
             _session.BuyTrainingItem(statId);
@@ -44,6 +61,11 @@ public partial class MainController : Node
         screen.EggPurchaseRequested += eggId =>
         {
             _session.BuyStoreEgg(eggId);
+            ShowShop();
+        };
+        screen.RareOfferPurchaseRequested += itemId =>
+        {
+            _session.BuyRareShopOffer(itemId);
             ShowShop();
         };
         box.AddChild(screen);
