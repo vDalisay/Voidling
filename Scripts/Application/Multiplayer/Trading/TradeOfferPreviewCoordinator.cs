@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using Voidling.Application.Ports.Multiplayer;
 using VoidlingGame;
@@ -18,12 +19,13 @@ public sealed record TradeVoidlingOfferPreview(
     bool HasAngelMutation,
     int OtherMutationCount,
     string VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
-    float PaletteHue = -1.0f,
+    float PaletteHue = VoidlingAppearanceData.LegacyUninitializedPaletteHue,
     string LayerIdsKey = "");
 
 public sealed class TradeOfferPreviewCoordinator
 {
     private const int RecentMessageLimit = 256;
+    private const int MaxLayerIdsKeyLength = 1024;
 
     private readonly MultiplayerConnectionService _connection;
     private readonly TradeNegotiationCoordinator _negotiation;
@@ -234,14 +236,28 @@ public sealed class TradeOfferPreviewCoordinator
     }
 
     private static bool IsValidPreview(TradeVoidlingOfferPreview? preview)
-        => preview == null ||
-           (!string.IsNullOrWhiteSpace(preview.AssetId) && preview.AssetId.Length <= 128 &&
-            !string.IsNullOrWhiteSpace(preview.DisplayName) && preview.DisplayName.Length <= 64 &&
-            !string.IsNullOrWhiteSpace(preview.TintHex) && preview.TintHex.Length <= 32 &&
-            preview.OtherMutationCount is >= 0 and <= 64 &&
-            !string.IsNullOrWhiteSpace(preview.VisualTypeId) && preview.VisualTypeId.Length <= 64 &&
-            float.IsFinite(preview.PaletteHue) && preview.PaletteHue < 1.0f &&
-            preview.LayerIdsKey.Length <= 1024);
+    {
+        if (preview == null)
+            return true;
+        if (string.IsNullOrWhiteSpace(preview.AssetId) || preview.AssetId.Length > 128 ||
+            string.IsNullOrWhiteSpace(preview.DisplayName) || preview.DisplayName.Length > 64 ||
+            string.IsNullOrWhiteSpace(preview.TintHex) || preview.TintHex.Length > 32 ||
+            preview.OtherMutationCount is < 0 or > 64 ||
+            !VoidlingAppearanceData.IsValidSemanticId(
+                preview.VisualTypeId,
+                VoidlingAppearanceData.MaxVisualTypeIdLength) ||
+            !VoidlingAppearanceData.IsValidStoredHue(preview.PaletteHue) ||
+            preview.LayerIdsKey == null || preview.LayerIdsKey.Length > MaxLayerIdsKeyLength)
+        {
+            return false;
+        }
+
+        var layerIds = VoidlingAppearanceData.ParseLayerIdsKey(preview.LayerIdsKey);
+        return layerIds.Length <= VoidlingAppearanceData.MaxLayerCount &&
+               layerIds.All(id => VoidlingAppearanceData.IsValidSemanticId(
+                   id,
+                   VoidlingAppearanceData.MaxLayerIdLength));
+    }
 
     private sealed class PreviewWire
     {
@@ -296,6 +312,10 @@ public sealed class TradeOfferPreviewCoordinator
                 return true;
             }
             catch (JsonException)
+            {
+                return false;
+            }
+            catch (NotSupportedException)
             {
                 return false;
             }
