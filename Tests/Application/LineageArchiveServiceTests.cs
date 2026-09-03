@@ -39,6 +39,59 @@ public sealed class LineageArchiveServiceTests
     }
 
     [Fact]
+    public void EnsureCurrentEntries_PreservesSemanticAppearanceAfterFullRecordIsGone()
+    {
+        var creature = CreateAdult(
+            "historical",
+            new GenomeFactory(Rules.Genetics).CreateRandom(405UL),
+            "",
+            "");
+        creature.Appearance = new VoidlingAppearanceData
+        {
+            VisualTypeId = "water",
+            PaletteHue = 0.375f,
+            LayerIds = new List<string> { "wing.large", "crystal.blue" }
+        };
+        var state = new GameStateData();
+        state.DepartedVoidlings.Add(creature);
+        var service = new LineageArchiveService();
+
+        service.EnsureCurrentEntries(state);
+        state.DepartedVoidlings.Clear();
+        var archived = Assert.Single(service.GetEffectiveLineage(state));
+
+        Assert.Equal("water", archived.VisualTypeId);
+        Assert.Equal(0.375f, archived.PaletteHue);
+        Assert.Equal(new[] { "crystal.blue", "wing.large" }, archived.LayerIds);
+        Assert.DoesNotContain(creature, state.Voidlings);
+        Assert.DoesNotContain(creature, state.DepartedVoidlings);
+    }
+
+    [Fact]
+    public void TryMerge_RejectsResourcePathAppearanceMetadata()
+    {
+        var state = new GameStateData();
+        var service = new LineageArchiveService();
+        var incoming = new LineageArchiveEntry(
+            "archive-only",
+            "Archive Only",
+            "",
+            "",
+            0,
+            "#FFFFFF",
+            false,
+            "res://Assets/Voidlings/body.png",
+            0.25f,
+            "wing.large");
+
+        var merged = service.TryMerge(state, new[] { incoming }, out var error);
+
+        Assert.False(merged);
+        Assert.Contains("invalid", error!, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(state.LineageArchive);
+    }
+
+    [Fact]
     public void BreedingPreview_DetectsSharedAncestorThatExistsOnlyInArchive()
     {
         var first = CreateAdult("first", new GenomeFactory(Rules.Genetics).CreateRandom(1UL), "founder", "unrelated-a");
