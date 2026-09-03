@@ -8,10 +8,9 @@ namespace VoidlingGame;
 public partial class FamilyTreeView
 {
     /// <summary>
-    /// Transitional adapter for the legacy tree layout. The view now receives an immutable
-    /// Application projection rather than traversing GameStateData. Snapshot VoidlingData objects
-    /// exist only inside this adapter so the established card/connection rendering can be reused
-    /// without making archive-only ancestors part of the mutable roster.
+    /// Transitional adapter for the legacy tree layout. The view receives an immutable Application
+    /// projection; snapshot DTOs only adapt that projection to the established card/connection code.
+    /// Semantic appearance is copied too so archive-only ancestors keep their historical body/layers.
     /// </summary>
     public void Build(LineageTreeProjection projection)
     {
@@ -41,9 +40,16 @@ public partial class FamilyTreeView
             ParentBId = member.ParentBId,
             FamilyGeneration = member.FamilyGeneration,
             TintHex = string.IsNullOrWhiteSpace(member.TintHex) ? "#F6F0C9" : member.TintHex,
+            Appearance = new VoidlingAppearanceData
+            {
+                VisualTypeId = member.VisualTypeId,
+                PaletteHue = member.PaletteHue,
+                LayerIds = member.LayerIds.ToList()
+            },
             InbreedingHistoryFlag = member.InbreedingHistoryFlag,
             InbreedingBurdenLevel = member.ActiveInbreedingBurden ?? 0
         };
+        snapshot.Appearance.Normalize();
 
         foreach (var stat in member.Stats)
         {
