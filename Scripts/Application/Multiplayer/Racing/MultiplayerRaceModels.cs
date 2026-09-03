@@ -43,10 +43,6 @@ public sealed record MultiplayerRaceOperationResult(bool Success, string? Error)
     public static MultiplayerRaceOperationResult Failed(string error) => new(false, error);
 }
 
-/// <summary>
-/// Creates the immutable race participant selected from local ownership. The network participant ID
-/// is namespaced by Steam identity so two peers cannot collide by using the same local creature ID.
-/// </summary>
 public sealed class MultiplayerRaceSelectionFactory
 {
     private readonly RaceParticipantSnapshotFactory _snapshots;
@@ -104,15 +100,12 @@ public sealed class MultiplayerRaceSelectionFactory
     }
 }
 
-/// <summary>
-/// Resolves a received start payload against the local build. A peer never silently races with
-/// different course/rule constants: fingerprints must match before RaceSimulation is constructed.
-/// </summary>
 public sealed class MultiplayerRaceEntryFactory
 {
     public const string DemoCourseId = "demo";
     public const int DemoCourseVersion = 2;
-    public const int CurrentStartVersion = 1;
+    // v2 freezes semantic body/palette/layer appearance with each immutable entrant snapshot.
+    public const int CurrentStartVersion = 2;
 
     private readonly RaceRules _rules;
     private readonly RaceCourse _course;
@@ -252,6 +245,8 @@ public static class MultiplayerRaceValidation
     public const int MaxCreatureIdLength = 128;
     public const int MaxDisplayNameLength = 64;
     public const int MaxTintLength = 16;
+    public const int MaxVisualTypeIdLength = 64;
+    public const int MaxLayerIdsKeyLength = 1024;
 
     public static string BuildParticipantId(PlatformUserId ownerId, string ownedCreatureId)
         => $"{ownerId.Value}:{ownedCreatureId}";
@@ -337,6 +332,10 @@ public static class MultiplayerRaceValidation
             participant.DisplayName.Length > MaxDisplayNameLength ||
             string.IsNullOrWhiteSpace(participant.TintHex) ||
             participant.TintHex.Length > MaxTintLength ||
+            string.IsNullOrWhiteSpace(participant.VisualTypeId) ||
+            participant.VisualTypeId.Length > MaxVisualTypeIdLength ||
+            !float.IsFinite(participant.PaletteHue) || participant.PaletteHue >= 1.0f ||
+            participant.LayerIdsKey.Length > MaxLayerIdsKeyLength ||
             !IsFiniteNonNegative(participant.Run) ||
             !IsFiniteNonNegative(participant.Swim) ||
             !IsFiniteNonNegative(participant.Fly) ||
