@@ -34,6 +34,32 @@ public partial class VoidlingVisualSmokeProbe : Node
         }
     }
 
+    private void ValidatePortrait(string visualTypeId)
+    {
+        var definition = VoidlingVisualFactory.ResolveDefinition(visualTypeId);
+        var hue = definition.SourcePaletteColors.Count > 0 ? 0.63f : -1.0f;
+        var appearance = new VoidlingVisualAppearance(
+            visualTypeId,
+            hue,
+            definition.DefaultLayerIds,
+            "#F6F0C9");
+        var portrait = UiFactory.CreatePortrait(
+            appearance,
+            hasAngelMutation: true,
+            otherMutationCount: 1,
+            new Vector2(48.0f, 48.0f));
+        AddChild(portrait);
+
+        if (portrait.Texture == null || portrait.Texture.GetWidth() <= 0 || portrait.Texture.GetHeight() <= 0)
+            throw new InvalidOperationException($"Portrait for '{visualTypeId}' resolved with invalid dimensions.");
+        if (definition.SourcePaletteColors.Count > 0 && portrait.Material == null)
+            throw new InvalidOperationException($"Palette-enabled portrait '{visualTypeId}' did not receive a palette material.");
+        if (portrait.GetNodeOrNull<Control>("__mutation_badge") == null)
+            throw new InvalidOperationException($"Portrait mutation overlay for '{visualTypeId}' was not composed.");
+
+        portrait.QueueFree();
+    }
+
     private static void ValidateWorldFrames(string visualTypeId)
     {
         var frames = VoidlingVisualFactory.GetWorldFrames(visualTypeId);
@@ -50,13 +76,6 @@ public partial class VoidlingVisualSmokeProbe : Node
         RequireAnimation(frames, "swim");
     }
 
-    private static void ValidatePortrait(string visualTypeId)
-    {
-        var portraitTexture = VoidlingVisualFactory.CreatePortraitTexture(visualTypeId);
-        if (portraitTexture.GetWidth() <= 0 || portraitTexture.GetHeight() <= 0)
-            throw new InvalidOperationException($"Portrait for '{visualTypeId}' resolved with invalid dimensions.");
-    }
-
     private static void ValidateGeometry(string visualTypeId)
     {
         foreach (var adult in new[] { false, true })
@@ -71,6 +90,11 @@ public partial class VoidlingVisualSmokeProbe : Node
         var raceScale = VoidlingVisualFactory.RaceScaleFor(visualTypeId);
         if (raceScale <= 0.0f || VoidlingVisualFactory.BuildShadowPolygon(raceScale, 20, visualTypeId).Length != 20)
             throw new InvalidOperationException($"Invalid race geometry for '{visualTypeId}'.");
+
+        _ = VoidlingMutationVisualMetrics.ForSpriteTarget(
+            VoidlingVisualFactory.WorldScale(adult: true, visualTypeId),
+            visualTypeId);
+        _ = VoidlingMutationVisualMetrics.ForPortrait(48.0f, new Vector2(48.0f, 48.0f), visualTypeId);
     }
 
     private void ValidateComposedSprite(string visualTypeId)
