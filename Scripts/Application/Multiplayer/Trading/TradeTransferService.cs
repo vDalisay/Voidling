@@ -18,6 +18,7 @@ public sealed class TradeTransferService
 {
     public const int MaxAssetsPerSide = 8;
     public const int MaxLineageEntriesPerBundle = 256;
+    public const int MaxAppearanceLayers = 32;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -170,8 +171,6 @@ public sealed class TradeTransferService
         if (!ValidateIncomingBundle(state, journal.IncomingBundle, out error))
             return TradeLocalOperationResult.Failed(error!);
 
-        // Every mutation that can fail is validated above. Merge ancestry before inserting assets;
-        // it is staged atomically by LineageArchiveService and cannot partially merge on conflict.
         if (!_lineage.TryMerge(state, journal.IncomingBundle.Lineage, out error))
             return TradeLocalOperationResult.Failed(error ?? "Incoming lineage could not be merged.");
 
@@ -379,10 +378,16 @@ public sealed class TradeTransferService
                 creature.TrainingPoints[statId] = 0;
         }
         creature.RareTraits ??= new List<RareTraitData>();
+        creature.Appearance ??= new VoidlingAppearanceData();
+        creature.Appearance.Normalize();
     }
 
     private static void NormalizeIncomingEgg(EggData egg)
-        => egg.RareTraits ??= new List<RareTraitData>();
+    {
+        egg.RareTraits ??= new List<RareTraitData>();
+        egg.Appearance ??= new VoidlingAppearanceData();
+        egg.Appearance.Normalize();
+    }
 
     private static bool IsValidIncomingCreature(VoidlingData? creature)
         => creature != null &&
@@ -390,7 +395,8 @@ public sealed class TradeTransferService
            creature.Id.Length <= 128 &&
            creature.Genome != null &&
            creature.FamilyGeneration >= 0 &&
-           Enum.IsDefined(creature.Stage);
+           Enum.IsDefined(creature.Stage) &&
+           IsValidAppearance(creature.Appearance);
 
     private static bool IsValidIncomingEgg(EggData? egg)
         => egg != null &&
@@ -401,7 +407,24 @@ public sealed class TradeTransferService
            egg.RequiredIncubationSeconds >= 0 &&
            egg.IncubationSeconds >= 0 &&
            Enum.IsDefined(egg.Source) &&
-           Enum.IsDefined(egg.State);
+           Enum.IsDefined(egg.State) &&
+           IsValidAppearance(egg.Appearance);
+
+    private static bool IsValidAppearance(VoidlingAppearanceData? appearance)
+    {
+        if (appearance == null ||
+            string.IsNullOrWhiteSpace(appearance.VisualTypeId) ||
+            appearance.VisualTypeId.Length > 64 ||
+            !(appearance.PaletteHue == -1.0f || VoidlingAppearanceData.IsValidHue(appearance.PaletteHue)))
+        {
+            return false;
+        }
+
+        var layers = appearance.LayerIds ?? new List<string>();
+        if (layers.Count > MaxAppearanceLayers)
+            return false;
+        return layers.All(id => !string.IsNullOrWhiteSpace(id) && id.Length <= 128);
+    }
 
     private static bool HasLineageRoot(
         IReadOnlyDictionary<string, LineageArchiveEntry> lineageById,
