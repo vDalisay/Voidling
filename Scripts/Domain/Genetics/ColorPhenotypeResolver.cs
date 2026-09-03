@@ -20,15 +20,20 @@ public sealed class ColorPhenotypeResolver
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
     }
 
+    /// <summary>
+    /// Pure read of color DNA. Legacy genomes resolve from their discrete alleles without being
+    /// rewritten; explicit migration/factory paths call EnsurePaletteGenes when persistence should
+    /// actually be upgraded.
+    /// </summary>
     public float ResolvePaletteHue(GenomeData genome)
     {
         ArgumentNullException.ThrowIfNull(genome);
-        EnsurePaletteGenes(genome);
 
-        var first = VoidlingAppearanceData.NormalizeHue(genome.PaletteHueA);
-        var second = VoidlingAppearanceData.NormalizeHue(genome.PaletteHueB);
-        var winner = genome.ExpressedColorIndex == 0 ? first : second;
-        var other = genome.ExpressedColorIndex == 0 ? second : first;
+        var first = AlleleHue(genome, 0);
+        var second = AlleleHue(genome, 1);
+        var expressedIndex = genome.ExpressedColorIndex == 0 ? 0 : 1;
+        var winner = expressedIndex == 0 ? first : second;
+        var other = expressedIndex == 0 ? second : first;
         var influence = (float)Math.Clamp(_rules.PaletteBlendInfluence, 0.0, 0.49);
         return MoveHueToward(winner, other, influence);
     }
@@ -45,17 +50,25 @@ public sealed class ColorPhenotypeResolver
 
     public float AlleleHue(GenomeData genome, int profileIndex)
     {
-        EnsurePaletteGenes(genome);
-        return profileIndex == 0
-            ? VoidlingAppearanceData.NormalizeHue(genome.PaletteHueA)
-            : VoidlingAppearanceData.NormalizeHue(genome.PaletteHueB);
+        ArgumentNullException.ThrowIfNull(genome);
+        if (profileIndex == 0)
+        {
+            return VoidlingAppearanceData.IsValidHue(genome.PaletteHueA)
+                ? VoidlingAppearanceData.NormalizeHue(genome.PaletteHueA)
+                : HueForLegacyAllele(genome.ColorAlleleA);
+        }
+
+        return VoidlingAppearanceData.IsValidHue(genome.PaletteHueB)
+            ? VoidlingAppearanceData.NormalizeHue(genome.PaletteHueB)
+            : HueForLegacyAllele(genome.ColorAlleleB);
     }
 
     public string ResolveTint(GenomeData genome)
     {
         ArgumentNullException.ThrowIfNull(genome);
         var targetHue = ResolvePaletteHue(genome);
-        var legacyIndex = genome.ExpressedColorIndex == 0 ? genome.ColorAlleleA : genome.ColorAlleleB;
+        var expressedIndex = genome.ExpressedColorIndex == 0 ? 0 : 1;
+        var legacyIndex = expressedIndex == 0 ? genome.ColorAlleleA : genome.ColorAlleleB;
         var sourceHex = _rules.PaletteHex.Count == 0
             ? "#F6F0C9"
             : _rules.PaletteHex[Math.Clamp(legacyIndex, 0, _rules.PaletteHex.Count - 1)];
