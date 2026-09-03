@@ -1,3 +1,6 @@
+using System;
+using System.Text.Json.Serialization;
+
 namespace Voidling.Domain.Racing;
 
 /// <summary>
@@ -16,4 +19,26 @@ public sealed record RaceParticipantSnapshot(
     float Stamina,
     string VisualTypeId = "normal",
     float PaletteHue = -1.0f,
-    string[]? LayerIds = null);
+    string LayerIdsKey = "")
+{
+    private const char LayerSeparator = '|';
+
+    [JsonIgnore]
+    public string[] LayerIds => string.IsNullOrWhiteSpace(LayerIdsKey)
+        ? Array.Empty<string>()
+        : LayerIdsKey.Split(LayerSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    public static string BuildLayerIdsKey(System.Collections.Generic.IEnumerable<string>? layerIds)
+    {
+        if (layerIds == null)
+            return string.Empty;
+
+        return string.Join(
+            LayerSeparator,
+            layerIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(id => id, StringComparer.OrdinalIgnoreCase));
+    }
+}
