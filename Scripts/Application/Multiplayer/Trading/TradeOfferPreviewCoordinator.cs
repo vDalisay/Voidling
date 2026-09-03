@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using Voidling.Application.Ports.Multiplayer;
+using VoidlingGame;
 
 namespace Voidling.Application.Multiplayer.Trading;
 
@@ -15,7 +16,10 @@ public sealed record TradeVoidlingOfferPreview(
     string DisplayName,
     string TintHex,
     bool HasAngelMutation,
-    int OtherMutationCount);
+    int OtherMutationCount,
+    string VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+    float PaletteHue = -1.0f,
+    string LayerIdsKey = "");
 
 public sealed class TradeOfferPreviewCoordinator
 {
@@ -61,9 +65,6 @@ public sealed class TradeOfferPreviewCoordinator
             (selectedAsset == null ||
              !string.Equals(selectedAsset.AssetId, preview.AssetId, StringComparison.Ordinal)))
         {
-            // A non-host caller sends the selection immediately before this preview on the same
-            // reliable ordered channel. Its local snapshot has not received the host echo yet, so
-            // allow that case; the host still validates preview.AssetId against canonical selection.
             if (_connection.IsLocalHost)
                 return false;
         }
@@ -203,8 +204,6 @@ public sealed class TradeOfferPreviewCoordinator
 
     private void HandleNegotiationChanged(TradeNegotiationState state)
     {
-        // Keep both slot previews visible while the existing two-phase transfer finalizes so the
-        // trading room does not blank out between mutual confirmation and the exchange animation.
         if (state.Phase is TradeNegotiationPhase.Negotiating or TradeNegotiationPhase.Finalizing)
             return;
 
@@ -239,14 +238,18 @@ public sealed class TradeOfferPreviewCoordinator
            (!string.IsNullOrWhiteSpace(preview.AssetId) && preview.AssetId.Length <= 128 &&
             !string.IsNullOrWhiteSpace(preview.DisplayName) && preview.DisplayName.Length <= 64 &&
             !string.IsNullOrWhiteSpace(preview.TintHex) && preview.TintHex.Length <= 32 &&
-            preview.OtherMutationCount is >= 0 and <= 64);
+            preview.OtherMutationCount is >= 0 and <= 64 &&
+            !string.IsNullOrWhiteSpace(preview.VisualTypeId) && preview.VisualTypeId.Length <= 64 &&
+            float.IsFinite(preview.PaletteHue) && preview.PaletteHue < 1.0f &&
+            preview.LayerIdsKey.Length <= 1024);
 
     private sealed class PreviewWire
     {
+        public const int CurrentVersion = 2;
         public const string CommandType = "trade.preview.publish";
         public const string StateType = "trade.preview.state";
 
-        public int Version { get; init; } = 1;
+        public int Version { get; init; } = CurrentVersion;
         public string Type { get; init; } = string.Empty;
         public Guid MessageId { get; init; } = Guid.NewGuid();
         public string NegotiationId { get; init; } = string.Empty;
@@ -282,7 +285,7 @@ public sealed class TradeOfferPreviewCoordinator
             try
             {
                 var decoded = JsonSerializer.Deserialize<PreviewWire>(payload);
-                if (decoded == null || decoded.Version != 1 || decoded.MessageId == Guid.Empty ||
+                if (decoded == null || decoded.Version != CurrentVersion || decoded.MessageId == Guid.Empty ||
                     decoded.Type is not (CommandType or StateType) ||
                     string.IsNullOrWhiteSpace(decoded.NegotiationId) || decoded.NegotiationId.Length > 64 ||
                     decoded.Revision < 0 || !IsValidPreview(decoded.Preview))
