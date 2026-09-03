@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
+using Voidling.Domain.Racing;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Details;
 using Voidling.Presentation.UI.Racing;
@@ -19,17 +20,33 @@ public partial class MainController : Node
             : owned.FirstOrDefault()?.Id ?? string.Empty;
 
         var viewState = owned.Select(CreateRacePickerView).ToArray();
-        var box = OpenModal(Tr("UI_RACE_PICKER_TITLE"), new Vector2(552, 310));
+        var courses = RaceCourseCatalog.All
+            .Select(course => new RacePickerCourseViewState(
+                course.Id,
+                course.Version,
+                course.Id == RaceCourseCatalog.Demo.Id
+                    ? Tr("UI_RACE_COURSE_DEMO_NAME")
+                    : Tr("UI_RACE_COURSE_LONG_NAME"),
+                course.Id == RaceCourseCatalog.Demo.Id
+                    ? Tr("UI_RACE_COURSE_DEMO_SUMMARY")
+                    : Tr("UI_RACE_COURSE_LONG_SUMMARY")))
+            .ToArray();
+
+        var box = OpenModal(Tr("UI_RACE_PICKER_TITLE"), new Vector2(552, 335));
         var screen = new RacePickerScreen();
-        screen.Configure(new RacePickerScreenState(viewState, selectedId));
-        screen.RaceRequested += creatureId =>
+        screen.Configure(new RacePickerScreenState(
+            viewState,
+            selectedId,
+            courses,
+            RaceCourseCatalog.Demo.Id,
+            RaceCourseCatalog.Demo.Version));
+        screen.RaceRequested += (creatureId, courseId, courseVersion) =>
         {
-            var selected = _session.FindVoidling(creatureId);
-            if (selected == null)
+            if (_session.FindVoidling(creatureId) == null)
                 return;
 
             CloseModal();
-            StartRace(selected);
+            StartRace(creatureId, courseId, courseVersion);
         };
         box.AddChild(screen);
     }
