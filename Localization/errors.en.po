@@ -1,0 +1,22 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Voidling\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "UI_SAVE_STATUS_SAVED"
+msgstr "SAVED"
+
+msgid "UI_SAVE_STATUS_FAILED"
+msgstr "SAVE FAILED"
+
+msgid "UI_SAVE_RECOVERED_BACKUP"
+msgstr "The latest save was damaged, so Voidling recovered the previous backup."
+
+msgid "UI_SAVE_LOAD_FAILED"
+msgstr "Your save could not be loaded. A new Garden was started; check the log before continuing."
+
+msgid "UI_SAVE_UNAVAILABLE"
+msgstr "Voidling cannot save right now. Progress may be lost until storage becomes available."
