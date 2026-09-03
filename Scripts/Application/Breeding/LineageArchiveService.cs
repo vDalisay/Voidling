@@ -13,6 +13,7 @@ namespace Voidling.Application.Breeding;
 /// </summary>
 public sealed class LineageArchiveService
 {
+    private const int MaxVisualTypeIdLength = 64;
     private const int MaxAppearanceLayers = 16;
     private const int MaxAppearanceLayerIdLength = 128;
 
@@ -222,7 +223,7 @@ public sealed class LineageArchiveService
             (!string.IsNullOrEmpty(entry.ParentBId) && entry.ParentBId.Length > 128) ||
             (!string.IsNullOrEmpty(entry.DisplayName) && entry.DisplayName.Length > 64) ||
             (!string.IsNullOrEmpty(entry.TintHex) && entry.TintHex.Length > 16) ||
-            (!string.IsNullOrEmpty(entry.VisualTypeId) && entry.VisualTypeId.Length > 64) ||
+            !VoidlingAppearanceData.IsValidSemanticId(entry.VisualTypeId, MaxVisualTypeIdLength) ||
             (!string.IsNullOrEmpty(entry.LayerIdsKey) && entry.LayerIdsKey.Length > 1024) ||
             !VoidlingAppearanceData.IsValidStoredHue(entry.PaletteHue))
         {
@@ -231,6 +232,6 @@ public sealed class LineageArchiveService
 
         var layerIds = entry.LayerIds;
         return layerIds.Length <= MaxAppearanceLayers &&
-               layerIds.All(id => !string.IsNullOrWhiteSpace(id) && id.Length <= MaxAppearanceLayerIdLength);
+               layerIds.All(id => VoidlingAppearanceData.IsValidSemanticId(id, MaxAppearanceLayerIdLength));
     }
 }
