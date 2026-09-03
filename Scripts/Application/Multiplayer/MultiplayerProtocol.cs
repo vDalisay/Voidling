@@ -6,7 +6,10 @@ namespace Voidling.Application.Multiplayer;
 
 public static class MultiplayerProtocol
 {
-    public const int CurrentVersion = 1;
+    // v2 adds persisted/networked semantic Voidling appearance (body family, palette hue and layer
+    // selections). Reject v1 peers at the envelope boundary so an older client cannot deserialize a
+    // traded Voidling and silently discard its new appearance state.
+    public const int CurrentVersion = 2;
     public const int MaxPacketBytes = 64 * 1024;
 
     public const string HelloMessageType = "hello";
@@ -338,7 +341,7 @@ public static class MultiplayerProtocol
 
     /// <summary>
     /// Safely inspects an envelope for protocol routing without interpreting its payload. This lets
-    /// multiple typed sub-protocols share one transport channel without treating each other as malformed.
+    /// multiple typed sub-protocols share one transport channel without treatinging each other as malformed.
     /// </summary>
     internal static bool TryPeekMessageType(ReadOnlySpan<byte> bytes, out string messageType)
     {
