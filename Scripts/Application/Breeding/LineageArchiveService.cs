@@ -220,5 +220,6 @@ public sealed class LineageArchiveService
            (string.IsNullOrEmpty(entry.TintHex) || entry.TintHex.Length <= 16) &&
            (string.IsNullOrEmpty(entry.VisualTypeId) || entry.VisualTypeId.Length <= 64) &&
            (string.IsNullOrEmpty(entry.LayerIdsKey) || entry.LayerIdsKey.Length <= 1024) &&
-           (!float.IsFinite(entry.PaletteHue) || entry.PaletteHue < 0.0f || entry.PaletteHue < 1.0f);
+           float.IsFinite(entry.PaletteHue) &&
+           entry.PaletteHue < 1.0f;
 }
