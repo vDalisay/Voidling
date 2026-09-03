@@ -9,7 +9,7 @@ namespace Voidling.Application.Breeding;
 /// <summary>
 /// Owns the persistent minimal ancestry graph used by breeding and multiplayer transfer.
 /// Full owned/departed creature objects remain the strongest local source; imported archive-only
-/// ancestors are retained so relatedness survives ownership transfer without retaining runtime data.
+/// ancestors are retained so relatedness and historical appearance survive ownership transfer.
 /// </summary>
 public sealed class LineageArchiveService
 {
@@ -23,11 +23,9 @@ public sealed class LineageArchiveService
         {
             if (!IsValid(entry) || byId.ContainsKey(entry.CreatureId))
                 continue;
-            byId.Add(entry.CreatureId, entry);
+            byId.Add(entry.CreatureId, NormalizeAppearance(entry));
         }
 
-        // Full local creature records are authoritative for their own lineage identity. This also
-        // deterministically repairs a stale archive entry instead of making an old save unloadable.
         foreach (var creature in state.Voidlings.Concat(state.DepartedVoidlings))
         {
             if (string.IsNullOrWhiteSpace(creature.Id))
@@ -57,10 +55,6 @@ public sealed class LineageArchiveService
         return TryBuildMerged(state.LineageArchive, incomingEntries, out _, out error);
     }
 
-    /// <summary>
-    /// Merges lineage received from another player. Conflicting ancestry identity is rejected;
-    /// cosmetic/biographical metadata may refresh when the stable ancestry identity matches.
-    /// </summary>
     public bool TryMerge(
         GameStateData state,
         IEnumerable<LineageArchiveEntry> incomingEntries,
@@ -77,10 +71,6 @@ public sealed class LineageArchiveService
         return true;
     }
 
-    /// <summary>
-    /// Returns the requested roots plus their archived ancestors, bounded by the same ancestry
-    /// depth used for relatedness. The result is deterministic and suitable for a trade package.
-    /// </summary>
     public IReadOnlyList<LineageArchiveEntry> GetAncestryClosure(
         GameStateData state,
         IEnumerable<string> rootCreatureIds,
@@ -139,17 +129,18 @@ public sealed class LineageArchiveService
         foreach (var existing in existingEntries)
         {
             if (IsValid(existing) && !staged.ContainsKey(existing.CreatureId))
-                staged.Add(existing.CreatureId, existing);
+                staged.Add(existing.CreatureId, NormalizeAppearance(existing));
         }
 
-        foreach (var incoming in incomingEntries)
+        foreach (var incomingRaw in incomingEntries)
         {
-            if (!IsValid(incoming))
+            if (!IsValid(incomingRaw))
             {
                 error = "Incoming lineage contains an invalid entry.";
                 return false;
             }
 
+            var incoming = NormalizeAppearance(incomingRaw);
             if (staged.TryGetValue(incoming.CreatureId, out var existing))
             {
                 if (!existing.HasSameLineageIdentity(incoming))
@@ -181,12 +172,40 @@ public sealed class LineageArchiveService
         var tint = string.IsNullOrWhiteSpace(incoming.TintHex)
             ? existing.TintHex
             : incoming.TintHex;
+        var visualTypeId = string.IsNullOrWhiteSpace(incoming.VisualTypeId)
+            ? existing.VisualTypeId
+            : incoming.VisualTypeId;
+        var paletteHue = VoidlingAppearanceData.IsValidHue(incoming.PaletteHue)
+            ? incoming.PaletteHue
+            : existing.PaletteHue;
+        var layerIdsKey = string.IsNullOrWhiteSpace(incoming.LayerIdsKey)
+            ? existing.LayerIdsKey
+            : incoming.LayerIdsKey;
 
         return existing with
         {
             DisplayName = displayName,
             TintHex = tint,
-            InbreedingHistoryFlag = existing.InbreedingHistoryFlag || incoming.InbreedingHistoryFlag
+            InbreedingHistoryFlag = existing.InbreedingHistoryFlag || incoming.InbreedingHistoryFlag,
+            VisualTypeId = visualTypeId,
+            PaletteHue = paletteHue,
+            LayerIdsKey = layerIdsKey
+        };
+    }
+
+    private static LineageArchiveEntry NormalizeAppearance(LineageArchiveEntry entry)
+    {
+        var visualTypeId = string.IsNullOrWhiteSpace(entry.VisualTypeId)
+            ? VoidlingAppearanceData.DefaultVisualTypeId
+            : entry.VisualTypeId.Trim().ToLowerInvariant();
+        var paletteHue = VoidlingAppearanceData.IsValidHue(entry.PaletteHue)
+            ? VoidlingAppearanceData.NormalizeHue(entry.PaletteHue)
+            : -1.0f;
+        return entry with
+        {
+            VisualTypeId = visualTypeId,
+            PaletteHue = paletteHue,
+            LayerIdsKey = VoidlingAppearanceData.BuildLayerIdsKey(entry.LayerIds)
         };
     }
 
@@ -198,5 +217,8 @@ public sealed class LineageArchiveService
            (string.IsNullOrEmpty(entry.ParentAId) || entry.ParentAId.Length <= 128) &&
            (string.IsNullOrEmpty(entry.ParentBId) || entry.ParentBId.Length <= 128) &&
            (string.IsNullOrEmpty(entry.DisplayName) || entry.DisplayName.Length <= 64) &&
-           (string.IsNullOrEmpty(entry.TintHex) || entry.TintHex.Length <= 16);
+           (string.IsNullOrEmpty(entry.TintHex) || entry.TintHex.Length <= 16) &&
+           (string.IsNullOrEmpty(entry.VisualTypeId) || entry.VisualTypeId.Length <= 64) &&
+           (string.IsNullOrEmpty(entry.LayerIdsKey) || entry.LayerIdsKey.Length <= 1024) &&
+           (!float.IsFinite(entry.PaletteHue) || entry.PaletteHue < 0.0f || entry.PaletteHue < 1.0f);
 }
