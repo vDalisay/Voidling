@@ -49,6 +49,7 @@ public partial class MainController : Node
         BuildTopBar();
         BuildToast();
         BuildGardenEventLog();
+        BuildSaveFeedbackIndicator();
 
         _modalHost = new ModalHost { ZIndex = 100 };
         _uiRoot.AddChild(_modalHost);
@@ -60,6 +61,7 @@ public partial class MainController : Node
         _session.GardenEventRaised += AppendGardenEvent;
         _gardenEventLog.Append(Tr("UI_GARDEN_LOG_STARTED"));
         RefreshUi();
+        Callable.From(StartFirstLaunchTutorialIfNeeded).CallDeferred();
     }
 
     public override void _ExitTree()
@@ -74,6 +76,7 @@ public partial class MainController : Node
         if (GodotObject.IsInstanceValid(_connectedZoneBridge))
             _connectedZoneBridge.StateChanged -= OnConnectedZoneStateChanged;
 
+        DetachSaveFeedbackIndicator();
         DetachMultiplayerRacePresentation();
         DetachTradePresentation();
     }
@@ -265,6 +268,7 @@ public partial class MainController : Node
 
         _selectedId = creatureId;
         RefreshUi();
+        OnTutorialVoidlingSelected();
     }
 
     private void DeselectVoidling()
