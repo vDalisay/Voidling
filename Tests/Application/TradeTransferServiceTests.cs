@@ -43,6 +43,25 @@ public sealed class TradeTransferServiceTests
     }
 
     [Fact]
+    public void BuildTransferBundle_RejectsMalformedLocalAppearance()
+    {
+        var state = new GameStateData();
+        var creature = CreateAdult("local", 10UL, "", "");
+        creature.Appearance.VisualTypeId = "res://Assets/Voidlings/body.png";
+        state.Voidlings.Add(creature);
+        var service = new TradeTransferService(Rules);
+
+        var success = service.TryBuildTransferBundle(
+            state,
+            new[] { new TradeAssetReference(TradeAssetKind.Voidling, creature.Id) },
+            out _,
+            out var error);
+
+        Assert.False(success);
+        Assert.Contains("invalid transfer state", error!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Prepare_PersistsJournalWithoutMovingAssetsAndLocksOutgoingAsset()
     {
         var state = new GameStateData();
@@ -61,12 +80,64 @@ public sealed class TradeTransferServiceTests
         Assert.Equal(LobbyId, journal.LobbyId);
         Assert.True(service.IsAssetLocked(state, outgoing[0]));
 
-        // The journal is ordinary local save data and survives JSON persistence without Steam.
         var restored = JsonSerializer.Deserialize<GameStateData>(JsonSerializer.Serialize(state));
         Assert.NotNull(restored);
         Assert.Single(restored!.PendingTradeJournal);
         Assert.Equal(tradeId, restored.PendingTradeJournal[0].TradeId);
         Assert.Equal(LobbyId, restored.PendingTradeJournal[0].LobbyId);
+    }
+
+    [Fact]
+    public void Prepare_RejectsMalformedIncomingAppearanceBeforeAddingJournal()
+    {
+        var state = new GameStateData();
+        var local = CreateAdult("local", 11UL, "", "");
+        state.Voidlings.Add(local);
+        var service = new TradeTransferService(Rules);
+        var outgoing = new[] { new TradeAssetReference(TradeAssetKind.Voidling, local.Id) };
+
+        var badPath = CreateAdult("bad-path", 31UL, "", "");
+        badPath.Appearance = new VoidlingAppearanceData
+        {
+            VisualTypeId = "res://Assets/Voidlings/body.png",
+            PaletteHue = 0.2f
+        };
+        var badPathBundle = new TradeTransferBundle(
+            new[] { badPath },
+            Array.Empty<EggData>(),
+            new[] { LineageArchiveEntry.FromVoidling(badPath) });
+        var pathResult = service.Prepare(
+            state,
+            Guid.NewGuid().ToString("N"),
+            LobbyId,
+            999UL,
+            "terms-hash",
+            outgoing,
+            badPathBundle);
+
+        var badHue = CreateAdult("bad-hue", 32UL, "", "");
+        badHue.Appearance = new VoidlingAppearanceData
+        {
+            VisualTypeId = "water",
+            PaletteHue = -2.0f
+        };
+        var badHueBundle = new TradeTransferBundle(
+            new[] { badHue },
+            Array.Empty<EggData>(),
+            new[] { LineageArchiveEntry.FromVoidling(badHue) });
+        var hueResult = service.Prepare(
+            state,
+            Guid.NewGuid().ToString("N"),
+            LobbyId,
+            999UL,
+            "terms-hash",
+            outgoing,
+            badHueBundle);
+
+        Assert.False(pathResult.Success);
+        Assert.False(hueResult.Success);
+        Assert.Empty(state.PendingTradeJournal);
+        Assert.Contains(state.Voidlings, creature => creature.Id == local.Id);
     }
 
     [Fact]
@@ -155,6 +226,46 @@ public sealed class TradeTransferServiceTests
         Assert.True(repeated.Success);
         Assert.True(repeated.AlreadyApplied);
         Assert.Single(state.Voidlings, creature => creature.Id == "remote");
+    }
+
+    [Fact]
+    public void CommitPrepared_PreservesSemanticAppearanceAndArchivedPortraitRecipe()
+    {
+        var state = new GameStateData();
+        var local = CreateAdult("local", 40UL, "", "");
+        state.Voidlings.Add(local);
+        var remote = CreateAdult("remote-appearance", 41UL, "", "");
+        remote.Appearance = new VoidlingAppearanceData
+        {
+            VisualTypeId = "flying",
+            PaletteHue = 0.625f,
+            LayerIds = new List<string> { "wing.large", "crystal.blue" }
+        };
+        var incoming = new TradeTransferBundle(
+            new[] { remote },
+            Array.Empty<EggData>(),
+            new[] { LineageArchiveEntry.FromVoidling(remote) });
+        var service = new TradeTransferService(Rules);
+        var tradeId = Guid.NewGuid().ToString("N");
+
+        Assert.True(service.Prepare(
+            state,
+            tradeId,
+            LobbyId,
+            999UL,
+            "terms-hash",
+            new[] { new TradeAssetReference(TradeAssetKind.Voidling, local.Id) },
+            incoming).Success);
+        Assert.True(service.CommitPrepared(state, tradeId).Success);
+
+        var received = Assert.Single(state.Voidlings, creature => creature.Id == remote.Id);
+        Assert.Equal("flying", received.Appearance.VisualTypeId);
+        Assert.Equal(0.625f, received.Appearance.PaletteHue);
+        Assert.Equal(new[] { "crystal.blue", "wing.large" }, received.Appearance.LayerIds);
+        var archive = Assert.Single(state.LineageArchive, entry => entry.CreatureId == remote.Id);
+        Assert.Equal("flying", archive.VisualTypeId);
+        Assert.Equal(0.625f, archive.PaletteHue);
+        Assert.Equal(new[] { "crystal.blue", "wing.large" }, archive.LayerIds);
     }
 
     [Fact]
