@@ -1,8 +1,8 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
-/bin/
-/obj/
+bin/
+obj/
 /.dotnet/
 /.nuget/
 /.appdata*/
