@@ -12,6 +12,7 @@ namespace VoidlingGame;
 public sealed class VoidlingAppearanceData
 {
     public const string DefaultVisualTypeId = "normal";
+    public const float LegacyUninitializedPaletteHue = -1.0f;
     public const char LayerSeparator = '|';
 
     /// <summary>
@@ -21,10 +22,10 @@ public sealed class VoidlingAppearanceData
     public string VisualTypeId { get; set; } = DefaultVisualTypeId;
 
     /// <summary>
-    /// Resolved palette anchor in turns [0,1). A negative value means legacy/uninitialized and is
-    /// deterministically reconstructed from color DNA during save migration.
+    /// Resolved palette anchor in turns [0,1). Exactly -1 is the legacy/uninitialized sentinel and
+    /// is deterministically reconstructed from color DNA during save migration.
     /// </summary>
-    public float PaletteHue { get; set; } = -1.0f;
+    public float PaletteHue { get; set; } = LegacyUninitializedPaletteHue;
 
     /// <summary>
     /// Optional semantic layer selections (for example a wing or crystal variation). Empty means
@@ -34,6 +35,9 @@ public sealed class VoidlingAppearanceData
 
     public static bool IsValidHue(float value)
         => float.IsFinite(value) && value >= 0.0f && value < 1.0f;
+
+    public static bool IsValidStoredHue(float value)
+        => value == LegacyUninitializedPaletteHue || IsValidHue(value);
 
     public static float NormalizeHue(float value)
     {
@@ -68,8 +72,9 @@ public sealed class VoidlingAppearanceData
         VisualTypeId = string.IsNullOrWhiteSpace(VisualTypeId)
             ? DefaultVisualTypeId
             : VisualTypeId.Trim().ToLowerInvariant();
-        if (IsValidHue(PaletteHue))
-            PaletteHue = NormalizeHue(PaletteHue);
+        PaletteHue = IsValidHue(PaletteHue)
+            ? NormalizeHue(PaletteHue)
+            : LegacyUninitializedPaletteHue;
         LayerIds ??= new List<string>();
         LayerIds = ParseLayerIdsKey(BuildLayerIdsKey(LayerIds)).ToList();
     }
