@@ -14,6 +14,9 @@ public sealed class VoidlingAppearanceData
     public const string DefaultVisualTypeId = "normal";
     public const float LegacyUninitializedPaletteHue = -1.0f;
     public const char LayerSeparator = '|';
+    public const int MaxVisualTypeIdLength = 64;
+    public const int MaxLayerCount = 16;
+    public const int MaxLayerIdLength = 128;
 
     /// <summary>
     /// Semantic body/morphology family such as normal, water or power. The production visual
@@ -78,6 +81,31 @@ public sealed class VoidlingAppearanceData
             : key.Split(
                 LayerSeparator,
                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    /// <summary>
+    /// Returns a safe canonical copy for read/projection paths. Invalid semantic IDs are discarded
+    /// rather than leaking resource-like strings into snapshots, and the source object is untouched.
+    /// </summary>
+    public VoidlingAppearanceData CreateCanonicalCopy()
+    {
+        var visualTypeId = IsValidSemanticId(VisualTypeId, MaxVisualTypeIdLength)
+            ? VisualTypeId.Trim().ToLowerInvariant()
+            : DefaultVisualTypeId;
+        var paletteHue = IsValidHue(PaletteHue)
+            ? NormalizeHue(PaletteHue)
+            : LegacyUninitializedPaletteHue;
+        var layers = (LayerIds ?? new List<string>())
+            .Where(id => IsValidSemanticId(id, MaxLayerIdLength))
+            .Take(MaxLayerCount)
+            .ToArray();
+
+        return new VoidlingAppearanceData
+        {
+            VisualTypeId = visualTypeId,
+            PaletteHue = paletteHue,
+            LayerIds = ParseLayerIdsKey(BuildLayerIdsKey(layers)).ToList()
+        };
+    }
 
     public void Normalize()
     {
