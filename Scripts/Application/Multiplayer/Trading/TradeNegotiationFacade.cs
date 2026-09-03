@@ -98,6 +98,14 @@ public sealed class TradeNegotiationFacade
 
     public TradeLobbyViewState Current => BuildState();
 
+    /// <summary>
+    /// Returns only the presentation-safe lifecycle phase for a known negotiation. This is useful
+    /// for integration probes that must distinguish authoritative completion from failure after the
+    /// active trading-room view has closed, without exposing transport IDs or durable journal state.
+    /// </summary>
+    public TradeNegotiationPhase? GetNegotiationPhase(string negotiationId)
+        => string.IsNullOrWhiteSpace(negotiationId) ? null : _negotiation.Get(negotiationId)?.Phase;
+
     public TradeNegotiationOperationResult Invite(string partnerKey)
     {
         if (!TryResolvePartner(partnerKey, out var partner))
