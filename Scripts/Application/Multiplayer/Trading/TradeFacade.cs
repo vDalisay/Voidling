@@ -16,7 +16,10 @@ public sealed record TradeLocalAssetView(
     string DisplayName,
     string TintHex,
     bool HasAngelMutation,
-    int OtherMutationCount);
+    int OtherMutationCount,
+    string VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+    float PaletteHue = -1.0f,
+    string LayerIdsKey = "");
 
 public sealed record TradeIncomingOfferView(
     string TradeId,
@@ -47,7 +50,7 @@ public sealed record TradeHubViewState(
 /// <summary>
 /// Presentation-safe trade façade. The UI can select local asset references and opaque lobby-member
 /// keys, but platform IDs, transport messages, transfer bundles and prepare/commit journals stay below
-/// this boundary. TradeNetworkCoordinator remains the only owner of the durable transfer protocol.
+/// this boundary. Semantic appearance is cosmetic view data and never participates in ownership checks.
 /// </summary>
 public sealed class TradeFacade
 {
@@ -196,13 +199,18 @@ public sealed class TradeFacade
             {
                 var hasAngel = voidling.RareTraits.Any(trait =>
                     string.Equals(trait.TraitId, "Angel", StringComparison.OrdinalIgnoreCase));
+                var appearance = voidling.Appearance ?? new VoidlingAppearanceData();
+                appearance.Normalize();
                 return new TradeLocalAssetView(
                     TradeAssetKind.Voidling,
                     voidling.Id,
                     voidling.Name,
                     voidling.TintHex,
                     hasAngel,
-                    voidling.RareTraits.Count - (hasAngel ? 1 : 0));
+                    voidling.RareTraits.Count - (hasAngel ? 1 : 0),
+                    appearance.VisualTypeId,
+                    appearance.PaletteHue,
+                    VoidlingAppearanceData.BuildLayerIdsKey(appearance.LayerIds));
             })
             .ToList();
 
