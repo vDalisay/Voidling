@@ -21,6 +21,10 @@ public partial class VoidlingActor : Node2D
     private bool _pickedUp;
     private float _baseScale;
     private float _baseSpriteY;
+    private string _visualTypeId = VoidlingAppearanceData.DefaultVisualTypeId;
+    private float _heldScaleMultiplier = 1.0f;
+    private float _heldSpriteYOffset;
+    private float _shadowCenterYOffset;
 
     public void Setup(VoidlingData data, Rect2 wanderBounds, Vector2 startPosition)
     {
@@ -30,18 +34,23 @@ public partial class VoidlingActor : Node2D
         _walkSpeed = data.Stage == LifeStage.Adult ? 20.0f : 17.0f;
         _rng.Seed = StableSeed(data.Id);
 
+        var appearance = VoidlingVisualAppearance.From(data.Appearance, data.TintHex);
+        var definition = VoidlingVisualFactory.ResolveDefinition(appearance.VisualTypeId);
+        _visualTypeId = definition.DefinitionId;
         var isAdult = data.Stage == LifeStage.Adult;
-        _baseScale = VoidlingVisualFactory.WorldScale(isAdult);
-        _baseSpriteY = VoidlingGroundVisualMetrics.SpriteCenterYOffset(_baseScale);
+        _baseScale = VoidlingVisualFactory.WorldScale(isAdult, _visualTypeId);
+        _baseSpriteY = VoidlingVisualFactory.WorldSpriteCenterYOffset(_baseScale, _visualTypeId);
+        _heldScaleMultiplier = definition.HeldScaleMultiplier;
+        _heldSpriteYOffset = definition.HeldSpriteYOffset;
+        _shadowCenterYOffset = definition.ShadowCenterYOffset;
 
         _sprite = new AnimatedSprite2D
         {
-            SpriteFrames = VoidlingVisualFactory.GetWorldFrames(),
             Scale = Vector2.One * _baseScale,
             Position = new Vector2(0, _baseSpriteY),
-            Modulate = GameRules.TintColor(data.TintHex),
             ZIndex = 2
         };
+        VoidlingVisualFactory.ApplyAppearance(_sprite, appearance, race: false);
         AddChild(_sprite);
         _sprite.Play("walk_down");
 
@@ -54,7 +63,7 @@ public partial class VoidlingActor : Node2D
         {
             Shape = new RectangleShape2D
             {
-                Size = VoidlingVisualFactory.WorldHitboxSize(isAdult)
+                Size = VoidlingVisualFactory.WorldHitboxSize(isAdult, _visualTypeId)
             },
             Position = new Vector2(0, _baseSpriteY)
         };
@@ -131,13 +140,13 @@ public partial class VoidlingActor : Node2D
         {
             _sprite.Scale = Vector2.One * (
                 pickedUp
-                    ? _baseScale * VoidlingVisualFactory.HeldScaleMultiplier
+                    ? _baseScale * _heldScaleMultiplier
                     : _baseScale);
             if (pickedUp)
             {
                 _sprite.Position = new Vector2(
                     0,
-                    _baseSpriteY + VoidlingVisualFactory.HeldSpriteYOffset);
+                    _baseSpriteY + _heldSpriteYOffset);
             }
             else if (wasPickedUp)
             {
@@ -180,11 +189,11 @@ public partial class VoidlingActor : Node2D
     public override void _Draw()
     {
         var shadowAlpha = _pickedUp ? 0.26f : 0.20f;
-        var shadowRadii = VoidlingGroundVisualMetrics.ShadowRadii(_baseScale);
+        var shadowRadii = VoidlingVisualFactory.ShadowRadii(_baseScale, _visualTypeId);
         if (_pickedUp)
             shadowRadii.X *= 1.08f;
         DrawEllipse(
-            new Vector2(0, VoidlingGroundVisualMetrics.ShadowCenterYOffset),
+            new Vector2(0, _shadowCenterYOffset),
             shadowRadii,
             new Color(0.20f, 0.24f, 0.20f, shadowAlpha));
 
