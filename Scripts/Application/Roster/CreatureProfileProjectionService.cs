@@ -31,6 +31,9 @@ public sealed record CreatureProfileProjection(
     int InbreedingBurden,
     LineageRiskBand LineageRisk,
     string TintHex,
+    string VisualTypeId,
+    float PaletteHue,
+    IReadOnlyList<string> LayerIds,
     bool HasAngelMutation,
     int OtherMutationCount,
     int ColorAlleleA,
@@ -41,8 +44,8 @@ public sealed record CreatureProfileProjection(
 
 /// <summary>
 /// Builds immutable player-information snapshots. Presentation receives already interpreted ranks,
-/// training progress, effective stats, mutation metadata and lineage risk instead of traversing
-/// mutable save/domain objects or reimplementing stat/genetics rules.
+/// training progress, effective stats, mutation metadata, semantic appearance and lineage risk
+/// instead of traversing mutable save/domain objects or reimplementing gameplay rules.
 /// </summary>
 public sealed class CreatureProfileProjectionService
 {
@@ -95,6 +98,8 @@ public sealed class CreatureProfileProjectionService
             .ToArray() ?? Array.Empty<CreatureProfileRareTraitProjection>();
         var hasAngel = rareTraits.Any(trait =>
             string.Equals(trait.TraitId, AngelMutationId, StringComparison.OrdinalIgnoreCase));
+        var appearance = (creature.Appearance ?? new VoidlingAppearanceData()).CreateCanonicalCopy();
+        var layerIds = appearance.LayerIds.ToArray();
 
         return new CreatureProfileProjection(
             creature.Id,
@@ -104,6 +109,9 @@ public sealed class CreatureProfileProjectionService
             Math.Max(0, creature.InbreedingBurdenLevel),
             LineageRiskProjection.FromBurden(creature.InbreedingBurdenLevel),
             creature.TintHex,
+            appearance.VisualTypeId,
+            appearance.PaletteHue,
+            Array.AsReadOnly(layerIds),
             hasAngel,
             rareTraits.Count(trait =>
                 !string.Equals(trait.TraitId, AngelMutationId, StringComparison.OrdinalIgnoreCase)),

@@ -5,6 +5,7 @@ using Voidling.Application.Breeding;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Details;
 using Voidling.Presentation.UI.Racing;
+using Voidling.Presentation.Voidlings;
 
 namespace VoidlingGame;
 
@@ -43,7 +44,7 @@ public partial class MainController : Node
         return new RacePickerVoidlingViewState(
             profile.CreatureId,
             profile.Name,
-            GameRules.TintColor(profile.TintHex),
+            ProfileAppearance(profile),
             profile.HasAngelMutation,
             profile.OtherMutationCount,
             statSummary);
@@ -79,6 +80,7 @@ public partial class MainController : Node
             profile.IsAdult,
             profile.FamilyGeneration,
             Tr(LineageRiskTranslationKey(profile.LineageRisk)),
+            ProfileAppearance(profile),
             GameRules.TintColor(profile.TintHex),
             profile.HasAngelMutation,
             profile.OtherMutationCount,
@@ -158,7 +160,7 @@ public partial class MainController : Node
             var otherMutations = member.RareTraitIds.Count(traitId =>
                 !string.Equals(traitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase));
             var portrait = UiFactory.CreatePortrait(
-                GameRules.TintColor(member.TintHex),
+                MemberAppearance(member),
                 hasAngel,
                 otherMutations,
                 new Vector2(60, 60));
@@ -209,6 +211,21 @@ public partial class MainController : Node
         tree.MemberSelected += ShowMember;
         ShowMember(data.Id);
     }
+
+    private static VoidlingVisualAppearance ProfileAppearance(
+        Voidling.Application.Roster.CreatureProfileProjection profile)
+        => new(
+            profile.VisualTypeId,
+            profile.PaletteHue,
+            profile.LayerIds,
+            profile.TintHex);
+
+    private static VoidlingVisualAppearance MemberAppearance(LineageMemberProjection member)
+        => new(
+            member.VisualTypeId,
+            member.PaletteHue,
+            member.LayerIds,
+            member.TintHex);
 
     private void ShowGoodbyeFirst(string creatureId)
     {

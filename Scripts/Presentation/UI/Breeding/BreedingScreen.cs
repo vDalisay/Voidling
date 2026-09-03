@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Breeding;
@@ -8,7 +9,7 @@ namespace Voidling.Presentation.UI.Breeding;
 public readonly record struct BreedingParentViewState(
     string Id,
     string Name,
-    Color TintColor,
+    VoidlingVisualAppearance Appearance,
     bool HasAngelMutation,
     int OtherMutationCount);
 
@@ -19,8 +20,8 @@ public sealed record BreedingScreenState(
     BreedingPreviewViewState InitialPreview);
 
 /// <summary>
-/// Standalone breeding view. It owns selector/portrait interaction and emits pair/breed intent.
-/// Validation, genetics, cooldowns, persistence, world placement, and animation remain outside.
+/// Standalone breeding view. Parent portraits resolve through the same semantic visual composition
+/// as Garden/race rendering; validation, genetics, persistence, placement and animation stay outside.
 /// </summary>
 public partial class BreedingScreen : VBoxContainer
 {
@@ -139,7 +140,7 @@ public partial class BreedingScreen : VBoxContainer
         var column = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         column.AddThemeConstantOverride("separation", 3);
         var portrait = UiFactory.CreatePortrait(
-            parent.TintColor,
+            parent.Appearance,
             parent.HasAngelMutation,
             parent.OtherMutationCount,
             new Vector2(70, 70));
@@ -151,7 +152,7 @@ public partial class BreedingScreen : VBoxContainer
     private static void SetPortrait(TextureRect portrait, BreedingParentViewState parent)
         => UiFactory.SetPortraitData(
             portrait,
-            parent.TintColor,
+            parent.Appearance,
             parent.HasAngelMutation,
             parent.OtherMutationCount);
 

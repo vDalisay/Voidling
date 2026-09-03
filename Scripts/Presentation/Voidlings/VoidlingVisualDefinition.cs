@@ -3,21 +3,35 @@ using Godot;
 namespace Voidling.Presentation.Voidlings;
 
 /// <summary>
-/// Designer-authored presentation contract for the base Voidling artwork.
-/// Gameplay/domain state must never depend on these texture/layout values.
+/// Designer-authored presentation contract for one semantic base Voidling body family.
+/// Gameplay/domain state never depends on these texture/layout values.
 /// </summary>
 [GlobalClass]
 public partial class VoidlingVisualDefinition : Resource
 {
     [ExportGroup("Identity / Assets")]
     [Export]
-    public string DefinitionId { get; set; } = "default";
+    public string DefinitionId { get; set; } = "normal";
 
     [Export]
     public Texture2D BaseAtlas { get; set; } = null!;
 
     [Export]
     public Texture2D SwimAtlas { get; set; } = null!;
+
+    [ExportGroup("Palette Recoloring")]
+    [Export]
+    public Godot.Collections.Array<Color> SourcePaletteColors { get; set; } = new();
+
+    [Export(PropertyHint.Range, "0.0001,0.2,0.0005")]
+    public float PaletteMatchTolerance { get; set; } = 0.0125f;
+
+    [ExportGroup("Layer Composition")]
+    [Export]
+    public Godot.Collections.Array<string> DefaultLayerIds { get; set; } = new();
+
+    [Export]
+    public Godot.Collections.Array<VoidlingVisualLayerDefinition> Layers { get; set; } = new();
 
     [ExportGroup("Atlas Layout")]
     [Export(PropertyHint.Range, "1,512,1")]

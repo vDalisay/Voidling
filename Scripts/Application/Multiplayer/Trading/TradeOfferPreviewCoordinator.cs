@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using Voidling.Application.Ports.Multiplayer;
+using VoidlingGame;
 
 namespace Voidling.Application.Multiplayer.Trading;
 
@@ -15,11 +17,15 @@ public sealed record TradeVoidlingOfferPreview(
     string DisplayName,
     string TintHex,
     bool HasAngelMutation,
-    int OtherMutationCount);
+    int OtherMutationCount,
+    string VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+    float PaletteHue = VoidlingAppearanceData.LegacyUninitializedPaletteHue,
+    string LayerIdsKey = "");
 
 public sealed class TradeOfferPreviewCoordinator
 {
     private const int RecentMessageLimit = 256;
+    private const int MaxLayerIdsKeyLength = 1024;
 
     private readonly MultiplayerConnectionService _connection;
     private readonly TradeNegotiationCoordinator _negotiation;
@@ -61,9 +67,6 @@ public sealed class TradeOfferPreviewCoordinator
             (selectedAsset == null ||
              !string.Equals(selectedAsset.AssetId, preview.AssetId, StringComparison.Ordinal)))
         {
-            // A non-host caller sends the selection immediately before this preview on the same
-            // reliable ordered channel. Its local snapshot has not received the host echo yet, so
-            // allow that case; the host still validates preview.AssetId against canonical selection.
             if (_connection.IsLocalHost)
                 return false;
         }
@@ -203,8 +206,6 @@ public sealed class TradeOfferPreviewCoordinator
 
     private void HandleNegotiationChanged(TradeNegotiationState state)
     {
-        // Keep both slot previews visible while the existing two-phase transfer finalizes so the
-        // trading room does not blank out between mutual confirmation and the exchange animation.
         if (state.Phase is TradeNegotiationPhase.Negotiating or TradeNegotiationPhase.Finalizing)
             return;
 
@@ -235,18 +236,36 @@ public sealed class TradeOfferPreviewCoordinator
     }
 
     private static bool IsValidPreview(TradeVoidlingOfferPreview? preview)
-        => preview == null ||
-           (!string.IsNullOrWhiteSpace(preview.AssetId) && preview.AssetId.Length <= 128 &&
-            !string.IsNullOrWhiteSpace(preview.DisplayName) && preview.DisplayName.Length <= 64 &&
-            !string.IsNullOrWhiteSpace(preview.TintHex) && preview.TintHex.Length <= 32 &&
-            preview.OtherMutationCount is >= 0 and <= 64);
+    {
+        if (preview == null)
+            return true;
+        if (string.IsNullOrWhiteSpace(preview.AssetId) || preview.AssetId.Length > 128 ||
+            string.IsNullOrWhiteSpace(preview.DisplayName) || preview.DisplayName.Length > 64 ||
+            string.IsNullOrWhiteSpace(preview.TintHex) || preview.TintHex.Length > 32 ||
+            preview.OtherMutationCount is < 0 or > 64 ||
+            !VoidlingAppearanceData.IsValidSemanticId(
+                preview.VisualTypeId,
+                VoidlingAppearanceData.MaxVisualTypeIdLength) ||
+            !VoidlingAppearanceData.IsValidStoredHue(preview.PaletteHue) ||
+            preview.LayerIdsKey == null || preview.LayerIdsKey.Length > MaxLayerIdsKeyLength)
+        {
+            return false;
+        }
+
+        var layerIds = VoidlingAppearanceData.ParseLayerIdsKey(preview.LayerIdsKey);
+        return layerIds.Length <= VoidlingAppearanceData.MaxLayerCount &&
+               layerIds.All(id => VoidlingAppearanceData.IsValidSemanticId(
+                   id,
+                   VoidlingAppearanceData.MaxLayerIdLength));
+    }
 
     private sealed class PreviewWire
     {
+        public const int CurrentVersion = 2;
         public const string CommandType = "trade.preview.publish";
         public const string StateType = "trade.preview.state";
 
-        public int Version { get; init; } = 1;
+        public int Version { get; init; } = CurrentVersion;
         public string Type { get; init; } = string.Empty;
         public Guid MessageId { get; init; } = Guid.NewGuid();
         public string NegotiationId { get; init; } = string.Empty;
@@ -282,7 +301,7 @@ public sealed class TradeOfferPreviewCoordinator
             try
             {
                 var decoded = JsonSerializer.Deserialize<PreviewWire>(payload);
-                if (decoded == null || decoded.Version != 1 || decoded.MessageId == Guid.Empty ||
+                if (decoded == null || decoded.Version != CurrentVersion || decoded.MessageId == Guid.Empty ||
                     decoded.Type is not (CommandType or StateType) ||
                     string.IsNullOrWhiteSpace(decoded.NegotiationId) || decoded.NegotiationId.Length > 64 ||
                     decoded.Revision < 0 || !IsValidPreview(decoded.Preview))
@@ -293,6 +312,10 @@ public sealed class TradeOfferPreviewCoordinator
                 return true;
             }
             catch (JsonException)
+            {
+                return false;
+            }
+            catch (NotSupportedException)
             {
                 return false;
             }

@@ -65,6 +65,7 @@ public sealed class RaceEntryFactory
         {
             var cpuSeed = simulationSeed + (ulong)(100 + cpuIndex * 17);
             var genome = _genomeFactory.CreateRandom(cpuSeed);
+            var paletteHue = _colorResolver.ResolvePaletteHue(genome);
             var cpu = new VoidlingData
             {
                 Id = $"cpu-{cpuIndex}-{cpuSeed}",
@@ -72,6 +73,11 @@ public sealed class RaceEntryFactory
                 Genome = genome,
                 Stage = LifeStage.Adult,
                 TintHex = _colorResolver.ResolveTint(genome),
+                Appearance = new VoidlingAppearanceData
+                {
+                    VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+                    PaletteHue = paletteHue
+                },
                 TrainingPoints = _rules.Genetics.StatIds.ToDictionary(id => id, _ => 0)
             };
             entrants.Add(new RaceEntrant(_snapshotFactory.Create(cpu), false, 0));

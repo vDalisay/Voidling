@@ -1,0 +1,69 @@
+name: Voidling Visual Pipeline
+
+on:
+  push:
+    branches:
+      - agent/contextualized-implementation-plan
+      - agent/appearance-visual-pipeline-v2
+  pull_request:
+
+jobs:
+  visual-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup Godot .NET
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.6.0
+          use-dotnet: true
+
+      - name: Restore and build
+        run: |
+          dotnet restore Voidling.csproj
+          dotnet build Voidling.csproj --configuration Debug --no-restore
+
+      - name: Enforce no direct production Voidling art loads
+        shell: bash
+        run: |
+          test -f Resources/Presentation/Voidlings/DefaultVoidlingVisualCatalog.tres
+          test -f Resources/Presentation/Voidlings/VoidlingPaletteSwap.gdshader
+
+          if grep -R -n -E '(GD\.Load|ResourceLoader\.Load).*Assets/Voidlings/' Scripts --include='*.cs'; then
+            echo 'Production Voidling art may only be referenced from catalog/Resource data, never consumer C#.'
+            exit 1
+          fi
+
+          if grep -R -n -F 'Basic Charakter Spritesheet.png' Scripts --include='*.cs'; then
+            echo 'Legacy base atlas paths are forbidden in C# consumers.'
+            exit 1
+          fi
+
+          if grep -R -n -F 'Early Access/Ocean Pack/swimming.png' Scripts --include='*.cs'; then
+            echo 'Legacy swim atlas paths are forbidden in C# consumers.'
+            exit 1
+          fi
+
+      - name: Import Godot resources
+        run: godot --headless --path . --import
+
+      - name: Voidling visual catalog smoke
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 20s godot --headless --path . -- --voidling-visual-smoke 2>&1 | tee voidling-visual-smoke.log
+          if ! grep -q 'VOIDLING_VISUAL_SMOKE_SUCCESS' voidling-visual-smoke.log; then
+            echo 'Voidling visual catalog smoke did not complete successfully.'
+            exit 1
+          fi
+          if grep -E '^(ERROR|SCRIPT ERROR):' voidling-visual-smoke.log; then
+            echo 'Voidling visual catalog smoke emitted a Godot error.'
+            exit 1
+          fi

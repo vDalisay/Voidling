@@ -55,7 +55,7 @@ public partial class MainController
                 return new MultiplayerRaceSetupVoidlingView(
                     view.Id,
                     view.Name,
-                    view.TintColor,
+                    view.Appearance,
                     view.HasAngelMutation,
                     view.OtherMutationCount,
                     view.StatSummary);
@@ -115,8 +115,6 @@ public partial class MainController
         if (_multiplayerRaceScreen != null && GodotObject.IsInstanceValid(_multiplayerRaceScreen))
             return;
 
-        // A connected-Garden race becomes authoritative once its synchronized start handshake
-        // succeeds. Dismiss any Garden modal so every participant enters the same race presentation.
         if (_modalHost.IsOpen)
             CloseModal(false);
 

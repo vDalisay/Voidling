@@ -3,9 +3,9 @@ using System;
 namespace Voidling.Application.Breeding;
 
 /// <summary>
-/// Player-facing qualitative lineage risk. The underlying deterministic breeding rules may retain
-/// exact percentages for viability resolution, but UI projections deliberately expose only bands so
-/// the game does not become an exact offspring-probability calculator.
+/// Player-facing lineage risk. The confirmed inbreeding consequence is hatch failure, so its exact
+/// percentage is intentionally visible. This is not a general offspring genetics probability
+/// calculator: stat/color/appearance outcome probabilities remain undisclosed.
 /// </summary>
 public enum LineageRiskBand
 {
@@ -35,7 +35,8 @@ public sealed record BreedingPairInfoProjection(
     bool Related,
     bool IsCleanOutcross,
     int ChildBurden,
-    LineageRiskBand LineageRisk);
+    LineageRiskBand LineageRisk,
+    int HatchFailurePercent);
 
 public sealed class BreedingPairInfoProjectionService
 {
@@ -48,6 +49,7 @@ public sealed class BreedingPairInfoProjectionService
             preview.Related,
             preview.IsCleanOutcross,
             Math.Max(0, preview.ChildBurden),
-            LineageRiskProjection.FromBurden(preview.ChildBurden));
+            LineageRiskProjection.FromBurden(preview.ChildBurden),
+            Math.Clamp(preview.HatchFailurePercent, 0, 100));
     }
 }

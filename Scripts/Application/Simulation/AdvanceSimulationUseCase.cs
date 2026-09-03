@@ -99,6 +99,14 @@ public sealed class AdvanceSimulationUseCase
             InbreedingBurdenLevel = egg.InbreedingBurdenLevel,
             InbreedingHistoryFlag = egg.InbreedingHistoryFlag,
             TintHex = egg.TintHex,
+            Appearance = new VoidlingAppearanceData
+            {
+                VisualTypeId = egg.Appearance?.VisualTypeId ?? VoidlingAppearanceData.DefaultVisualTypeId,
+                PaletteHue = egg.Appearance?.PaletteHue ?? -1.0f,
+                LayerIds = egg.Appearance?.LayerIds == null
+                    ? new List<string>()
+                    : new List<string>(egg.Appearance.LayerIds)
+            },
             RareTraits = egg.RareTraits,
             WorldX = egg.WorldX,
             WorldY = egg.WorldY

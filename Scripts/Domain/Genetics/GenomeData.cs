@@ -21,12 +21,27 @@ public sealed class GenePairData
 /// <summary>
 /// Persisted breeding potential. Ability genes contain the two visible DNA profiles; trained
 /// performance remains separate on VoidlingData.TrainingPoints and is never written back here.
+/// ColorAlleleA/B remain for backwards compatibility with existing saves. PaletteHueA/B are the
+/// production color-DNA representation and allow continuous, slight multi-generation color drift.
 /// </summary>
 public sealed class GenomeData
 {
     public Dictionary<string, GenePairData> AbilityGenes { get; set; } = new();
+
+    // Legacy discrete color DNA. Keep until old saves have safely migrated through production.
     public int ColorAlleleA { get; set; }
     public int ColorAlleleB { get; set; }
+
+    /// <summary>Color DNA profile A, normalized hue turns [0,1). Negative means legacy/uninitialized.</summary>
+    public float PaletteHueA { get; set; } = -1.0f;
+
+    /// <summary>Color DNA profile B, normalized hue turns [0,1). Negative means legacy/uninitialized.</summary>
+    public float PaletteHueB { get; set; } = -1.0f;
+
+    /// <summary>
+    /// 0 or 1. The selected profile is the dominant side of the palette blend; phenotype resolution
+    /// nudges that winning hue slightly toward the other profile instead of averaging them equally.
+    /// </summary>
     public int ExpressedColorIndex { get; set; }
 }
 

@@ -6,7 +6,7 @@
 
 [resource]
 script = ExtResource("1_visual")
-DefinitionId = "default"
+DefinitionId = "normal"
 BaseAtlas = ExtResource("2_base")
 SwimAtlas = ExtResource("3_swim")
 FrameWidth = 48

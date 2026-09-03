@@ -30,6 +30,9 @@ public sealed record LineageMemberProjection(
     string ParentBId,
     int FamilyGeneration,
     string TintHex,
+    string VisualTypeId,
+    float PaletteHue,
+    IReadOnlyList<string> LayerIds,
     bool InbreedingHistoryFlag,
     int? ActiveInbreedingBurden,
     LineageMemberPresence Presence,
@@ -41,8 +44,8 @@ public sealed record LineageTreeProjection(
     IReadOnlyList<LineageMemberProjection> Members);
 
 /// <summary>
-/// Builds immutable, presentation-ready lineage snapshots. Presentation never needs to traverse
-/// mutable save DTOs to discover parents, departed members or archive-only ancestors.
+/// Builds immutable, presentation-ready lineage snapshots. Historical members retain semantic
+/// appearance so family-tree portraits stay faithful after the full creature object is gone.
 /// </summary>
 public sealed class LineageTreeProjectionService
 {
@@ -116,6 +119,9 @@ public sealed class LineageTreeProjectionService
             archive.ParentBId,
             Math.Max(0, archive.FamilyGeneration),
             archive.TintHex,
+            archive.VisualTypeId,
+            archive.PaletteHue,
+            Array.AsReadOnly(archive.LayerIds),
             archive.InbreedingHistoryFlag,
             ActiveInbreedingBurden: null,
             LineageMemberPresence.Archived,
@@ -139,6 +145,8 @@ public sealed class LineageTreeProjectionService
             .Where(trait => !string.IsNullOrWhiteSpace(trait.TraitId))
             .Select(trait => trait.TraitId)
             .ToArray() ?? Array.Empty<string>();
+        var appearance = (creature.Appearance ?? new VoidlingAppearanceData()).CreateCanonicalCopy();
+        var layerIds = appearance.LayerIds.ToArray();
 
         return new LineageMemberProjection(
             creature.Id,
@@ -147,6 +155,9 @@ public sealed class LineageTreeProjectionService
             creature.ParentBId,
             Math.Max(0, creature.FamilyGeneration),
             creature.TintHex,
+            appearance.VisualTypeId,
+            appearance.PaletteHue,
+            Array.AsReadOnly(layerIds),
             creature.InbreedingHistoryFlag,
             Math.Max(0, creature.InbreedingBurdenLevel),
             presence,

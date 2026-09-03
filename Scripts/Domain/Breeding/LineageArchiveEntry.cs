@@ -1,12 +1,13 @@
 using System;
+using System.Text.Json.Serialization;
 using VoidlingGame;
 
 namespace Voidling.Domain.Breeding;
 
 /// <summary>
-/// Minimal persistent ancestry identity. It deliberately excludes genome/training/runtime state so
-/// family relationships can survive departure or multiplayer ownership transfer without retaining
-/// complete historical creature objects.
+/// Minimal persistent ancestry identity plus the semantic appearance needed to keep historical
+/// family-tree portraits visually faithful after a full creature record is gone. It deliberately
+/// excludes genome/training/runtime state and never stores presentation resource paths.
 /// </summary>
 public sealed record LineageArchiveEntry(
     string CreatureId,
@@ -15,11 +16,26 @@ public sealed record LineageArchiveEntry(
     string ParentBId,
     int FamilyGeneration,
     string TintHex,
-    bool InbreedingHistoryFlag)
+    bool InbreedingHistoryFlag,
+    string VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+    float PaletteHue = VoidlingAppearanceData.LegacyUninitializedPaletteHue,
+    string LayerIdsKey = "")
 {
+    [JsonIgnore]
+    public string[] LayerIds => VoidlingAppearanceData.ParseLayerIdsKey(LayerIdsKey);
+
     public static LineageArchiveEntry FromVoidling(VoidlingData creature)
     {
         ArgumentNullException.ThrowIfNull(creature);
+        var appearance = creature.Appearance;
+        var visualTypeId = string.IsNullOrWhiteSpace(appearance?.VisualTypeId)
+            ? VoidlingAppearanceData.DefaultVisualTypeId
+            : appearance!.VisualTypeId.Trim().ToLowerInvariant();
+        var paletteHue = appearance != null && VoidlingAppearanceData.IsValidHue(appearance.PaletteHue)
+            ? VoidlingAppearanceData.NormalizeHue(appearance.PaletteHue)
+            : VoidlingAppearanceData.LegacyUninitializedPaletteHue;
+        var layerIdsKey = VoidlingAppearanceData.BuildLayerIdsKey(appearance?.LayerIds);
+
         return new LineageArchiveEntry(
             creature.Id,
             creature.Name,
@@ -27,7 +43,10 @@ public sealed record LineageArchiveEntry(
             creature.ParentBId,
             Math.Max(0, creature.FamilyGeneration),
             creature.TintHex,
-            creature.InbreedingHistoryFlag);
+            creature.InbreedingHistoryFlag,
+            visualTypeId,
+            paletteHue,
+            layerIdsKey);
     }
 
     public bool HasSameLineageIdentity(LineageArchiveEntry other)

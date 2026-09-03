@@ -5,6 +5,7 @@ using Voidling.Application.Breeding;
 using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
+using Voidling.Domain.Genetics;
 using Voidling.Domain.Rules;
 using VoidlingGame;
 
@@ -17,14 +18,16 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 8;
+    public const int CurrentSaveVersion = 9;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
+    private readonly ColorPhenotypeResolver _colors;
 
     public GameStateMigrationService(GameBalanceRules rules)
     {
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
+        _colors = new ColorPhenotypeResolver(rules.Appearance);
     }
 
     public void Normalize(GameStateData state)
@@ -58,6 +61,7 @@ public sealed class GameStateMigrationService
 
         foreach (var creature in state.Voidlings.Concat(state.DepartedVoidlings))
         {
+            creature.Genome ??= new GenomeData();
             creature.TrainingPoints ??= new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (var statId in _rules.Genetics.StatIds)
             {
@@ -66,10 +70,15 @@ public sealed class GameStateMigrationService
             }
 
             creature.RareTraits ??= new List<RareTraitData>();
+            creature.Appearance = NormalizeAppearance(creature.Genome, creature.Appearance);
         }
 
         foreach (var egg in state.OwnedEggs.Concat(state.StoreEggs))
+        {
+            egg.Genome ??= new GenomeData();
             egg.RareTraits ??= new List<RareTraitData>();
+            egg.Appearance = NormalizeAppearance(egg.Genome, egg.Appearance);
+        }
 
         // Version 5 introduced a minimal persistent ancestry graph. Populate it from every full
         // creature record already known locally, while preserving archive-only ancestors imported
@@ -108,6 +117,21 @@ public sealed class GameStateMigrationService
             .TakeLast(DailyFriendRaceService.MaxAttemptHistory)
             .ToList();
 
+        // Version 9 adds semantic visual family/layer state plus continuous color DNA. Old discrete
+        // swatches are converted deterministically to hue positions; no RNG is consumed and the
+        // legacy TintHex remains untouched as a compatibility fallback.
         state.SaveVersion = CurrentSaveVersion;
+    }
+
+    private VoidlingAppearanceData NormalizeAppearance(
+        GenomeData genome,
+        VoidlingAppearanceData? appearance)
+    {
+        _colors.EnsurePaletteGenes(genome);
+        appearance ??= new VoidlingAppearanceData();
+        appearance.Normalize();
+        if (!VoidlingAppearanceData.IsValidHue(appearance.PaletteHue))
+            appearance.PaletteHue = _colors.ResolvePaletteHue(genome);
+        return appearance;
     }
 }

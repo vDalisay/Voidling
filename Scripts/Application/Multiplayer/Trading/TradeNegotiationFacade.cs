@@ -13,7 +13,10 @@ public sealed record TradeVoidlingChoiceView(
     string DisplayName,
     string TintHex,
     bool HasAngelMutation,
-    int OtherMutationCount);
+    int OtherMutationCount,
+    string VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+    float PaletteHue = VoidlingAppearanceData.LegacyUninitializedPaletteHue,
+    string LayerIdsKey = "");
 
 public sealed record TradeInviteView(string NegotiationId, string FromDisplayName);
 
@@ -95,6 +98,14 @@ public sealed class TradeNegotiationFacade
 
     public TradeLobbyViewState Current => BuildState();
 
+    /// <summary>
+    /// Returns only the presentation-safe lifecycle phase for a known negotiation. This is useful
+    /// for integration probes that must distinguish authoritative completion from failure after the
+    /// active trading-room view has closed, without exposing transport IDs or durable journal state.
+    /// </summary>
+    public TradeNegotiationPhase? GetNegotiationPhase(string negotiationId)
+        => string.IsNullOrWhiteSpace(negotiationId) ? null : _negotiation.Get(negotiationId)?.Phase;
+
     public TradeNegotiationOperationResult Invite(string partnerKey)
     {
         if (!TryResolvePartner(partnerKey, out var partner))
@@ -134,7 +145,10 @@ public sealed class TradeNegotiationFacade
                 selected.DisplayName,
                 selected.TintHex,
                 selected.HasAngelMutation,
-                selected.OtherMutationCount);
+                selected.OtherMutationCount,
+                selected.VisualTypeId,
+                selected.PaletteHue,
+                selected.LayerIdsKey);
         if (!_previews.Publish(negotiationId, preview))
         {
             return TradeNegotiationOperationResult.Failed(
@@ -222,21 +236,13 @@ public sealed class TradeNegotiationFacade
             ? null
             : choices.FirstOrDefault(choice => string.Equals(choice.AssetId, localAsset.AssetId, StringComparison.Ordinal));
 
-        // Commit removes the outgoing Voidling from local ownership before LocalTradeCommitted is
-        // raised. Keep rendering the already-synchronized preview while Finalizing so the local slot
-        // never flashes empty between mutual confirmation and the exchange animation.
         if (localAsset != null && localOffer == null)
         {
             var localPreview = _previews.GetPreview(state.NegotiationId, local.Id);
             if (localPreview != null &&
                 string.Equals(localPreview.AssetId, localAsset.AssetId, StringComparison.Ordinal))
             {
-                localOffer = new TradeVoidlingChoiceView(
-                    localPreview.AssetId,
-                    localPreview.DisplayName,
-                    localPreview.TintHex,
-                    localPreview.HasAngelMutation,
-                    localPreview.OtherMutationCount);
+                localOffer = FromPreview(localPreview);
             }
         }
 
@@ -245,12 +251,7 @@ public sealed class TradeNegotiationFacade
         if (remoteAsset != null && preview != null &&
             string.Equals(remoteAsset.AssetId, preview.AssetId, StringComparison.Ordinal))
         {
-            remoteOffer = new TradeVoidlingChoiceView(
-                preview.AssetId,
-                preview.DisplayName,
-                preview.TintHex,
-                preview.HasAngelMutation,
-                preview.OtherMutationCount);
+            remoteOffer = FromPreview(preview);
         }
 
         return new TradeNegotiationView(
@@ -276,14 +277,29 @@ public sealed class TradeNegotiationFacade
             {
                 var hasAngel = voidling.RareTraits.Any(trait =>
                     string.Equals(trait.TraitId, "Angel", StringComparison.OrdinalIgnoreCase));
+                var appearance = (voidling.Appearance ?? new VoidlingAppearanceData()).CreateCanonicalCopy();
                 return new TradeVoidlingChoiceView(
                     voidling.Id,
                     voidling.Name,
                     voidling.TintHex,
                     hasAngel,
-                    Math.Max(0, voidling.RareTraits.Count - (hasAngel ? 1 : 0)));
+                    Math.Max(0, voidling.RareTraits.Count - (hasAngel ? 1 : 0)),
+                    appearance.VisualTypeId,
+                    appearance.PaletteHue,
+                    VoidlingAppearanceData.BuildLayerIdsKey(appearance.LayerIds));
             })
             .ToArray();
+
+    private static TradeVoidlingChoiceView FromPreview(TradeVoidlingOfferPreview preview)
+        => new(
+            preview.AssetId,
+            preview.DisplayName,
+            preview.TintHex,
+            preview.HasAngelMutation,
+            preview.OtherMutationCount,
+            preview.VisualTypeId,
+            preview.PaletteHue,
+            preview.LayerIdsKey);
 
     private void HandleNegotiationChanged(TradeNegotiationState state)
     {

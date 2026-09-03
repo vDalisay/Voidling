@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Racing;
@@ -9,7 +10,7 @@ namespace Voidling.Presentation.UI.Racing;
 public readonly record struct RacePickerVoidlingViewState(
     string Id,
     string Name,
-    Color TintColor,
+    VoidlingVisualAppearance Appearance,
     bool HasAngelMutation,
     int OtherMutationCount,
     string StatSummary);
@@ -20,8 +21,8 @@ public sealed record RacePickerScreenState(
 
 /// <summary>
 /// Standalone race-selection view. It renders immutable, presentation-ready participant snapshots
-/// and emits the selected creature ID. It has no knowledge of GameSession, race construction,
-/// persistence, balance rules, or the race simulator.
+/// and emits the selected creature ID. Appearance remains semantic until the shared visual factory
+/// composes the portrait/card, so typed bodies and layers cannot drift from the race itself.
 /// </summary>
 public partial class RacePickerScreen : VBoxContainer
 {
@@ -77,7 +78,7 @@ public partial class RacePickerScreen : VBoxContainer
         var previewRow = new HBoxContainer();
         previewRow.AddThemeConstantOverride("separation", 12);
         var previewPortrait = UiFactory.CreatePortrait(
-            selected.TintColor,
+            selected.Appearance,
             selected.HasAngelMutation,
             selected.OtherMutationCount,
             new Vector2(72, 72));
@@ -99,7 +100,7 @@ public partial class RacePickerScreen : VBoxContainer
             _selectedId = candidate.Id;
             UiFactory.SetPortraitData(
                 previewPortrait,
-                candidate.TintColor,
+                candidate.Appearance,
                 candidate.HasAngelMutation,
                 candidate.OtherMutationCount);
             previewName.Text = candidate.Name;
@@ -114,7 +115,7 @@ public partial class RacePickerScreen : VBoxContainer
             var captured = creature;
             var entry = UiFactory.CreateVoidlingCard(
                 creature.Name,
-                creature.TintColor,
+                creature.Appearance,
                 creature.HasAngelMutation,
                 creature.OtherMutationCount,
                 pressed =>

@@ -93,35 +93,40 @@ public static class UiFactory
         var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
         var otherTraits = data.RareTraits?.Count(t =>
             !string.Equals(t.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
-
         return CreatePortrait(
-            GameRules.TintColor(data.TintHex),
+            VoidlingVisualAppearance.From(data.Appearance, data.TintHex),
             hasAngel,
             otherTraits,
             minimumSize);
     }
 
     public static TextureRect CreatePortrait(
-        Color tintColor,
+        VoidlingVisualAppearance appearance,
         bool hasAngelMutation,
         int otherMutationCount,
         Vector2 minimumSize)
     {
-        var portrait = new TextureRect
-        {
-            Texture = VoidlingVisualFactory.CreatePortraitTexture(),
-            CustomMinimumSize = minimumSize,
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        };
-        SetPortraitData(portrait, tintColor, hasAngelMutation, otherMutationCount);
+        var portrait = VoidlingPortraitComposer.Create(appearance, minimumSize);
+        SetPortraitData(portrait, appearance, hasAngelMutation, otherMutationCount);
         return portrait;
     }
 
+    // Compatibility overload for UI projections that have not yet been enriched with semantic
+    // appearance. Production creature surfaces should prefer the VoidlingVisualAppearance overload.
+    public static TextureRect CreatePortrait(
+        Color tintColor,
+        bool hasAngelMutation,
+        int otherMutationCount,
+        Vector2 minimumSize)
+        => CreatePortrait(
+            LegacyAppearance(tintColor),
+            hasAngelMutation,
+            otherMutationCount,
+            minimumSize);
+
     public static VBoxContainer CreateVoidlingCard(
         string name,
-        Color tintColor,
+        VoidlingVisualAppearance appearance,
         bool hasAngelMutation,
         int otherMutationCount,
         Action<bool> toggled,
@@ -135,7 +140,7 @@ public static class UiFactory
         card.ToggleMode = true;
         card.KeepPressedOutside = true;
         var portrait = CreatePortrait(
-            tintColor,
+            appearance,
             hasAngelMutation,
             otherMutationCount,
             new Vector2(48, 48));
@@ -153,26 +158,40 @@ public static class UiFactory
         return entry;
     }
 
+    public static VBoxContainer CreateVoidlingCard(
+        string name,
+        Color tintColor,
+        bool hasAngelMutation,
+        int otherMutationCount,
+        Action<bool> toggled,
+        out Button card)
+        => CreateVoidlingCard(
+            name,
+            LegacyAppearance(tintColor),
+            hasAngelMutation,
+            otherMutationCount,
+            toggled,
+            out card);
+
     public static void SetPortraitData(TextureRect portrait, VoidlingData data)
     {
         var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
         var otherTraits = data.RareTraits?.Count(t =>
             !string.Equals(t.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
-
         SetPortraitData(
             portrait,
-            GameRules.TintColor(data.TintHex),
+            VoidlingVisualAppearance.From(data.Appearance, data.TintHex),
             hasAngel,
             otherTraits);
     }
 
     public static void SetPortraitData(
         TextureRect portrait,
-        Color tintColor,
+        VoidlingVisualAppearance appearance,
         bool hasAngelMutation,
         int otherMutationCount)
     {
-        portrait.SelfModulate = tintColor;
+        VoidlingPortraitComposer.Apply(portrait, appearance);
 
         var oldBadge = portrait.GetNodeOrNull<Control>("__mutation_badge");
         if (oldBadge != null && GodotObject.IsInstanceValid(oldBadge))
@@ -192,14 +211,26 @@ public static class UiFactory
         {
             Name = "__mutation_badge",
             MouseFilter = Control.MouseFilterEnum.Ignore,
-            ZIndex = 5,
+            ZIndex = 50,
             ShowAngel = hasAngelMutation,
             SparkleCount = Math.Max(0, otherMutationCount),
-            NominalSpritePixels = requestedSpritePixels
+            NominalSpritePixels = requestedSpritePixels,
+            VisualTypeId = appearance.VisualTypeId
         };
         badge.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         portrait.AddChild(badge);
     }
+
+    public static void SetPortraitData(
+        TextureRect portrait,
+        Color tintColor,
+        bool hasAngelMutation,
+        int otherMutationCount)
+        => SetPortraitData(
+            portrait,
+            LegacyAppearance(tintColor),
+            hasAngelMutation,
+            otherMutationCount);
 
     public static AtlasTexture CreateIcon(int index)
     {
@@ -236,6 +267,13 @@ public static class UiFactory
         try { return Color.FromHtml(tintHex); }
         catch { return Color.FromHtml("#F6F0C9"); }
     }
+
+    private static VoidlingVisualAppearance LegacyAppearance(Color tintColor)
+        => new(
+            VoidlingAppearanceData.DefaultVisualTypeId,
+            -1.0f,
+            Array.Empty<string>(),
+            tintColor.ToHtml());
 
     private static StyleBoxTexture CreatePanelStyle()
     {

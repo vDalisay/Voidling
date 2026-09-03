@@ -43,10 +43,6 @@ public sealed record MultiplayerRaceOperationResult(bool Success, string? Error)
     public static MultiplayerRaceOperationResult Failed(string error) => new(false, error);
 }
 
-/// <summary>
-/// Creates the immutable race participant selected from local ownership. The network participant ID
-/// is namespaced by Steam identity so two peers cannot collide by using the same local creature ID.
-/// </summary>
 public sealed class MultiplayerRaceSelectionFactory
 {
     private readonly RaceParticipantSnapshotFactory _snapshots;
@@ -104,15 +100,12 @@ public sealed class MultiplayerRaceSelectionFactory
     }
 }
 
-/// <summary>
-/// Resolves a received start payload against the local build. A peer never silently races with
-/// different course/rule constants: fingerprints must match before RaceSimulation is constructed.
-/// </summary>
 public sealed class MultiplayerRaceEntryFactory
 {
     public const string DemoCourseId = "demo";
     public const int DemoCourseVersion = 2;
-    public const int CurrentStartVersion = 1;
+    // v2 freezes semantic body/palette/layer appearance with each immutable entrant snapshot.
+    public const int CurrentStartVersion = 2;
 
     private readonly RaceRules _rules;
     private readonly RaceCourse _course;
@@ -252,6 +245,10 @@ public static class MultiplayerRaceValidation
     public const int MaxCreatureIdLength = 128;
     public const int MaxDisplayNameLength = 64;
     public const int MaxTintLength = 16;
+    public const int MaxVisualTypeIdLength = 64;
+    public const int MaxLayerIdsKeyLength = 1024;
+    public const int MaxAppearanceLayers = 16;
+    public const int MaxAppearanceLayerIdLength = 128;
 
     public static string BuildParticipantId(PlatformUserId ownerId, string ownedCreatureId)
         => $"{ownerId.Value}:{ownedCreatureId}";
@@ -337,6 +334,10 @@ public static class MultiplayerRaceValidation
             participant.DisplayName.Length > MaxDisplayNameLength ||
             string.IsNullOrWhiteSpace(participant.TintHex) ||
             participant.TintHex.Length > MaxTintLength ||
+            !VoidlingAppearanceData.IsValidSemanticId(participant.VisualTypeId, MaxVisualTypeIdLength) ||
+            !VoidlingAppearanceData.IsValidStoredHue(participant.PaletteHue) ||
+            participant.LayerIdsKey == null ||
+            participant.LayerIdsKey.Length > MaxLayerIdsKeyLength ||
             !IsFiniteNonNegative(participant.Run) ||
             !IsFiniteNonNegative(participant.Swim) ||
             !IsFiniteNonNegative(participant.Fly) ||
@@ -344,6 +345,14 @@ public static class MultiplayerRaceValidation
             !IsFiniteNonNegative(participant.Stamina))
         {
             error = "Multiplayer race entrant snapshot is invalid.";
+            return false;
+        }
+
+        var layerIds = participant.LayerIds;
+        if (layerIds.Length > MaxAppearanceLayers ||
+            layerIds.Any(id => !VoidlingAppearanceData.IsValidSemanticId(id, MaxAppearanceLayerIdLength)))
+        {
+            error = "Multiplayer race entrant appearance layers are invalid.";
             return false;
         }
 
@@ -366,6 +375,7 @@ public static class StableRaceSeed
     public static ulong FromChallengeId(string challengeId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(challengeId);
+        // Keep this namespace stable: it defines deterministic race seeds, not the wire schema.
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"voidling:multiplayer-race:v1:{challengeId}"));
         var seed = BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan(0, sizeof(ulong)));
         return seed == 0 ? 1UL : seed;

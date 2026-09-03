@@ -19,13 +19,11 @@ public readonly record struct AngelHaloVisual(
 
 /// <summary>
 /// Canonical Angel-mutation presentation. Garden actors, races and UI portraits all consume this
-/// exact pixel layout. Art-dependent anchor/scale values come from DefaultVoidlingVisual.tres so a
-/// new body sheet cannot leave mutation adornments positioned for the previous silhouette.
+/// exact pixel layout. Art-dependent anchors resolve from the selected visual-family definition so
+/// Water/Power/Flying silhouettes can tune mutation placement independently without consumer edits.
 /// </summary>
 public static class VoidlingMutationVisualMetrics
 {
-    // This is the deliberately pixelated perspective halo that replaced the older smooth ellipse.
-    // Keep the pattern here rather than recreating circles/arcs in individual screens.
     private static readonly string[] AdultPattern =
     {
         "  #####  ",
@@ -46,32 +44,32 @@ public static class VoidlingMutationVisualMetrics
     public static readonly Color GoldColor = Color.FromHtml("#F1CE55");
     public static readonly Color ShineColor = Color.FromHtml("#FFF2A8");
 
-    public static AngelHaloVisual ForSpriteTarget(float spriteScale)
+    public static AngelHaloVisual ForSpriteTarget(float spriteScale, string? visualTypeId = null)
     {
-        var referenceScale = Mathf.Max(0.01f, VoidlingVisualFactory.AdultWorldScale);
+        var definition = VoidlingVisualFactory.ResolveDefinition(visualTypeId);
+        var referenceScale = Mathf.Max(0.01f, definition.AdultWorldScale);
         var ratio = Mathf.Max(0.25f, spriteScale / referenceScale);
-        var compact = spriteScale < VoidlingVisualFactory.MutationCompactScaleThreshold;
-
-        // MutationAdornment2D follows the sprite center, so this is intentionally target-local.
+        var compact = spriteScale < definition.MutationCompactScaleThreshold;
         var localCenterY = compact
-            ? VoidlingVisualFactory.MutationCompactCenterYOffset
-            : VoidlingVisualFactory.MutationAdultCenterYOffset * ratio;
+            ? definition.MutationCompactCenterYOffset
+            : definition.MutationAdultCenterYOffset * ratio;
         return new AngelHaloVisual(new Vector2(0, localCenterY), 1.0f, compact);
     }
 
-    public static AngelHaloVisual ForPortrait(float nominalSpritePixels, Vector2 controlSize)
+    public static AngelHaloVisual ForPortrait(
+        float nominalSpritePixels,
+        Vector2 controlSize,
+        string? visualTypeId = null)
     {
-        var referencePixels = Mathf.Max(1.0f, VoidlingVisualFactory.FrameHeight);
+        var definition = VoidlingVisualFactory.ResolveDefinition(visualTypeId);
+        var referencePixels = Mathf.Max(1.0f, definition.FrameHeight);
         var spriteScale = Mathf.Max(0.20f, nominalSpritePixels / referencePixels);
-        var compact = nominalSpritePixels < VoidlingVisualFactory.PortraitMutationCompactPixelThreshold;
-        var referenceScale = Mathf.Max(0.01f, VoidlingVisualFactory.AdultWorldScale);
+        var compact = nominalSpritePixels < definition.PortraitMutationCompactPixelThreshold;
+        var referenceScale = Mathf.Max(0.01f, definition.AdultWorldScale);
         var localCenterY = compact
-            ? VoidlingVisualFactory.MutationCompactCenterYOffset
-            : VoidlingVisualFactory.MutationAdultCenterYOffset *
+            ? definition.MutationCompactCenterYOffset
+            : definition.MutationAdultCenterYOffset *
               Mathf.Max(0.65f, spriteScale / referenceScale);
-
-        // UI cards can render larger than world sprites, but keep whole-pixel cells so the halo
-        // remains crisp instead of turning into a smooth/vector effect.
         var cellSize = Mathf.Max(1.0f, Mathf.Round(nominalSpritePixels / referencePixels));
         return new AngelHaloVisual(
             new Vector2(controlSize.X * 0.5f, controlSize.Y * 0.5f + localCenterY),

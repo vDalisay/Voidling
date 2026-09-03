@@ -13,20 +13,32 @@ public partial class MutationAdornment2D : Node2D
     private AnimatedSprite2D? _target;
     private bool _showAngel;
     private int _sparkleCount;
+    private string _visualTypeId = VoidlingAppearanceData.DefaultVisualTypeId;
 
     public void Setup(VoidlingData data, AnimatedSprite2D target)
     {
         var showAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
         var sparkleCount = data.RareTraits.Count(t =>
             !string.Equals(t.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase));
-        Setup(showAngel, sparkleCount, target);
+        Setup(
+            showAngel,
+            sparkleCount,
+            target,
+            data.Appearance?.VisualTypeId ?? VoidlingAppearanceData.DefaultVisualTypeId);
     }
 
-    public void Setup(bool showAngel, int sparkleCount, AnimatedSprite2D target)
+    public void Setup(
+        bool showAngel,
+        int sparkleCount,
+        AnimatedSprite2D target,
+        string? visualTypeId = null)
     {
         _target = target;
         _showAngel = showAngel;
         _sparkleCount = Math.Max(0, sparkleCount);
+        _visualTypeId = string.IsNullOrWhiteSpace(visualTypeId)
+            ? VoidlingAppearanceData.DefaultVisualTypeId
+            : visualTypeId;
         ZIndex = target.ZIndex + 8;
         Position = target.Position;
         QueueRedraw();
@@ -51,7 +63,7 @@ public partial class MutationAdornment2D : Node2D
 
         var spriteScale = Mathf.Abs(_target.Scale.X);
         if (_showAngel)
-            DrawPixelHalo(VoidlingMutationVisualMetrics.ForSpriteTarget(spriteScale));
+            DrawPixelHalo(VoidlingMutationVisualMetrics.ForSpriteTarget(spriteScale, _visualTypeId));
 
         if (_sparkleCount > 0)
             DrawTraitSparkles(spriteScale);
@@ -65,7 +77,10 @@ public partial class MutationAdornment2D : Node2D
 
     private void DrawTraitSparkles(float spriteScale)
     {
-        var ratio = Mathf.Max(0.25f, spriteScale / 0.62f);
+        var referenceScale = Mathf.Max(
+            0.01f,
+            VoidlingVisualFactory.ResolveDefinition(_visualTypeId).AdultWorldScale);
+        var ratio = Mathf.Max(0.25f, spriteScale / referenceScale);
         var t = (float)Time.GetTicksMsec() / 340.0f;
         var count = Mathf.Clamp(_sparkleCount + 1, 2, 4);
         for (var i = 0; i < count; i++)

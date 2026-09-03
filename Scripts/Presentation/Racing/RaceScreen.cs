@@ -69,6 +69,7 @@ public partial class RaceScreen : Node2D
     private sealed class RacerVisual
     {
         public RaceEntrant Entrant { get; init; } = null!;
+        public VoidlingVisualAppearance Appearance { get; init; }
         public AnimatedSprite2D Sprite { get; init; } = null!;
         public Polygon2D Shadow { get; init; } = null!;
         public float BaseY { get; init; }
@@ -256,40 +257,46 @@ public partial class RaceScreen : Node2D
         for (var i = 0; i < entrants.Count; i++)
         {
             var entrant = entrants[i];
+            var appearance = AppearanceFor(entrant.Participant);
+            var visualTypeId = appearance.VisualTypeId;
             var baseY = TrackY + _racerOffsets[Math.Min(i, _racerOffsets.Length - 1)];
-            var raceScale = VoidlingVisualFactory.RaceScale;
+            var raceScale = VoidlingVisualFactory.RaceScaleFor(visualTypeId);
 
             var shadow = new Polygon2D
             {
-                Polygon = VoidlingVisualFactory.BuildShadowPolygon(raceScale, 18),
+                Polygon = VoidlingVisualFactory.BuildShadowPolygon(raceScale, 18, visualTypeId),
                 Color = new Color(0.15f, 0.18f, 0.16f, 0.34f),
                 Position = new Vector2(
                     Course.StartX,
-                    baseY + VoidlingVisualFactory.ShadowCenterYOffset),
+                    baseY + VoidlingVisualFactory.ShadowCenterYOffsetFor(visualTypeId)),
                 ZIndex = 7 + i
             };
             AddChild(shadow);
 
             var sprite = new AnimatedSprite2D
             {
-                SpriteFrames = VoidlingVisualFactory.GetRaceFrames(),
                 Position = new Vector2(
                     Course.StartX,
-                    baseY + VoidlingVisualFactory.RaceSpriteCenterYOffset()),
+                    baseY + VoidlingVisualFactory.RaceSpriteCenterYOffset(visualTypeId)),
                 Scale = Vector2.One * raceScale,
-                Modulate = ParseTint(entrant.Participant.TintHex),
                 ZIndex = 10 + i
             };
+            VoidlingVisualFactory.ApplyAppearance(sprite, appearance, race: true);
             AddChild(sprite);
             sprite.Play("run");
 
             var mutationAdornment = new MutationAdornment2D();
-            mutationAdornment.Setup(entrant.HasAngelMutation, entrant.OtherMutationCount, sprite);
+            mutationAdornment.Setup(
+                entrant.HasAngelMutation,
+                entrant.OtherMutationCount,
+                sprite,
+                visualTypeId);
             AddChild(mutationAdornment);
 
             var visual = new RacerVisual
             {
                 Entrant = entrant,
+                Appearance = appearance,
                 Sprite = sprite,
                 Shadow = shadow,
                 BaseY = baseY
@@ -456,12 +463,13 @@ public partial class RaceScreen : Node2D
             visual.Sprite.Rotation = 0.0f;
         }
 
+        var visualTypeId = visual.Appearance.VisualTypeId;
         visual.Sprite.Position = new Vector2(
             state.X,
-            visual.BaseY + VoidlingVisualFactory.RaceSpriteCenterYOffset() + yOffset);
+            visual.BaseY + VoidlingVisualFactory.RaceSpriteCenterYOffset(visualTypeId) + yOffset);
         visual.Shadow.Position = new Vector2(
             state.X,
-            visual.BaseY + VoidlingVisualFactory.ShadowCenterYOffset);
+            visual.BaseY + VoidlingVisualFactory.ShadowCenterYOffsetFor(visualTypeId));
         visual.Shadow.Scale = shadowScale;
         var shadowColor = visual.Shadow.Color;
         shadowColor.A = shadowAlpha;
@@ -857,7 +865,7 @@ public partial class RaceScreen : Node2D
 
     private static TextureRect CreateEntrantPortrait(RaceEntrant entrant, Vector2 size)
         => UiFactory.CreatePortrait(
-            ParseTint(entrant.Participant.TintHex),
+            AppearanceFor(entrant.Participant),
             entrant.HasAngelMutation,
             entrant.OtherMutationCount,
             size);
@@ -979,6 +987,13 @@ public partial class RaceScreen : Node2D
                 break;
         }
     }
+
+    private static VoidlingVisualAppearance AppearanceFor(RaceParticipantSnapshot participant)
+        => new(
+            participant.VisualTypeId,
+            participant.PaletteHue,
+            participant.LayerIds,
+            participant.TintHex);
 
     private static bool InLaunchRamp(float x)
         => x >= Course.GlideLaunchStartX && x < Course.GlideSegment.StartX;

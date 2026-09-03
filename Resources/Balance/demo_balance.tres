@@ -9,6 +9,7 @@ AbilityRankBreakthroughChance = 0.01
 RareFounderTraitChance = 0.0005
 RareTraitTransmissionChance = 0.1
 RelatedAncestorDepth = 3
+PaletteBlendInfluence = 0.18
 BreedCooldownSeconds = 8.0
 EggIncubationSeconds = 22.0
 TrainingPointsPerLevel = 12

@@ -5,6 +5,7 @@ using Voidling.Application.Breeding;
 using Voidling.Presentation.UI.Breeding;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Shop;
+using Voidling.Presentation.Voidlings;
 
 namespace VoidlingGame;
 
@@ -102,7 +103,7 @@ public partial class MainController : Node
         return new BreedingParentViewState(
             Id: data.Id,
             Name: data.Name,
-            TintColor: GameRules.TintColor(data.TintHex),
+            Appearance: VoidlingVisualAppearance.From(data.Appearance, data.TintHex),
             HasAngelMutation: hasAngel,
             OtherMutationCount: otherMutations);
     }
@@ -122,15 +123,15 @@ public partial class MainController : Node
         }
         else if (preview.Related)
         {
-            text = $"Related pairing • lineage risk: {LineageRiskDisplayName(preview.LineageRisk)}.";
+            text = $"Related pairing • lineage risk: {LineageRiskDisplayName(preview.LineageRisk)} • {preview.HatchFailurePercent}% hatch-failure risk.";
         }
         else if (preview.IsCleanOutcross)
         {
-            text = $"Clean outcross • lineage risk improves to {LineageRiskDisplayName(preview.LineageRisk)}.";
+            text = $"Clean outcross • lineage risk improves to {LineageRiskDisplayName(preview.LineageRisk)} • {preview.HatchFailurePercent}% hatch-failure risk.";
         }
         else if (preview.ChildBurden > 0)
         {
-            text = $"Unrelated pairing • lineage risk remains {LineageRiskDisplayName(preview.LineageRisk)}.";
+            text = $"Unrelated pairing • lineage risk remains {LineageRiskDisplayName(preview.LineageRisk)} • {preview.HatchFailurePercent}% hatch-failure risk.";
         }
         else
         {

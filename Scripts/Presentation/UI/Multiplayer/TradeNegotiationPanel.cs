@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using Voidling.Application.Multiplayer.Trading;
+using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Multiplayer;
@@ -100,7 +101,7 @@ public partial class TradeNegotiationPanel : VBoxContainer
                 var captured = choice;
                 var cardContainer = UiFactory.CreateVoidlingCard(
                     choice.DisplayName,
-                    UiFactory.ParseTint(choice.TintHex),
+                    AppearanceFor(choice),
                     choice.HasAngelMutation,
                     choice.OtherMutationCount,
                     pressed =>
@@ -141,9 +142,6 @@ public partial class TradeNegotiationPanel : VBoxContainer
                 ? Tr("UI_TRADE_PARTNER_ACCEPTED")
                 : Tr("UI_TRADE_PARTNER_WAITING");
 
-        // Normal finalization text belongs to presentation/localization. The Application message is
-        // still surfaced for actual failure/diagnostic states, but should not replace localized copy
-        // just because the coordinator supplied its English debug description of Finalizing.
         if (trade.Phase != TradeNegotiationPhase.Finalizing && !string.IsNullOrWhiteSpace(trade.Message))
             status = trade.Message!;
         var statusLabel = UiFactory.CreateLabel(status, 7);
@@ -178,7 +176,7 @@ public partial class TradeNegotiationPanel : VBoxContainer
         else
         {
             var portrait = UiFactory.CreatePortrait(
-                UiFactory.ParseTint(offer.TintHex),
+                AppearanceFor(offer),
                 offer.HasAngelMutation,
                 offer.OtherMutationCount,
                 new Vector2(46, 46));
@@ -201,4 +199,11 @@ public partial class TradeNegotiationPanel : VBoxContainer
 
         return panel;
     }
+
+    private static VoidlingVisualAppearance AppearanceFor(TradeVoidlingChoiceView choice)
+        => new(
+            choice.VisualTypeId,
+            choice.PaletteHue,
+            VoidlingAppearanceData.ParseLayerIdsKey(choice.LayerIdsKey),
+            choice.TintHex);
 }

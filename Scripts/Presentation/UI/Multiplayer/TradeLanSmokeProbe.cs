@@ -8,7 +8,9 @@ namespace Voidling.Presentation.UI.Multiplayer;
 /// <summary>
 /// Command-line-only presentation integration probe for development LAN testing. It intentionally
 /// drives the exact same invite/select/accept bridge API as the player-facing trade UI, then requires
-/// the existing durable trade callback to confirm the expected Voidlings were exchanged locally.
+/// both the local durable trade callback and authoritative negotiation completion before succeeding.
+/// The host remains alive until the completed client leaves the lobby, preventing process shutdown
+/// from racing the final reliable completion snapshot.
 /// </summary>
 public partial class TradeLanSmokeProbe : Node
 {
@@ -20,6 +22,8 @@ public partial class TradeLanSmokeProbe : Node
     private bool _advanceScheduled;
     private bool _inviteSent;
     private bool _inviteAccepted;
+    private bool _localCommitObserved;
+    private bool _authoritativeCompletionObserved;
     private string? _negotiationId;
     private string? _localAssetId;
     private string? _remoteAssetId;
@@ -82,6 +86,8 @@ public partial class TradeLanSmokeProbe : Node
 
         var state = _bridge.Current;
         PrintState(state);
+        if (TryFinishCompletedTrade(state))
+            return;
         if (!state.Availability.IsAvailable || !state.IsConnected || state.LocalVoidlings.Count == 0)
             return;
 
@@ -130,8 +136,8 @@ public partial class TradeLanSmokeProbe : Node
             _remoteAssetId = active.RemoteOfferAssetId;
 
         // Once both players confirm, ownership can change before the presentation commit callback is
-        // delivered. Never interpret a Finalizing room as a request to select again; just wait for the
-        // durable callback that proves the negotiated assets were committed.
+        // delivered. Never interpret a Finalizing room as a request to select again; wait for both
+        // the local durable callback and the host-authoritative Completed phase instead.
         if (active.Phase != TradeNegotiationPhase.Negotiating)
             return;
 
@@ -195,6 +201,54 @@ public partial class TradeLanSmokeProbe : Node
             return;
         }
 
+        _localCommitObserved = true;
+        ScheduleAdvance();
+    }
+
+    private bool TryFinishCompletedTrade(TradeLobbyViewState state)
+    {
+        if (_bridge == null || string.IsNullOrWhiteSpace(_negotiationId))
+            return false;
+
+        var phase = _bridge.GetNegotiationPhase(_negotiationId);
+        if (phase is TradeNegotiationPhase.Failed or TradeNegotiationPhase.Cancelled)
+        {
+            Fail($"authoritative negotiation ended as {phase}");
+            return true;
+        }
+
+        if (phase != TradeNegotiationPhase.Completed)
+            return false;
+
+        if (!_authoritativeCompletionObserved)
+        {
+            _authoritativeCompletionObserved = true;
+            GD.Print($"[trade-lan-smoke] authoritative negotiation completed: {_negotiationId}");
+        }
+
+        // Completed means the host has observed both durable commits. Also require this process to
+        // have received its own durable callback so the smoke test proves both the authoritative and
+        // local persistence paths. The host then stays alive until the successful client disconnects,
+        // which acts as an acknowledgement that the final reliable completion snapshot arrived.
+        if (!_localCommitObserved)
+            return false;
+        if (_hostMode && state.Partners.Count > 0)
+            return false;
+
+        Succeed();
+        return true;
+    }
+
+    private void Succeed()
+    {
+        if (_complete)
+            return;
+        if (string.IsNullOrWhiteSpace(_localAssetId) || string.IsNullOrWhiteSpace(_remoteAssetId))
+        {
+            Fail("trade completed without both negotiated Voidling IDs");
+            return;
+        }
+
         _complete = true;
         GD.Print(
             $"[trade-lan-smoke] LAN_TRADE_SMOKE_SUCCESS negotiation={_negotiationId} " +
@@ -219,7 +273,7 @@ public partial class TradeLanSmokeProbe : Node
         await ToSignal(GetTree().CreateTimer(TimeoutSeconds), SceneTreeTimer.SignalName.Timeout);
         if (_complete || !IsInsideTree())
             return;
-        Fail("timed out waiting for mutual confirmation and durable trade commit");
+        Fail("timed out waiting for both local durable commit, authoritative completion, and peer acknowledgement");
     }
 
     private void Fail(string reason)

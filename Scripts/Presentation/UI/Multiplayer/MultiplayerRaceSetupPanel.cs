@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Godot;
 using Voidling.Application.Multiplayer.Challenges;
 using Voidling.Application.Multiplayer.Racing;
+using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Multiplayer;
@@ -10,7 +11,7 @@ namespace Voidling.Presentation.UI.Multiplayer;
 public sealed record MultiplayerRaceSetupVoidlingView(
     string Id,
     string Name,
-    Color TintColor,
+    VoidlingVisualAppearance Appearance,
     bool HasAngelMutation,
     int OtherMutationCount,
     string StatSummary);
@@ -20,8 +21,8 @@ public sealed record MultiplayerRaceSetupPanelState(
     IReadOnlyList<MultiplayerRaceSetupVoidlingView> Voidlings);
 
 /// <summary>
-/// Race-specific lobby setup. The panel only selects one local Voidling and requests the existing
-/// synchronized start handshake; it does not construct network race data or advance simulation.
+/// Race-specific lobby setup. The panel selects one local Voidling and requests the synchronized
+/// start handshake; all creature cards use the same semantic appearance as the eventual race.
 /// </summary>
 public partial class MultiplayerRaceSetupPanel : VBoxContainer
 {
@@ -124,7 +125,7 @@ public partial class MultiplayerRaceSetupPanel : VBoxContainer
             var captured = creature;
             var entry = UiFactory.CreateVoidlingCard(
                 creature.Name,
-                creature.TintColor,
+                creature.Appearance,
                 creature.HasAngelMutation,
                 creature.OtherMutationCount,
                 pressed =>
