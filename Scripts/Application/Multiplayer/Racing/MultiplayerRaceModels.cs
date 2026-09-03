@@ -334,8 +334,7 @@ public static class MultiplayerRaceValidation
             participant.DisplayName.Length > MaxDisplayNameLength ||
             string.IsNullOrWhiteSpace(participant.TintHex) ||
             participant.TintHex.Length > MaxTintLength ||
-            string.IsNullOrWhiteSpace(participant.VisualTypeId) ||
-            participant.VisualTypeId.Length > MaxVisualTypeIdLength ||
+            !VoidlingAppearanceData.IsValidSemanticId(participant.VisualTypeId, MaxVisualTypeIdLength) ||
             !VoidlingAppearanceData.IsValidStoredHue(participant.PaletteHue) ||
             participant.LayerIdsKey == null ||
             participant.LayerIdsKey.Length > MaxLayerIdsKeyLength ||
@@ -351,7 +350,7 @@ public static class MultiplayerRaceValidation
 
         var layerIds = participant.LayerIds;
         if (layerIds.Length > MaxAppearanceLayers ||
-            layerIds.Any(id => string.IsNullOrWhiteSpace(id) || id.Length > MaxAppearanceLayerIdLength))
+            layerIds.Any(id => !VoidlingAppearanceData.IsValidSemanticId(id, MaxAppearanceLayerIdLength)))
         {
             error = "Multiplayer race entrant appearance layers are invalid.";
             return false;
