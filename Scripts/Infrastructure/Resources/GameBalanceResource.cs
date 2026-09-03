@@ -8,11 +8,6 @@ namespace Voidling.Infrastructure.Resources;
 /// Godot Inspector authoring surface for balance values that are already consumed by live
 /// gameplay. The Resource never crosses the infrastructure boundary: Bootstrap converts it once
 /// into immutable plain-C# GameBalanceRules consumed by Application and Domain.
-///
-/// Stable IDs, palettes, inbreeding failure tiers, reward tables, and race tuning remain in the
-/// domain defaults until the live code consuming them has moved behind the corresponding pure
-/// domain/application seam. Do not expose an Inspector knob before it is the real source used by
-/// gameplay; that would create competing configuration systems.
 /// </summary>
 [GlobalClass]
 public partial class GameBalanceResource : Resource
@@ -32,6 +27,10 @@ public partial class GameBalanceResource : Resource
 
     [Export(PropertyHint.Range, "1,8,1")]
     public int RelatedAncestorDepth { get; set; } = 3;
+
+    [ExportGroup("Appearance Genetics")]
+    [Export(PropertyHint.Range, "0,0.49,0.01")]
+    public float PaletteBlendInfluence { get; set; } = 0.18f;
 
     [ExportGroup("Breeding / Hatching")]
     [Export(PropertyHint.Range, "0,300,0.5")]
@@ -73,6 +72,10 @@ public partial class GameBalanceResource : Resource
                 RareFounderTraitChance = Probability(RareFounderTraitChance),
                 RareTraitTransmissionChance = Probability(RareTraitTransmissionChance),
                 RelatedAncestorDepth = Math.Max(1, RelatedAncestorDepth)
+            },
+            Appearance = defaults.Appearance with
+            {
+                PaletteBlendInfluence = Math.Clamp((double)PaletteBlendInfluence, 0.0, 0.49)
             },
             Breeding = defaults.Breeding with
             {
