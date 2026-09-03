@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Voidling.Application.Racing;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Racing;
@@ -23,6 +25,46 @@ public sealed class RacingArchitectureTests
 
         Assert.Equal(originalRun, snapshot.Run);
         Assert.True(factory.Create(creature).Run > originalRun);
+    }
+
+    [Fact]
+    public void Snapshot_FreezesSemanticAppearanceWithoutMutatingLiveCreature()
+    {
+        var creature = CreateCreature();
+        creature.Appearance = new VoidlingAppearanceData
+        {
+            VisualTypeId = "Flying",
+            PaletteHue = 0.725f,
+            LayerIds = new List<string> { "wing.large", "crystal.blue" }
+        };
+        var factory = new RaceParticipantSnapshotFactory(Rules);
+
+        var snapshot = factory.Create(creature);
+
+        Assert.Equal("flying", snapshot.VisualTypeId);
+        Assert.Equal(0.725f, snapshot.PaletteHue);
+        Assert.Equal(new[] { "crystal.blue", "wing.large" }, snapshot.LayerIds);
+        Assert.Equal("Flying", creature.Appearance.VisualTypeId);
+        Assert.Equal(new[] { "wing.large", "crystal.blue" }, creature.Appearance.LayerIds);
+    }
+
+    [Fact]
+    public void RaceEntryFactory_CpuRacersFreezeContinuousPaletteHueDeterministically()
+    {
+        var factory = new RaceEntryFactory(Rules);
+
+        var first = factory.Create(CreateCreature(), 123456UL);
+        var second = factory.Create(CreateCreature(), 123456UL);
+        var firstCpu = first.Entrants.Skip(1).Select(entry => entry.Participant).ToArray();
+        var secondCpu = second.Entrants.Skip(1).Select(entry => entry.Participant).ToArray();
+
+        Assert.Equal(3, firstCpu.Length);
+        Assert.All(firstCpu, cpu =>
+        {
+            Assert.Equal(VoidlingAppearanceData.DefaultVisualTypeId, cpu.VisualTypeId);
+            Assert.True(VoidlingAppearanceData.IsValidHue(cpu.PaletteHue));
+        });
+        Assert.Equal(firstCpu.Select(cpu => cpu.PaletteHue), secondCpu.Select(cpu => cpu.PaletteHue));
     }
 
     [Fact]
