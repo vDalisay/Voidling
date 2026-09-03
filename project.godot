@@ -34,7 +34,7 @@ project/assembly_name="Voidling"
 
 [internationalization]
 
-locale/translations=PackedStringArray("res://Localization/en.po", "res://Localization/trade.en.po")
+locale/translations=PackedStringArray("res://Localization/en.po", "res://Localization/trade.en.po", "res://Localization/favorite-food.en.po", "res://Localization/errors.en.po")
 
 [physics]
 
