@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace VoidlingGame;
 
@@ -11,6 +12,7 @@ namespace VoidlingGame;
 public sealed class VoidlingAppearanceData
 {
     public const string DefaultVisualTypeId = "normal";
+    public const char LayerSeparator = '|';
 
     /// <summary>
     /// Semantic body/morphology family such as normal, water or power. The production visual
@@ -41,6 +43,26 @@ public sealed class VoidlingAppearanceData
         return value < 0.0f ? value + 1.0f : value;
     }
 
+    public static string BuildLayerIdsKey(IEnumerable<string>? layerIds)
+    {
+        if (layerIds == null)
+            return string.Empty;
+        return string.Join(
+            LayerSeparator,
+            layerIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(id => id, StringComparer.OrdinalIgnoreCase));
+    }
+
+    public static string[] ParseLayerIdsKey(string? key)
+        => string.IsNullOrWhiteSpace(key)
+            ? Array.Empty<string>()
+            : key.Split(
+                LayerSeparator,
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
     public void Normalize()
     {
         VisualTypeId = string.IsNullOrWhiteSpace(VisualTypeId)
@@ -49,6 +71,6 @@ public sealed class VoidlingAppearanceData
         if (IsValidHue(PaletteHue))
             PaletteHue = NormalizeHue(PaletteHue);
         LayerIds ??= new List<string>();
-        LayerIds.RemoveAll(string.IsNullOrWhiteSpace);
+        LayerIds = ParseLayerIdsKey(BuildLayerIdsKey(LayerIds)).ToList();
     }
 }
