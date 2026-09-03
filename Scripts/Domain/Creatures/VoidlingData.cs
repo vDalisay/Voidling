@@ -26,7 +26,12 @@ public sealed class VoidlingData
     public int FamilyGeneration { get; set; }
     public int InbreedingBurdenLevel { get; set; }
     public bool InbreedingHistoryFlag { get; set; }
+
+    // Legacy single-tint presentation value. Kept for save/backwards compatibility and fallback UI;
+    // production rendering resolves the semantic Appearance + palette DNA through the visual catalog.
     public string TintHex { get; set; } = "#F6F0C9";
+    public VoidlingAppearanceData Appearance { get; set; } = new();
+
     public List<RareTraitData> RareTraits { get; set; } = new();
 
     // Initial/world placement. Normal wandering does not continuously write to the save.
