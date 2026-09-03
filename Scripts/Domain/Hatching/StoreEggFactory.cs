@@ -7,8 +7,8 @@ namespace Voidling.Domain.Hatching;
 
 /// <summary>
 /// Creates a fully rolled store egg at inventory-entry time. The returned EggData already owns
-/// its seed, genome, phenotype-facing tint, and founder-trait roll; purchase/hatching only move
-/// this persisted object and must never reroll it.
+/// its seed, genome, semantic appearance/palette phenotype, and founder-trait roll; purchase/hatching
+/// only move this persisted object and must never reroll it.
 /// </summary>
 public sealed class StoreEggFactory
 {
@@ -20,7 +20,7 @@ public sealed class StoreEggFactory
     public StoreEggFactory(GameBalanceRules rules)
     {
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
-        _genomes = new GenomeFactory(rules.Genetics);
+        _genomes = new GenomeFactory(rules.Genetics, rules.Appearance);
         _rareTraits = new RareTraitInheritanceService(rules.Genetics);
         _colors = new ColorPhenotypeResolver(rules.Appearance);
     }
@@ -39,6 +39,11 @@ public sealed class StoreEggFactory
             Genome = genome,
             RequiredIncubationSeconds = _rules.Hatching.IncubationSeconds,
             TintHex = _colors.ResolveTint(genome),
+            Appearance = new VoidlingAppearanceData
+            {
+                VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+                PaletteHue = _colors.ResolvePaletteHue(genome)
+            },
             RareTraits = _rareTraits.RollFounderTraits(eggSeed, eggId),
             IsViable = true,
             FailureResolved = true

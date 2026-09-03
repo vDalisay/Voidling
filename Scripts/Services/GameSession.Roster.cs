@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using Voidling.Application.Breeding;
+using Voidling.Application.Roster;
 
 namespace VoidlingGame;
 
@@ -15,6 +17,12 @@ public partial class GameSession
 
     public bool IsDeparted(string id)
         => _roster!.IsDeparted(State, id);
+
+    public LineageTreeProjection CreateLineageTreeProjection(string selectedCreatureId)
+        => _lineageTreeProjection!.Create(State, selectedCreatureId);
+
+    public CreatureProfileProjection? CreateCreatureProfileProjection(string creatureId)
+        => _lineageTreeProjection!.CreateCreatureProfile(State, creatureId);
 
     public void DiscardFailedEgg(string eggId)
     {

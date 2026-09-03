@@ -1,99 +1,73 @@
 using System;
 using System.Linq;
 using Godot;
+using Voidling.Application.Breeding;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Details;
 using Voidling.Presentation.UI.Racing;
+using Voidling.Presentation.Voidlings;
 
 namespace VoidlingGame;
 
 public partial class MainController : Node
 {
-    private void ShowRacePicker()
+    private RacePickerVoidlingViewState CreateRacePickerView(VoidlingData creature)
     {
-        var owned = _session.State.Voidlings.ToArray();
-        var selectedId = owned.Any(v => v.Id == _selectedId)
-            ? _selectedId
-            : owned.FirstOrDefault()?.Id ?? string.Empty;
-
-        var viewState = owned.Select(CreateRacePickerView).ToArray();
-        var box = OpenModal(Tr("UI_RACE_PICKER_TITLE"), new Vector2(552, 310));
-        var screen = new RacePickerScreen();
-        screen.Configure(new RacePickerScreenState(viewState, selectedId));
-        screen.RaceRequested += creatureId =>
-        {
-            var selected = _session.FindVoidling(creatureId);
-            if (selected == null)
-                return;
-
-            CloseModal();
-            StartRace(selected);
-        };
-        box.AddChild(screen);
-    }
-
-    private static RacePickerVoidlingViewState CreateRacePickerView(VoidlingData creature)
-    {
-        var hasAngel = GameRules.HasMutation(creature, GameRules.AngelMutationId);
-        var otherMutations = creature.RareTraits?.Count(trait =>
-            !string.Equals(trait.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
-        var statSummary = string.Join("   ", GameRules.StatIds.Select(stat =>
-            $"{StatPresentationCatalog.NameFor(stat)} {GameRules.GradeName(GameRules.GetGene(creature, stat).ExpressedValue)} {Mathf.RoundToInt(GameRules.EffectiveStat(creature, stat))}"));
+        var profile = _session.CreateCreatureProfileProjection(creature.Id)
+            ?? throw new InvalidOperationException($"Could not project race-picker data for '{creature.Id}'.");
+        var statSummary = string.Join("   ", profile.Stats.Select(stat =>
+            $"{StatPresentationCatalog.NameFor(stat.StatId)} {stat.InheritedRank} {stat.EffectiveValue}"));
 
         return new RacePickerVoidlingViewState(
-            creature.Id,
-            creature.Name,
-            GameRules.TintColor(creature.TintHex),
-            hasAngel,
-            otherMutations,
+            profile.CreatureId,
+            profile.Name,
+            ProfileAppearance(profile),
+            profile.HasAngelMutation,
+            profile.OtherMutationCount,
             statSummary);
     }
 
     private void ShowDetails()
     {
-        var data = _session.FindVoidling(_selectedId);
-        if (data == null)
+        var profile = _session.CreateCreatureProfileProjection(_selectedId);
+        if (profile == null)
             return;
 
-        var hasAngel = GameRules.HasMutation(data, GameRules.AngelMutationId);
-        var otherMutations = data.RareTraits?.Count(trait =>
-            !string.Equals(trait.TraitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase)) ?? 0;
-        var stats = GameRules.StatIds.Select(statId =>
-        {
-            var gene = GameRules.GetGene(data, statId);
-            return new DetailsStatViewState(
-                StatPresentationCatalog.NameFor(statId),
-                StatPresentationCatalog.ColorFor(statId),
-                GameRules.GradeName(gene.ExpressedValue),
-                GameRules.StatLevel(data, statId),
-                Mathf.RoundToInt(GameRules.EffectiveStat(data, statId)),
-                GameRules.StatLevelProgress(data, statId),
-                GameRules.GradeName(gene.AlleleA),
-                GameRules.GradeName(gene.AlleleB));
-        }).ToArray();
-        var rareTraits = data.RareTraits?
+        var stats = profile.Stats
+            .Select(stat => new DetailsStatViewState(
+                StatPresentationCatalog.NameFor(stat.StatId),
+                StatPresentationCatalog.ColorFor(stat.StatId),
+                stat.InheritedRank,
+                stat.TrainingLevel,
+                stat.EffectiveValue,
+                stat.TrainingProgress,
+                stat.Dna1Rank,
+                stat.Dna2Rank))
+            .ToArray();
+        var rareTraits = profile.RareTraits
             .Select(trait => new DetailsRareTraitViewState(
                 trait.TraitId,
-                _session.NameFor(trait.FounderCreatureId),
+                trait.FounderName,
                 trait.GenerationFromFounder,
                 trait.CanTransmit))
-            .ToArray() ?? Array.Empty<DetailsRareTraitViewState>();
+            .ToArray();
 
         var state = new DetailsScreenState(
-            data.Name,
-            data.Stage == LifeStage.Adult,
-            data.FamilyGeneration,
-            data.InbreedingBurdenLevel,
-            GameRules.TintColor(data.TintHex),
-            hasAngel,
-            otherMutations,
-            data.Genome.ColorAlleleA,
-            data.Genome.ColorAlleleB,
-            data.Genome.ExpressedColorIndex,
+            profile.Name,
+            profile.IsAdult,
+            profile.FamilyGeneration,
+            Tr(LineageRiskTranslationKey(profile.LineageRisk)),
+            ProfileAppearance(profile),
+            GameRules.TintColor(profile.TintHex),
+            profile.HasAngelMutation,
+            profile.OtherMutationCount,
+            profile.ColorAlleleA,
+            profile.ColorAlleleB,
+            profile.ExpressedColorIndex,
             stats,
             rareTraits);
 
-        var box = OpenModal($"{data.Name.ToUpperInvariant()} — DETAILS", new Vector2(536, 318));
+        var box = OpenModal($"{profile.Name.ToUpperInvariant()} — DETAILS", new Vector2(536, 318));
         var screen = new DetailsScreen();
         screen.Configure(state);
         box.AddChild(screen);
@@ -104,6 +78,9 @@ public partial class MainController : Node
         var data = _session.FindVoidling(_selectedId);
         if (data == null)
             return;
+
+        var projection = _session.CreateLineageTreeProjection(data.Id);
+        var membersById = projection.Members.ToDictionary(member => member.CreatureId, StringComparer.Ordinal);
 
         var box = OpenModal($"{data.Name.ToUpperInvariant()} — FAMILY TREE", new Vector2(612, 330));
         var note = UiFactory.CreateLabel("Drag empty space with left mouse. Click a family member for stats and parents.", 6);
@@ -117,7 +94,7 @@ public partial class MainController : Node
         {
             EdgePanningEnabled = _session.State.EdgePanning
         };
-        tree.Build(data.Id, _session.State.Voidlings, _session.State.DepartedVoidlings);
+        tree.Build(projection);
         content.AddChild(tree);
 
         var inspector = UiFactory.CreatePanel(new Vector2(153, 252));
@@ -128,10 +105,12 @@ public partial class MainController : Node
         inspectorBox.AddThemeConstantOverride("separation", 3);
         inspector.AddChild(inspectorBox);
 
+        string NameFor(string memberId)
+            => membersById.TryGetValue(memberId, out var known) ? known.DisplayName : "Unknown";
+
         void ShowMember(string memberId)
         {
-            var member = _session.FindLineageVoidling(memberId);
-            if (member == null)
+            if (!membersById.TryGetValue(memberId, out var member))
                 return;
 
             foreach (var old in inspectorBox.GetChildren())
@@ -144,7 +123,7 @@ public partial class MainController : Node
             tree.SetSelectedMember(memberId);
 
             var heading = new HBoxContainer();
-            var memberName = UiFactory.CreateTitle(member.Name);
+            var memberName = UiFactory.CreateTitle(member.DisplayName);
             memberName.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
             heading.AddChild(memberName);
             var dismiss = UiFactory.CreateButton("X");
@@ -153,25 +132,53 @@ public partial class MainController : Node
             heading.AddChild(dismiss);
             inspectorBox.AddChild(heading);
 
-            var portrait = UiFactory.CreatePortrait(member, new Vector2(60, 60));
-            if (_session.IsDeparted(member.Id))
+            var hasAngel = member.RareTraitIds.Any(traitId =>
+                string.Equals(traitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase));
+            var otherMutations = member.RareTraitIds.Count(traitId =>
+                !string.Equals(traitId, GameRules.AngelMutationId, StringComparison.OrdinalIgnoreCase));
+            var portrait = UiFactory.CreatePortrait(
+                MemberAppearance(member),
+                hasAngel,
+                otherMutations,
+                new Vector2(60, 60));
+            if (member.Presence != LineageMemberPresence.Owned)
                 portrait.Modulate = new Color(0.55f, 0.55f, 0.55f, 0.72f);
             inspectorBox.AddChild(portrait);
 
-            if (_session.IsDeparted(member.Id))
+            if (member.Presence == LineageMemberPresence.Departed)
                 inspectorBox.AddChild(UiFactory.CreateLabel("LEFT THE FARM", 6));
+            else if (member.Presence == LineageMemberPresence.Archived)
+                inspectorBox.AddChild(UiFactory.CreateLabel("ARCHIVED RECORD", 6));
 
-            foreach (var statId in GameRules.StatIds)
+            if (member.ActiveInbreedingBurden.HasValue)
             {
-                var gene = GameRules.GetGene(member, statId);
-                var stat = UiFactory.CreateLabel(
-                    $"{StatPresentationCatalog.NameFor(statId)}  {GameRules.GradeName(gene.ExpressedValue)}  LV{GameRules.StatLevel(member, statId)}", 6);
-                stat.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(statId));
-                inspectorBox.AddChild(stat);
+                var burdenLabel = member.InbreedingHistoryFlag
+                    ? $"Burden {member.ActiveInbreedingBurden.Value} • history marked"
+                    : $"Burden {member.ActiveInbreedingBurden.Value}";
+                inspectorBox.AddChild(UiFactory.CreateLabel(burdenLabel, 5));
+            }
+            else if (member.InbreedingHistoryFlag)
+            {
+                inspectorBox.AddChild(UiFactory.CreateLabel("Historical inbreeding mark", 5));
+            }
+
+            if (member.Stats.Count == 0)
+            {
+                inspectorBox.AddChild(UiFactory.CreateLabel("Stats not retained in archive.", 5));
+            }
+            else
+            {
+                foreach (var stat in member.Stats)
+                {
+                    var label = UiFactory.CreateLabel(
+                        $"{StatPresentationCatalog.NameFor(stat.StatId)}  {GameRules.GradeName(stat.ExpressedAllele)}  LV{stat.Level}", 6);
+                    label.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(stat.StatId));
+                    inspectorBox.AddChild(label);
+                }
             }
 
             var parentText = member.ParentAId.Length > 0
-                ? $"Parents:\n{_session.NameFor(member.ParentAId)}\n+ {_session.NameFor(member.ParentBId)}"
+                ? $"Parents:\n{NameFor(member.ParentAId)}\n+ {NameFor(member.ParentBId)}"
                 : "Parents:\nFounder / store line";
             var parents = UiFactory.CreateLabel(parentText, 6);
             parents.AutowrapMode = TextServer.AutowrapMode.WordSmart;
@@ -181,6 +188,21 @@ public partial class MainController : Node
         tree.MemberSelected += ShowMember;
         ShowMember(data.Id);
     }
+
+    private static VoidlingVisualAppearance ProfileAppearance(
+        Voidling.Application.Roster.CreatureProfileProjection profile)
+        => new(
+            profile.VisualTypeId,
+            profile.PaletteHue,
+            profile.LayerIds,
+            profile.TintHex);
+
+    private static VoidlingVisualAppearance MemberAppearance(LineageMemberProjection member)
+        => new(
+            member.VisualTypeId,
+            member.PaletteHue,
+            member.LayerIds,
+            member.TintHex);
 
     private void ShowGoodbyeFirst(string creatureId)
     {

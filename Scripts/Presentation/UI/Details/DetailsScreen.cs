@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Details;
@@ -25,7 +26,8 @@ public sealed record DetailsScreenState(
     string Name,
     bool IsAdult,
     int FamilyGeneration,
-    int InbreedingBurden,
+    string LineageRisk,
+    VoidlingVisualAppearance Appearance,
     Color TintColor,
     bool HasAngelMutation,
     int OtherMutationCount,
@@ -36,9 +38,9 @@ public sealed record DetailsScreenState(
     IReadOnlyList<DetailsRareTraitViewState> RareTraits);
 
 /// <summary>
-/// Standalone Stats/DNA/Visual detail view over immutable presentation-ready data. Genetics,
-/// progression, lineage lookup and mutation interpretation are resolved before the screen is
-/// configured so this class cannot become another gameplay-rules owner.
+/// Standalone Stats/DNA/Visual detail view over immutable presentation-ready data. The current
+/// color swatch remains useful UI information, while all actual creature portraits are composed
+/// from semantic body/palette/layer appearance through the central visual pipeline.
 /// </summary>
 public partial class DetailsScreen : VBoxContainer
 {
@@ -146,7 +148,7 @@ public partial class DetailsScreen : VBoxContainer
         var summary = new VBoxContainer();
         summary.AddThemeConstantOverride("separation", 2);
         summary.AddChild(UiFactory.CreateLabel(string.Format(Tr("UI_DETAILS_GENERATION"), state.FamilyGeneration), 8));
-        summary.AddChild(UiFactory.CreateLabel(string.Format(Tr("UI_DETAILS_INBREEDING"), state.InbreedingBurden), 7));
+        summary.AddChild(UiFactory.CreateLabel(string.Format(Tr("UI_DETAILS_INBREEDING"), state.LineageRisk), 7));
         summary.AddChild(UiFactory.CreateLabel(Tr("UI_DETAILS_DNA_HINT"), 6));
         intro.AddChild(summary);
         _body.AddChild(intro);
@@ -203,7 +205,7 @@ public partial class DetailsScreen : VBoxContainer
 
     private static TextureRect CreatePortrait(DetailsScreenState state, Vector2 size)
         => UiFactory.CreatePortrait(
-            state.TintColor,
+            state.Appearance,
             state.HasAngelMutation,
             state.OtherMutationCount,
             size);

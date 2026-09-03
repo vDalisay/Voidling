@@ -11,6 +11,9 @@ public partial class FamilyTreeView
 
     public override void _Process(double delta)
     {
+        // The connection flow pulses are time-driven, so the view repaints every frame.
+        QueueRedraw();
+
         if (_panning || !EdgePanningEnabled)
             return;
 
@@ -34,7 +37,7 @@ public partial class FamilyTreeView
 
         _panOffset += direction.Normalized() * TreeEdgePanSpeed * (float)delta;
         ClampPan();
-        ApplyPan();
+        ApplyView();
         QueueRedraw();
     }
 }

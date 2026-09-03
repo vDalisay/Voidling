@@ -8,6 +8,7 @@ public partial class HaloBadge : Control
     public bool ShowAngel { get; set; }
     public int SparkleCount { get; set; }
     public float NominalSpritePixels { get; set; } = 48.0f;
+    public string VisualTypeId { get; set; } = VoidlingAppearanceData.DefaultVisualTypeId;
 
     public override void _Process(double delta)
     {
@@ -26,15 +27,18 @@ public partial class HaloBadge : Control
 
     private void DrawHalo()
     {
-        var halo = VoidlingMutationVisualMetrics.ForPortrait(NominalSpritePixels, Size);
+        var halo = VoidlingMutationVisualMetrics.ForPortrait(NominalSpritePixels, Size, VisualTypeId);
         foreach (var pixel in VoidlingMutationVisualMetrics.BuildPixels(halo))
             DrawRect(pixel.Rect, VoidlingMutationVisualMetrics.ColorFor(pixel.Tone));
     }
 
     private void DrawSparkles()
     {
-        var spriteScale = Mathf.Max(0.20f, NominalSpritePixels / 48.0f);
-        var ratio = Mathf.Max(0.25f, spriteScale / 0.62f);
+        var definition = VoidlingVisualFactory.ResolveDefinition(VisualTypeId);
+        var referencePixels = Mathf.Max(1.0f, definition.FrameHeight);
+        var spriteScale = Mathf.Max(0.20f, NominalSpritePixels / referencePixels);
+        var referenceScale = Mathf.Max(0.01f, definition.AdultWorldScale);
+        var ratio = Mathf.Max(0.25f, spriteScale / referenceScale);
         var time = (float)Time.GetTicksMsec() / 420.0f;
         var count = Mathf.Clamp(SparkleCount + 1, 2, 4);
         for (var i = 0; i < count; i++)

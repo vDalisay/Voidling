@@ -10,9 +10,6 @@ public partial class VoidlingActor : Node2D
 
     public string CreatureId { get; private set; } = "";
 
-    private static readonly Texture2D CharacterTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
-
     private readonly RandomNumberGenerator _rng = new();
     private AnimatedSprite2D _sprite = null!;
     private Rect2 _wanderBounds;
@@ -24,6 +21,14 @@ public partial class VoidlingActor : Node2D
     private bool _pickedUp;
     private float _baseScale;
     private float _baseSpriteY;
+    private string _visualTypeId = VoidlingAppearanceData.DefaultVisualTypeId;
+    private float _heldScaleMultiplier = 1.0f;
+    private float _heldSpriteYOffset;
+    private float _shadowCenterYOffset;
+    private VoidlingVisualAppearance _appearance;
+    private Vector2 _tileCenter;
+    private float _tileRadius;
+    private StringName _tileAnimation = "";
 
     public void Setup(VoidlingData data, Rect2 wanderBounds, Vector2 startPosition)
     {
@@ -33,17 +38,24 @@ public partial class VoidlingActor : Node2D
         _walkSpeed = data.Stage == LifeStage.Adult ? 20.0f : 17.0f;
         _rng.Seed = StableSeed(data.Id);
 
-        _baseScale = data.Stage == LifeStage.Adult ? 0.62f : 0.31f;
-        _baseSpriteY = VoidlingGroundVisualMetrics.SpriteCenterYOffset(_baseScale);
+        var appearance = VoidlingVisualAppearance.From(data.Appearance, data.TintHex);
+        _appearance = appearance;
+        var definition = VoidlingVisualFactory.ResolveDefinition(appearance.VisualTypeId);
+        _visualTypeId = definition.DefinitionId;
+        var isAdult = data.Stage == LifeStage.Adult;
+        _baseScale = VoidlingVisualFactory.WorldScale(isAdult, _visualTypeId);
+        _baseSpriteY = VoidlingVisualFactory.WorldSpriteCenterYOffset(_baseScale, _visualTypeId);
+        _heldScaleMultiplier = definition.HeldScaleMultiplier;
+        _heldSpriteYOffset = definition.HeldSpriteYOffset;
+        _shadowCenterYOffset = VoidlingVisualFactory.ShadowCenterYOffset(_baseScale, _visualTypeId);
 
         _sprite = new AnimatedSprite2D
         {
-            SpriteFrames = BuildSpriteFrames(),
             Scale = Vector2.One * _baseScale,
             Position = new Vector2(0, _baseSpriteY),
-            Modulate = GameRules.TintColor(data.TintHex),
             ZIndex = 2
         };
+        VoidlingVisualFactory.ApplyAppearance(_sprite, appearance, race: false);
         AddChild(_sprite);
         _sprite.Play("walk_down");
 
@@ -51,11 +63,13 @@ public partial class VoidlingActor : Node2D
         mutationAdornment.Setup(data, _sprite);
         AddChild(mutationAdornment);
 
-        var hitSize = data.Stage == LifeStage.Adult ? new Vector2(23, 27) : new Vector2(14, 16);
         var area = new Area2D { InputPickable = true };
         var collision = new CollisionShape2D
         {
-            Shape = new RectangleShape2D { Size = hitSize },
+            Shape = new RectangleShape2D
+            {
+                Size = VoidlingVisualFactory.WorldHitboxSize(isAdult, _visualTypeId)
+            },
             Position = new Vector2(0, _baseSpriteY)
         };
         area.AddChild(collision);
@@ -88,11 +102,60 @@ public partial class VoidlingActor : Node2D
         {
             var direction = toTarget.Normalized();
             Position += direction * _walkSpeed * step;
-            Position = new Vector2(
-                Mathf.Clamp(Position.X, _wanderBounds.Position.X, _wanderBounds.End.X),
-                Mathf.Clamp(Position.Y, _wanderBounds.Position.Y, _wanderBounds.End.Y));
+            Position = ClampToWanderArea(Position);
             PlayForDirection(direction);
         }
+    }
+
+    /// <summary>True while this Voidling is training on a land tile and stays on that ground.</summary>
+    public bool IsOnTile => _tileRadius > 0.0f;
+
+    /// <summary>
+    /// Keeps a training Voidling on its own tile, doing the activity that tile trains. It only
+    /// leaves when the player picks it up and puts it down somewhere else.
+    /// </summary>
+    public void ConfineToTile(Vector2 center, float radius, StringName activityAnimation)
+    {
+        if (_tileRadius > 0.0f &&
+            _tileCenter.IsEqualApprox(center) &&
+            Mathf.IsEqualApprox(_tileRadius, radius) &&
+            _tileAnimation == activityAnimation)
+        {
+            return;
+        }
+
+        _tileCenter = center;
+        _tileRadius = Mathf.Max(1.0f, radius);
+        _tileAnimation = activityAnimation;
+        VoidlingVisualFactory.ApplyAppearance(_sprite, _appearance, race: true);
+        Position = ClampToWanderArea(Position);
+        RefreshMovementState();
+    }
+
+    public void ReleaseFromTile()
+    {
+        if (_tileRadius <= 0.0f)
+            return;
+
+        _tileRadius = 0.0f;
+        _tileAnimation = "";
+        _sprite.FlipH = false;
+        VoidlingVisualFactory.ApplyAppearance(_sprite, _appearance, race: false);
+        Position = ClampToWanderArea(Position);
+        RefreshMovementState();
+    }
+
+    private Vector2 ClampToWanderArea(Vector2 position)
+    {
+        if (!IsOnTile)
+        {
+            return new Vector2(
+                Mathf.Clamp(position.X, _wanderBounds.Position.X, _wanderBounds.End.X),
+                Mathf.Clamp(position.Y, _wanderBounds.Position.Y, _wanderBounds.End.Y));
+        }
+
+        var offset = position - _tileCenter;
+        return offset.Length() <= _tileRadius ? position : _tileCenter + offset.Normalized() * _tileRadius;
     }
 
     public void SetSelected(bool selected)
@@ -129,10 +192,15 @@ public partial class VoidlingActor : Node2D
 
         if (_sprite != null)
         {
-            _sprite.Scale = Vector2.One * (pickedUp ? _baseScale * 1.14f : _baseScale);
+            _sprite.Scale = Vector2.One * (
+                pickedUp
+                    ? _baseScale * _heldScaleMultiplier
+                    : _baseScale);
             if (pickedUp)
             {
-                _sprite.Position = new Vector2(0, _baseSpriteY - 9.0f);
+                _sprite.Position = new Vector2(
+                    0,
+                    _baseSpriteY + _heldSpriteYOffset);
             }
             else if (wasPickedUp)
             {
@@ -175,11 +243,11 @@ public partial class VoidlingActor : Node2D
     public override void _Draw()
     {
         var shadowAlpha = _pickedUp ? 0.26f : 0.20f;
-        var shadowRadii = VoidlingGroundVisualMetrics.ShadowRadii(_baseScale);
+        var shadowRadii = VoidlingVisualFactory.ShadowRadii(_baseScale, _visualTypeId);
         if (_pickedUp)
             shadowRadii.X *= 1.08f;
         DrawEllipse(
-            new Vector2(0, VoidlingGroundVisualMetrics.ShadowCenterYOffset),
+            new Vector2(0, _shadowCenterYOffset),
             shadowRadii,
             new Color(0.20f, 0.24f, 0.20f, shadowAlpha));
 
@@ -207,19 +275,32 @@ public partial class VoidlingActor : Node2D
         }
 
         PickNewTarget();
-        _sprite.Play("walk_down");
+        _sprite.Play(IsOnTile ? _tileAnimation : "walk_down");
     }
 
     private void PickNewTarget()
     {
-        _target = new Vector2(
-            _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
-            _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y));
+        _target = IsOnTile
+            ? _tileCenter + Vector2.Right.Rotated(_rng.RandfRange(0.0f, Mathf.Tau)) *
+              _rng.RandfRange(0.0f, _tileRadius)
+            : new Vector2(
+                _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
+                _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y));
         _nextTargetSeconds = _rng.RandfRange(1.5f, 4.0f);
     }
 
     private void PlayForDirection(Vector2 direction)
     {
+        // A Voidling on a land tile wears the race frames, which only carry its activity loop.
+        // Facing comes from a flip there instead of a per-direction animation.
+        if (IsOnTile)
+        {
+            _sprite.FlipH = direction.X < 0.0f;
+            if (_sprite.Animation != _tileAnimation)
+                _sprite.Play(_tileAnimation);
+            return;
+        }
+
         StringName animation;
         if (Mathf.Abs(direction.X) > Mathf.Abs(direction.Y))
             animation = direction.X < 0.0f ? "walk_left" : "walk_right";
@@ -240,6 +321,12 @@ public partial class VoidlingActor : Node2D
         }
 
         var garden = FindGardenController();
+
+        // While the player is placing an egg or a land tile, the click belongs to the Garden.
+        // Falling through without handling it keeps tiles placeable where a Voidling stands.
+        if (garden != null && (garden.IsPlacingEgg || garden.IsPlacingLand))
+            return;
+
         if (mouse.Pressed)
         {
             garden?.BeginVoidlingPointerInteraction(CreatureId);
@@ -288,33 +375,5 @@ public partial class VoidlingActor : Node2D
             hash *= prime;
         }
         return hash;
-    }
-
-    private static SpriteFrames BuildSpriteFrames()
-    {
-        var frames = new SpriteFrames();
-        frames.RemoveAnimation("default");
-        AddDirection(frames, "walk_down", 0);
-        AddDirection(frames, "walk_up", 1);
-        AddDirection(frames, "walk_left", 2);
-        AddDirection(frames, "walk_right", 3);
-        return frames;
-    }
-
-    private static void AddDirection(SpriteFrames frames, string name, int row)
-    {
-        frames.AddAnimation(name);
-        frames.SetAnimationLoop(name, true);
-        frames.SetAnimationSpeed(name, 6.0);
-
-        for (var column = 0; column < 4; column++)
-        {
-            var atlas = new AtlasTexture
-            {
-                Atlas = CharacterTexture,
-                Region = new Rect2(column * 48, row * 48, 48, 48)
-            };
-            frames.AddFrame(name, atlas);
-        }
     }
 }

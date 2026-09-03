@@ -2,15 +2,25 @@ using System;
 using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
+using Voidling.Domain.Shop;
 using Voidling.Presentation.UI.Breeding;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Shop;
+using Voidling.Presentation.Voidlings;
 
 namespace VoidlingGame;
 
 public partial class MainController : Node
 {
+    /// <summary>Opens the Shop. Restocking happens here, so a bought slot stays empty for the visit.</summary>
     private void ShowShop()
+    {
+        _session.RefillStoreEggs();
+        RenderShop();
+    }
+
+    /// <summary>Redraws the Shop in place after a transaction, without restocking the stall.</summary>
+    private void RenderShop()
     {
         var state = _session.State;
         var trainingItems = GameRules.StatIds
@@ -30,22 +40,78 @@ public partial class MainController : Node
                 Price: GameRules.StoreEggPrice))
             .ToArray();
 
-        var box = OpenModal(Tr("UI_SHOP_TITLE"), new Vector2(558, 320));
+        ShopRareOfferViewState? rareOffer = string.Equals(
+            state.ShopRareOfferItemId,
+            ShopItemIds.FullIncubationSkip,
+            StringComparison.Ordinal)
+            ? new ShopRareOfferViewState(
+                ShopItemIds.FullIncubationSkip,
+                "RARE: INCUBATION SKIP",
+                "Completes one owned egg's incubation timer. Hatching still follows normal Garden rules.",
+                GameRules.FullIncubationSkipPrice)
+            : null;
+
+        var landTiles = GameRules.StatIds
+            .Select(statId => new ShopLandTileViewState(
+                StatId: statId,
+                DisplayName: StatPresentationCatalog.NameFor(statId),
+                IdentityColor: StatPresentationCatalog.ColorFor(statId),
+                Stored: state.GardenModules.Count(module =>
+                    !module.Placed && string.Equals(module.StatId, statId, StringComparison.Ordinal)),
+                Price: GameRules.GardenModuleRules.PurchaseCost))
+            .ToArray();
+
+        var rotationRemaining = (int)Math.Ceiling(Math.Max(
+            0.0,
+            GameRules.ShopEggRotationIntervalSeconds - state.ShopEggRotationElapsedSeconds));
+
+        var box = OpenModal(Tr("UI_SHOP_TITLE"), new Vector2(558, 344));
         box.AddThemeConstantOverride("separation", 4);
+        box.AddChild(CreateDailyLoginPanel());
+
+        // Three shelves no longer fit the stall at once, so the stock scrolls.
+        var stall = new ScrollContainer
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill
+        };
+        box.AddChild(stall);
 
         var screen = new ShopScreen();
-        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs));
+        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rotationRemaining, rareOffer, landTiles));
         screen.TrainingItemPurchaseRequested += statId =>
         {
             _session.BuyTrainingItem(statId);
-            ShowShop();
+            RenderShop();
         };
         screen.EggPurchaseRequested += eggId =>
         {
+            var tint = GameRules.TintColor(
+                state.StoreEggs.FirstOrDefault(egg => egg.Id == eggId)?.TintHex ?? "#F6F0C9");
+            var coinsBefore = state.Coins;
             _session.BuyStoreEgg(eggId);
-            ShowShop();
+            if (state.Coins != coinsBefore)
+            {
+                PurchaseCelebration.ShowEgg(
+                    _uiRoot,
+                    new Vector2(ScreenWidth, ScreenHeight),
+                    tint,
+                    Tr("UI_SHOP_EGG_BOUGHT"));
+            }
+
+            RenderShop();
         };
-        box.AddChild(screen);
+        screen.RareOfferPurchaseRequested += itemId =>
+        {
+            _session.BuyRareShopOffer(itemId);
+            RenderShop();
+        };
+        screen.LandPurchaseRequested += statId =>
+        {
+            _session.BuyGardenModule(statId);
+            RenderShop();
+        };
+        stall.AddChild(screen);
     }
 
     private void ShowBreeding()
@@ -56,7 +122,7 @@ public partial class MainController : Node
 
         var parentViews = adults.Select(CreateBreedingParentView).ToArray();
         var initialPreview = parentViews.Length >= 2
-            ? CreateBreedingPreviewView(_session.GetBreedingPreviewData(parentViews[0].Id, parentViews[1].Id))
+            ? CreateBreedingPreviewView(_session.GetBreedingPairInfo(parentViews[0].Id, parentViews[1].Id))
             : new BreedingPreviewViewState(Tr("UI_BREED_NEED_TWO_ADULTS"), false);
 
         var box = OpenModal(Tr("UI_BREED_TITLE"), new Vector2(440, 270));
@@ -64,12 +130,12 @@ public partial class MainController : Node
         screen.Configure(new BreedingScreenState(parentViews, initialPreview));
         screen.PairChanged += (parentAId, parentBId) =>
         {
-            var preview = _session.GetBreedingPreviewData(parentAId, parentBId);
+            var preview = _session.GetBreedingPairInfo(parentAId, parentBId);
             screen.SetPreview(CreateBreedingPreviewView(preview));
         };
         screen.BreedRequested += (parentAId, parentBId) =>
         {
-            var preview = _session.GetBreedingPreviewData(parentAId, parentBId);
+            var preview = _session.GetBreedingPairInfo(parentAId, parentBId);
             if (!preview.CanBreed)
             {
                 screen.SetPreview(CreateBreedingPreviewView(preview));
@@ -102,12 +168,12 @@ public partial class MainController : Node
         return new BreedingParentViewState(
             Id: data.Id,
             Name: data.Name,
-            TintColor: GameRules.TintColor(data.TintHex),
+            Appearance: VoidlingVisualAppearance.From(data.Appearance, data.TintHex),
             HasAngelMutation: hasAngel,
             OtherMutationCount: otherMutations);
     }
 
-    private BreedingPreviewViewState CreateBreedingPreviewView(BreedingPreview preview)
+    private BreedingPreviewViewState CreateBreedingPreviewView(BreedingPairInfoProjection preview)
     {
         string text;
         if (!preview.CanBreed)
@@ -122,18 +188,15 @@ public partial class MainController : Node
         }
         else if (preview.Related)
         {
-            text = string.Format(
-                Tr("UI_BREED_RELATED"),
-                preview.ChildBurden,
-                preview.HatchFailurePercent);
+            text = $"Related pairing • lineage risk: {LineageRiskDisplayName(preview.LineageRisk)} • {preview.HatchFailurePercent}% hatch-failure risk.";
         }
         else if (preview.IsCleanOutcross)
         {
-            text = string.Format(Tr("UI_BREED_CLEAN_OUTCROSS"), preview.ChildBurden);
+            text = $"Clean outcross • lineage risk improves to {LineageRiskDisplayName(preview.LineageRisk)} • {preview.HatchFailurePercent}% hatch-failure risk.";
         }
         else if (preview.ChildBurden > 0)
         {
-            text = string.Format(Tr("UI_BREED_UNRELATED_BURDEN"), preview.ChildBurden);
+            text = $"Unrelated pairing • lineage risk remains {LineageRiskDisplayName(preview.LineageRisk)} • {preview.HatchFailurePercent}% hatch-failure risk.";
         }
         else
         {
@@ -142,4 +205,14 @@ public partial class MainController : Node
 
         return new BreedingPreviewViewState(text, preview.CanBreed);
     }
+
+    private static string LineageRiskDisplayName(LineageRiskBand risk)
+        => risk switch
+        {
+            LineageRiskBand.None => "None",
+            LineageRiskBand.Low => "Low",
+            LineageRiskBand.Moderate => "Moderate",
+            LineageRiskBand.High => "High",
+            _ => "Critical"
+        };
 }

@@ -18,6 +18,9 @@ public sealed class TradeTransferService
 {
     public const int MaxAssetsPerSide = 8;
     public const int MaxLineageEntriesPerBundle = 256;
+    public const int MaxAppearanceLayers = 16;
+    public const int MaxAppearanceLayerIdLength = 128;
+    public const int MaxVisualTypeIdLength = 64;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -51,6 +54,11 @@ public sealed class TradeTransferService
                 {
                     var creature = state.Voidlings.First(v =>
                         string.Equals(v.Id, asset.AssetId, StringComparison.Ordinal));
+                    if (!IsValidIncomingCreature(creature))
+                    {
+                        error = $"Voidling '{creature.Id}' has invalid transfer state.";
+                        return false;
+                    }
                     voidlings.Add(Clone(creature));
                     lineageRoots.Add(creature.Id);
                     break;
@@ -59,6 +67,11 @@ public sealed class TradeTransferService
                 {
                     var egg = state.OwnedEggs.First(e =>
                         string.Equals(e.Id, asset.AssetId, StringComparison.Ordinal));
+                    if (!IsValidIncomingEgg(egg))
+                    {
+                        error = $"Egg '{egg.Id}' has invalid transfer state.";
+                        return false;
+                    }
                     eggs.Add(Clone(egg));
                     if (!string.IsNullOrWhiteSpace(egg.ParentAId))
                         lineageRoots.Add(egg.ParentAId);
@@ -170,8 +183,6 @@ public sealed class TradeTransferService
         if (!ValidateIncomingBundle(state, journal.IncomingBundle, out error))
             return TradeLocalOperationResult.Failed(error!);
 
-        // Every mutation that can fail is validated above. Merge ancestry before inserting assets;
-        // it is staged atomically by LineageArchiveService and cannot partially merge on conflict.
         if (!_lineage.TryMerge(state, journal.IncomingBundle.Lineage, out error))
             return TradeLocalOperationResult.Failed(error ?? "Incoming lineage could not be merged.");
 
@@ -379,10 +390,16 @@ public sealed class TradeTransferService
                 creature.TrainingPoints[statId] = 0;
         }
         creature.RareTraits ??= new List<RareTraitData>();
+        creature.Appearance ??= new VoidlingAppearanceData();
+        creature.Appearance.Normalize();
     }
 
     private static void NormalizeIncomingEgg(EggData egg)
-        => egg.RareTraits ??= new List<RareTraitData>();
+    {
+        egg.RareTraits ??= new List<RareTraitData>();
+        egg.Appearance ??= new VoidlingAppearanceData();
+        egg.Appearance.Normalize();
+    }
 
     private static bool IsValidIncomingCreature(VoidlingData? creature)
         => creature != null &&
@@ -390,7 +407,8 @@ public sealed class TradeTransferService
            creature.Id.Length <= 128 &&
            creature.Genome != null &&
            creature.FamilyGeneration >= 0 &&
-           Enum.IsDefined(creature.Stage);
+           Enum.IsDefined(creature.Stage) &&
+           IsValidAppearance(creature.Appearance);
 
     private static bool IsValidIncomingEgg(EggData? egg)
         => egg != null &&
@@ -401,7 +419,22 @@ public sealed class TradeTransferService
            egg.RequiredIncubationSeconds >= 0 &&
            egg.IncubationSeconds >= 0 &&
            Enum.IsDefined(egg.Source) &&
-           Enum.IsDefined(egg.State);
+           Enum.IsDefined(egg.State) &&
+           IsValidAppearance(egg.Appearance);
+
+    private static bool IsValidAppearance(VoidlingAppearanceData? appearance)
+    {
+        if (appearance == null ||
+            !VoidlingAppearanceData.IsValidSemanticId(appearance.VisualTypeId, MaxVisualTypeIdLength) ||
+            !VoidlingAppearanceData.IsValidStoredHue(appearance.PaletteHue))
+        {
+            return false;
+        }
+
+        var layers = appearance.LayerIds ?? new List<string>();
+        return layers.Count <= MaxAppearanceLayers &&
+               layers.All(id => VoidlingAppearanceData.IsValidSemanticId(id, MaxAppearanceLayerIdLength));
+    }
 
     private static bool HasLineageRoot(
         IReadOnlyDictionary<string, LineageArchiveEntry> lineageById,

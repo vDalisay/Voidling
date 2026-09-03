@@ -1,5 +1,6 @@
 using System;
 using Godot;
+using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Multiplayer;
@@ -9,7 +10,10 @@ public sealed record TradeExchangeAssetView(
     bool IsEgg,
     string TintHex,
     bool HasAngelMutation,
-    int OtherMutationCount);
+    int OtherMutationCount,
+    string VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+    float PaletteHue = -1.0f,
+    string LayerIdsKey = "");
 
 public sealed record TradeExchangeScreenState(
     TradeExchangeAssetView? Outgoing,
@@ -86,7 +90,6 @@ public partial class TradeExchangeScreen : Control
         };
         AddChild(_energy);
 
-        // Show one representative per side; sequence every asset if batch trades become common.
         if (_state.Outgoing != null)
         {
             _outgoingVisual = CreateAssetVisual(_state.Outgoing);
@@ -193,7 +196,11 @@ public partial class TradeExchangeScreen : Control
         if (!asset.IsEgg)
         {
             var portrait = UiFactory.CreatePortrait(
-                ParseTint(asset.TintHex),
+                new VoidlingVisualAppearance(
+                    asset.VisualTypeId,
+                    asset.PaletteHue,
+                    VoidlingAppearanceData.ParseLayerIdsKey(asset.LayerIdsKey),
+                    asset.TintHex),
                 asset.HasAngelMutation,
                 asset.OtherMutationCount,
                 new Vector2(68, 68));
@@ -208,12 +215,6 @@ public partial class TradeExchangeScreen : Control
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered
         };
-    }
-
-    private static Color ParseTint(string tintHex)
-    {
-        try { return Color.FromHtml(tintHex); }
-        catch { return Color.FromHtml("#F6F0C9"); }
     }
 
     private static Vector2[] BuildCircle(float radius, int points)

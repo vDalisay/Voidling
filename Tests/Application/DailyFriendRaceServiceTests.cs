@@ -110,7 +110,7 @@ public sealed class DailyFriendRaceServiceTests
     }
 
     [Fact]
-    public void VersionEightMigrationInitializesAndBoundsDailyHistoryWithoutSteam()
+    public void LegacyMigrationInitializesAndBoundsDailyHistoryWithoutSteam()
     {
         var state = new GameStateData
         {
@@ -121,7 +121,7 @@ public sealed class DailyFriendRaceServiceTests
 
         migration.Normalize(state);
 
-        Assert.Equal(8, state.SaveVersion);
+        Assert.Equal(GameStateMigrationService.CurrentSaveVersion, state.SaveVersion);
         Assert.NotNull(state.DailyRaceAttempts);
         Assert.Empty(state.DailyRaceAttempts);
     }

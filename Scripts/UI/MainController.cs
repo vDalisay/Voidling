@@ -49,9 +49,11 @@ public partial class MainController : Node
         BuildTopBar();
         BuildToast();
         BuildGardenEventLog();
+        BuildSaveFeedbackIndicator();
 
         _modalHost = new ModalHost { ZIndex = 100 };
         _uiRoot.AddChild(_modalHost);
+        BuildQuickMenu();
         ComposeTradePresentation();
         ComposeChallengePresentation();
 
@@ -60,6 +62,7 @@ public partial class MainController : Node
         _session.GardenEventRaised += AppendGardenEvent;
         _gardenEventLog.Append(Tr("UI_GARDEN_LOG_STARTED"));
         RefreshUi();
+        Callable.From(StartFirstLaunchTutorialIfNeeded).CallDeferred();
     }
 
     public override void _ExitTree()
@@ -74,6 +77,7 @@ public partial class MainController : Node
         if (GodotObject.IsInstanceValid(_connectedZoneBridge))
             _connectedZoneBridge.StateChanged -= OnConnectedZoneStateChanged;
 
+        DetachSaveFeedbackIndicator();
         DetachMultiplayerRacePresentation();
         DetachTradePresentation();
     }
@@ -90,6 +94,7 @@ public partial class MainController : Node
 
     public override void _UnhandledInput(InputEvent inputEvent)
     {
+        // A running race owns Escape: it opens its own pause menu so the player can leave mid-race.
         if (_race != null || _multiplayerRaceScreen != null || _tradeExchangeScreen != null ||
             !inputEvent.IsActionPressed("ui_cancel"))
             return;
@@ -119,7 +124,7 @@ public partial class MainController : Node
         AddTopButton(row, Tr("UI_TOP_SHOP"), ShowShop, 0, 57);
         AddTopButton(row, Tr("UI_TOP_INVENTORY"), ShowInventory, 3, 68);
         AddTopButton(row, Tr("UI_TOP_BREED"), ShowBreeding, 6, 57);
-        AddTopButton(row, Tr("UI_TOP_RACE"), ShowRacePicker, 12, 57);
+        AddTopButton(row, Tr("UI_TOP_RACE"), ShowRacePickerWithCourses, 12, 57);
         AddTopButton(row, Tr("UI_TOP_ONLINE"), ShowConnectedZone, -1, 58);
         AddTopButton(row, Tr("UI_TOP_SETTINGS"), ShowSettingsExtended, -1, 67);
         AddTopButton(row, Tr("UI_TOP_CENTER"), _garden.ResetCamera, -1, 57);
@@ -170,6 +175,7 @@ public partial class MainController : Node
         _garden.Select(_selectedId);
         RebuildDetailsPanel();
         RefreshConnectedZonePanel();
+        RefreshQuickMenu();
 
         if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))
             _gardenEventLog.Visible = !_modalHost.IsOpen;
@@ -194,6 +200,11 @@ public partial class MainController : Node
 
     private void HideGardenHudPanels()
     {
+        if (_quickMenu != null && GodotObject.IsInstanceValid(_quickMenu))
+        {
+            _quickMenu.Close();
+            _quickMenu.Visible = false;
+        }
         if (_detailsPanel != null && GodotObject.IsInstanceValid(_detailsPanel))
             _detailsPanel.Visible = false;
         if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))
@@ -232,8 +243,6 @@ public partial class MainController : Node
         _gardenEventLog.Append(string.Format(Tr("UI_GARDEN_LOG_RACE_RESULT"), placement));
         _session.ApplyRacePlacementReward(placement);
 
-        // Steam is only a best-time projection. The local race reward is already persisted above,
-        // and leaderboard failure cannot invalidate or roll back that single-player result.
         if (_race != null &&
             GodotObject.IsInstanceValid(_race) &&
             _race.TryGetPlayerFinishMilliseconds(out var finishedMilliseconds))
@@ -265,6 +274,7 @@ public partial class MainController : Node
 
         _selectedId = creatureId;
         RefreshUi();
+        OnTutorialVoidlingSelected();
     }
 
     private void DeselectVoidling()

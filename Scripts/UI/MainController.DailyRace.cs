@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Godot;
 using Voidling.Application.Multiplayer.Leaderboards;
+using Voidling.Domain.Racing;
 using Voidling.Presentation.Racing;
 using Voidling.Presentation.UI.Multiplayer;
 using Voidling.Presentation.UI.Racing;
@@ -81,11 +82,15 @@ public partial class MainController
         var selectedId = owned.Any(value => value.Id == _selectedId)
             ? _selectedId
             : owned.FirstOrDefault()?.Id ?? string.Empty;
+        var dailyCourse = CreateRacePickerCourseView(RaceCourseCatalog.Demo);
         var picker = new RacePickerScreen();
         picker.Configure(new RacePickerScreenState(
             owned.Select(CreateRacePickerView).ToArray(),
-            selectedId));
-        picker.RaceRequested += BeginOrResumeDailyRace;
+            selectedId,
+            new[] { dailyCourse },
+            dailyCourse.Id,
+            dailyCourse.Version));
+        picker.RaceRequested += (creatureId, _, _) => BeginOrResumeDailyRace(creatureId);
         box.AddChild(picker);
     }
 

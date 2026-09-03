@@ -159,6 +159,24 @@ msgstr "No Voidlings are currently on the farm."
 msgid "UI_RACE_PICKER_HINT"
 msgstr "Choose one Voidling. All other racers are generated CPU opponents."
 
+msgid "UI_RACE_PICKER_COURSE"
+msgstr "COURSE"
+
+msgid "UI_RACE_PICKER_NO_COURSES"
+msgstr "No race courses are available."
+
+msgid "UI_RACE_COURSE_DEMO_NAME"
+msgstr "SPROUT DASH"
+
+msgid "UI_RACE_COURSE_DEMO_SUMMARY"
+msgstr "Short opener. One swim, a short Power climb, then a glide into the run home."
+
+msgid "UI_RACE_COURSE_LONG_STANDARD_NAME"
+msgstr "LONG HAUL"
+
+msgid "UI_RACE_COURSE_LONG_STANDARD_SUMMARY"
+msgstr "Endurance course. Two swims, a long Power climb and six hurdles before the glide."
+
 msgid "UI_RACE_START"
 msgstr "Start Race"
 
@@ -167,6 +185,33 @@ msgstr "GROWING THE RACE TRACK..."
 
 msgid "UI_RACE_COUNTDOWN_GO"
 msgstr "RACE!"
+
+msgid "UI_INVENTORY_STORED_EGGS"
+msgstr "EGGS TO PLACE"
+
+msgid "UI_INVENTORY_STORED_EGG"
+msgstr "Unplaced egg {0}"
+
+msgid "UI_INVENTORY_PLACE_HINT"
+msgstr "Place an egg in the garden to start its incubation timer."
+
+msgid "UI_INVENTORY_PLACE"
+msgstr "Place"
+
+msgid "UI_GARDEN_PLACE_EGG_HINT"
+msgstr "Click the garden to place the egg. Right-click to cancel."
+
+msgid "UI_SHOP_EGG_BOUGHT"
+msgstr "EGG ADDED TO INVENTORY"
+
+msgid "UI_GARDEN_VOIDLINGS"
+msgstr "VOIDLINGS"
+
+msgid "UI_GARDEN_VOIDLINGS_SEARCH"
+msgstr "Search name or colour"
+
+msgid "UI_GARDEN_VOIDLINGS_EMPTY"
+msgstr "No Voidling matches that search."
 
 msgid "UI_INVENTORY_TITLE"
 msgstr "INVENTORY"
@@ -246,6 +291,9 @@ msgstr "RUN"
 msgid "UI_RACE_SECTION_SWIM"
 msgstr "SWIM"
 
+msgid "UI_RACE_SECTION_CLIMB"
+msgstr "CLIMB"
+
 msgid "UI_RACE_SECTION_GLIDE"
 msgstr "GLIDE"
 
@@ -275,6 +323,15 @@ msgstr "Race complete!"
 
 msgid "UI_RACE_RESULT_PLACE"
 msgstr "You placed #{0}"
+
+msgid "UI_RACE_PAUSED"
+msgstr "RACE PAUSED"
+
+msgid "UI_RACE_RESUME"
+msgstr "Resume Race"
+
+msgid "UI_RACE_QUIT"
+msgstr "Quit to Garden"
 
 msgid "UI_RACE_RETURN"
 msgstr "Return to Garden"
@@ -674,3 +731,48 @@ msgstr "Race finished — you placed #{0}."
 
 msgid "UI_GARDEN_LOG_TRADE_COMPLETE"
 msgstr "Trade complete — sent {0}, received {1}."
+
+msgid "UI_GARDEN_PLACE_LAND_HINT"
+msgstr "Click where the island should grow. Right-click to cancel."
+
+msgid "UI_SHOP_LAND_TITLE"
+msgstr "LAND"
+
+msgid "UI_SHOP_LAND_SUBTITLE"
+msgstr "Hex tiles that extend the island and train the stat they are cut for."
+
+msgid "UI_INVENTORY_LAND"
+msgstr "LAND TO PLACE"
+
+msgid "UI_INVENTORY_LAND_TILE"
+msgstr "{0} land tile"
+
+msgid "UI_INVENTORY_LAND_HINT"
+msgstr "Place a tile against the island, then drop a Voidling on it to train there."
+
+msgid "UI_LAND_TITLE"
+msgstr "Island land"
+
+msgid "UI_LAND_SUMMARY"
+msgstr "{0} placed  •  {1} in inventory  •  {2} sprouts"
+
+msgid "UI_LAND_HINT"
+msgstr "Buy land in the Shop, place it from the Inventory, then drop a Voidling onto a tile to start training there."
+
+msgid "UI_LAND_EMPTY"
+msgstr "No land yet. Buy a hex tile in the Shop, then place it from your Inventory."
+
+msgid "UI_LAND_STORED"
+msgstr "In inventory"
+
+msgid "UI_PROFILE_PASSIVE_ON"
+msgstr "Passive: {0}"
+
+msgid "UI_PROFILE_PASSIVE_OFF"
+msgstr "Passive: not training"
+
+msgid "UI_PROFILE_PASSIVE_STOP"
+msgstr "Stop"
+
+msgid "UI_PROFILE_PASSIVE_HINT"
+msgstr "Drop this Voidling onto a land tile in the Garden to train that stat."

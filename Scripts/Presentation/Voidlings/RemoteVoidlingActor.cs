@@ -7,20 +7,18 @@ using VoidlingGame;
 namespace Voidling.Presentation.Voidlings;
 
 /// <summary>
-/// Non-interactive presentation of another player's shared Voidling. It owns no save object and has
-/// no collision/selection hooks; reliable snapshots provide identity/cosmetics while lossy transforms
-/// only move the visual target.
+/// Non-interactive presentation of another player's shared Voidling. Reliable snapshots carry only
+/// semantic appearance state; this client resolves the same local visual catalog as owned creatures.
 /// </summary>
 public partial class RemoteVoidlingActor : Node2D
 {
-    private static readonly Texture2D CharacterTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
-
     private AnimatedSprite2D _sprite = null!;
     private MutationAdornment2D _mutationAdornment = null!;
     private Label _label = null!;
     private Vector2 _targetPosition;
     private float _baseScale;
+    private string _visualTypeId = VoidlingAppearanceData.DefaultVisualTypeId;
+    private float _shadowCenterYOffset;
 
     public SharedVoidlingKey Key { get; private set; }
 
@@ -32,11 +30,7 @@ public partial class RemoteVoidlingActor : Node2D
         Position = new Vector2(snapshot.ZoneX, snapshot.ZoneY);
         _targetPosition = Position;
 
-        _sprite = new AnimatedSprite2D
-        {
-            SpriteFrames = BuildSpriteFrames(),
-            ZIndex = 2
-        };
+        _sprite = new AnimatedSprite2D { ZIndex = 2 };
         AddChild(_sprite);
 
         _mutationAdornment = new MutationAdornment2D();
@@ -63,24 +57,25 @@ public partial class RemoteVoidlingActor : Node2D
         if (snapshot.Key != Key)
             throw new InvalidOperationException("A remote actor cannot change connected-zone identity.");
 
-        _baseScale = snapshot.Stage == LifeStage.Adult ? 0.62f : 0.31f;
+        var appearance = new VoidlingVisualAppearance(
+            snapshot.VisualTypeId,
+            snapshot.PaletteHue,
+            snapshot.LayerIds ?? Array.Empty<string>(),
+            snapshot.TintHex);
+        var definition = VoidlingVisualFactory.ResolveDefinition(snapshot.VisualTypeId);
+        _visualTypeId = definition.DefinitionId;
+        var isAdult = snapshot.Stage == LifeStage.Adult;
+        _baseScale = VoidlingVisualFactory.WorldScale(isAdult, _visualTypeId);
+        _shadowCenterYOffset = VoidlingVisualFactory.ShadowCenterYOffset(_baseScale, _visualTypeId);
         _sprite.Scale = Vector2.One * _baseScale;
-        _sprite.Position = new Vector2(0, VoidlingGroundVisualMetrics.SpriteCenterYOffset(_baseScale));
-
-        try
-        {
-            _sprite.Modulate = Color.FromHtml(snapshot.TintHex);
-        }
-        catch (Exception)
-        {
-            _sprite.Modulate = Colors.White;
-        }
+        _sprite.Position = new Vector2(
+            0,
+            VoidlingVisualFactory.WorldSpriteCenterYOffset(_baseScale, _visualTypeId));
+        VoidlingVisualFactory.ApplyAppearance(_sprite, appearance, race: false);
 
         var rareTraits = snapshot.RareTraitIds ?? Array.Empty<string>();
-        var hasAngel = rareTraits.Any(id =>
-            string.Equals(id, "Angel", StringComparison.OrdinalIgnoreCase));
-        var otherMutations = rareTraits.Count(id =>
-            !string.Equals(id, "Angel", StringComparison.OrdinalIgnoreCase));
+        var hasAngel = rareTraits.Any(id => string.Equals(id, "Angel", StringComparison.OrdinalIgnoreCase));
+        var otherMutations = rareTraits.Count(id => !string.Equals(id, "Angel", StringComparison.OrdinalIgnoreCase));
         _mutationAdornment.Setup(hasAngel, otherMutations, _sprite);
 
         var owner = string.IsNullOrWhiteSpace(ownerDisplayName) ? "Friend" : ownerDisplayName.Trim();
@@ -95,16 +90,12 @@ public partial class RemoteVoidlingActor : Node2D
             return;
 
         _targetPosition = new Vector2(transform.ZoneX, transform.ZoneY);
-        var animation = string.IsNullOrWhiteSpace(transform.AnimationState)
-            ? "idle"
-            : transform.AnimationState;
-
+        var animation = string.IsNullOrWhiteSpace(transform.AnimationState) ? "idle" : transform.AnimationState;
         if (string.Equals(animation, "idle", StringComparison.OrdinalIgnoreCase))
         {
             _sprite.Stop();
             return;
         }
-
         if (_sprite.SpriteFrames.HasAnimation(animation))
             _sprite.Play(animation);
     }
@@ -124,39 +115,11 @@ public partial class RemoteVoidlingActor : Node2D
 
     public override void _Draw()
     {
-        var shadowRadii = VoidlingGroundVisualMetrics.ShadowRadii(_baseScale);
+        var shadowRadii = VoidlingVisualFactory.ShadowRadii(_baseScale, _visualTypeId);
         DrawEllipse(
-            new Vector2(0, VoidlingGroundVisualMetrics.ShadowCenterYOffset),
+            new Vector2(0, _shadowCenterYOffset),
             shadowRadii,
             new Color(0.20f, 0.24f, 0.20f, 0.16f));
-    }
-
-    private static SpriteFrames BuildSpriteFrames()
-    {
-        var frames = new SpriteFrames();
-        frames.RemoveAnimation("default");
-        AddDirection(frames, "walk_down", 0);
-        AddDirection(frames, "walk_up", 1);
-        AddDirection(frames, "walk_left", 2);
-        AddDirection(frames, "walk_right", 3);
-        return frames;
-    }
-
-    private static void AddDirection(SpriteFrames frames, string name, int row)
-    {
-        frames.AddAnimation(name);
-        frames.SetAnimationLoop(name, true);
-        frames.SetAnimationSpeed(name, 6.0);
-
-        for (var column = 0; column < 4; column++)
-        {
-            var atlas = new AtlasTexture
-            {
-                Atlas = CharacterTexture,
-                Region = new Rect2(column * 48, row * 48, 48, 48)
-            };
-            frames.AddFrame(name, atlas);
-        }
     }
 
     private void DrawEllipse(Vector2 center, Vector2 radii, Color color, int points = 20)

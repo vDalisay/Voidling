@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Godot;
+using Voidling.Domain.Genetics;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
 
@@ -13,13 +15,18 @@ namespace VoidlingGame;
 /// </summary>
 public static class GameRules
 {
-    public const string AngelMutationId = "Angel";
+    public const string AngelMutationId = MutationIds.Angel;
 
     private static GameBalanceRules _balance = GameBalanceRules.DemoDefaults;
     private static StatCalculator _stats = new(_balance.Stats);
 
     public static int StoreEggPrice => _balance.Shop.StoreEggPrice;
+    public static int StoreEggSlotCount => Math.Max(1, _balance.Shop.StoreEggSlotCount);
     public static int TrainingItemPrice => _balance.Shop.TrainingItemPrice;
+    public static int EggShellSalePrice => _balance.Shop.EggShellSalePrice;
+    public static int FullIncubationSkipPrice => Math.Max(0, _balance.Shop.FullIncubationSkipPrice);
+    public static double RareOfferAppearanceChance => Math.Clamp(_balance.Shop.RareOfferAppearanceChance, 0.0, 1.0);
+    public static float ShopEggRotationIntervalSeconds => Math.Max(1.0f, _balance.Shop.EggRotationIntervalSeconds);
     public static float EggIncubationSeconds => _balance.Hatching.IncubationSeconds;
     public static float ChildToAdultSeconds => _balance.Lifecycle.ChildToAdultSeconds;
     public static float BreedCooldownSeconds => _balance.Breeding.CooldownSeconds;
@@ -29,21 +36,19 @@ public static class GameRules
     public static int RelatedAncestorDepth => _balance.Genetics.RelatedAncestorDepth;
     public static int TrainingPointsPerLevel => _balance.Stats.TrainingPointsPerLevel;
     public static int MaxStatLevel => _balance.Stats.MaxLevel;
+    public static int GardenMaxPopulation => Math.Max(1, _balance.Garden.MaxPopulation);
+    public static GardenModuleRules GardenModuleRules => _balance.GardenModules;
+    public static CareInteractionRules CareInteractionRules => _balance.CareInteractions;
+    public static IReadOnlyList<int> DailyLoginCoinRewards => _balance.DailyLogin.CoinRewards;
+    public static DailyMissionRules DailyMissionRules => _balance.DailyMissions;
 
     public static readonly string[] StatIds = { "run", "swim", "fly", "power", "stamina" };
 
+    // Legacy palette only. Continuous palette hue DNA remains authoritative for production color.
     public static readonly string[] PaletteHex =
     {
-        "#F6F0C9",
-        "#E7A6B6",
-        "#A9D5C0",
-        "#B7B2E8",
-        "#F0C778",
-        "#A8C8EC",
-        "#D4A7E8",
-        "#E9B690",
-        "#AFCB7A",
-        "#D9D1C6"
+        "#F6F0C9", "#E7A6B6", "#A9D5C0", "#B7B2E8", "#F0C778",
+        "#A8C8EC", "#D4A7E8", "#E9B690", "#AFCB7A", "#D9D1C6"
     };
 
     public static readonly string[] RareTraitIds = { "Lustrous", "Prismatic", "Aurora" };
@@ -56,12 +61,7 @@ public static class GameRules
 
     public static string GradeName(int grade) => Math.Clamp(grade, 0, 5) switch
     {
-        0 => "E",
-        1 => "D",
-        2 => "C",
-        3 => "B",
-        4 => "A",
-        _ => "S"
+        0 => "E", 1 => "D", 2 => "C", 3 => "B", 4 => "A", _ => "S"
     };
 
     public static int HatchFailurePercent(int burdenLevel)
@@ -72,24 +72,12 @@ public static class GameRules
         return values[Math.Clamp(burdenLevel, 0, values.Count - 1)];
     }
 
-    public static int GetTrainingPoints(VoidlingData data, string statId)
-        => _stats.GetTrainingPoints(data, statId);
-
-    public static int StatLevel(VoidlingData data, string statId)
-        => _stats.GetLevel(data, statId);
-
-    public static float StatLevelProgress(VoidlingData data, string statId)
-        => _stats.GetLevelProgress(data, statId);
-
-    public static GenePairData GetGene(VoidlingData data, string statId)
-        => StatCalculator.GetGene(data, statId);
-
-    public static float EffectiveStat(VoidlingData data, string statId)
-        => _stats.GetEffectiveStat(data, statId);
-
+    public static int GetTrainingPoints(VoidlingData data, string statId) => _stats.GetTrainingPoints(data, statId);
+    public static int StatLevel(VoidlingData data, string statId) => _stats.GetLevel(data, statId);
+    public static float StatLevelProgress(VoidlingData data, string statId) => _stats.GetLevelProgress(data, statId);
+    public static GenePairData GetGene(VoidlingData data, string statId) => StatCalculator.GetGene(data, statId);
+    public static float EffectiveStat(VoidlingData data, string statId) => _stats.GetEffectiveStat(data, statId);
     public static bool HasMutation(VoidlingData data, string mutationId)
         => data.RareTraits.Exists(t => string.Equals(t.TraitId, mutationId, StringComparison.OrdinalIgnoreCase));
-
-    public static Color TintColor(string html)
-        => string.IsNullOrWhiteSpace(html) ? Colors.White : Color.FromHtml(html);
+    public static Color TintColor(string html) => string.IsNullOrWhiteSpace(html) ? Colors.White : Color.FromHtml(html);
 }

@@ -25,6 +25,9 @@ public partial class TradePresentationBridge : Node
 
     public TradeLobbyViewState Current => RequireNegotiation().Current;
 
+    public TradeNegotiationPhase? GetNegotiationPhase(string negotiationId)
+        => RequireNegotiation().GetNegotiationPhase(negotiationId);
+
     public void Configure(TradeFacade durableFacade, TradeNegotiationFacade negotiationFacade)
     {
         if (_durableFacade != null || _negotiationFacade != null)

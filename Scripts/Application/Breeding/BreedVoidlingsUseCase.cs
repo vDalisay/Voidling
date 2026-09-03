@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Voidling.Application.Ports;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Hatching;
@@ -14,7 +15,10 @@ public enum BreedingFailure
     ParentNotFound,
     SameParent,
     ParentNotAdult,
-    ParentOnCooldown
+    ParentOnCooldown,
+    InvalidEggId,
+    DuplicateAssetId,
+    PersistenceFailed
 }
 
 public readonly record struct BreedingPreview(
@@ -38,8 +42,10 @@ public sealed record BreedingResult(
 }
 
 /// <summary>
-/// Player-initiated breeding orchestration. It mutates the supplied aggregate but performs no
-/// persistence, UI, animation or Godot work. IDs/seeds/world coordinates are explicit inputs.
+/// Player-initiated breeding orchestration. IDs/seeds/world coordinates are explicit inputs and
+/// all inherited egg state is frozen exactly once at creation time. Execute mutates only the supplied
+/// aggregate; ExecuteAndPersist adds the Application persistence boundary and rolls that mutation back
+/// when the repository rejects the transaction. Presentation/animation never determines the outcome.
 /// </summary>
 public sealed class BreedVoidlingsUseCase
 {
@@ -58,7 +64,7 @@ public sealed class BreedVoidlingsUseCase
         _relationships = new RelationshipService(rules.Genetics.RelatedAncestorDepth);
         _lineage = new LineageArchiveService();
         _burden = new InbreedingBurdenService();
-        _genomeInheritance = new GenomeInheritanceService(rules.Genetics);
+        _genomeInheritance = new GenomeInheritanceService(rules.Genetics, rules.Appearance);
         _rareTraits = new RareTraitInheritanceService(rules.Genetics);
         _viability = new HatchViabilityService(rules.Breeding);
         _colors = new ColorPhenotypeResolver(rules.Appearance);
@@ -96,9 +102,14 @@ public sealed class BreedVoidlingsUseCase
         if (failure != BreedingFailure.None || first == null || second == null)
             return new BreedingResult(failure, null, false, 0, 0);
 
+        var idFailure = ValidateEggId(state, eggId);
+        if (idFailure != BreedingFailure.None)
+            return new BreedingResult(idFailure, null, false, 0, 0);
+
         var related = _relationships.AreRelated(first, second, _lineage.GetEffectiveLineage(state));
         var childBurden = _burden.ComputeChildBurden(first, second, related);
         var genome = _genomeInheritance.CreateChild(first, second, eggSeed);
+        var tint = _colors.ResolveTint(genome);
         var egg = new EggData
         {
             Id = eggId,
@@ -113,7 +124,15 @@ public sealed class BreedVoidlingsUseCase
             IsViable = _viability.RollViability(eggSeed, childBurden),
             FailureResolved = true,
             RequiredIncubationSeconds = _rules.Hatching.IncubationSeconds,
-            TintHex = _colors.ResolveTint(genome),
+            TintHex = tint,
+            Appearance = new VoidlingAppearanceData
+            {
+                // Newly hatched Voidlings currently begin from the neutral morphology. The visual
+                // catalog already supports later semantic type changes; the exact stat/evolution
+                // policy that changes normal -> water/fly/power is intentionally not invented here.
+                VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+                PaletteHue = _colors.ResolvePaletteHue(genome)
+            },
             RareTraits = _rareTraits.Inherit(first, second, eggSeed),
             WorldX = worldX,
             WorldY = worldY
@@ -129,6 +148,52 @@ public sealed class BreedVoidlingsUseCase
             related,
             childBurden,
             _viability.FailurePercent(childBurden));
+    }
+
+    public BreedingResult ExecuteAndPersist(
+        GameStateData state,
+        string parentAId,
+        string parentBId,
+        ulong eggSeed,
+        string eggId,
+        float worldX,
+        float worldY,
+        IGameStateRepository repository)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(repository);
+
+        var first = state.Voidlings.FirstOrDefault(v => v.Id == parentAId);
+        var second = state.Voidlings.FirstOrDefault(v => v.Id == parentBId);
+        var firstCooldown = first?.BreedCooldownSeconds ?? 0.0f;
+        var secondCooldown = second?.BreedCooldownSeconds ?? 0.0f;
+        var lineageBefore = state.LineageArchive?.ToList() ?? new();
+
+        var result = Execute(state, parentAId, parentBId, eggSeed, eggId, worldX, worldY);
+        if (!result.Succeeded || result.Egg == null)
+            return result;
+
+        try
+        {
+            repository.Save(state);
+            return result;
+        }
+        catch
+        {
+            state.OwnedEggs.Remove(result.Egg);
+            if (first != null)
+                first.BreedCooldownSeconds = firstCooldown;
+            if (second != null)
+                second.BreedCooldownSeconds = secondCooldown;
+            state.LineageArchive = lineageBefore;
+
+            return new BreedingResult(
+                BreedingFailure.PersistenceFailed,
+                null,
+                result.Related,
+                result.ChildBurden,
+                result.HatchFailurePercent);
+        }
     }
 
     private static (BreedingFailure Failure, VoidlingData? First, VoidlingData? Second) Validate(
@@ -147,5 +212,18 @@ public sealed class BreedVoidlingsUseCase
         if (first.BreedCooldownSeconds > 0.0f || second.BreedCooldownSeconds > 0.0f)
             return (BreedingFailure.ParentOnCooldown, first, second);
         return (BreedingFailure.None, first, second);
+    }
+
+    private static BreedingFailure ValidateEggId(GameStateData state, string eggId)
+    {
+        if (string.IsNullOrWhiteSpace(eggId) || eggId.Length > 128)
+            return BreedingFailure.InvalidEggId;
+
+        var duplicate = state.OwnedEggs.Any(egg => egg.Id == eggId) ||
+                        state.StoreEggs.Any(egg => egg.Id == eggId) ||
+                        state.Voidlings.Any(creature => creature.Id == eggId) ||
+                        state.DepartedVoidlings.Any(creature => creature.Id == eggId) ||
+                        state.LineageArchive.Any(entry => entry.CreatureId == eggId);
+        return duplicate ? BreedingFailure.DuplicateAssetId : BreedingFailure.None;
     }
 }

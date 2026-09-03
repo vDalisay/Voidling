@@ -11,7 +11,12 @@ public enum EggSource
 public enum EggState
 {
     Incubating,
-    Failed
+    WaitingForSpace,
+    Failed,
+
+    // Owned but not yet placed in the Garden. Stored eggs never accumulate incubation time, so the
+    // timer starts when the player puts the egg down. Appended last to keep persisted values stable.
+    Stored
 }
 
 public sealed class EggData
@@ -30,7 +35,12 @@ public sealed class EggData
     public EggState State { get; set; } = EggState.Incubating;
     public float IncubationSeconds { get; set; }
     public float RequiredIncubationSeconds { get; set; }
+
+    // Legacy fallback tint plus production semantic appearance recipe. The appearance outcome is
+    // frozen when this specific egg is created, just like its genome and viability roll.
     public string TintHex { get; set; } = "#F6F0C9";
+    public VoidlingAppearanceData Appearance { get; set; } = new();
+
     public List<RareTraitData> RareTraits { get; set; } = new();
 
     public float WorldX { get; set; }

@@ -2,29 +2,41 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Voidling.Application.Breeding;
+using Voidling.Application.Daily;
+using Voidling.Application.Garden;
 using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
+using Voidling.Domain.Care;
+using Voidling.Domain.Genetics;
+using Voidling.Domain.Preferences;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Stats;
 using VoidlingGame;
 
 namespace Voidling.Application.Persistence;
 
 /// <summary>
-/// Owns backward-compatible normalization of the serialized game-state aggregate.
-/// Keep migrations explicit and monotonic: loading an old save may fill deterministic
-/// defaults, but must never reroll existing genetics, eggs, lineage, or race data.
+/// Backward-compatible, deterministic save normalization. Existing genetics/appearance are never
+/// rerolled; semantic v9 appearance migration remains authoritative while later progression fields
+/// receive deterministic defaults.
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 8;
+    public const int CurrentSaveVersion = 21;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
+    private readonly CreatureNeedsService _needs = new();
+    private readonly FavoriteFoodPreferenceService _favoriteFood = new();
+    private readonly StatCalculator _stats;
+    private readonly ColorPhenotypeResolver _colors;
 
     public GameStateMigrationService(GameBalanceRules rules)
     {
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
+        _stats = new StatCalculator(_rules.Stats);
+        _colors = new ColorPhenotypeResolver(_rules.Appearance);
     }
 
     public void Normalize(GameStateData state)
@@ -37,77 +49,224 @@ public sealed class GameStateMigrationService
         state.LineageArchive ??= new List<LineageArchiveEntry>();
         state.OwnedEggs ??= new List<EggData>();
         state.StoreEggs ??= new List<EggData>();
+        state.EggShells ??= new List<EggShellData>();
         state.TrainingItems ??= new Dictionary<string, int>(StringComparer.Ordinal);
+        state.GardenModules ??= new List<GardenModuleData>();
         state.PendingTradeJournal ??= new List<PendingTradeJournalEntry>();
         state.AppliedTradeIds ??= new List<string>();
         state.AppliedMultiplayerRaceIds ??= new List<string>();
         state.DailyRaceAttempts ??= new List<DailyRaceAttemptData>();
+        state.DailyLogin ??= new DailyLoginStateData();
+        state.DailyMissions ??= new DailyMissionStateData();
+        state.DailyMissions.Missions ??= new List<DailyMissionProgressData>();
 
-        // Version 4 introduced persisted audio and race auto-finish settings.
+        state.Voidlings.RemoveAll(static value => value is null);
+        state.DepartedVoidlings.RemoveAll(static value => value is null);
+        state.OwnedEggs.RemoveAll(static value => value is null);
+        state.StoreEggs.RemoveAll(static value => value is null);
+        state.EggShells.RemoveAll(static value => value is null);
+
         if (previousVersion < 4)
         {
             state.MasterVolume = 1.0f;
             state.AutoFinishRaces = true;
         }
+        if (previousVersion < 14)
+        {
+            state.SoundEffectVolume = 1.0f;
+            state.UiSoundVolume = 1.0f;
+        }
+        if (previousVersion < 15)
+        {
+            // Tutorial was introduced later; do not interrupt established saves.
+            state.TutorialCompleted = true;
+        }
+
+        state.MasterVolume = NormalizeVolume(state.MasterVolume);
+        state.SoundEffectVolume = NormalizeVolume(state.SoundEffectVolume);
+        state.UiSoundVolume = NormalizeVolume(state.UiSoundVolume);
 
         foreach (var statId in _rules.Genetics.StatIds)
         {
-            if (!state.TrainingItems.ContainsKey(statId))
-                state.TrainingItems[statId] = 0;
+            if (!state.TrainingItems.ContainsKey(statId)) state.TrainingItems[statId] = 0;
+            state.TrainingItems[statId] = Math.Max(0, state.TrainingItems[statId]);
         }
 
-        foreach (var creature in state.Voidlings.Concat(state.DepartedVoidlings))
-        {
-            creature.TrainingPoints ??= new Dictionary<string, int>(StringComparer.Ordinal);
-            foreach (var statId in _rules.Genetics.StatIds)
-            {
-                if (!creature.TrainingPoints.ContainsKey(statId))
-                    creature.TrainingPoints[statId] = 0;
-            }
-
-            creature.RareTraits ??= new List<RareTraitData>();
-        }
+        NormalizeGardenModules(state);
+        foreach (var creature in state.Voidlings.Concat(state.DepartedVoidlings)) NormalizeCreature(state, creature);
 
         foreach (var egg in state.OwnedEggs.Concat(state.StoreEggs))
+        {
+            egg.Genome ??= new GenomeData();
+            NormalizeGenome(egg.Genome);
             egg.RareTraits ??= new List<RareTraitData>();
+            egg.Appearance = NormalizeAppearance(egg.Genome, egg.Appearance);
+            egg.IncubationSeconds = NonNegativeFinite(egg.IncubationSeconds);
+            egg.RequiredIncubationSeconds = NonNegativeFinite(egg.RequiredIncubationSeconds);
+            egg.FamilyGeneration = Math.Max(0, egg.FamilyGeneration);
+            egg.InbreedingBurdenLevel = Math.Max(0, egg.InbreedingBurdenLevel);
+        }
 
-        // Version 5 introduced a minimal persistent ancestry graph. Populate it from every full
-        // creature record already known locally, while preserving archive-only ancestors imported
-        // through multiplayer trades. This is deterministic and never changes genes or IDs.
         _lineage.EnsureCurrentEntries(state);
 
-        // Version 6 adds only empty trade durability collections to old saves. Pending journals and
-        // applied transaction IDs are local data; loading a save never contacts Steam or a peer.
-        state.PendingTradeJournal.RemoveAll(entry =>
-            entry == null || string.IsNullOrWhiteSpace(entry.TradeId));
-        state.AppliedTradeIds = state.AppliedTradeIds
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-
-        // Version 7 keeps the multiplayer-win total and a bounded local dedupe history. Both are
-        // purely local persistence; normalization never queries Steam or attempts leaderboard IO.
+        state.PendingTradeJournal.RemoveAll(entry => entry == null || string.IsNullOrWhiteSpace(entry.TradeId));
+        state.AppliedTradeIds = state.AppliedTradeIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToList();
         state.MultiplayerWins = Math.Max(0, state.MultiplayerWins);
-        state.AppliedMultiplayerRaceIds = state.AppliedMultiplayerRaceIds
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Distinct(StringComparer.Ordinal)
-            .TakeLast(256)
-            .ToList();
-
-        // Version 8 persists local daily-race attempts. Keep at most one structurally valid attempt
-        // per UTC day and retain old rules-version attempts instead of erasing them: an incompatible
-        // update may prevent resume, but must not accidentally grant a second attempt that day.
+        state.AppliedMultiplayerRaceIds = state.AppliedMultiplayerRaceIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).TakeLast(256).ToList();
         state.DailyRaceAttempts = state.DailyRaceAttempts
-            .Where(attempt => DailyFriendRaceService.IsStructurallyValid(
-                attempt,
-                requireCurrentRules: false,
-                out _))
+            .Where(attempt => DailyFriendRaceService.IsStructurallyValid(attempt, requireCurrentRules: false, out _))
             .GroupBy(attempt => attempt.DailyKey, StringComparer.Ordinal)
             .Select(group => group.Last())
             .OrderBy(attempt => attempt.DailyKey, StringComparer.Ordinal)
             .TakeLast(DailyFriendRaceService.MaxAttemptHistory)
             .ToList();
 
+        state.DailyLogin.LastClaimDayNumber = Math.Max(0, state.DailyLogin.LastClaimDayNumber);
+        state.DailyLogin.Streak = Math.Max(0, state.DailyLogin.Streak);
+        if (state.DailyLogin.LastClaimDayNumber == 0) state.DailyLogin.Streak = 0;
+
+        state.DailyMissions.DayNumber = Math.Max(0, state.DailyMissions.DayNumber);
+        state.DailyMissions.Missions.RemoveAll(mission => mission == null || string.IsNullOrWhiteSpace(mission.MissionId));
+        foreach (var mission in state.DailyMissions.Missions) mission.Progress = Math.Max(0, mission.Progress);
+
+        if (!double.IsFinite(state.GardenIncomeCoinRemainder) || state.GardenIncomeCoinRemainder < 0.0 || state.GardenIncomeCoinRemainder >= 1.0)
+            state.GardenIncomeCoinRemainder = 0.0;
+
+        var rotationInterval = Math.Max(1.0, _rules.Shop.EggRotationIntervalSeconds);
+        if (!double.IsFinite(state.ShopEggRotationElapsedSeconds) || state.ShopEggRotationElapsedSeconds < 0.0)
+            state.ShopEggRotationElapsedSeconds = 0.0;
+        else if (state.ShopEggRotationElapsedSeconds >= rotationInterval)
+            state.ShopEggRotationElapsedSeconds %= rotationInterval;
+
         state.SaveVersion = CurrentSaveVersion;
     }
+
+    private void NormalizeCreature(GameStateData state, VoidlingData creature)
+    {
+        creature.Id ??= string.Empty;
+        creature.Name = string.IsNullOrWhiteSpace(creature.Name) ? "Voidling" : creature.Name;
+        creature.Genome ??= new GenomeData();
+        NormalizeGenome(creature.Genome);
+        creature.TrainingPoints ??= new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var statId in _rules.Genetics.StatIds)
+        {
+            if (!creature.TrainingPoints.ContainsKey(statId)) creature.TrainingPoints[statId] = 0;
+            creature.TrainingPoints[statId] = Math.Clamp(creature.TrainingPoints[statId], 0, _stats.GetTrainingPointCap(creature, statId));
+        }
+
+        creature.RareTraits ??= new List<RareTraitData>();
+        creature.Appearance = NormalizeAppearance(creature.Genome, creature.Appearance);
+        creature.Needs ??= new CreatureNeedsState();
+        _needs.Normalize(creature.Needs);
+        _favoriteFood.Normalize(creature, _rules.Genetics.StatIds);
+        creature.FamilyGeneration = Math.Max(0, creature.FamilyGeneration);
+        creature.InbreedingBurdenLevel = Math.Max(0, creature.InbreedingBurdenLevel);
+        creature.ReincarnationCount = Math.Max(0, creature.ReincarnationCount);
+        creature.AgeSeconds = NonNegativeFinite(creature.AgeSeconds);
+        creature.AdultAgeSeconds = NonNegativeFinite(creature.AdultAgeSeconds);
+        creature.BreedCooldownSeconds = NonNegativeFinite(creature.BreedCooldownSeconds);
+        creature.SwimFlyInfluence = FiniteOrZero(creature.SwimFlyInfluence);
+        creature.RunPowerInfluence = FiniteOrZero(creature.RunPowerInfluence);
+        creature.EvolutionMagnitude = NonNegativeFinite(creature.EvolutionMagnitude);
+
+        if (!_rules.Genetics.StatIds.Contains(creature.PassiveTrainingStatId ?? string.Empty))
+        {
+            creature.PassiveTrainingStatId = string.Empty;
+            creature.PassiveTrainingModuleId = string.Empty;
+            creature.PassiveTrainingPointsPerMinute = 0.0f;
+            creature.PassiveTrainingPointRemainder = 0.0;
+        }
+        else if (!double.IsFinite(creature.PassiveTrainingPointRemainder) || creature.PassiveTrainingPointRemainder < 0.0 || creature.PassiveTrainingPointRemainder >= 1.0)
+        {
+            creature.PassiveTrainingPointRemainder = 0.0;
+        }
+        NormalizePassiveModuleAssignment(state, creature);
+    }
+
+    private void NormalizeGenome(GenomeData genome)
+    {
+        genome.AbilityGenes ??= new Dictionary<string, GenePairData>(StringComparer.Ordinal);
+        genome.PersonalityGenes ??= new Dictionary<string, GenePairData>(StringComparer.Ordinal);
+        foreach (var statId in _rules.Genetics.StatIds)
+        {
+            if (!genome.AbilityGenes.TryGetValue(statId, out var gene) || gene == null)
+            {
+                gene = new GenePairData(); genome.AbilityGenes[statId] = gene;
+            }
+            gene.AlleleA = Math.Clamp(gene.AlleleA, 0, 5);
+            gene.AlleleB = Math.Clamp(gene.AlleleB, 0, 5);
+            gene.ExpressedAlleleIndex = gene.ExpressedAlleleIndex == 1 ? 1 : 0;
+        }
+    }
+
+    private VoidlingAppearanceData NormalizeAppearance(GenomeData genome, VoidlingAppearanceData? appearance)
+    {
+        // Preserve the validated v9 migration exactly: legacy palette genes are initialized
+        // deterministically and semantic appearance never stores resource paths.
+        _colors.EnsurePaletteGenes(genome);
+        appearance ??= new VoidlingAppearanceData();
+        appearance.Normalize();
+        if (!VoidlingAppearanceData.IsValidHue(appearance.PaletteHue))
+            appearance.PaletteHue = _colors.ResolvePaletteHue(genome);
+        return appearance;
+    }
+
+    /// <summary>Deterministic hexes the four pre-hex Garden slots become, in slot order.</summary>
+    private static readonly (int Q, int R)[] LegacySlotHexes = { (0, 0), (1, 0), (0, 1), (-1, 1) };
+
+    private void NormalizeGardenModules(GameStateData state)
+    {
+        var normalized = new List<GardenModuleData>();
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var occupied = new HashSet<(int Q, int R)>();
+        var maxLevel = Math.Max(1, _rules.GardenModules.MaxLevel);
+        foreach (var module in state.GardenModules)
+        {
+            if (module == null || string.IsNullOrWhiteSpace(module.Id) || !_rules.Genetics.StatIds.Contains(module.StatId ?? string.Empty)) continue;
+            module.Id = module.Id.Trim();
+            if (!ids.Add(module.Id)) continue;
+            module.Level = Math.Clamp(module.Level, 1, maxLevel);
+
+            // Pre-hex saves stored an abstract slot index. Keep those tiles on the ground by
+            // mapping each slot to its own hex instead of dropping the player back to storage.
+            if (!module.Placed && module.SlotIndex >= 0 && module.SlotIndex < LegacySlotHexes.Length)
+            {
+                (module.HexQ, module.HexR) = LegacySlotHexes[module.SlotIndex];
+                module.Placed = true;
+            }
+
+            module.SlotIndex = -1;
+            // ponytail: overlap only, no connectivity re-check on load. Tiles can only be placed
+            // connected, so a save can only lose connectivity if it was hand-edited.
+            if (module.Placed && !occupied.Add((module.HexQ, module.HexR))) module.Placed = false;
+            normalized.Add(module);
+        }
+        state.GardenModules = normalized;
+    }
+
+    private void NormalizePassiveModuleAssignment(GameStateData state, VoidlingData creature)
+    {
+        creature.PassiveTrainingModuleId ??= string.Empty;
+        if (string.IsNullOrEmpty(creature.PassiveTrainingModuleId))
+        {
+            creature.PassiveTrainingPointsPerMinute = 0.0f;
+            return;
+        }
+        var module = state.GardenModules.FirstOrDefault(candidate => string.Equals(candidate.Id, creature.PassiveTrainingModuleId, StringComparison.Ordinal));
+        if (module == null)
+        {
+            creature.PassiveTrainingStatId = string.Empty;
+            creature.PassiveTrainingModuleId = string.Empty;
+            creature.PassiveTrainingPointsPerMinute = 0.0f;
+            creature.PassiveTrainingPointRemainder = 0.0;
+            return;
+        }
+        creature.PassiveTrainingStatId = module.StatId;
+        creature.PassiveTrainingPointsPerMinute = module.Placed ? _rules.GardenModules.PointsPerMinuteForLevel(module.Level) : 0.0f;
+        if (creature.PassiveTrainingPointsPerMinute <= 0.0f) creature.PassiveTrainingPointRemainder = 0.0;
+    }
+
+    private static float NormalizeVolume(float value) => float.IsFinite(value) ? Math.Clamp(value, 0.0f, 1.0f) : 1.0f;
+    private static float NonNegativeFinite(float value) => float.IsFinite(value) ? Math.Max(0.0f, value) : 0.0f;
+    private static float FiniteOrZero(float value) => float.IsFinite(value) ? value : 0.0f;
 }

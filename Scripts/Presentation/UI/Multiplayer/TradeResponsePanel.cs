@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using Voidling.Application.Multiplayer.Trading;
+using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Multiplayer;
@@ -76,7 +77,7 @@ public partial class TradeResponsePanel : VBoxContainer
                     var voidlingAsset = asset;
                     assets.AddChild(UiFactory.CreateVoidlingCard(
                         asset.DisplayName,
-                        UiFactory.ParseTint(asset.TintHex),
+                        AppearanceFor(asset),
                         asset.HasAngelMutation,
                         asset.OtherMutationCount,
                         pressed => ToggleAsset(selected, voidlingAsset, pressed),
@@ -111,6 +112,13 @@ public partial class TradeResponsePanel : VBoxContainer
         actions.AddChild(decline);
         AddChild(actions);
     }
+
+    private static VoidlingVisualAppearance AppearanceFor(TradeLocalAssetView asset)
+        => new(
+            asset.VisualTypeId,
+            asset.PaletteHue,
+            VoidlingAppearanceData.ParseLayerIdsKey(asset.LayerIdsKey),
+            asset.TintHex);
 
     private static void ToggleAsset(
         ICollection<TradeAssetReference> selected,
