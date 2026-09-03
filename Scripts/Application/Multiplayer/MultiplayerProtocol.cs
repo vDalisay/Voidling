@@ -341,7 +341,7 @@ public static class MultiplayerProtocol
 
     /// <summary>
     /// Safely inspects an envelope for protocol routing without interpreting its payload. This lets
-    /// multiple typed sub-protocols share one transport channel without treatinging each other as malformed.
+    /// multiple typed sub-protocols share one transport channel without treating each other as malformed.
     /// </summary>
     internal static bool TryPeekMessageType(ReadOnlySpan<byte> bytes, out string messageType)
     {
