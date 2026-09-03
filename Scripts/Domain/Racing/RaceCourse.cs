@@ -77,6 +77,7 @@ public sealed class RaceCourse
     public IReadOnlyList<RaceCourseSegment> Segments { get; }
     public IReadOnlyList<float> Obstacles { get; }
     public RaceCourseSegment GlideSegment { get; }
+    public bool HasGlideSegment => GlideSegment.Kind == RaceSegmentKind.Glide;
 
     public RaceSegmentKind SegmentKindAt(float x)
         => Segments.FirstOrDefault(segment => segment.Contains(x)).Kind;
