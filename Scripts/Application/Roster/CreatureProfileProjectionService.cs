@@ -98,12 +98,8 @@ public sealed class CreatureProfileProjectionService
             .ToArray() ?? Array.Empty<CreatureProfileRareTraitProjection>();
         var hasAngel = rareTraits.Any(trait =>
             string.Equals(trait.TraitId, AngelMutationId, StringComparison.OrdinalIgnoreCase));
-        var appearance = creature.Appearance ?? new VoidlingAppearanceData();
-        appearance.Normalize();
-        var layerIds = appearance.LayerIds
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var appearance = (creature.Appearance ?? new VoidlingAppearanceData()).CreateCanonicalCopy();
+        var layerIds = appearance.LayerIds.ToArray();
 
         return new CreatureProfileProjection(
             creature.Id,
