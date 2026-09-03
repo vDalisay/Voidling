@@ -43,6 +43,27 @@ public sealed class AppearanceGeneticsTests
     }
 
     [Fact]
+    public void ChildColorDna_LegacyParentsAreReadWithoutMutation()
+    {
+        var first = Parent("legacy-a", -1.0f, -1.0f);
+        first.Genome.ColorAlleleA = 1;
+        first.Genome.ColorAlleleB = 2;
+        var second = Parent("legacy-b", -1.0f, -1.0f);
+        second.Genome.ColorAlleleA = 3;
+        second.Genome.ColorAlleleB = 4;
+        var service = new GenomeInheritanceService(Rules.Genetics, Rules.Appearance);
+
+        var child = service.CreateChild(first, second, 99882UL);
+
+        Assert.Equal(-1.0f, first.Genome.PaletteHueA);
+        Assert.Equal(-1.0f, first.Genome.PaletteHueB);
+        Assert.Equal(-1.0f, second.Genome.PaletteHueA);
+        Assert.Equal(-1.0f, second.Genome.PaletteHueB);
+        Assert.True(VoidlingAppearanceData.IsValidHue(child.PaletteHueA));
+        Assert.True(VoidlingAppearanceData.IsValidHue(child.PaletteHueB));
+    }
+
+    [Fact]
     public void PhenotypeResolution_NudgesWinnerWithoutCollapsingToMidpoint()
     {
         var genome = new GenomeData
@@ -57,6 +78,29 @@ public sealed class AppearanceGeneticsTests
 
         Assert.InRange(hue, 0.93f, 0.95f);
         Assert.True(CircularDistance(hue, 0.0f) < CircularDistance(hue, 2.0f / 3.0f));
+    }
+
+    [Fact]
+    public void PhenotypeResolution_LegacyGenomeFallbackIsPure()
+    {
+        var genome = new GenomeData
+        {
+            ColorAlleleA = 1,
+            ColorAlleleB = 4,
+            PaletteHueA = -1.0f,
+            PaletteHueB = -1.0f,
+            ExpressedColorIndex = 1
+        };
+        var resolver = new ColorPhenotypeResolver(Rules.Appearance);
+
+        var hue = resolver.ResolvePaletteHue(genome);
+        var tint = resolver.ResolveTint(genome);
+
+        Assert.True(VoidlingAppearanceData.IsValidHue(hue));
+        Assert.StartsWith("#", tint);
+        Assert.Equal(-1.0f, genome.PaletteHueA);
+        Assert.Equal(-1.0f, genome.PaletteHueB);
+        Assert.Equal(1, genome.ExpressedColorIndex);
     }
 
     private static VoidlingData Parent(string id, float firstHue, float secondHue)
