@@ -53,8 +53,6 @@ public sealed class GenomeInheritanceService
 
         ApplyNormalRankBreakthrough(parentA, parentB, genome, seed);
 
-        _colors.EnsurePaletteGenes(parentA.Genome);
-        _colors.EnsurePaletteGenes(parentB.Genome);
         var parentAProfile = StableRandom.Create(seed, "inherit:color:a").Next(2);
         var parentBProfile = StableRandom.Create(seed, "inherit:color:b").Next(2);
 
@@ -103,8 +101,6 @@ public sealed class GenomeInheritanceService
         else
             alleleB = targetGrade;
 
-        // Re-resolve expression from the same stable expression substream so the new higher allele
-        // follows the normal heterozygous expression rule instead of being automatically expressed.
         childGenome.AbilityGenes[selectedStatId] = AbilityGeneExpression.CreatePair(
             alleleA,
             alleleB,
