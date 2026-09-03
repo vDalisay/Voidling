@@ -193,6 +193,7 @@ public static class ConnectedZoneValidation
     public const int MaxTintLength = 16;
     public const int MaxVisualTypeIdLength = 64;
     public const int MaxAppearanceLayers = 16;
+    public const int MaxAppearanceLayerIdLength = 128;
     public const int MaxRareTraits = 32;
 
     public static bool IsValidSharedVoidling(SharedVoidlingSnapshot? snapshot)
@@ -205,8 +206,7 @@ public static class ConnectedZoneValidation
             snapshot.DisplayName.Length > MaxDisplayNameLength ||
             string.IsNullOrWhiteSpace(snapshot.TintHex) ||
             snapshot.TintHex.Length > MaxTintLength ||
-            string.IsNullOrWhiteSpace(snapshot.VisualTypeId) ||
-            snapshot.VisualTypeId.Length > MaxVisualTypeIdLength ||
+            !VoidlingAppearanceData.IsValidSemanticId(snapshot.VisualTypeId, MaxVisualTypeIdLength) ||
             !VoidlingAppearanceData.IsValidStoredHue(snapshot.PaletteHue) ||
             !float.IsFinite(snapshot.ZoneX) ||
             !float.IsFinite(snapshot.ZoneY) ||
@@ -216,8 +216,11 @@ public static class ConnectedZoneValidation
         }
 
         var layers = snapshot.LayerIds ?? Array.Empty<string>();
-        if (layers.Length > MaxAppearanceLayers || layers.Any(id => string.IsNullOrWhiteSpace(id) || id.Length > 128))
+        if (layers.Length > MaxAppearanceLayers ||
+            layers.Any(id => !VoidlingAppearanceData.IsValidSemanticId(id, MaxAppearanceLayerIdLength)))
+        {
             return false;
+        }
 
         var rareTraits = snapshot.RareTraitIds ?? Array.Empty<string>();
         if (rareTraits.Length > MaxRareTraits)
