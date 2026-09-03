@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Voidling.Domain.Racing;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
@@ -23,6 +24,8 @@ public sealed class RaceParticipantSnapshotFactory
     public RaceParticipantSnapshot Create(VoidlingData creature)
     {
         ArgumentNullException.ThrowIfNull(creature);
+        var appearance = creature.Appearance ?? new VoidlingAppearanceData();
+        appearance.Normalize();
         return new RaceParticipantSnapshot(
             CreatureId: creature.Id,
             DisplayName: creature.Name,
@@ -31,6 +34,9 @@ public sealed class RaceParticipantSnapshotFactory
             Swim: _stats.GetEffectiveStat(creature, "swim"),
             Fly: _stats.GetEffectiveStat(creature, "fly"),
             Power: _stats.GetEffectiveStat(creature, "power"),
-            Stamina: _stats.GetEffectiveStat(creature, "stamina"));
+            Stamina: _stats.GetEffectiveStat(creature, "stamina"),
+            VisualTypeId: appearance.VisualTypeId,
+            PaletteHue: appearance.PaletteHue,
+            LayerIds: appearance.LayerIds.Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
     }
 }
