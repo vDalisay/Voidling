@@ -9,7 +9,7 @@ namespace Voidling.Presentation.Voidlings;
 /// atlases. The overlay sheets use the same frame grid as their owning body definition, so wings,
 /// crystals and future adornment layers remain perfectly synchronized without consumer code.
 /// </summary>
-public partial class VoidlingVisualLayerSync2D : Node
+public partial class VoidlingVisualLayerSync2D : Node2D
 {
     private AnimatedSprite2D? _target;
     private readonly List<AnimatedSprite2D> _layers = new();
@@ -33,7 +33,7 @@ public partial class VoidlingVisualLayerSync2D : Node
                 Centered = target.Centered
             };
             VoidlingVisualFactory.ApplyLayerPalette(layer, definition, layerDefinition, appearance);
-            target.AddChild(layer);
+            AddChild(layer);
             _layers.Add(layer);
         }
 
