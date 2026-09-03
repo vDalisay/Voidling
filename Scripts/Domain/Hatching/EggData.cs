@@ -11,6 +11,7 @@ public enum EggSource
 public enum EggState
 {
     Incubating,
+    WaitingForSpace,
     Failed
 }
 
