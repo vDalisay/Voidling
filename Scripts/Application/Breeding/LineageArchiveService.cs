@@ -13,6 +13,9 @@ namespace Voidling.Application.Breeding;
 /// </summary>
 public sealed class LineageArchiveService
 {
+    private const int MaxAppearanceLayers = 16;
+    private const int MaxAppearanceLayerIdLength = 128;
+
     public void EnsureCurrentEntries(GameStateData state)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -200,7 +203,7 @@ public sealed class LineageArchiveService
             : entry.VisualTypeId.Trim().ToLowerInvariant();
         var paletteHue = VoidlingAppearanceData.IsValidHue(entry.PaletteHue)
             ? VoidlingAppearanceData.NormalizeHue(entry.PaletteHue)
-            : -1.0f;
+            : VoidlingAppearanceData.LegacyUninitializedPaletteHue;
         return entry with
         {
             VisualTypeId = visualTypeId,
@@ -210,16 +213,24 @@ public sealed class LineageArchiveService
     }
 
     private static bool IsValid(LineageArchiveEntry? entry)
-        => entry != null &&
-           !string.IsNullOrWhiteSpace(entry.CreatureId) &&
-           entry.CreatureId.Length <= 128 &&
-           entry.FamilyGeneration >= 0 &&
-           (string.IsNullOrEmpty(entry.ParentAId) || entry.ParentAId.Length <= 128) &&
-           (string.IsNullOrEmpty(entry.ParentBId) || entry.ParentBId.Length <= 128) &&
-           (string.IsNullOrEmpty(entry.DisplayName) || entry.DisplayName.Length <= 64) &&
-           (string.IsNullOrEmpty(entry.TintHex) || entry.TintHex.Length <= 16) &&
-           (string.IsNullOrEmpty(entry.VisualTypeId) || entry.VisualTypeId.Length <= 64) &&
-           (string.IsNullOrEmpty(entry.LayerIdsKey) || entry.LayerIdsKey.Length <= 1024) &&
-           float.IsFinite(entry.PaletteHue) &&
-           entry.PaletteHue < 1.0f;
+    {
+        if (entry == null ||
+            string.IsNullOrWhiteSpace(entry.CreatureId) ||
+            entry.CreatureId.Length > 128 ||
+            entry.FamilyGeneration < 0 ||
+            (!string.IsNullOrEmpty(entry.ParentAId) && entry.ParentAId.Length > 128) ||
+            (!string.IsNullOrEmpty(entry.ParentBId) && entry.ParentBId.Length > 128) ||
+            (!string.IsNullOrEmpty(entry.DisplayName) && entry.DisplayName.Length > 64) ||
+            (!string.IsNullOrEmpty(entry.TintHex) && entry.TintHex.Length > 16) ||
+            (!string.IsNullOrEmpty(entry.VisualTypeId) && entry.VisualTypeId.Length > 64) ||
+            (!string.IsNullOrEmpty(entry.LayerIdsKey) && entry.LayerIdsKey.Length > 1024) ||
+            !VoidlingAppearanceData.IsValidStoredHue(entry.PaletteHue))
+        {
+            return false;
+        }
+
+        var layerIds = entry.LayerIds;
+        return layerIds.Length <= MaxAppearanceLayers &&
+               layerIds.All(id => !string.IsNullOrWhiteSpace(id) && id.Length <= MaxAppearanceLayerIdLength);
+    }
 }
