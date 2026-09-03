@@ -23,7 +23,7 @@ public sealed record SharedVoidlingSnapshot(
     float ZoneX,
     float ZoneY,
     string VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
-    float PaletteHue = -1.0f,
+    float PaletteHue = VoidlingAppearanceData.LegacyUninitializedPaletteHue,
     string[]? LayerIds = null)
 {
     public SharedVoidlingKey Key => new(OwnerId, CreatureId);
@@ -207,7 +207,7 @@ public static class ConnectedZoneValidation
             snapshot.TintHex.Length > MaxTintLength ||
             string.IsNullOrWhiteSpace(snapshot.VisualTypeId) ||
             snapshot.VisualTypeId.Length > MaxVisualTypeIdLength ||
-            (!VoidlingAppearanceData.IsValidHue(snapshot.PaletteHue) && snapshot.PaletteHue >= 0.0f) ||
+            !VoidlingAppearanceData.IsValidStoredHue(snapshot.PaletteHue) ||
             !float.IsFinite(snapshot.ZoneX) ||
             !float.IsFinite(snapshot.ZoneY) ||
             snapshot.FamilyGeneration < 0)
