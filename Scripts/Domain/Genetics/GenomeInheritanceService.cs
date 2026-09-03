@@ -10,14 +10,23 @@ namespace Voidling.Domain.Genetics;
 /// Creates a child's normal genome from the two selected parents only. Each ability locus keeps
 /// exactly two visible DNA-profile values: profile 1 comes from parent A and profile 2 from parent B.
 /// Deeper ancestry is intentionally outside this service and is reserved for pedigree/inbreeding.
+/// Color DNA follows the same parent-only rule and carries continuous hue values so later generations
+/// can produce small palette-family shifts without embedding art/palette files in Domain state.
 /// </summary>
 public sealed class GenomeInheritanceService
 {
     private readonly GeneticsRules _rules;
+    private readonly ColorPhenotypeResolver _colors;
 
     public GenomeInheritanceService(GeneticsRules rules)
+        : this(rules, GameBalanceRules.DemoDefaults.Appearance)
+    {
+    }
+
+    public GenomeInheritanceService(GeneticsRules rules, AppearanceRules appearance)
     {
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
+        _colors = new ColorPhenotypeResolver(appearance ?? throw new ArgumentNullException(nameof(appearance)));
     }
 
     public GenomeData CreateChild(VoidlingData parentA, VoidlingData parentB, ulong seed)
@@ -44,10 +53,15 @@ public sealed class GenomeInheritanceService
 
         ApplyNormalRankBreakthrough(parentA, parentB, genome, seed);
 
-        var colorA = StableRandom.Create(seed, "inherit:color:a");
-        var colorB = StableRandom.Create(seed, "inherit:color:b");
-        genome.ColorAlleleA = colorA.NextDouble() < 0.5 ? parentA.Genome.ColorAlleleA : parentA.Genome.ColorAlleleB;
-        genome.ColorAlleleB = colorB.NextDouble() < 0.5 ? parentB.Genome.ColorAlleleA : parentB.Genome.ColorAlleleB;
+        _colors.EnsurePaletteGenes(parentA.Genome);
+        _colors.EnsurePaletteGenes(parentB.Genome);
+        var parentAProfile = StableRandom.Create(seed, "inherit:color:a").Next(2);
+        var parentBProfile = StableRandom.Create(seed, "inherit:color:b").Next(2);
+
+        genome.ColorAlleleA = parentAProfile == 0 ? parentA.Genome.ColorAlleleA : parentA.Genome.ColorAlleleB;
+        genome.ColorAlleleB = parentBProfile == 0 ? parentB.Genome.ColorAlleleA : parentB.Genome.ColorAlleleB;
+        genome.PaletteHueA = _colors.AlleleHue(parentA.Genome, parentAProfile);
+        genome.PaletteHueB = _colors.AlleleHue(parentB.Genome, parentBProfile);
         genome.ExpressedColorIndex = StableRandom.Create(seed, "express:color").NextDouble() < 0.5 ? 0 : 1;
         return genome;
     }
