@@ -17,8 +17,8 @@ public sealed record RaceParticipantSnapshot(
     float Fly,
     float Power,
     float Stamina,
-    string VisualTypeId = "normal",
-    float PaletteHue = -1.0f,
+    string VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+    float PaletteHue = VoidlingAppearanceData.LegacyUninitializedPaletteHue,
     string LayerIdsKey = "")
 {
     [JsonIgnore]
