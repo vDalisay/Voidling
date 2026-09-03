@@ -145,8 +145,7 @@ public sealed class LineageTreeProjectionService
             .Where(trait => !string.IsNullOrWhiteSpace(trait.TraitId))
             .Select(trait => trait.TraitId)
             .ToArray() ?? Array.Empty<string>();
-        var appearance = creature.Appearance ?? new VoidlingAppearanceData();
-        appearance.Normalize();
+        var appearance = (creature.Appearance ?? new VoidlingAppearanceData()).CreateCanonicalCopy();
         var layerIds = appearance.LayerIds.ToArray();
 
         return new LineageMemberProjection(
