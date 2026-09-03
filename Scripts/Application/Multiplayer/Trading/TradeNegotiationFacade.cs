@@ -15,7 +15,7 @@ public sealed record TradeVoidlingChoiceView(
     bool HasAngelMutation,
     int OtherMutationCount,
     string VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
-    float PaletteHue = -1.0f,
+    float PaletteHue = VoidlingAppearanceData.LegacyUninitializedPaletteHue,
     string LayerIdsKey = "");
 
 public sealed record TradeInviteView(string NegotiationId, string FromDisplayName);
@@ -269,8 +269,7 @@ public sealed class TradeNegotiationFacade
             {
                 var hasAngel = voidling.RareTraits.Any(trait =>
                     string.Equals(trait.TraitId, "Angel", StringComparison.OrdinalIgnoreCase));
-                var appearance = voidling.Appearance ?? new VoidlingAppearanceData();
-                appearance.Normalize();
+                var appearance = (voidling.Appearance ?? new VoidlingAppearanceData()).CreateCanonicalCopy();
                 return new TradeVoidlingChoiceView(
                     voidling.Id,
                     voidling.Name,
