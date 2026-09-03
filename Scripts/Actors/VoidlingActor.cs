@@ -25,6 +25,10 @@ public partial class VoidlingActor : Node2D
     private float _heldScaleMultiplier = 1.0f;
     private float _heldSpriteYOffset;
     private float _shadowCenterYOffset;
+    private VoidlingVisualAppearance _appearance;
+    private Vector2 _tileCenter;
+    private float _tileRadius;
+    private StringName _tileAnimation = "";
 
     public void Setup(VoidlingData data, Rect2 wanderBounds, Vector2 startPosition)
     {
@@ -35,6 +39,7 @@ public partial class VoidlingActor : Node2D
         _rng.Seed = StableSeed(data.Id);
 
         var appearance = VoidlingVisualAppearance.From(data.Appearance, data.TintHex);
+        _appearance = appearance;
         var definition = VoidlingVisualFactory.ResolveDefinition(appearance.VisualTypeId);
         _visualTypeId = definition.DefinitionId;
         var isAdult = data.Stage == LifeStage.Adult;
@@ -42,7 +47,7 @@ public partial class VoidlingActor : Node2D
         _baseSpriteY = VoidlingVisualFactory.WorldSpriteCenterYOffset(_baseScale, _visualTypeId);
         _heldScaleMultiplier = definition.HeldScaleMultiplier;
         _heldSpriteYOffset = definition.HeldSpriteYOffset;
-        _shadowCenterYOffset = definition.ShadowCenterYOffset;
+        _shadowCenterYOffset = VoidlingVisualFactory.ShadowCenterYOffset(_baseScale, _visualTypeId);
 
         _sprite = new AnimatedSprite2D
         {
@@ -97,11 +102,60 @@ public partial class VoidlingActor : Node2D
         {
             var direction = toTarget.Normalized();
             Position += direction * _walkSpeed * step;
-            Position = new Vector2(
-                Mathf.Clamp(Position.X, _wanderBounds.Position.X, _wanderBounds.End.X),
-                Mathf.Clamp(Position.Y, _wanderBounds.Position.Y, _wanderBounds.End.Y));
+            Position = ClampToWanderArea(Position);
             PlayForDirection(direction);
         }
+    }
+
+    /// <summary>True while this Voidling is training on a land tile and stays on that ground.</summary>
+    public bool IsOnTile => _tileRadius > 0.0f;
+
+    /// <summary>
+    /// Keeps a training Voidling on its own tile, doing the activity that tile trains. It only
+    /// leaves when the player picks it up and puts it down somewhere else.
+    /// </summary>
+    public void ConfineToTile(Vector2 center, float radius, StringName activityAnimation)
+    {
+        if (_tileRadius > 0.0f &&
+            _tileCenter.IsEqualApprox(center) &&
+            Mathf.IsEqualApprox(_tileRadius, radius) &&
+            _tileAnimation == activityAnimation)
+        {
+            return;
+        }
+
+        _tileCenter = center;
+        _tileRadius = Mathf.Max(1.0f, radius);
+        _tileAnimation = activityAnimation;
+        VoidlingVisualFactory.ApplyAppearance(_sprite, _appearance, race: true);
+        Position = ClampToWanderArea(Position);
+        RefreshMovementState();
+    }
+
+    public void ReleaseFromTile()
+    {
+        if (_tileRadius <= 0.0f)
+            return;
+
+        _tileRadius = 0.0f;
+        _tileAnimation = "";
+        _sprite.FlipH = false;
+        VoidlingVisualFactory.ApplyAppearance(_sprite, _appearance, race: false);
+        Position = ClampToWanderArea(Position);
+        RefreshMovementState();
+    }
+
+    private Vector2 ClampToWanderArea(Vector2 position)
+    {
+        if (!IsOnTile)
+        {
+            return new Vector2(
+                Mathf.Clamp(position.X, _wanderBounds.Position.X, _wanderBounds.End.X),
+                Mathf.Clamp(position.Y, _wanderBounds.Position.Y, _wanderBounds.End.Y));
+        }
+
+        var offset = position - _tileCenter;
+        return offset.Length() <= _tileRadius ? position : _tileCenter + offset.Normalized() * _tileRadius;
     }
 
     public void SetSelected(bool selected)
@@ -221,19 +275,32 @@ public partial class VoidlingActor : Node2D
         }
 
         PickNewTarget();
-        _sprite.Play("walk_down");
+        _sprite.Play(IsOnTile ? _tileAnimation : "walk_down");
     }
 
     private void PickNewTarget()
     {
-        _target = new Vector2(
-            _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
-            _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y));
+        _target = IsOnTile
+            ? _tileCenter + Vector2.Right.Rotated(_rng.RandfRange(0.0f, Mathf.Tau)) *
+              _rng.RandfRange(0.0f, _tileRadius)
+            : new Vector2(
+                _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
+                _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y));
         _nextTargetSeconds = _rng.RandfRange(1.5f, 4.0f);
     }
 
     private void PlayForDirection(Vector2 direction)
     {
+        // A Voidling on a land tile wears the race frames, which only carry its activity loop.
+        // Facing comes from a flip there instead of a per-direction animation.
+        if (IsOnTile)
+        {
+            _sprite.FlipH = direction.X < 0.0f;
+            if (_sprite.Animation != _tileAnimation)
+                _sprite.Play(_tileAnimation);
+            return;
+        }
+
         StringName animation;
         if (Mathf.Abs(direction.X) > Mathf.Abs(direction.Y))
             animation = direction.X < 0.0f ? "walk_left" : "walk_right";
@@ -254,6 +321,12 @@ public partial class VoidlingActor : Node2D
         }
 
         var garden = FindGardenController();
+
+        // While the player is placing an egg or a land tile, the click belongs to the Garden.
+        // Falling through without handling it keeps tiles placeable where a Voidling stands.
+        if (garden != null && (garden.IsPlacingEgg || garden.IsPlacingLand))
+            return;
+
         if (mouse.Pressed)
         {
             garden?.BeginVoidlingPointerInteraction(CreatureId);

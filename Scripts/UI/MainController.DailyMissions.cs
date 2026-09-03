@@ -25,7 +25,7 @@ public partial class MainController
         back.CustomMinimumSize = new Vector2(112, 22);
         back.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd;
         UiFactory.ApplyPixelFont(back, 7);
-        back.Pressed += ShowShop;
+        back.Pressed += RenderShop;
         box.AddChild(back);
     }
 

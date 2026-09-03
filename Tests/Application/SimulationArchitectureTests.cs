@@ -35,6 +35,59 @@ public sealed class SimulationArchitectureTests
         Assert.Equal("child", adult.CreatureId);
     }
 
+    /// <summary>
+    /// An adult must survive a long play session. Voidlings are bred and raised across sittings, so
+    /// a lifespan short enough to expire inside one loses lineages the player was working on.
+    /// </summary>
+    [Fact]
+    public void Advance_AdultSurvivesSixHoursOfOpenGameTimeBeforeItsLifeEnds()
+    {
+        const float sixHours = 6.0f * 60.0f * 60.0f;
+        Assert.True(
+            Rules.Reincarnation.AdultLifespanSeconds >= sixHours,
+            $"Adult lifespan is {Rules.Reincarnation.AdultLifespanSeconds}s, below the six-hour floor.");
+
+        var adult = NewAdult("elder");
+        var state = new GameStateData();
+        state.Voidlings.Add(adult);
+        var simulation = new AdvanceSimulationUseCase(Rules);
+
+        // One minute short of six hours the creature is still in the Garden and still an adult.
+        simulation.Advance(state, sixHours - 60.0f);
+
+        Assert.Contains(adult, state.Voidlings);
+        Assert.Empty(state.DepartedVoidlings);
+        Assert.Equal(LifeStage.Adult, adult.Stage);
+    }
+
+    /// <summary>
+    /// Reincarnation is gated on hidden care, so an uncared-for creature reaching the end of its
+    /// life departs permanently. This pins the current rule so a balance change to it is deliberate.
+    /// </summary>
+    [Fact]
+    public void Advance_UncaredForAdultDepartsPermanentlyAtTheEndOfItsLife()
+    {
+        var adult = NewAdult("neglected");
+        adult.AdultAgeSeconds = Rules.Reincarnation.AdultLifespanSeconds - 1.0f;
+        var state = new GameStateData();
+        state.Voidlings.Add(adult);
+
+        var result = new AdvanceSimulationUseCase(Rules).Advance(state, 2.0f);
+
+        Assert.Single(result.Events.OfType<CreatureDiedEvent>());
+        Assert.Empty(result.Events.OfType<CreatureReincarnatedEvent>());
+        Assert.DoesNotContain(adult, state.Voidlings);
+        Assert.Contains(adult, state.DepartedVoidlings);
+    }
+
+    private static VoidlingData NewAdult(string id) => new()
+    {
+        Id = id,
+        Name = id,
+        Stage = LifeStage.Adult,
+        AgeSeconds = Rules.Lifecycle.ChildToAdultSeconds
+    };
+
     [Fact]
     public void Advance_AdultTransitionIsEmittedExactlyOnce()
     {

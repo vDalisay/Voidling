@@ -12,7 +12,11 @@ public enum EggState
 {
     Incubating,
     WaitingForSpace,
-    Failed
+    Failed,
+
+    // Owned but not yet placed in the Garden. Stored eggs never accumulate incubation time, so the
+    // timer starts when the player puts the egg down. Appended last to keep persisted values stable.
+    Stored
 }
 
 public sealed class EggData

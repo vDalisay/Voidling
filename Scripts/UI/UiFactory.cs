@@ -262,6 +262,14 @@ public static class UiFactory
         control.AddThemeFontSizeOverride("font_size", size);
     }
 
+    // The pixel font ships a single weight, so emphasis is a same-colour outline that thickens the
+    // glyphs instead of a second font file.
+    public static void SetLabelBold(Label label, bool bold)
+    {
+        label.AddThemeConstantOverride("outline_size", bold ? 2 : 0);
+        label.AddThemeColorOverride("font_outline_color", label.GetThemeColor("font_color"));
+    }
+
     public static Color ParseTint(string tintHex)
     {
         try { return Color.FromHtml(tintHex); }

@@ -26,7 +26,8 @@ public enum PassiveTrainingFailure
     None,
     UnknownStat,
     CreatureNotFound,
-    NoPlacedModule
+    LandNotPlaced,
+    LandFull
 }
 
 public enum GardenModuleFailure
@@ -35,7 +36,8 @@ public enum GardenModuleFailure
     UnknownStat,
     DuplicateModuleId,
     ModuleNotFound,
-    InvalidSlot,
+    AlreadyPlaced,
+    DoesNotFit,
     NotEnoughCurrency,
     MaxLevel
 }
@@ -168,37 +170,34 @@ public sealed class TrainingUseCase
             Id = moduleId,
             StatId = statId,
             Level = 1,
-            SlotIndex = -1
+            Placed = false
         });
         return new GardenModuleMutationResult(GardenModuleFailure.None, true, cost);
     }
 
-    public GardenModuleMutationResult PlaceGardenModule(GameStateData state, string moduleId, int slotIndex)
+    /// <summary>Puts an owned land tile down at a hex, if the island can grow there.</summary>
+    public GardenModuleMutationResult PlaceGardenModule(GameStateData state, string moduleId, int hexQ, int hexR)
     {
         ArgumentNullException.ThrowIfNull(state);
-        if (slotIndex < -1 || slotIndex >= Math.Max(1, _rules.GardenModules.SlotCount))
-            return new GardenModuleMutationResult(GardenModuleFailure.InvalidSlot, false);
-
         var module = state.GardenModules.FirstOrDefault(candidate => candidate.Id == moduleId);
         if (module == null)
             return new GardenModuleMutationResult(GardenModuleFailure.ModuleNotFound, false);
-        if (module.SlotIndex == slotIndex)
-            return new GardenModuleMutationResult(GardenModuleFailure.None, false);
+        if (module.Placed)
+            return new GardenModuleMutationResult(GardenModuleFailure.AlreadyPlaced, false);
+        if (!_rules.GardenModules.Hex.CanPlace(hexQ, hexR, (q, r) => IsHexOccupied(state, q, r)))
+            return new GardenModuleMutationResult(GardenModuleFailure.DoesNotFit, false);
 
-        if (slotIndex >= 0)
-        {
-            var occupying = state.GardenModules.FirstOrDefault(candidate =>
-                candidate.Id != module.Id && candidate.SlotIndex == slotIndex);
-            if (occupying != null)
-            {
-                occupying.SlotIndex = module.SlotIndex;
-                RefreshAssignedCreatureRates(state, occupying);
-            }
-        }
-
-        module.SlotIndex = slotIndex;
+        module.HexQ = hexQ;
+        module.HexR = hexR;
+        module.Placed = true;
         RefreshAssignedCreatureRates(state, module);
         return new GardenModuleMutationResult(GardenModuleFailure.None, true);
+    }
+
+    public static bool IsHexOccupied(GameStateData state, int hexQ, int hexR)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return state.GardenModules.Any(module => module.Placed && module.HexQ == hexQ && module.HexR == hexR);
     }
 
     public GardenModuleMutationResult UpgradeGardenModule(GameStateData state, string moduleId)
@@ -220,72 +219,62 @@ public sealed class TrainingUseCase
         return new GardenModuleMutationResult(GardenModuleFailure.None, true, cost);
     }
 
-    public PassiveTrainingAssignmentResult SetPassiveTraining(GameStateData state, string creatureId, string? statId)
+    /// <summary>
+    /// Assigns passive training by dropping a Voidling onto a placed land tile. The tile is the
+    /// source of truth for the stat and rate; the creature is free to wander off it afterwards.
+    /// </summary>
+    public PassiveTrainingAssignmentResult SetPassiveTrainingLand(GameStateData state, string creatureId, string moduleId)
     {
         ArgumentNullException.ThrowIfNull(state);
-        var requested = statId ?? string.Empty;
-        if (requested.Length > 0 && !_rules.Genetics.StatIds.Contains(requested))
-            return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.UnknownStat, string.Empty, false);
-
         var creature = state.Voidlings.FirstOrDefault(v => v.Id == creatureId);
         if (creature == null)
             return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.CreatureNotFound, string.Empty, false);
-        if (requested.Length == 0)
-            return ClearPassiveTraining(creature);
 
-        var changed = !string.Equals(creature.PassiveTrainingStatId, requested, StringComparison.Ordinal) ||
-                      creature.PassiveTrainingModuleId.Length > 0 ||
-                      creature.PassiveTrainingPointsPerMinute != 0.0f ||
-                      creature.PassiveTrainingPointRemainder != 0.0;
-        if (changed)
-        {
-            creature.PassiveTrainingStatId = requested;
-            creature.PassiveTrainingModuleId = string.Empty;
-            creature.PassiveTrainingPointsPerMinute = 0.0f;
-            creature.PassiveTrainingPointRemainder = 0.0;
-        }
-
-        return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.None, requested, changed);
-    }
-
-    public PassiveTrainingAssignmentResult SetPassiveTrainingFromPlacedModule(
-        GameStateData state,
-        string creatureId,
-        string? statId)
-    {
-        ArgumentNullException.ThrowIfNull(state);
-        var requested = statId ?? string.Empty;
-        if (requested.Length > 0 && !_rules.Genetics.StatIds.Contains(requested))
+        var module = state.GardenModules.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, moduleId, StringComparison.Ordinal));
+        if (module == null || !module.Placed)
+            return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.LandNotPlaced, string.Empty, false);
+        if (!_rules.Genetics.StatIds.Contains(module.StatId))
             return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.UnknownStat, string.Empty, false);
+        if (!HasRoomFor(state, module.Id, creatureId))
+            return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.LandFull, module.StatId, false);
 
-        var creature = state.Voidlings.FirstOrDefault(v => v.Id == creatureId);
-        if (creature == null)
-            return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.CreatureNotFound, string.Empty, false);
-        if (requested.Length == 0)
-            return ClearPassiveTraining(creature);
-
-        var module = state.GardenModules
-            .Where(candidate => candidate.SlotIndex >= 0 && string.Equals(candidate.StatId, requested, StringComparison.Ordinal))
-            .OrderByDescending(candidate => candidate.Level)
-            .ThenBy(candidate => candidate.SlotIndex)
-            .ThenBy(candidate => candidate.Id, StringComparer.Ordinal)
-            .FirstOrDefault();
-        if (module == null)
-            return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.NoPlacedModule, requested, false);
-
-        var changed = !string.Equals(creature.PassiveTrainingStatId, requested, StringComparison.Ordinal) ||
+        var rate = RateFor(module);
+        var changed = !string.Equals(creature.PassiveTrainingStatId, module.StatId, StringComparison.Ordinal) ||
                       !string.Equals(creature.PassiveTrainingModuleId, module.Id, StringComparison.Ordinal) ||
                       creature.PassiveTrainingPointRemainder != 0.0 ||
-                      !creature.PassiveTrainingPointsPerMinute.Equals(RateFor(module));
+                      !creature.PassiveTrainingPointsPerMinute.Equals(rate);
         if (changed)
         {
-            creature.PassiveTrainingStatId = requested;
+            creature.PassiveTrainingStatId = module.StatId;
             creature.PassiveTrainingModuleId = module.Id;
-            creature.PassiveTrainingPointsPerMinute = RateFor(module);
+            creature.PassiveTrainingPointsPerMinute = rate;
             creature.PassiveTrainingPointRemainder = 0.0;
         }
 
-        return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.None, requested, changed);
+        return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.None, module.StatId, changed);
+    }
+
+    /// <summary>
+    /// True when one more Voidling still fits on a tile. A creature already training there is not
+    /// counted against itself, so putting it back down on its own ground always works.
+    /// </summary>
+    public bool HasRoomFor(GameStateData state, string moduleId, string creatureId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var residents = state.Voidlings.Count(creature =>
+            string.Equals(creature.PassiveTrainingModuleId, moduleId, StringComparison.Ordinal) &&
+            !string.Equals(creature.Id, creatureId, StringComparison.Ordinal));
+        return residents < Math.Max(1, _rules.GardenModules.VoidlingsPerTile);
+    }
+
+    public PassiveTrainingAssignmentResult StopPassiveTraining(GameStateData state, string creatureId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var creature = state.Voidlings.FirstOrDefault(v => v.Id == creatureId);
+        return creature == null
+            ? new PassiveTrainingAssignmentResult(PassiveTrainingFailure.CreatureNotFound, string.Empty, false)
+            : ClearPassiveTraining(creature);
     }
 
     private PassiveTrainingAssignmentResult ClearPassiveTraining(VoidlingData creature)
@@ -321,7 +310,7 @@ public sealed class TrainingUseCase
     }
 
     private float RateFor(GardenModuleData module)
-        => module.SlotIndex >= 0
+        => module.Placed
             ? _rules.GardenModules.PointsPerMinuteForLevel(module.Level)
             : 0.0f;
 }

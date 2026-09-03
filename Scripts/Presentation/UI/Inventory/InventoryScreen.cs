@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Voidling.Presentation.UI.Common;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Inventory;
@@ -9,13 +10,17 @@ public readonly record struct InventoryItemViewState(string DisplayName, int Cou
 public readonly record struct FailedEggViewState(string EggId, string DisplayName);
 public readonly record struct EggShellViewState(string ShellId, string DisplayName, int SaleValue);
 public readonly record struct IncubatingEggViewState(string EggId, string DisplayName, int SecondsRemaining);
-public sealed record InventoryScreenState(IReadOnlyList<InventoryItemViewState> Items, IReadOnlyList<FailedEggViewState> FailedEggs, IReadOnlyList<EggShellViewState> EggShells, int IncubationSkipCount, IReadOnlyList<IncubatingEggViewState> IncubatingEggs);
+public readonly record struct StoredEggViewState(string EggId, string DisplayName, Color TintColor);
+public readonly record struct StoredLandViewState(string ModuleId, string DisplayName, Color TintColor);
+public sealed record InventoryScreenState(IReadOnlyList<InventoryItemViewState> Items, IReadOnlyList<FailedEggViewState> FailedEggs, IReadOnlyList<EggShellViewState> EggShells, int IncubationSkipCount, IReadOnlyList<IncubatingEggViewState> IncubatingEggs, IReadOnlyList<StoredEggViewState> StoredEggs, IReadOnlyList<StoredLandViewState> StoredLand);
 
 public partial class InventoryScreen : VBoxContainer
 {
     public event Action<string>? DiscardFailedEggRequested;
     public event Action<string>? SellEggShellRequested;
     public event Action<string>? UseIncubationSkipRequested;
+    public event Action<StoredEggViewState>? PlaceStoredEggRequested;
+    public event Action<StoredLandViewState>? PlaceStoredLandRequested;
     private static readonly Texture2D EggTexture = GD.Load<Texture2D>("res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
     private InventoryScreenState? _state;
 
@@ -32,6 +37,18 @@ public partial class InventoryScreen : VBoxContainer
         var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(340, 198), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ExpandFill }; AddChild(scroll);
         var list = new VBoxContainer(); list.AddThemeConstantOverride("separation", 5); scroll.AddChild(list);
         foreach (var item in _state.Items) list.AddChild(CreateInventoryRow(CreateItemIcon(item), item.DisplayName, item.Count));
+        if (_state.StoredEggs.Count > 0)
+        {
+            list.AddChild(UiFactory.CreateLabel(Tr("UI_INVENTORY_STORED_EGGS"), 8));
+            list.AddChild(UiFactory.CreateLabel(Tr("UI_INVENTORY_PLACE_HINT"), 6));
+            foreach (var egg in _state.StoredEggs) list.AddChild(CreateStoredEggRow(egg));
+        }
+        if (_state.StoredLand.Count > 0)
+        {
+            list.AddChild(UiFactory.CreateLabel(Tr("UI_INVENTORY_LAND"), 8));
+            list.AddChild(UiFactory.CreateLabel(Tr("UI_INVENTORY_LAND_HINT"), 6));
+            foreach (var land in _state.StoredLand) list.AddChild(CreateStoredLandRow(land));
+        }
         if (_state.IncubationSkipCount > 0)
         {
             list.AddChild(UiFactory.CreateLabel($"INCUBATION SKIPS  x{_state.IncubationSkipCount}", 8));
@@ -54,6 +71,25 @@ public partial class InventoryScreen : VBoxContainer
     private static Control CreateInventoryRow(Texture2D iconTexture, string itemName, int count)
     {
         var panel = CreateRowPanel(); var row = CreateRow(panel); row.AddChild(CreateRowIcon(iconTexture)); var name = UiFactory.CreateLabel(itemName, 8); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.VerticalAlignment = VerticalAlignment.Center; row.AddChild(name); var amount = UiFactory.CreateLabel($"x{count}", 9); amount.CustomMinimumSize = new Vector2(42, 20); amount.HorizontalAlignment = HorizontalAlignment.Right; amount.VerticalAlignment = VerticalAlignment.Center; row.AddChild(amount); return panel;
+    }
+
+    private Control CreateStoredEggRow(StoredEggViewState egg)
+    {
+        var panel = CreateRowPanel(); var row = CreateRow(panel); var icon = CreateRowIcon(CreateEggTexture()); icon.Modulate = egg.TintColor; row.AddChild(icon); var name = UiFactory.CreateLabel(egg.DisplayName, 8); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.VerticalAlignment = VerticalAlignment.Center; row.AddChild(name); var place = UiFactory.CreateButton(Tr("UI_INVENTORY_PLACE")); place.CustomMinimumSize = new Vector2(76, 22); UiFactory.ApplyPixelFont(place, 7); place.Pressed += () => PlaceStoredEggRequested?.Invoke(egg); row.AddChild(place); return panel;
+    }
+
+    private Control CreateStoredLandRow(StoredLandViewState land)
+    {
+        var panel = CreateRowPanel(); var row = CreateRow(panel); row.AddChild(CreateHexIcon(land.TintColor)); var name = UiFactory.CreateLabel(land.DisplayName, 8); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.VerticalAlignment = VerticalAlignment.Center; row.AddChild(name); var place = UiFactory.CreateButton(Tr("UI_INVENTORY_PLACE")); place.CustomMinimumSize = new Vector2(76, 22); UiFactory.ApplyPixelFont(place, 7); place.Pressed += () => PlaceStoredLandRequested?.Invoke(land); row.AddChild(place); return panel;
+    }
+
+    private static Control CreateHexIcon(Color color)
+    {
+        var holder = new Control { CustomMinimumSize = new Vector2(22, 22), MouseFilter = Control.MouseFilterEnum.Ignore };
+        var center = new Vector2(11, 11);
+        var polygon = HexShape.Corners(10.0f, 17.0f); for (var i = 0; i < polygon.Length; i++) polygon[i] += center;
+        holder.AddChild(new Polygon2D { Polygon = polygon, Color = color });
+        return holder;
     }
 
     private Control CreateIncubationSkipRow(IncubatingEggViewState egg)

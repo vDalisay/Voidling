@@ -64,10 +64,9 @@ public partial class RemoteVoidlingActor : Node2D
             snapshot.TintHex);
         var definition = VoidlingVisualFactory.ResolveDefinition(snapshot.VisualTypeId);
         _visualTypeId = definition.DefinitionId;
-        _shadowCenterYOffset = definition.ShadowCenterYOffset;
-
         var isAdult = snapshot.Stage == LifeStage.Adult;
         _baseScale = VoidlingVisualFactory.WorldScale(isAdult, _visualTypeId);
+        _shadowCenterYOffset = VoidlingVisualFactory.ShadowCenterYOffset(_baseScale, _visualTypeId);
         _sprite.Scale = Vector2.One * _baseScale;
         _sprite.Position = new Vector2(
             0,

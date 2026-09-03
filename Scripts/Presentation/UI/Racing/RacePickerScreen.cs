@@ -19,7 +19,9 @@ public readonly record struct RacePickerCourseViewState(
     string Id,
     int Version,
     string Name,
-    string Summary);
+    string Summary,
+    IReadOnlyList<string> Sections,
+    int LengthMeters);
 
 public sealed record RacePickerScreenState(
     IReadOnlyList<RacePickerVoidlingViewState> Voidlings,
@@ -81,38 +83,61 @@ public partial class RacePickerScreen : VBoxContainer
         BuildPicker(_state.Voidlings, _state.Courses);
     }
 
+    // Courses are picked from cards that spell out the sections ahead, so a player can tell a
+    // Climb/Power course from a Swim one before committing to the start line.
+    private void BuildCourseCards(IReadOnlyList<RacePickerCourseViewState> courses)
+    {
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 6);
+        AddChild(row);
+
+        var summary = UiFactory.CreateLabel(string.Empty, 6);
+        summary.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        summary.CustomMinimumSize = new Vector2(500, 16);
+        AddChild(summary);
+
+        var buttons = new Dictionary<string, Button>(StringComparer.Ordinal);
+        foreach (var course in courses)
+        {
+            var captured = course;
+            var key = CourseKey(course);
+            var card = new Button
+            {
+                ToggleMode = true,
+                CustomMinimumSize = new Vector2(168, 42),
+                FocusMode = Control.FocusModeEnum.None,
+                ButtonPressed = key == CourseKey(_selectedCourseId, _selectedCourseVersion)
+            };
+            UiFactory.ApplyButtonChrome(card);
+            UiFactory.ApplyPixelFont(card, 7);
+            card.Text = $"{course.Name}\n{string.Join(" - ", course.Sections)}\n{course.LengthMeters} M";
+            card.Pressed += () =>
+            {
+                _selectedCourseId = captured.Id;
+                _selectedCourseVersion = captured.Version;
+                summary.Text = captured.Summary;
+                foreach (var pair in buttons)
+                    pair.Value.ButtonPressed = pair.Key == CourseKey(captured);
+            };
+            buttons[key] = card;
+            row.AddChild(card);
+        }
+
+        summary.Text = courses
+            .First(course => CourseKey(course) == CourseKey(_selectedCourseId, _selectedCourseVersion))
+            .Summary;
+    }
+
+    private static string CourseKey(RacePickerCourseViewState course) => CourseKey(course.Id, course.Version);
+
+    private static string CourseKey(string id, int version) => $"{id}@{version}";
+
     private void BuildPicker(
         IReadOnlyList<RacePickerVoidlingViewState> voidlings,
         IReadOnlyList<RacePickerCourseViewState> courses)
     {
-        var courseRow = new HBoxContainer();
-        courseRow.AddThemeConstantOverride("separation", 7);
-        courseRow.AddChild(UiFactory.CreateLabel(Tr("UI_RACE_PICKER_COURSE"), 7));
-
-        var courseOption = new OptionButton { CustomMinimumSize = new Vector2(185, 24) };
-        UiFactory.ApplyPixelFont(courseOption, 7);
-        UiFactory.ApplyButtonChrome(courseOption);
-        var selectedCourseIndex = 0;
-        for (var i = 0; i < courses.Count; i++)
-        {
-            courseOption.AddItem(courses[i].Name);
-            if (courses[i].Id == _selectedCourseId && courses[i].Version == _selectedCourseVersion)
-                selectedCourseIndex = i;
-        }
-        courseOption.Select(selectedCourseIndex);
-        courseRow.AddChild(courseOption);
-        AddChild(courseRow);
-
-        var courseSummary = UiFactory.CreateLabel(courses[selectedCourseIndex].Summary, 6);
-        courseSummary.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        AddChild(courseSummary);
-        courseOption.ItemSelected += index =>
-        {
-            var selectedCourse = courses[(int)index];
-            _selectedCourseId = selectedCourse.Id;
-            _selectedCourseVersion = selectedCourse.Version;
-            courseSummary.Text = selectedCourse.Summary;
-        };
+        AddChild(UiFactory.CreateLabel(Tr("UI_RACE_PICKER_COURSE"), 7));
+        BuildCourseCards(courses);
 
         var scroll = new ScrollContainer
         {

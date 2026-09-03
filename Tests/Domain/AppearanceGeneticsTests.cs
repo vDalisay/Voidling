@@ -103,6 +103,52 @@ public sealed class AppearanceGeneticsTests
         Assert.Equal(1, genome.ExpressedColorIndex);
     }
 
+    /// <summary>
+    /// Colour is Mendelian, not paint mixing. A parent shows one of its two hues and can silently
+    /// carry the other, so a red x blue pairing can legitimately produce a child in a third colour
+    /// family when both parents pass on their hidden allele.
+    /// </summary>
+    [Fact]
+    public void ChildColor_CanExpressACarriedHueNeitherParentShows()
+    {
+        const float red = 0.00f;
+        const float blue = 0.62f;
+        const float carriedAmber = 0.11f;
+        const float carriedLime = 0.24f;
+
+        // Each parent expresses index 0 (red / blue) while carrying an unrelated hue at index 1.
+        var redParent = Parent("shown-red", red, carriedAmber);
+        redParent.Genome.ExpressedColorIndex = 0;
+        var blueParent = Parent("shown-blue", blue, carriedLime);
+        blueParent.Genome.ExpressedColorIndex = 0;
+
+        var service = new GenomeInheritanceService(Rules.Genetics, Rules.Appearance);
+        var resolver = new ColorPhenotypeResolver(Rules.Appearance);
+
+        var carriedOnlyChildren = 0;
+        for (var seed = 1UL; seed <= 400UL; seed++)
+        {
+            var child = service.CreateChild(redParent, blueParent, seed);
+
+            // Every allele a child holds came from one of the four parental alleles.
+            Assert.Contains(child.PaletteHueA, new[] { red, carriedAmber });
+            Assert.Contains(child.PaletteHueB, new[] { blue, carriedLime });
+
+            if (child.PaletteHueA != carriedAmber || child.PaletteHueB != carriedLime)
+                continue;
+
+            carriedOnlyChildren++;
+            var hue = resolver.ResolvePaletteHue(child);
+            Assert.True(
+                CircularDistance(hue, red) > 0.05f && CircularDistance(hue, blue) > 0.05f,
+                $"Seed {seed} produced hue {hue}, which should sit away from both shown parent hues.");
+        }
+
+        Assert.True(
+            carriedOnlyChildren > 0,
+            "Two carried alleles should sometimes meet; otherwise the carrier case is unreachable.");
+    }
+
     private static VoidlingData Parent(string id, float firstHue, float secondHue)
     {
         var parent = new VoidlingData { Id = id, Stage = LifeStage.Adult };

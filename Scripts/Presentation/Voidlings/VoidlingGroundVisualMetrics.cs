@@ -9,7 +9,8 @@ namespace Voidling.Presentation.Voidlings;
 /// </summary>
 public static class VoidlingGroundVisualMetrics
 {
-    public static float ShadowCenterYOffset => VoidlingVisualFactory.ShadowCenterYOffset;
+    public static float ShadowCenterYOffset(float spriteScale)
+        => VoidlingVisualFactory.ShadowCenterYOffset(spriteScale);
 
     public static float SpriteCenterYOffset(float spriteScale)
         => VoidlingVisualFactory.WorldSpriteCenterYOffset(spriteScale);

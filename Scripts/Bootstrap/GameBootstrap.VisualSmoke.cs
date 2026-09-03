@@ -1,6 +1,8 @@
 using System;
 using Godot;
 using Voidling.Infrastructure.Persistence;
+using Voidling.Presentation.Racing;
+using VoidlingGame;
 using Voidling.Presentation.Voidlings;
 
 namespace Voidling.Bootstrap;
@@ -17,6 +19,33 @@ public partial class GameBootstrap
             AddChild(new VoidlingVisualSmokeProbe
             {
                 Name = nameof(VoidlingVisualSmokeProbe)
+            });
+        }
+
+        if (Array.Exists(args, arg =>
+                string.Equals(arg, "--voidling-race-presentation-smoke", StringComparison.OrdinalIgnoreCase)))
+        {
+            AddChild(new RacePresentationSmokeProbe
+            {
+                Name = nameof(RacePresentationSmokeProbe)
+            });
+        }
+
+        if (Array.Exists(args, arg =>
+                string.Equals(arg, "--voidling-race-completion-smoke", StringComparison.OrdinalIgnoreCase)))
+        {
+            AddChild(new RaceCompletionSmokeProbe
+            {
+                Name = nameof(RaceCompletionSmokeProbe)
+            });
+        }
+
+        if (Array.Exists(args, arg =>
+                string.Equals(arg, "--voidling-family-tree-smoke", StringComparison.OrdinalIgnoreCase)))
+        {
+            AddChild(new FamilyTreeSmokeProbe
+            {
+                Name = nameof(FamilyTreeSmokeProbe)
             });
         }
 

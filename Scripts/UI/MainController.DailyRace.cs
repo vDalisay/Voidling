@@ -82,11 +82,7 @@ public partial class MainController
         var selectedId = owned.Any(value => value.Id == _selectedId)
             ? _selectedId
             : owned.FirstOrDefault()?.Id ?? string.Empty;
-        var dailyCourse = new RacePickerCourseViewState(
-            RaceCourseCatalog.Demo.Id,
-            RaceCourseCatalog.Demo.Version,
-            Tr("UI_RACE_COURSE_DEMO_NAME"),
-            Tr("UI_RACE_COURSE_DEMO_SUMMARY"));
+        var dailyCourse = CreateRacePickerCourseView(RaceCourseCatalog.Demo);
         var picker = new RacePickerScreen();
         picker.Configure(new RacePickerScreenState(
             owned.Select(CreateRacePickerView).ToArray(),

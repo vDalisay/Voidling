@@ -107,15 +107,16 @@ public partial class VoidlingVisualDefinition : Resource
     [Export]
     public Vector2 AdultShadowRadii { get; set; } = new(5.2f, 1.8f);
 
+    // Authored at scale one and multiplied by the sprite scale, exactly like
+    // WorldSpriteCenterYOffsetAtScaleOne. Both must scale together or the shadow only lines up with
+    // the feet at a single size.
     [Export]
-    public float ShadowCenterYOffset { get; set; } = 0.8f;
+    public float ShadowCenterYOffsetAtScaleOne { get; set; } = 1.29f;
 
     [ExportGroup("Race Geometry")]
     [Export(PropertyHint.Range, "0.01,4,0.01")]
     public float RaceScale { get; set; } = 0.72f;
 
-    [Export]
-    public float RaceSpriteCenterYOffset { get; set; } = -8.0f;
 
     [ExportGroup("Mutation Anchors")]
     [Export]

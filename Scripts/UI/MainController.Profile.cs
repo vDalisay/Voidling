@@ -155,40 +155,41 @@ public partial class MainController : Node
             SlideInDetailsPanel(_detailsPanel);
     }
 
+    /// <summary>
+    /// Passive training is assigned by dropping this Voidling onto a Garden land tile, so the
+    /// panel only reports what it is training and offers a way out of it.
+    /// </summary>
     private Control CreatePassiveTrainingRow(VoidlingData data)
     {
         var row = new HBoxContainer { CustomMinimumSize = new Vector2(194, 22) };
         row.AddThemeConstantOverride("separation", 4);
-        var label = UiFactory.CreateLabel("Passive", 7);
-        label.CustomMinimumSize = new Vector2(52, 20);
-        label.TooltipText = "Slow open-game training. Active treats remain faster.";
+
+        var training = data.PassiveTrainingStatId.Length > 0;
+        var label = UiFactory.CreateLabel(
+            training
+                ? string.Format(Tr("UI_PROFILE_PASSIVE_ON"), StatPresentationCatalog.NameFor(data.PassiveTrainingStatId))
+                : Tr("UI_PROFILE_PASSIVE_OFF"),
+            7);
+        label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        label.VerticalAlignment = VerticalAlignment.Center;
+        label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        label.TooltipText = Tr("UI_PROFILE_PASSIVE_HINT");
+        if (training)
+            label.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(data.PassiveTrainingStatId));
         row.AddChild(label);
 
-        var selector = new OptionButton
+        if (!training)
+            return row;
+
+        var stop = UiFactory.CreateButton(Tr("UI_PROFILE_PASSIVE_STOP"));
+        stop.CustomMinimumSize = new Vector2(52, 20);
+        UiFactory.ApplyPixelFont(stop, 6);
+        stop.Pressed += () =>
         {
-            CustomMinimumSize = new Vector2(138, 20),
-            FocusMode = Control.FocusModeEnum.None,
-            TooltipText = "Choose one stat to train slowly while the game remains open."
-        };
-        UiFactory.ApplyPixelFont(selector, 7);
-        selector.AddItem("Off");
-        var selected = 0;
-        for (var i = 0; i < GameRules.StatIds.Length; i++)
-        {
-            var statId = GameRules.StatIds[i];
-            selector.AddItem(StatPresentationCatalog.NameFor(statId));
-            if (string.Equals(data.PassiveTrainingStatId, statId, StringComparison.Ordinal))
-                selected = i + 1;
-        }
-        selector.Select(selected);
-        selector.ItemSelected += index =>
-        {
-            var selectedIndex = (int)index;
-            var statId = selectedIndex <= 0 ? string.Empty : GameRules.StatIds[selectedIndex - 1];
-            if (_session.SetPassiveTraining(data.Id, statId))
+            if (_session.StopPassiveTraining(data.Id))
                 RebuildDetailsPanel();
         };
-        row.AddChild(selector);
+        row.AddChild(stop);
         return row;
     }
 
@@ -308,6 +309,24 @@ public partial class MainController : Node
             .ToList();
         items.Add(new InventoryItemViewState(Tr("UI_INVENTORY_EGGS"), state.OwnedEggs.Count, -1, UsesEggIcon: true));
 
+        var storedEggs = state.OwnedEggs
+            .Where(egg => egg.State == EggState.Stored)
+            .Select((egg, index) => new StoredEggViewState(
+                egg.Id,
+                string.Format(Tr("UI_INVENTORY_STORED_EGG"), index + 1),
+                GameRules.TintColor(egg.TintHex)))
+            .ToList();
+
+        var storedLand = state.GardenModules
+            .Where(module => !module.Placed)
+            .OrderBy(module => module.StatId, StringComparer.Ordinal)
+            .ThenBy(module => module.Id, StringComparer.Ordinal)
+            .Select(module => new StoredLandViewState(
+                module.Id,
+                string.Format(Tr("UI_INVENTORY_LAND_TILE"), StatPresentationCatalog.NameFor(module.StatId)),
+                StatPresentationCatalog.ColorFor(module.StatId)))
+            .ToList();
+
         var failedEggs = state.OwnedEggs
             .Where(egg => egg.State == EggState.Failed)
             .Select((egg, index) => new FailedEggViewState(egg.Id, string.Format(Tr("UI_INVENTORY_FAILED_EGG"), index + 1)))
@@ -323,7 +342,17 @@ public partial class MainController : Node
 
         var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(380, 292));
         var screen = new InventoryScreen();
-        screen.Configure(new InventoryScreenState(items, failedEggs, eggShells, incubationSkipCount, incubatingEggs));
+        screen.Configure(new InventoryScreenState(items, failedEggs, eggShells, incubationSkipCount, incubatingEggs, storedEggs, storedLand));
+        screen.PlaceStoredEggRequested += egg =>
+        {
+            CloseModal();
+            _garden.BeginEggPlacement(egg.EggId, egg.TintColor);
+        };
+        screen.PlaceStoredLandRequested += land =>
+        {
+            CloseModal();
+            _garden.BeginLandPlacement(land.ModuleId, land.TintColor);
+        };
         screen.DiscardFailedEggRequested += eggId => { _session.DiscardFailedEgg(eggId); CallDeferred(nameof(ShowInventory)); };
         screen.SellEggShellRequested += shellId => { if (_session.SellEggShell(shellId)) CallDeferred(nameof(ShowInventory)); };
         screen.UseIncubationSkipRequested += eggId => { if (_session.UseFullIncubationSkip(eggId)) CallDeferred(nameof(ShowInventory)); };

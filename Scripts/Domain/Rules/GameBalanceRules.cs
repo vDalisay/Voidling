@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Voidling.Domain.Garden;
 
 namespace Voidling.Domain.Rules;
 
@@ -44,11 +45,29 @@ public sealed record DailyMissionRules(
     IReadOnlyList<DailyMissionDefinition> Definitions);
 
 public sealed record GardenModuleRules(
-    int SlotCount,
     int PurchaseCost,
     IReadOnlyList<int> UpgradeCosts,
     IReadOnlyList<float> PointsPerMinuteByLevel)
 {
+    /// <summary>
+    /// How many Voidlings one tile can train at once. Bigger tiles are expected to raise this.
+    /// </summary>
+    public int VoidlingsPerTile { get; init; } = 1;
+
+    /// <summary>
+    /// Hex geometry the land tiles snap to. Sized in sprite proportions: a 5-wide flat top scales
+    /// to this tile at x7, so a 70x60 tile sprite drops straight in.
+    /// </summary>
+    public GardenHexLayout Hex { get; init; } = new(
+        TopEdgeWidth: 35.0f,
+        Height: 60.0f,
+        OriginX: 416.0f,
+        OriginY: 256.0f,
+        IslandLeft: 64.0f,
+        IslandTop: 64.0f,
+        IslandRight: 768.0f,
+        IslandBottom: 448.0f);
+
     public int MaxLevel => Math.Max(1, Math.Min(PointsPerMinuteByLevel.Count, UpgradeCosts.Count + 1));
 
     public float PointsPerMinuteForLevel(int level)
@@ -93,6 +112,8 @@ public sealed record PassiveTrainingRules(float PointsPerMinute);
 public sealed record FavoriteFoodRules(int BonusTrainingPoints);
 public sealed record LifecycleRules(float ChildToAdultSeconds);
 public sealed record ReincarnationRules(
+    // Adult lifetime in seconds of open-game time. The simulation only advances while the game is
+    // running, so this is playtime rather than wall-clock age.
     float AdultLifespanSeconds,
     float MinimumHappiness,
     float MaximumStress,
@@ -174,7 +195,6 @@ public sealed record GameBalanceRules(
 {
     public GardenRules Garden { get; init; } = new(MaxPopulation: 8);
     public GardenModuleRules GardenModules { get; init; } = new(
-        SlotCount: 4,
         PurchaseCost: 40,
         UpgradeCosts: Array.AsReadOnly(new[] { 25, 50 }),
         PointsPerMinuteByLevel: Array.AsReadOnly(new[] { 1.0f, 1.5f, 2.0f }));
@@ -194,7 +214,7 @@ public sealed record GameBalanceRules(
     public FavoriteFoodRules FavoriteFood { get; init; } = new(BonusTrainingPoints: 1);
     public EvolutionRules Evolution { get; init; } = new(SpecializationThreshold: 0.50f);
     public ReincarnationRules Reincarnation { get; init; } = new(
-        AdultLifespanSeconds: 900.0f,
+        AdultLifespanSeconds: 21600.0f,
         MinimumHappiness: 10.0f,
         MaximumStress: 70.0f,
         RetainedTrainingFraction: 0.10f);

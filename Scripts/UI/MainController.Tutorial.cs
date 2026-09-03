@@ -80,7 +80,7 @@ public partial class MainController
                 _tutorialStep = FirstLaunchTutorialStep.Breeding;
                 break;
             case FirstLaunchTutorialStep.Breeding:
-                ShowRacePicker();
+                ShowRacePickerWithCourses();
                 _tutorialStep = FirstLaunchTutorialStep.Race;
                 break;
             case FirstLaunchTutorialStep.Race:

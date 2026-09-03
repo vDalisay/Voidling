@@ -63,14 +63,14 @@ public partial class GameSession
         }
 
         RecordDailyMissionEvent(DailyMissionEventKind.PurchaseShopItem);
-        SaveAndNotify($"Bought a {DisplayStatId(statId)} Garden module.");
-        RaiseGardenEvent($"A {DisplayStatId(statId)} training module was added to Garden storage.");
+        SaveAndNotify($"Bought a {DisplayStatId(statId)} land tile.");
+        RaiseGardenEvent($"A {DisplayStatId(statId)} land tile is waiting in your inventory.");
         return true;
     }
 
-    public bool PlaceGardenModule(string moduleId, int slotIndex)
+    public bool PlaceGardenModule(string moduleId, int hexQ, int hexR)
     {
-        var result = _training!.PlaceGardenModule(State, moduleId, slotIndex);
+        var result = _training!.PlaceGardenModule(State, moduleId, hexQ, hexR);
         if (!result.Succeeded)
         {
             ToastRequested?.Invoke(PlayerActionFailureText.ForGardenModule(result.Failure));
@@ -80,10 +80,9 @@ public partial class GameSession
             return true;
 
         var module = State.GardenModules.Find(candidate => candidate.Id == moduleId);
-        var message = slotIndex < 0
-            ? $"Stored the {DisplayStatId(module?.StatId ?? string.Empty)} module."
-            : $"Placed the {DisplayStatId(module?.StatId ?? string.Empty)} module in Garden slot {slotIndex + 1}.";
+        var message = $"Placed the {DisplayStatId(module?.StatId ?? string.Empty)} land tile.";
         SaveAndNotify(message);
+        RaiseGardenEvent(message);
         return true;
     }
 
@@ -101,7 +100,8 @@ public partial class GameSession
         return true;
     }
 
-    public bool SetPassiveTraining(string creatureId, string statId)
+    /// <summary>Drops a Voidling onto a placed land tile so it trains that tile's stat.</summary>
+    public bool SetPassiveTrainingLand(string creatureId, string moduleId)
     {
         var creature = FindVoidling(creatureId);
         if (creature == null)
@@ -110,20 +110,44 @@ public partial class GameSession
             return false;
         }
 
-        var result = _training!.SetPassiveTrainingFromPlacedModule(State, creatureId, statId);
+        var result = _training!.SetPassiveTrainingLand(State, creatureId, moduleId);
         if (!result.Succeeded)
         {
-            ToastRequested?.Invoke(PlayerActionFailureText.ForPassiveTraining(result.Failure, DisplayStatId(statId)));
-            if (result.Failure == PassiveTrainingFailure.NoPlacedModule)
-                StateChanged?.Invoke();
+            ToastRequested?.Invoke(PlayerActionFailureText.ForPassiveTraining(result.Failure));
             return false;
         }
         if (!result.Changed)
             return true;
 
-        var message = string.IsNullOrEmpty(result.StatId)
-            ? $"{creature.Name} stopped passive training."
-            : $"{creature.Name} started passive {DisplayStatId(result.StatId)} training.";
+        var message = $"{creature.Name} started passive {DisplayStatId(result.StatId)} training.";
+        SaveAndNotify(message);
+        RaiseGardenEvent(message);
+        return true;
+    }
+
+    /// <summary>Whether one more Voidling still fits on a placed land tile.</summary>
+    public bool HasRoomOnLand(string moduleId, string creatureId)
+        => _training!.HasRoomFor(State, moduleId, creatureId);
+
+    public bool StopPassiveTraining(string creatureId)
+    {
+        var creature = FindVoidling(creatureId);
+        if (creature == null)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.MissingVoidling);
+            return false;
+        }
+
+        var result = _training!.StopPassiveTraining(State, creatureId);
+        if (!result.Succeeded)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.ForPassiveTraining(result.Failure));
+            return false;
+        }
+        if (!result.Changed)
+            return true;
+
+        var message = $"{creature.Name} stopped passive training.";
         SaveAndNotify(message);
         RaiseGardenEvent(message);
         return true;

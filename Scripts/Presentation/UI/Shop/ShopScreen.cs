@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Common;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Shop;
@@ -8,7 +10,8 @@ namespace Voidling.Presentation.UI.Shop;
 public readonly record struct ShopTrainingItemViewState(string StatId, string DisplayName, Color IdentityColor, int Owned, int Price);
 public readonly record struct ShopEggViewState(string EggId, Color TintColor, int Number, int Price);
 public readonly record struct ShopRareOfferViewState(string ItemId, string DisplayName, string Tooltip, int Price);
-public sealed record ShopScreenState(int Coins, IReadOnlyList<ShopTrainingItemViewState> TrainingItems, IReadOnlyList<ShopEggViewState> Eggs, int EggRotationSecondsRemaining, ShopRareOfferViewState? RareOffer);
+public readonly record struct ShopLandTileViewState(string StatId, string DisplayName, Color IdentityColor, int Stored, int Price);
+public sealed record ShopScreenState(int Coins, IReadOnlyList<ShopTrainingItemViewState> TrainingItems, IReadOnlyList<ShopEggViewState> Eggs, int EggRotationSecondsRemaining, ShopRareOfferViewState? RareOffer, IReadOnlyList<ShopLandTileViewState> LandTiles);
 
 public partial class ShopScreen : VBoxContainer
 {
@@ -16,6 +19,9 @@ public partial class ShopScreen : VBoxContainer
     public event Action<string>? TrainingItemPurchaseRequested;
     public event Action<string>? EggPurchaseRequested;
     public event Action<string>? RareOfferPurchaseRequested;
+    public event Action<string>? LandPurchaseRequested;
+    private const float SwatchTopEdgeWidth = 11.0f;
+    private const float SwatchHeight = 19.0f;
     private ShopScreenState? _state;
 
     public void Configure(ShopScreenState state)
@@ -35,6 +41,8 @@ public partial class ShopScreen : VBoxContainer
         AddChild(BuildTreatShelf(_state.TrainingItems));
         AddChild(BuildSectionLabel(Tr("UI_SHOP_EGGS_TITLE"), Tr("UI_SHOP_EGGS_SUBTITLE")));
         AddChild(BuildEggShelf(_state.Eggs));
+        AddChild(BuildSectionLabel(Tr("UI_SHOP_LAND_TITLE"), Tr("UI_SHOP_LAND_SUBTITLE")));
+        AddChild(BuildLandShelf(_state.LandTiles));
     }
 
     private Control BuildSummary(ShopScreenState state)
@@ -74,6 +82,32 @@ public partial class ShopScreen : VBoxContainer
     private Control BuildEggShelf(IReadOnlyList<ShopEggViewState> eggs)
     {
         var shelf = CreateStallShelf(); var grid = new GridContainer { Columns = 3 }; grid.AddThemeConstantOverride("h_separation", 7); grid.AddThemeConstantOverride("v_separation", 3); shelf.GetNode<VBoxContainer>("ShelfBox").AddChild(grid); foreach (var egg in eggs) grid.AddChild(BuildEggProduct(egg)); return shelf;
+    }
+
+    private Control BuildLandShelf(IReadOnlyList<ShopLandTileViewState> tiles)
+    {
+        var shelf = CreateStallShelf(); var grid = new GridContainer { Columns = 5 }; grid.AddThemeConstantOverride("h_separation", 5); grid.AddThemeConstantOverride("v_separation", 3); shelf.GetNode<VBoxContainer>("ShelfBox").AddChild(grid); foreach (var tile in tiles) grid.AddChild(BuildLandProduct(tile)); return shelf;
+    }
+
+    private Control BuildLandProduct(ShopLandTileViewState tile)
+    {
+        var card = CreateMarketCard(new Vector2(94, 70)); card.TooltipText = Tr("UI_SHOP_LAND_SUBTITLE"); var column = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; column.AddThemeConstantOverride("separation", 1); card.AddChild(column);
+        column.AddChild(BuildHexSwatch(tile.IdentityColor));
+        var name = UiFactory.CreateLabel(tile.DisplayName, 6); name.HorizontalAlignment = HorizontalAlignment.Center; name.AddThemeColorOverride("font_color", tile.IdentityColor.Darkened(0.35f)); column.AddChild(name);
+        var stock = UiFactory.CreateLabel(string.Format(Tr("UI_SHOP_OWNED"), tile.Stored), 5); stock.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(stock);
+        var buy = UiFactory.CreateButton(string.Format(Tr("UI_SHOP_BUY"), tile.Price)); buy.CustomMinimumSize = new Vector2(78, 19); UiFactory.ApplyPixelFont(buy, 6); buy.TooltipText = card.TooltipText; buy.Pressed += () => LandPurchaseRequested?.Invoke(tile.StatId); column.AddChild(buy); return card;
+    }
+
+    /// <summary>Small flat-top hex in tile proportions so the stall reads as the land it sells.</summary>
+    private static Control BuildHexSwatch(Color color)
+    {
+        var holder = new Control { CustomMinimumSize = new Vector2(82, 26), MouseFilter = Control.MouseFilterEnum.Ignore };
+        var center = new Vector2(41, 13);
+        var polygon = HexShape.Corners(SwatchTopEdgeWidth, SwatchHeight); for (var i = 0; i < polygon.Length; i++) polygon[i] += center;
+        var outline = HexShape.Outline(SwatchTopEdgeWidth, SwatchHeight); for (var i = 0; i < outline.Length; i++) outline[i] += center;
+        holder.AddChild(new Polygon2D { Polygon = polygon, Color = color });
+        holder.AddChild(new Line2D { Points = outline, DefaultColor = color.Darkened(0.4f), Width = 1.5f, JointMode = Line2D.LineJointMode.Round });
+        return holder;
     }
 
     private Control BuildTreatProduct(ShopTrainingItemViewState item)

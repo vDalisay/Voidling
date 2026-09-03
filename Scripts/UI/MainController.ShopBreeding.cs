@@ -12,7 +12,15 @@ namespace VoidlingGame;
 
 public partial class MainController : Node
 {
+    /// <summary>Opens the Shop. Restocking happens here, so a bought slot stays empty for the visit.</summary>
     private void ShowShop()
+    {
+        _session.RefillStoreEggs();
+        RenderShop();
+    }
+
+    /// <summary>Redraws the Shop in place after a transaction, without restocking the stall.</summary>
+    private void RenderShop()
     {
         var state = _session.State;
         var trainingItems = GameRules.StatIds
@@ -43,6 +51,16 @@ public partial class MainController : Node
                 GameRules.FullIncubationSkipPrice)
             : null;
 
+        var landTiles = GameRules.StatIds
+            .Select(statId => new ShopLandTileViewState(
+                StatId: statId,
+                DisplayName: StatPresentationCatalog.NameFor(statId),
+                IdentityColor: StatPresentationCatalog.ColorFor(statId),
+                Stored: state.GardenModules.Count(module =>
+                    !module.Placed && string.Equals(module.StatId, statId, StringComparison.Ordinal)),
+                Price: GameRules.GardenModuleRules.PurchaseCost))
+            .ToArray();
+
         var rotationRemaining = (int)Math.Ceiling(Math.Max(
             0.0,
             GameRules.ShopEggRotationIntervalSeconds - state.ShopEggRotationElapsedSeconds));
@@ -51,24 +69,49 @@ public partial class MainController : Node
         box.AddThemeConstantOverride("separation", 4);
         box.AddChild(CreateDailyLoginPanel());
 
+        // Three shelves no longer fit the stall at once, so the stock scrolls.
+        var stall = new ScrollContainer
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill
+        };
+        box.AddChild(stall);
+
         var screen = new ShopScreen();
-        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rotationRemaining, rareOffer));
+        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rotationRemaining, rareOffer, landTiles));
         screen.TrainingItemPurchaseRequested += statId =>
         {
             _session.BuyTrainingItem(statId);
-            ShowShop();
+            RenderShop();
         };
         screen.EggPurchaseRequested += eggId =>
         {
+            var tint = GameRules.TintColor(
+                state.StoreEggs.FirstOrDefault(egg => egg.Id == eggId)?.TintHex ?? "#F6F0C9");
+            var coinsBefore = state.Coins;
             _session.BuyStoreEgg(eggId);
-            ShowShop();
+            if (state.Coins != coinsBefore)
+            {
+                PurchaseCelebration.ShowEgg(
+                    _uiRoot,
+                    new Vector2(ScreenWidth, ScreenHeight),
+                    tint,
+                    Tr("UI_SHOP_EGG_BOUGHT"));
+            }
+
+            RenderShop();
         };
         screen.RareOfferPurchaseRequested += itemId =>
         {
             _session.BuyRareShopOffer(itemId);
-            ShowShop();
+            RenderShop();
         };
-        box.AddChild(screen);
+        screen.LandPurchaseRequested += statId =>
+        {
+            _session.BuyGardenModule(statId);
+            RenderShop();
+        };
+        stall.AddChild(screen);
     }
 
     private void ShowBreeding()

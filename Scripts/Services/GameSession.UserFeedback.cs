@@ -45,21 +45,23 @@ public static class PlayerActionFailureText
         {
             GardenModuleFailure.None => string.Empty,
             GardenModuleFailure.UnknownStat => "That Garden training option is unavailable.",
-            GardenModuleFailure.DuplicateModuleId => "Could not create that Garden module. Please try again.",
-            GardenModuleFailure.ModuleNotFound => "That Garden module is no longer available.",
-            GardenModuleFailure.InvalidSlot => "That Garden slot is unavailable.",
+            GardenModuleFailure.DuplicateModuleId => "Could not create that land tile. Please try again.",
+            GardenModuleFailure.ModuleNotFound => "That land tile is no longer available.",
+            GardenModuleFailure.AlreadyPlaced => "That land tile is already part of the island.",
+            GardenModuleFailure.DoesNotFit => "Land has to touch the island and cannot overlap another tile.",
             GardenModuleFailure.NotEnoughCurrency => "Not enough sprouts.",
-            GardenModuleFailure.MaxLevel => "That Garden module is already at its current maximum level.",
+            GardenModuleFailure.MaxLevel => "That land tile is already at its current maximum level.",
             _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)
         };
 
-    public static string ForPassiveTraining(PassiveTrainingFailure failure, string statLabel)
+    public static string ForPassiveTraining(PassiveTrainingFailure failure)
         => failure switch
         {
             PassiveTrainingFailure.None => string.Empty,
             PassiveTrainingFailure.UnknownStat => "That passive training option is unavailable.",
             PassiveTrainingFailure.CreatureNotFound => MissingVoidling,
-            PassiveTrainingFailure.NoPlacedModule => $"Place a {statLabel} Garden module first.",
+            PassiveTrainingFailure.LandNotPlaced => "That land tile is not on the island yet.",
+            PassiveTrainingFailure.LandFull => "That land tile is already taken. One Voidling trains per tile.",
             _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)
         };
 }

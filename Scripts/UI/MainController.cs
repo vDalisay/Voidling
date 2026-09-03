@@ -53,6 +53,7 @@ public partial class MainController : Node
 
         _modalHost = new ModalHost { ZIndex = 100 };
         _uiRoot.AddChild(_modalHost);
+        BuildQuickMenu();
         ComposeTradePresentation();
         ComposeChallengePresentation();
 
@@ -93,6 +94,7 @@ public partial class MainController : Node
 
     public override void _UnhandledInput(InputEvent inputEvent)
     {
+        // A running race owns Escape: it opens its own pause menu so the player can leave mid-race.
         if (_race != null || _multiplayerRaceScreen != null || _tradeExchangeScreen != null ||
             !inputEvent.IsActionPressed("ui_cancel"))
             return;
@@ -173,6 +175,7 @@ public partial class MainController : Node
         _garden.Select(_selectedId);
         RebuildDetailsPanel();
         RefreshConnectedZonePanel();
+        RefreshQuickMenu();
 
         if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))
             _gardenEventLog.Visible = !_modalHost.IsOpen;
@@ -197,6 +200,11 @@ public partial class MainController : Node
 
     private void HideGardenHudPanels()
     {
+        if (_quickMenu != null && GodotObject.IsInstanceValid(_quickMenu))
+        {
+            _quickMenu.Close();
+            _quickMenu.Visible = false;
+        }
         if (_detailsPanel != null && GodotObject.IsInstanceValid(_detailsPanel))
             _detailsPanel.Visible = false;
         if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))

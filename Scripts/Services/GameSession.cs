@@ -188,7 +188,8 @@ public partial class GameSession : Node
         for (var i = 0; i < State.OwnedEggs.Count; i++)
         {
             var egg = State.OwnedEggs[i];
-            if (Math.Abs(egg.WorldX) < 0.01f && Math.Abs(egg.WorldY) < 0.01f)
+            // Stored eggs are meant to have no Garden position until the player places them.
+            if (egg.State != EggState.Stored && Math.Abs(egg.WorldX) < 0.01f && Math.Abs(egg.WorldY) < 0.01f)
             { var p = NestPosition(i); egg.WorldX = p.X; egg.WorldY = p.Y; }
         }
         var slots = GameRules.StoreEggSlotCount;
@@ -235,11 +236,10 @@ public partial class GameSession : Node
         };
     }
 
+    private static Vector2 NestPosition(int index) => new(315 + (index % 5) * 26, 275 + (index / 5) * 24);
     private EggData CreateStoreEgg() { var seed = NextSeed(); return _shop!.CreateStoreInventoryEgg(NewId(), seed); }
     private void ApplyAudioSettings()
     { _audioSettings!.ApplyMasterVolume(State.MasterVolume); _audioSettings.ApplySoundEffectVolume(State.SoundEffectVolume); _audioSettings.ApplyUiSoundVolume(State.UiSoundVolume); }
-    private Vector2 NextNestPosition() => NestPosition(State.OwnedEggs.Count);
-    private static Vector2 NestPosition(int index) => new(315 + (index % 5) * 26, 275 + (index / 5) * 24);
     private static Vector2 StarterSpawnPosition(int index)
     {
         var p = new[] { new Vector2(300,185), new Vector2(420,210), new Vector2(250,250), new Vector2(485,160), new Vector2(360,290), new Vector2(530,250) };

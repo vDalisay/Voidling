@@ -108,6 +108,74 @@ jobs:
             exit 1
           fi
 
+      # Every cataloged Voidling body family must resolve world/race/portrait output through the
+      # production factory, so an art change cannot silently break a creature surface.
+      - name: Voidling visual smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 20s godot --headless --path . -- --voidling-visual-smoke 2>&1 | tee voidling-visual-smoke.log
+          if ! grep -q 'VOIDLING_VISUAL_SMOKE_SUCCESS' voidling-visual-smoke.log; then
+            echo 'Voidling visual contract failed.'
+            exit 1
+          fi
+          if grep -E '^(ERROR|SCRIPT ERROR):' voidling-visual-smoke.log; then
+            echo 'Voidling visual smoke emitted a Godot error.'
+            exit 1
+          fi
+
+      # Race presentation regressions that only surface once Godot is running: authored segment
+      # kinds that draw nothing (Climb rendered as bare ground), HUD labels that fall through to the
+      # wrong section, course strings that were never authored and showed raw keys to players, and
+      # a race sprite pivot that drifts off the shared shadow so creatures float above their shadow.
+      - name: Race presentation smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 20s godot --headless --path . -- --voidling-race-presentation-smoke 2>&1 | tee race-presentation-smoke.log
+          if ! grep -q 'RACE_PRESENTATION_SMOKE_SUCCESS' race-presentation-smoke.log; then
+            echo 'Race presentation contract failed.'
+            exit 1
+          fi
+          if grep -E '^(ERROR|SCRIPT ERROR):' race-presentation-smoke.log; then
+            echo 'Race presentation smoke emitted a Godot error.'
+            exit 1
+          fi
+
+      # Race a real RaceScreen to the finish line and require a results screen with a working way
+      # back. Guards the freeze where the simulation completed but the podium never rendered, which
+      # left the player stuck on a motionless track.
+      - name: Race completion smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 90s godot --headless --path . -- --voidling-race-completion-smoke 2>&1 | tee race-completion-smoke.log
+          if ! grep -q 'RACE_COMPLETION_SMOKE_SUCCESS' race-completion-smoke.log; then
+            echo 'Race never reached a usable results screen.'
+            exit 1
+          fi
+          if grep -E '^(ERROR|SCRIPT ERROR):' race-completion-smoke.log; then
+            echo 'Race completion smoke emitted a Godot error.'
+            exit 1
+          fi
+
+      # Family tree viewport geometry: how far the lineage may be zoomed out, that content smaller
+      # than the viewport centres instead of pinning to a corner, and that the inheritance-flow
+      # pulses sample points along the drawn connection rather than drifting off it.
+      - name: Family tree smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 20s godot --headless --path . -- --voidling-family-tree-smoke 2>&1 | tee family-tree-smoke.log
+          if ! grep -q 'FAMILY_TREE_SMOKE_SUCCESS' family-tree-smoke.log; then
+            echo 'Family tree viewport contract failed.'
+            exit 1
+          fi
+          if grep -E '^(ERROR|SCRIPT ERROR):' family-tree-smoke.log; then
+            echo 'Family tree smoke emitted a Godot error.'
+            exit 1
+          fi
+
       # Exercise the actual user:// repository. Two successful saves establish a backup, then the
       # probe corrupts the primary and must recover/heal from the previous backup without copying
       # the corrupt primary over it.

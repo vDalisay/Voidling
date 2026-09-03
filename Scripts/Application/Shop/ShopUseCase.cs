@@ -19,9 +19,9 @@ public enum ShopFailure
     NotEnoughCurrency
 }
 
-public sealed record StoreEggPurchaseResult(ShopFailure Failure, EggData? PurchasedEgg, EggData? ReplacementEgg)
+public sealed record StoreEggPurchaseResult(ShopFailure Failure, EggData? PurchasedEgg)
 {
-    public bool Succeeded => Failure == ShopFailure.None && PurchasedEgg != null && ReplacementEgg != null;
+    public bool Succeeded => Failure == ShopFailure.None && PurchasedEgg != null;
 }
 
 public readonly record struct EggShellSaleResult(ShopFailure Failure, int CoinsGained)
@@ -50,22 +50,47 @@ public sealed class ShopUseCase
 
     public EggData CreateStoreInventoryEgg(string eggId, ulong eggSeed) => _storeEggFactory.Create(eggId, eggSeed);
 
-    public StoreEggPurchaseResult BuyStoreEgg(GameStateData state, string eggId, string replacementEggId, ulong replacementEggSeed, float worldX, float worldY)
+    /// <summary>
+    /// Moves one store egg into the player's inventory. The bought slot stays empty until the Shop
+    /// is opened again, and the egg does not incubate until the player places it in the Garden.
+    /// </summary>
+    public StoreEggPurchaseResult BuyStoreEgg(GameStateData state, string eggId)
     {
         ArgumentNullException.ThrowIfNull(state);
         var failure = ValidateStoreEggPurchase(state, eggId);
-        if (failure != ShopFailure.None) return new StoreEggPurchaseResult(failure, null, null);
+        if (failure != ShopFailure.None) return new StoreEggPurchaseResult(failure, null);
         var purchasedEgg = state.StoreEggs.First(egg => egg.Id == eggId);
         state.Coins -= _rules.Shop.StoreEggPrice;
         state.StoreEggs.Remove(purchasedEgg);
         purchasedEgg.Source = EggSource.Store;
         purchasedEgg.IncubationSeconds = 0.0f;
-        purchasedEgg.WorldX = worldX;
-        purchasedEgg.WorldY = worldY;
+        purchasedEgg.State = EggState.Stored;
         state.OwnedEggs.Add(purchasedEgg);
-        var replacement = _storeEggFactory.Create(replacementEggId, replacementEggSeed);
-        state.StoreEggs.Add(replacement);
-        return new StoreEggPurchaseResult(ShopFailure.None, purchasedEgg, replacement);
+        return new StoreEggPurchaseResult(ShopFailure.None, purchasedEgg);
+    }
+
+    /// <summary>Tops the store back up to its slot count. Called when the Shop is opened.</summary>
+    public bool RefillStoreEggSlots(GameStateData state, Func<EggData> createEgg)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(createEgg);
+        var missing = Math.Max(0, _rules.Shop.StoreEggSlotCount - state.StoreEggs.Count);
+        for (var i = 0; i < missing; i++) state.StoreEggs.Add(createEgg());
+        return missing > 0;
+    }
+
+    /// <summary>Places a stored egg in the Garden, which is what starts its incubation timer.</summary>
+    public ShopFailure PlaceStoredEgg(GameStateData state, string eggId, float worldX, float worldY)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var egg = state.OwnedEggs.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, eggId, StringComparison.Ordinal) && candidate.State == EggState.Stored);
+        if (egg == null) return ShopFailure.EggNotFound;
+        egg.WorldX = worldX;
+        egg.WorldY = worldY;
+        egg.IncubationSeconds = 0.0f;
+        egg.State = EggState.Incubating;
+        return ShopFailure.None;
     }
 
     public ShopFailure BuyRareOffer(GameStateData state, string itemId)

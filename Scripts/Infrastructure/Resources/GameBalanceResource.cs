@@ -81,9 +81,6 @@ public partial class GameBalanceResource : Resource
     public int GardenMaxPopulation { get; set; } = 8;
 
     [ExportGroup("Garden Modules")]
-    [Export(PropertyHint.Range, "1,12,1")]
-    public int GardenModuleSlotCount { get; set; } = 4;
-
     [Export(PropertyHint.Range, "0,10000,1")]
     public int GardenModulePurchaseCost { get; set; } = 40;
 
@@ -108,7 +105,7 @@ public partial class GameBalanceResource : Resource
 
     [ExportGroup("Lifecycle / Reincarnation")]
     [Export(PropertyHint.Range, "30,86400,1")]
-    public float AdultLifespanSeconds { get; set; } = 900.0f;
+    public float AdultLifespanSeconds { get; set; } = 21600.0f;
 
     [Export(PropertyHint.Range, "0,100,0.5")]
     public float ReincarnationMinimumHappiness { get; set; } = 10.0f;
@@ -293,7 +290,6 @@ public partial class GameBalanceResource : Resource
                 MaxPopulation = Math.Clamp(GardenMaxPopulation, 1, 64)
             },
             GardenModules = new GardenModuleRules(
-                SlotCount: Math.Clamp(GardenModuleSlotCount, 1, 12),
                 PurchaseCost: Math.Max(0, GardenModulePurchaseCost),
                 UpgradeCosts: Array.AsReadOnly(new[]
                 {

@@ -46,6 +46,8 @@ public partial class GardenController : Node2D
         _session = GetNode<GameSession>("/root/GameBootstrap/GameSession");
         _actorsRoot = GetNode<Node2D>("Actors");
         _eggsRoot = GetNode<Node2D>("Eggs");
+        _landRoot = new Node2D { Name = "Land" };
+        AddChild(_landRoot);
         _camera = GetNode<Camera2D>("Camera2D");
         _zoomTarget = _camera.Zoom.X;
 
@@ -64,6 +66,9 @@ public partial class GardenController : Node2D
     public override void _Process(double delta)
     {
         UpdateEggPulse();
+        UpdatePlacementGhost();
+        UpdateLandGhost();
+        UpdateLandHover();
 
         var zoomBlend = 1.0f - Mathf.Exp(-12.0f * (float)delta);
         var zoom = Mathf.Lerp(_camera.Zoom.X, _zoomTarget, zoomBlend);
@@ -114,6 +119,28 @@ public partial class GardenController : Node2D
 
         if (inputEvent is InputEventMouseButton mouse)
         {
+            if (IsPlacingEgg && mouse.Pressed &&
+                mouse.ButtonIndex is MouseButton.Left or MouseButton.Right)
+            {
+                if (mouse.ButtonIndex == MouseButton.Left)
+                    TryCompleteEggPlacement(mouse.Position);
+                else
+                    CancelEggPlacement();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            if (IsPlacingLand && mouse.Pressed &&
+                mouse.ButtonIndex is MouseButton.Left or MouseButton.Right)
+            {
+                if (mouse.ButtonIndex == MouseButton.Left)
+                    TryCompleteLandPlacement(mouse.Position);
+                else
+                    CancelLandPlacement();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
             if (mouse.ButtonIndex == MouseButton.Left && !mouse.Pressed &&
                 (_draggedId.Length > 0 || _pendingGrabId.Length > 0))
             {
@@ -229,7 +256,11 @@ public partial class GardenController : Node2D
             DropGrabbedVoidling();
 
         if (!active)
+        {
             StopFollowing();
+            CancelEggPlacement();
+            CancelLandPlacement();
+        }
 
         Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
         _camera.Enabled = active;
@@ -360,11 +391,14 @@ public partial class GardenController : Node2D
 
         Select(_selectedId);
         RefreshEggs();
+        RefreshLand();
+        RefreshTileResidents();
     }
 
     private void RefreshEggs()
     {
-        var eggsById = _session.State.OwnedEggs.ToDictionary(e => e.Id, StringComparer.Ordinal);
+        var placed = _session.State.OwnedEggs.Where(egg => egg.State != EggState.Stored).ToList();
+        var eggsById = placed.ToDictionary(e => e.Id, StringComparer.Ordinal);
 
         foreach (var staleId in _eggVisuals.Keys.Where(id => !eggsById.ContainsKey(id)).ToArray())
         {
@@ -375,7 +409,7 @@ public partial class GardenController : Node2D
             _eggVisuals.Remove(staleId);
         }
 
-        foreach (var egg in _session.State.OwnedEggs)
+        foreach (var egg in placed)
         {
             if (!_eggVisuals.TryGetValue(egg.Id, out var visual))
             {
@@ -463,16 +497,32 @@ public partial class GardenController : Node2D
     private void DropGrabbedVoidling()
     {
         var creatureId = _draggedId;
+        var landModuleId = _hoveredModuleId;
         _draggedId = "";
         Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
 
         if (creatureId.Length == 0 || !_actors.TryGetValue(creatureId, out var actor))
+        {
+            UpdateLandHover();
             return;
+        }
 
-        actor.Position = ClampToGarden(actor.Position);
+        // Dropping onto a tile with room settles the Voidling on that ground; anywhere else it is a
+        // normal release into the Garden, which is also the only way to take a trainee off its tile.
+        // A full tile refuses the drop and the session says why.
+        var tileAccepts = landModuleId.Length > 0 && _session.HasRoomOnLand(landModuleId, creatureId);
+        actor.Position = tileAccepts
+            ? TileCenterOf(landModuleId)
+            : ClampToGarden(actor.Position);
         actor.SetPickedUp(false);
         SpawnDust(actor.Position + new Vector2(0, 4));
         _session.MoveVoidling(creatureId, actor.Position);
+        UpdateLandHover();
+
+        if (landModuleId.Length > 0)
+            _session.SetPassiveTrainingLand(creatureId, landModuleId);
+        else if (WasTrainingOnLand(creatureId))
+            _session.StopPassiveTraining(creatureId);
     }
 
     private void SpawnHeartParticle(VoidlingActor actor, float xOffset, double delay)

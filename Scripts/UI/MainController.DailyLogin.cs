@@ -34,7 +34,7 @@ public partial class MainController
         claim.Pressed += () =>
         {
             if (_session.ClaimDailyLogin())
-                ShowShop();
+                RenderShop();
         };
         row.AddChild(claim);
 

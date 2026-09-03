@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using Godot;
 using Voidling.Application.Breeding;
-using Voidling.Domain.Racing;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Details;
 using Voidling.Presentation.UI.Racing;
@@ -12,45 +11,6 @@ namespace VoidlingGame;
 
 public partial class MainController : Node
 {
-    private void ShowRacePicker()
-    {
-        var owned = _session.State.Voidlings.ToArray();
-        var selectedId = owned.Any(v => v.Id == _selectedId)
-            ? _selectedId
-            : owned.FirstOrDefault()?.Id ?? string.Empty;
-
-        var viewState = owned.Select(CreateRacePickerView).ToArray();
-        var courses = RaceCourseCatalog.All
-            .Select(course => new RacePickerCourseViewState(
-                course.Id,
-                course.Version,
-                course.Id == RaceCourseCatalog.Demo.Id
-                    ? Tr("UI_RACE_COURSE_DEMO_NAME")
-                    : Tr("UI_RACE_COURSE_LONG_NAME"),
-                course.Id == RaceCourseCatalog.Demo.Id
-                    ? Tr("UI_RACE_COURSE_DEMO_SUMMARY")
-                    : Tr("UI_RACE_COURSE_LONG_SUMMARY")))
-            .ToArray();
-
-        var box = OpenModal(Tr("UI_RACE_PICKER_TITLE"), new Vector2(552, 335));
-        var screen = new RacePickerScreen();
-        screen.Configure(new RacePickerScreenState(
-            viewState,
-            selectedId,
-            courses,
-            RaceCourseCatalog.Demo.Id,
-            RaceCourseCatalog.Demo.Version));
-        screen.RaceRequested += (creatureId, courseId, courseVersion) =>
-        {
-            if (_session.FindVoidling(creatureId) == null)
-                return;
-
-            CloseModal();
-            StartRaceWithCourse(creatureId, courseId, courseVersion);
-        };
-        box.AddChild(screen);
-    }
-
     private RacePickerVoidlingViewState CreateRacePickerView(VoidlingData creature)
     {
         var profile = _session.CreateCreatureProfileProjection(creature.Id)

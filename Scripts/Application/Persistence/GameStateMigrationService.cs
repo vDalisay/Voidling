@@ -23,7 +23,7 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 20;
+    public const int CurrentSaveVersion = 21;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -211,12 +211,14 @@ public sealed class GameStateMigrationService
         return appearance;
     }
 
+    /// <summary>Deterministic hexes the four pre-hex Garden slots become, in slot order.</summary>
+    private static readonly (int Q, int R)[] LegacySlotHexes = { (0, 0), (1, 0), (0, 1), (-1, 1) };
+
     private void NormalizeGardenModules(GameStateData state)
     {
         var normalized = new List<GardenModuleData>();
         var ids = new HashSet<string>(StringComparer.Ordinal);
-        var occupied = new HashSet<int>();
-        var slotCount = Math.Max(1, _rules.GardenModules.SlotCount);
+        var occupied = new HashSet<(int Q, int R)>();
         var maxLevel = Math.Max(1, _rules.GardenModules.MaxLevel);
         foreach (var module in state.GardenModules)
         {
@@ -224,7 +226,19 @@ public sealed class GameStateMigrationService
             module.Id = module.Id.Trim();
             if (!ids.Add(module.Id)) continue;
             module.Level = Math.Clamp(module.Level, 1, maxLevel);
-            if (module.SlotIndex < -1 || module.SlotIndex >= slotCount || (module.SlotIndex >= 0 && !occupied.Add(module.SlotIndex))) module.SlotIndex = -1;
+
+            // Pre-hex saves stored an abstract slot index. Keep those tiles on the ground by
+            // mapping each slot to its own hex instead of dropping the player back to storage.
+            if (!module.Placed && module.SlotIndex >= 0 && module.SlotIndex < LegacySlotHexes.Length)
+            {
+                (module.HexQ, module.HexR) = LegacySlotHexes[module.SlotIndex];
+                module.Placed = true;
+            }
+
+            module.SlotIndex = -1;
+            // ponytail: overlap only, no connectivity re-check on load. Tiles can only be placed
+            // connected, so a save can only lose connectivity if it was hand-edited.
+            if (module.Placed && !occupied.Add((module.HexQ, module.HexR))) module.Placed = false;
             normalized.Add(module);
         }
         state.GardenModules = normalized;
@@ -248,7 +262,7 @@ public sealed class GameStateMigrationService
             return;
         }
         creature.PassiveTrainingStatId = module.StatId;
-        creature.PassiveTrainingPointsPerMinute = module.SlotIndex >= 0 ? _rules.GardenModules.PointsPerMinuteForLevel(module.Level) : 0.0f;
+        creature.PassiveTrainingPointsPerMinute = module.Placed ? _rules.GardenModules.PointsPerMinuteForLevel(module.Level) : 0.0f;
         if (creature.PassiveTrainingPointsPerMinute <= 0.0f) creature.PassiveTrainingPointRemainder = 0.0;
     }
 

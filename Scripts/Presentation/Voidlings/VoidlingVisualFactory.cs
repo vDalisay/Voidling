@@ -36,7 +36,6 @@ public static class VoidlingVisualFactory
     public static int FrameHeight => DefaultDefinition.FrameHeight;
     public static float AdultWorldScale => DefaultDefinition.AdultWorldScale;
     public static float RaceScale => DefaultDefinition.RaceScale;
-    public static float ShadowCenterYOffset => DefaultDefinition.ShadowCenterYOffset;
     public static float HeldScaleMultiplier => DefaultDefinition.HeldScaleMultiplier;
     public static float HeldSpriteYOffset => DefaultDefinition.HeldSpriteYOffset;
     public static float MutationAdultCenterYOffset => DefaultDefinition.MutationAdultCenterYOffset;
@@ -99,11 +98,16 @@ public static class VoidlingVisualFactory
     public static float RaceScaleFor(string? visualTypeId)
         => ResolveDefinition(visualTypeId).RaceScale;
 
+    // The race sprite sits on its ground pivot exactly like the Garden does, so the shared shadow
+    // offset lands under the same feet at either scale instead of drifting into a floating gap.
     public static float RaceSpriteCenterYOffset(string? visualTypeId = null)
-        => ResolveDefinition(visualTypeId).RaceSpriteCenterYOffset;
+    {
+        var definition = ResolveDefinition(visualTypeId);
+        return definition.WorldSpriteCenterYOffsetAtScaleOne * definition.RaceScale;
+    }
 
-    public static float ShadowCenterYOffsetFor(string? visualTypeId = null)
-        => ResolveDefinition(visualTypeId).ShadowCenterYOffset;
+    public static float ShadowCenterYOffset(float spriteScale, string? visualTypeId = null)
+        => ResolveDefinition(visualTypeId).ShadowCenterYOffsetAtScaleOne * spriteScale;
 
     public static Vector2 ShadowRadii(float spriteScale, string? visualTypeId = null)
     {
