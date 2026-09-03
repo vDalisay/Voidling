@@ -56,6 +56,24 @@ public sealed record RaceDeterministicStateSnapshot(
     IReadOnlyList<string> FinishOrder);
 
 /// <summary>
+/// Non-authoritative balancing diagnostics accumulated while the deterministic simulation runs.
+/// These values are never consulted by movement, RNG, finish order, replay checksums, or rewards.
+/// </summary>
+public readonly record struct RaceParticipantTelemetrySnapshot(
+    string ParticipantId,
+    float MaxObservedSpeed,
+    float MinimumObservedStamina,
+    int ObstacleAvoids,
+    int ObstacleFailures,
+    int CheerActivations,
+    int FinishFixedStep,
+    int Placement);
+
+public sealed record RaceSimulationTelemetrySnapshot(
+    int FixedStepCount,
+    IReadOnlyList<RaceParticipantTelemetrySnapshot> Participants);
+
+/// <summary>
 /// Deterministic fixed-step race simulation for the current demo course. It owns every state
 /// transition that can affect race results; Godot frame rate, sprites, camera, VFX, and animation
 /// cannot consume its random stream or alter finish order.
@@ -96,6 +114,13 @@ public sealed class RaceSimulation
         public float GlideEndX { get; set; }
         public bool Finished { get; set; }
         public int FinishFixedStep { get; set; }
+
+        // Diagnostic-only counters. No authoritative code reads these fields.
+        public float MaxObservedSpeed { get; set; }
+        public float MinimumObservedStamina { get; set; }
+        public int ObstacleAvoids { get; set; }
+        public int ObstacleFailures { get; set; }
+        public int CheerActivations { get; set; }
     }
 
     public RaceSimulation(
@@ -125,7 +150,8 @@ public sealed class RaceSimulation
                 X = _course.StartX,
                 MaxStamina = maxStamina,
                 CurrentStamina = maxStamina,
-                GlideEndX = _course.GlideSegment.EndX
+                MinimumObservedStamina = maxStamina,
+                GlideEndX = _course.HasGlideSegment ? _course.GlideSegment.EndX : _course.EndX
             };
             _participants.Add(state);
             _participantsById.Add(participant.CreatureId, state);
@@ -181,6 +207,27 @@ public sealed class RaceSimulation
         return new RaceDeterministicStateSnapshot(
             Array.AsReadOnly(participants),
             Array.AsReadOnly(_finishOrder.ToArray()));
+    }
+
+    public RaceSimulationTelemetrySnapshot GetTelemetrySnapshot()
+    {
+        var participants = _participants
+            .Select(state => new RaceParticipantTelemetrySnapshot(
+                ParticipantId: state.Participant.CreatureId,
+                MaxObservedSpeed: state.MaxObservedSpeed,
+                MinimumObservedStamina: state.MinimumObservedStamina,
+                ObstacleAvoids: state.ObstacleAvoids,
+                ObstacleFailures: state.ObstacleFailures,
+                CheerActivations: state.CheerActivations,
+                FinishFixedStep: state.FinishFixedStep,
+                Placement: state.Finished
+                    ? _finishOrder.IndexOf(state.Participant.CreatureId) + 1
+                    : 0))
+            .ToArray();
+
+        return new RaceSimulationTelemetrySnapshot(
+            _fixedStepCount,
+            Array.AsReadOnly(participants));
     }
 
     public IReadOnlyList<RaceSimulationEvent> Advance(double elapsedSeconds)
@@ -249,7 +296,9 @@ public sealed class RaceSimulation
             return false;
 
         state.CurrentStamina -= _performance.CheerCost;
+        state.MinimumObservedStamina = Math.Min(state.MinimumObservedStamina, state.CurrentStamina);
         state.CheerSeconds = _performance.CheerDurationSeconds;
+        state.CheerActivations++;
         return true;
     }
 
@@ -270,6 +319,7 @@ public sealed class RaceSimulation
                 state.CurrentStamina = Math.Max(
                     0.0f,
                     state.CurrentStamina - _performance.GetDelayStaminaDrainPerSecond() * step);
+                state.MinimumObservedStamina = Math.Min(state.MinimumObservedStamina, state.CurrentStamina);
                 continue;
             }
 
@@ -281,10 +331,12 @@ public sealed class RaceSimulation
                 state.CurrentStamina,
                 state.MaxStamina,
                 state.CheerSeconds > 0.0f);
+            state.MaxObservedSpeed = Math.Max(state.MaxObservedSpeed, movement.Speed);
 
             state.CurrentStamina = Math.Max(
                 0.0f,
                 state.CurrentStamina - movement.StaminaDrainPerSecond * step);
+            state.MinimumObservedStamina = Math.Min(state.MinimumObservedStamina, state.CurrentStamina);
             state.X += movement.Speed * step;
 
             ResolvePendingObstacle(state, events);
@@ -354,6 +406,7 @@ public sealed class RaceSimulation
 
         if (!avoided)
         {
+            state.ObstacleFailures++;
             state.DelaySeconds = _performance.GetObstacleDelaySeconds(state.Participant);
             state.X -= _performance.ObstacleRollbackDistance;
             state.ObstacleRetryPending = true;
@@ -361,6 +414,7 @@ public sealed class RaceSimulation
             return;
         }
 
+        state.ObstacleAvoids++;
         state.NextObstacleIndex++;
         events.Add(new RaceObstacleResolvedEvent(state.Participant.CreatureId, obstacleIndex, true));
     }
