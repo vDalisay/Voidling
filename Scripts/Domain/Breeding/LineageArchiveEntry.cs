@@ -27,8 +27,15 @@ public sealed record LineageArchiveEntry(
     public static LineageArchiveEntry FromVoidling(VoidlingData creature)
     {
         ArgumentNullException.ThrowIfNull(creature);
-        var appearance = creature.Appearance ?? new VoidlingAppearanceData();
-        appearance.Normalize();
+        var appearance = creature.Appearance;
+        var visualTypeId = string.IsNullOrWhiteSpace(appearance?.VisualTypeId)
+            ? VoidlingAppearanceData.DefaultVisualTypeId
+            : appearance!.VisualTypeId.Trim().ToLowerInvariant();
+        var paletteHue = appearance != null && VoidlingAppearanceData.IsValidHue(appearance.PaletteHue)
+            ? VoidlingAppearanceData.NormalizeHue(appearance.PaletteHue)
+            : VoidlingAppearanceData.LegacyUninitializedPaletteHue;
+        var layerIdsKey = VoidlingAppearanceData.BuildLayerIdsKey(appearance?.LayerIds);
+
         return new LineageArchiveEntry(
             creature.Id,
             creature.Name,
@@ -37,9 +44,9 @@ public sealed record LineageArchiveEntry(
             Math.Max(0, creature.FamilyGeneration),
             creature.TintHex,
             creature.InbreedingHistoryFlag,
-            appearance.VisualTypeId,
-            appearance.PaletteHue,
-            VoidlingAppearanceData.BuildLayerIdsKey(appearance.LayerIds));
+            visualTypeId,
+            paletteHue,
+            layerIdsKey);
     }
 
     public bool HasSameLineageIdentity(LineageArchiveEntry other)
