@@ -20,7 +20,9 @@ public readonly record struct VoidlingVisualAppearance(
         var typeId = string.IsNullOrWhiteSpace(appearance.VisualTypeId)
             ? VoidlingAppearanceData.DefaultVisualTypeId
             : appearance.VisualTypeId;
-        var layers = appearance.LayerIds?.ToArray() ?? Array.Empty<string>();
+        var layers = appearance.LayerIds == null
+            ? Array.Empty<string>()
+            : new List<string>(appearance.LayerIds).ToArray();
         return new VoidlingVisualAppearance(typeId, appearance.PaletteHue, layers, fallbackTintHex);
     }
 }
