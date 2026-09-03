@@ -55,7 +55,7 @@ public sealed class PlayerInformationProjectionTests
     [InlineData(3, LineageRiskBand.High)]
     [InlineData(4, LineageRiskBand.Critical)]
     [InlineData(99, LineageRiskBand.Critical)]
-    public void BreedingPairInfo_ProjectsBurdenAsQualitativeRiskWithoutProbability(
+    public void BreedingPairInfo_ProjectsQualitativeBandAndConfirmedHatchFailureRisk(
         int burden,
         LineageRiskBand expected)
     {
@@ -71,9 +71,12 @@ public sealed class PlayerInformationProjectionTests
         Assert.True(projection.CanBreed);
         Assert.Equal(expected, projection.LineageRisk);
         Assert.Equal(burden, projection.ChildBurden);
+        Assert.Equal(73, projection.HatchFailurePercent);
         Assert.DoesNotContain(
             projection.GetType().GetProperties(),
-            property => property.Name.Contains("Percent", System.StringComparison.OrdinalIgnoreCase));
+            property => property.Name.Contains("StatChance", System.StringComparison.OrdinalIgnoreCase) ||
+                        property.Name.Contains("ColorChance", System.StringComparison.OrdinalIgnoreCase) ||
+                        property.Name.Contains("OffspringProbability", System.StringComparison.OrdinalIgnoreCase));
     }
 
     private static VoidlingData CreateCreature(string id)
