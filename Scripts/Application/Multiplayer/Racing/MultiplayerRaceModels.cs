@@ -247,6 +247,8 @@ public static class MultiplayerRaceValidation
     public const int MaxTintLength = 16;
     public const int MaxVisualTypeIdLength = 64;
     public const int MaxLayerIdsKeyLength = 1024;
+    public const int MaxAppearanceLayers = 16;
+    public const int MaxAppearanceLayerIdLength = 128;
 
     public static string BuildParticipantId(PlatformUserId ownerId, string ownedCreatureId)
         => $"{ownerId.Value}:{ownedCreatureId}";
@@ -334,7 +336,8 @@ public static class MultiplayerRaceValidation
             participant.TintHex.Length > MaxTintLength ||
             string.IsNullOrWhiteSpace(participant.VisualTypeId) ||
             participant.VisualTypeId.Length > MaxVisualTypeIdLength ||
-            !float.IsFinite(participant.PaletteHue) || participant.PaletteHue >= 1.0f ||
+            !VoidlingAppearanceData.IsValidStoredHue(participant.PaletteHue) ||
+            participant.LayerIdsKey == null ||
             participant.LayerIdsKey.Length > MaxLayerIdsKeyLength ||
             !IsFiniteNonNegative(participant.Run) ||
             !IsFiniteNonNegative(participant.Swim) ||
@@ -343,6 +346,14 @@ public static class MultiplayerRaceValidation
             !IsFiniteNonNegative(participant.Stamina))
         {
             error = "Multiplayer race entrant snapshot is invalid.";
+            return false;
+        }
+
+        var layerIds = participant.LayerIds;
+        if (layerIds.Length > MaxAppearanceLayers ||
+            layerIds.Any(id => string.IsNullOrWhiteSpace(id) || id.Length > MaxAppearanceLayerIdLength))
+        {
+            error = "Multiplayer race entrant appearance layers are invalid.";
             return false;
         }
 
@@ -365,6 +376,7 @@ public static class StableRaceSeed
     public static ulong FromChallengeId(string challengeId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(challengeId);
+        // Keep this namespace stable: it defines deterministic race seeds, not the wire schema.
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"voidling:multiplayer-race:v1:{challengeId}"));
         var seed = BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan(0, sizeof(ulong)));
         return seed == 0 ? 1UL : seed;
