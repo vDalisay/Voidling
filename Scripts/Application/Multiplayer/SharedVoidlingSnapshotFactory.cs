@@ -7,8 +7,7 @@ namespace Voidling.Application.Multiplayer;
 
 /// <summary>
 /// Builds an explicit network snapshot from a locally owned Voidling. Ownership validation happens
-/// before anything is sent, and only the fields required by connected-Garden presentation leave the
-/// local save aggregate.
+/// before anything is sent, and only semantic appearance data leaves the local save aggregate.
 /// </summary>
 public sealed class SharedVoidlingSnapshotFactory
 {
@@ -32,13 +31,11 @@ public sealed class SharedVoidlingSnapshotFactory
             error = "Local platform identity is unavailable.";
             return false;
         }
-
         if (string.IsNullOrWhiteSpace(creatureId))
         {
             error = "Creature ID is required.";
             return false;
         }
-
         if (!float.IsFinite(zoneX) || !float.IsFinite(zoneY))
         {
             error = "Connected-zone position must be finite.";
@@ -53,9 +50,7 @@ public sealed class SharedVoidlingSnapshotFactory
             return false;
         }
 
-        var displayName = string.IsNullOrWhiteSpace(creature.Name)
-            ? "Voidling"
-            : creature.Name.Trim();
+        var displayName = string.IsNullOrWhiteSpace(creature.Name) ? "Voidling" : creature.Name.Trim();
         if (displayName.Length > ConnectedZoneValidation.MaxDisplayNameLength)
             displayName = displayName[..ConnectedZoneValidation.MaxDisplayNameLength];
 
@@ -65,6 +60,12 @@ public sealed class SharedVoidlingSnapshotFactory
             .Distinct(StringComparer.Ordinal)
             .Take(ConnectedZoneValidation.MaxRareTraits)
             .Cast<string>()
+            .ToArray();
+        var appearance = creature.Appearance ?? new VoidlingAppearanceData();
+        appearance.Normalize();
+        var layerIds = appearance.LayerIds
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(ConnectedZoneValidation.MaxAppearanceLayers)
             .ToArray();
 
         snapshot = new SharedVoidlingSnapshot(
@@ -76,7 +77,10 @@ public sealed class SharedVoidlingSnapshotFactory
             Math.Max(0, creature.FamilyGeneration),
             rareTraitIds,
             zoneX,
-            zoneY);
+            zoneY,
+            appearance.VisualTypeId,
+            appearance.PaletteHue,
+            layerIds);
 
         if (!ConnectedZoneValidation.IsValidSharedVoidling(snapshot))
         {
