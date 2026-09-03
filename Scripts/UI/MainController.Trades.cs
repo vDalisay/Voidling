@@ -85,9 +85,6 @@ public partial class MainController
             return;
         }
 
-        // The accepting host can transition synchronously; a non-host receives the host echo shortly
-        // afterwards. Try immediately and keep the state/event fallback below so both participants are
-        // pulled into the same room without clicking Trades again.
         ScheduleTradeRoomOpen(negotiationId);
         RefreshTradeHub();
     }
@@ -107,8 +104,6 @@ public partial class MainController
         var trade = current.ActiveNegotiation;
         if (trade == null || !string.Equals(trade.NegotiationId, negotiationId, StringComparison.Ordinal))
         {
-            // A non-host may still be waiting for the authoritative host echo. Do not bounce it out
-            // of the trade flow; NegotiationActivated/StateChanged will schedule another attempt.
             RefreshTradeHub();
             return;
         }
@@ -189,17 +184,11 @@ public partial class MainController
             }
             else if (state.ActiveNegotiation.Phase == TradeNegotiationPhase.Negotiating)
             {
-                // Host-local transitions can already be canonical before a callback reaches the UI.
-                // State reconciliation therefore also owns auto-entry, independently of event order.
                 ScheduleTradeRoomOpen(state.ActiveNegotiation.NegotiationId);
             }
         }
         else if (_tradeNegotiationPanel != null && GodotObject.IsInstanceValid(_tradeNegotiationPanel))
         {
-            // Do not destroy the pre-commit offer snapshot synchronously. A successful durable
-            // commit can publish its terminal negotiation state immediately around the local commit
-            // callback. Defer room cleanup one frame so the exchange animation gets first chance to
-            // consume that snapshot; a real cancellation/failure will still return to the lobby.
             ScheduleTradeRoomEndedCheck();
         }
 
@@ -321,7 +310,10 @@ public partial class MainController
             false,
             voidling.TintHex,
             voidling.HasAngelMutation,
-            voidling.OtherMutationCount);
+            voidling.OtherMutationCount,
+            voidling.VisualTypeId,
+            voidling.PaletteHue,
+            voidling.LayerIdsKey);
 
     private TradeExchangeAssetView? BuildTradeExchangeAsset(TradeAssetReference? asset)
     {
@@ -336,12 +328,17 @@ public partial class MainController
                 return null;
             var hasAngel = voidling.RareTraits.Any(trait =>
                 string.Equals(trait.TraitId, "Angel", StringComparison.OrdinalIgnoreCase));
+            var appearance = voidling.Appearance ?? new VoidlingAppearanceData();
+            appearance.Normalize();
             return new TradeExchangeAssetView(
                 voidling.Name,
                 false,
                 voidling.TintHex,
                 hasAngel,
-                Math.Max(0, voidling.RareTraits.Count - (hasAngel ? 1 : 0)));
+                Math.Max(0, voidling.RareTraits.Count - (hasAngel ? 1 : 0)),
+                appearance.VisualTypeId,
+                appearance.PaletteHue,
+                VoidlingAppearanceData.BuildLayerIdsKey(appearance.LayerIds));
         }
 
         var eggIndex = _session.State.OwnedEggs.FindIndex(egg =>
