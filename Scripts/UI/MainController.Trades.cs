@@ -328,8 +328,7 @@ public partial class MainController
                 return null;
             var hasAngel = voidling.RareTraits.Any(trait =>
                 string.Equals(trait.TraitId, "Angel", StringComparison.OrdinalIgnoreCase));
-            var appearance = voidling.Appearance ?? new VoidlingAppearanceData();
-            appearance.Normalize();
+            var appearance = (voidling.Appearance ?? new VoidlingAppearanceData()).CreateCanonicalCopy();
             return new TradeExchangeAssetView(
                 voidling.Name,
                 false,
