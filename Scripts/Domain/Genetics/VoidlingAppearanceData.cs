@@ -39,6 +39,18 @@ public sealed class VoidlingAppearanceData
     public static bool IsValidStoredHue(float value)
         => value == LegacyUninitializedPaletteHue || IsValidHue(value);
 
+    public static bool IsValidSemanticId(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length > maxLength ||
+            !string.Equals(value, value.Trim(), StringComparison.Ordinal) ||
+            value.Contains('/') || value.Contains('\\'))
+        {
+            return false;
+        }
+
+        return value.All(character => !char.IsControl(character));
+    }
+
     public static float NormalizeHue(float value)
     {
         if (!float.IsFinite(value))
