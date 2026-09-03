@@ -14,7 +14,9 @@ public sealed record GeneticsRules(
     IReadOnlyList<string> FounderTraitIds,
     int RelatedAncestorDepth);
 
-public sealed record AppearanceRules(IReadOnlyList<string> PaletteHex);
+public sealed record AppearanceRules(
+    IReadOnlyList<string> PaletteHex,
+    double PaletteBlendInfluence);
 
 public sealed record BreedingRules(float CooldownSeconds, IReadOnlyList<int> HatchFailurePercentByBurden);
 
@@ -90,19 +92,23 @@ public sealed record GameBalanceRules(
             RareTraitTransmissionChance: 0.10,
             FounderTraitIds: Array.AsReadOnly(new[] { "Lustrous", "Prismatic", "Aurora" }),
             RelatedAncestorDepth: 3),
-        Appearance: new AppearanceRules(Array.AsReadOnly(new[]
-        {
-            "#F6F0C9",
-            "#E7A6B6",
-            "#A9D5C0",
-            "#B7B2E8",
-            "#F0C778",
-            "#A8C8EC",
-            "#D4A7E8",
-            "#E9B690",
-            "#AFCB7A",
-            "#D9D1C6"
-        })),
+        Appearance: new AppearanceRules(
+            PaletteHex: Array.AsReadOnly(new[]
+            {
+                "#F6F0C9",
+                "#E7A6B6",
+                "#A9D5C0",
+                "#B7B2E8",
+                "#F0C778",
+                "#A8C8EC",
+                "#D4A7E8",
+                "#E9B690",
+                "#AFCB7A",
+                "#D9D1C6"
+            }),
+            // Provisional designer tuning for the confirmed rule: one color profile wins 50/50,
+            // then moves only slightly toward the other profile on the hue wheel.
+            PaletteBlendInfluence: 0.18),
         Breeding: new BreedingRules(
             CooldownSeconds: 8.0f,
             HatchFailurePercentByBurden: Array.AsReadOnly(new[] { 0, 20, 50, 80, 100 })),
