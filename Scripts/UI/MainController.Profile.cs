@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Domain.Shop;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Inventory;
+using Voidling.Presentation.UI.Shop;
 
 namespace VoidlingGame;
 
@@ -21,7 +23,8 @@ public partial class MainController : Node
     private void RebuildDetailsPanel()
     {
         var data = _session.FindVoidling(_selectedId);
-        if (data == null)
+        var profile = data == null ? null : _session.CreateCreatureProfileProjection(data.Id);
+        if (data == null || profile == null)
         {
             _profileProgressCreatureId = string.Empty;
             _profileDisplayedProgress.Clear();
@@ -29,10 +32,7 @@ public partial class MainController : Node
             return;
         }
 
-        var sameCreature = string.Equals(
-            _profileProgressCreatureId,
-            data.Id,
-            StringComparison.Ordinal);
+        var sameCreature = string.Equals(_profileProgressCreatureId, data.Id, StringComparison.Ordinal);
         if (!sameCreature)
         {
             _profileDisplayedProgress.Clear();
@@ -43,11 +43,9 @@ public partial class MainController : Node
             _detailsPanel.QueueFree();
         _detailsPanel = null;
 
-        _detailsPanel = UiFactory.CreatePanel(new Vector2(226, 294));
-        _detailsPanel.Position = new Vector2(
-            sameCreature ? DetailsPanelRestX : DetailsPanelHiddenX,
-            57);
-        _detailsPanel.Size = new Vector2(226, 294);
+        _detailsPanel = UiFactory.CreatePanel(new Vector2(226, 318));
+        _detailsPanel.Position = new Vector2(sameCreature ? DetailsPanelRestX : DetailsPanelHiddenX, 33);
+        _detailsPanel.Size = new Vector2(226, 318);
         _uiRoot.AddChild(_detailsPanel);
 
         var box = new VBoxContainer();
@@ -71,7 +69,6 @@ public partial class MainController : Node
         nameButton.AddThemeColorOverride("font_hover_color", Color.FromHtml("#263B31"));
         nameButton.AddThemeColorOverride("font_pressed_color", Color.FromHtml("#263B31"));
         heading.AddChild(nameButton);
-
         nameButton.Pressed += () => BeginInlineRename(heading, nameButton, data);
 
         var follow = UiFactory.CreateButton("◉");
@@ -92,10 +89,34 @@ public partial class MainController : Node
         heading.AddChild(close);
         box.AddChild(heading);
 
+        var personalityLabel = PersonalityPresentationCatalog.LabelFor(profile.Personality);
         var stage = data.Stage == LifeStage.Adult
-            ? "Adult"
-            : $"Child • {Math.Max(0, (int)Math.Ceiling(GameRules.ChildToAdultSeconds - data.AgeSeconds))}s to adult";
-        box.AddChild(UiFactory.CreateLabel(stage, 7));
+            ? $"Adult • {personalityLabel}"
+            : $"Child • {Math.Max(0, (int)Math.Ceiling(GameRules.ChildToAdultSeconds - data.AgeSeconds))}s • {personalityLabel}";
+        var stageLabel = UiFactory.CreateLabel(stage, 7);
+        stageLabel.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        stageLabel.TooltipText = $"Personality: {PersonalityPresentationCatalog.FlavorFor(profile.Personality)}";
+        box.AddChild(stageLabel);
+
+        var demeanor = UiFactory.CreateLabel(
+            profile.CareDemeanor == Voidling.Application.Roster.CreatureCareDemeanor.Settled
+                ? "Seems content and at ease."
+                : "Seems restless and could use some attention.",
+            6);
+        demeanor.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        demeanor.CustomMinimumSize = new Vector2(194, 15);
+        box.AddChild(demeanor);
+
+        if (!string.IsNullOrWhiteSpace(profile.DiscoveredFavoriteFoodId))
+        {
+            var favoriteFood = UiFactory.CreateLabel(
+                string.Format(Tr("UI_PROFILE_FAVORITE_FOOD"), StatPresentationCatalog.NameFor(profile.DiscoveredFavoriteFoodId)),
+                6);
+            favoriteFood.CustomMinimumSize = new Vector2(194, 15);
+            box.AddChild(favoriteFood);
+        }
+
+        box.AddChild(CreatePassiveTrainingRow(data));
 
         foreach (var statId in GameRules.StatIds)
             box.AddChild(CreateProfileStatBlock(data, statId, sameCreature));
@@ -134,16 +155,49 @@ public partial class MainController : Node
             SlideInDetailsPanel(_detailsPanel);
     }
 
+    private Control CreatePassiveTrainingRow(VoidlingData data)
+    {
+        var row = new HBoxContainer { CustomMinimumSize = new Vector2(194, 22) };
+        row.AddThemeConstantOverride("separation", 4);
+        var label = UiFactory.CreateLabel("Passive", 7);
+        label.CustomMinimumSize = new Vector2(52, 20);
+        label.TooltipText = "Slow open-game training. Active treats remain faster.";
+        row.AddChild(label);
+
+        var selector = new OptionButton
+        {
+            CustomMinimumSize = new Vector2(138, 20),
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Choose one stat to train slowly while the game remains open."
+        };
+        UiFactory.ApplyPixelFont(selector, 7);
+        selector.AddItem("Off");
+        var selected = 0;
+        for (var i = 0; i < GameRules.StatIds.Length; i++)
+        {
+            var statId = GameRules.StatIds[i];
+            selector.AddItem(StatPresentationCatalog.NameFor(statId));
+            if (string.Equals(data.PassiveTrainingStatId, statId, StringComparison.Ordinal))
+                selected = i + 1;
+        }
+        selector.Select(selected);
+        selector.ItemSelected += index =>
+        {
+            var selectedIndex = (int)index;
+            var statId = selectedIndex <= 0 ? string.Empty : GameRules.StatIds[selectedIndex - 1];
+            if (_session.SetPassiveTraining(data.Id, statId))
+                RebuildDetailsPanel();
+        };
+        row.AddChild(selector);
+        return row;
+    }
+
     private void SlideInDetailsPanel(PanelContainer panel)
     {
         panel.Modulate = new Color(panel.Modulate.R, panel.Modulate.G, panel.Modulate.B, 0.94f);
         var tween = CreateTween().SetParallel(true);
-        tween.TweenProperty(panel, "position:x", DetailsPanelRestX, DetailsPanelEnterSeconds)
-            .SetTrans(Tween.TransitionType.Cubic)
-            .SetEase(Tween.EaseType.Out);
-        tween.TweenProperty(panel, "modulate:a", 1.0f, DetailsPanelEnterSeconds * 0.65)
-            .SetTrans(Tween.TransitionType.Sine)
-            .SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(panel, "position:x", DetailsPanelRestX, DetailsPanelEnterSeconds).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(panel, "modulate:a", 1.0f, DetailsPanelEnterSeconds * 0.65).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
     }
 
     private void SlideOutDetailsPanel()
@@ -153,55 +207,35 @@ public partial class MainController : Node
             _detailsPanel = null;
             return;
         }
-
         var panel = _detailsPanel;
         _detailsPanel = null;
         panel.MouseFilter = Control.MouseFilterEnum.Ignore;
         var tween = CreateTween().SetParallel(true);
-        tween.TweenProperty(panel, "position:x", DetailsPanelHiddenX, DetailsPanelExitSeconds)
-            .SetTrans(Tween.TransitionType.Cubic)
-            .SetEase(Tween.EaseType.In);
+        tween.TweenProperty(panel, "position:x", DetailsPanelHiddenX, DetailsPanelExitSeconds).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.In);
         tween.TweenProperty(panel, "modulate:a", 0.92f, DetailsPanelExitSeconds);
-        tween.Finished += () =>
-        {
-            if (GodotObject.IsInstanceValid(panel))
-                panel.QueueFree();
-        };
+        tween.Finished += () => { if (GodotObject.IsInstanceValid(panel)) panel.QueueFree(); };
     }
 
     private void BeginInlineRename(HBoxContainer heading, Button nameButton, VoidlingData data)
     {
         if (!GodotObject.IsInstanceValid(nameButton) || !nameButton.Visible)
             return;
-
         nameButton.Visible = false;
-        var edit = new LineEdit
-        {
-            Text = data.Name,
-            MaxLength = 18,
-            CustomMinimumSize = new Vector2(118, 23),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            SelectAllOnFocus = true
-        };
+        var edit = new LineEdit { Text = data.Name, MaxLength = 18, CustomMinimumSize = new Vector2(118, 23), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SelectAllOnFocus = true };
         UiFactory.ApplyPixelFont(edit, 10);
         heading.AddChild(edit);
         heading.MoveChild(edit, 0);
-
         var committed = false;
         void CommitRename()
         {
-            if (committed || !GodotObject.IsInstanceValid(edit))
-                return;
+            if (committed || !GodotObject.IsInstanceValid(edit)) return;
             committed = true;
-
             if (!_session.RenameVoidling(data.Id, edit.Text))
             {
                 edit.QueueFree();
-                if (GodotObject.IsInstanceValid(nameButton))
-                    nameButton.Visible = true;
+                if (GodotObject.IsInstanceValid(nameButton)) nameButton.Visible = true;
             }
         }
-
         edit.TextSubmitted += _ => CommitRename();
         edit.FocusExited += CommitRename;
         edit.GrabFocus();
@@ -214,112 +248,85 @@ public partial class MainController : Node
         container.AddThemeConstantOverride("separation", 1);
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 4);
-
         var gene = GameRules.GetGene(data, statId);
         var effective = (int)Math.Round(GameRules.EffectiveStat(data, statId));
         var level = GameRules.StatLevel(data, statId);
         var count = _session.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0;
         var color = StatPresentationCatalog.ColorFor(statId);
-
-        var label = UiFactory.CreateLabel(
-            $"{StatPresentationCatalog.NameFor(statId).ToUpperInvariant(),-7} {GameRules.GradeName(gene.ExpressedValue)}  LV{level:00}  {effective:00}", 7);
+        var statName = StatPresentationCatalog.NameFor(statId);
+        var label = UiFactory.CreateLabel($"{statName.ToUpperInvariant(),-7} {GameRules.GradeName(gene.ExpressedValue)}  LV{level:00}  {effective:00}", 7);
         label.CustomMinimumSize = new Vector2(142, 17);
         label.AddThemeColorOverride("font_color", color);
         label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
         label.AddThemeConstantOverride("outline_size", statId == "stamina" ? 2 : 1);
         label.TooltipText = $"DNA {GameRules.GradeName(gene.AlleleA)}/{GameRules.GradeName(gene.AlleleB)} • training {GameRules.GetTrainingPoints(data, statId)}";
         row.AddChild(label);
-
-        var use = UiFactory.CreateButton($"+1 ({count})");
+        var use = UiFactory.CreateButton(TrainingItemEffectPresentation.BaseEffectText);
         use.CustomMinimumSize = new Vector2(48, 17);
         UiFactory.ApplyPixelFont(use, 6);
         use.Disabled = count <= 0;
+        use.TooltipText = TrainingItemEffectPresentation.ProfileTooltip(statName, count);
         var capturedStat = statId;
         use.Pressed += () => _session.UseTrainingItem(_selectedId, capturedStat);
         row.AddChild(use);
         container.AddChild(row);
-
-        var bar = CreateStatProgressBar(data, statId, new Vector2(142, 6), animateProgress);
-        container.AddChild(bar);
+        container.AddChild(CreateStatProgressBar(data, statId, new Vector2(142, 6), animateProgress));
         return container;
     }
 
-    private ProgressBar CreateStatProgressBar(
-        VoidlingData data,
-        string statId,
-        Vector2 size,
-        bool animateProgress)
+    private ProgressBar CreateStatProgressBar(VoidlingData data, string statId, Vector2 size, bool animateProgress)
     {
         var target = GameRules.StatLevelProgress(data, statId);
-        var start = animateProgress && _profileDisplayedProgress.TryGetValue(statId, out var previous)
-            ? previous
-            : target;
+        var start = animateProgress && _profileDisplayedProgress.TryGetValue(statId, out var previous) ? previous : target;
         _profileDisplayedProgress[statId] = target;
-
-        var bar = new ProgressBar
-        {
-            MinValue = 0,
-            MaxValue = 1,
-            Value = start,
-            ShowPercentage = false,
-            CustomMinimumSize = size
-        };
+        var bar = new ProgressBar { MinValue = 0, MaxValue = 1, Value = start, ShowPercentage = false, CustomMinimumSize = size };
         var background = new StyleBoxFlat { BgColor = Color.FromHtml("#6D6658") };
         var fill = new StyleBoxFlat { BgColor = StatPresentationCatalog.ColorFor(statId) };
-        background.CornerRadiusTopLeft = background.CornerRadiusTopRight = 1;
-        background.CornerRadiusBottomLeft = background.CornerRadiusBottomRight = 1;
-        fill.CornerRadiusTopLeft = fill.CornerRadiusTopRight = 1;
-        fill.CornerRadiusBottomLeft = fill.CornerRadiusBottomRight = 1;
+        background.CornerRadiusTopLeft = background.CornerRadiusTopRight = background.CornerRadiusBottomLeft = background.CornerRadiusBottomRight = 1;
+        fill.CornerRadiusTopLeft = fill.CornerRadiusTopRight = fill.CornerRadiusBottomLeft = fill.CornerRadiusBottomRight = 1;
         bar.AddThemeStyleboxOverride("background", background);
         bar.AddThemeStyleboxOverride("fill", fill);
-
         if (animateProgress && Math.Abs(target - start) > 0.0001)
         {
             Callable.From(() =>
             {
-                if (!GodotObject.IsInstanceValid(bar) || !bar.IsInsideTree())
-                    return;
-                var tween = bar.CreateTween();
-                tween.TweenProperty(bar, "value", target, ProfileProgressTweenSeconds)
-                    .SetTrans(Tween.TransitionType.Cubic)
-                    .SetEase(Tween.EaseType.Out);
+                if (!GodotObject.IsInstanceValid(bar) || !bar.IsInsideTree()) return;
+                bar.CreateTween().TweenProperty(bar, "value", target, ProfileProgressTweenSeconds).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
             }).CallDeferred();
         }
-
         return bar;
     }
 
     private void ShowInventory()
     {
+        var state = _session.State;
         var items = GameRules.StatIds
             .Select((statId, index) => new InventoryItemViewState(
                 string.Format(Tr("UI_INVENTORY_TREAT"), StatPresentationCatalog.NameFor(statId)),
-                _session.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0,
+                state.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0,
                 18 + index))
             .ToList();
-        items.Add(new InventoryItemViewState(
-            Tr("UI_INVENTORY_EGGS"),
-            _session.State.OwnedEggs.Count,
-            -1,
-            UsesEggIcon: true));
+        items.Add(new InventoryItemViewState(Tr("UI_INVENTORY_EGGS"), state.OwnedEggs.Count, -1, UsesEggIcon: true));
 
-        var failedEggs = _session.State.OwnedEggs
+        var failedEggs = state.OwnedEggs
             .Where(egg => egg.State == EggState.Failed)
-            .Select((egg, index) => new FailedEggViewState(
-                egg.Id,
-                string.Format(Tr("UI_INVENTORY_FAILED_EGG"), index + 1)))
+            .Select((egg, index) => new FailedEggViewState(egg.Id, string.Format(Tr("UI_INVENTORY_FAILED_EGG"), index + 1)))
+            .ToList();
+        var eggShells = state.EggShells
+            .Select((shell, index) => new EggShellViewState(shell.Id, $"Eggshell {index + 1}", GameRules.EggShellSalePrice))
+            .ToList();
+        var incubationSkipCount = state.UtilityItems.TryGetValue(ShopItemIds.FullIncubationSkip, out var ownedSkips) ? Math.Max(0, ownedSkips) : 0;
+        var incubatingEggs = state.OwnedEggs
+            .Where(egg => egg.State == EggState.Incubating && egg.IncubationSeconds < egg.RequiredIncubationSeconds)
+            .Select((egg, index) => new IncubatingEggViewState(egg.Id, $"Egg {index + 1}", Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds))))
             .ToList();
 
         var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(380, 292));
         var screen = new InventoryScreen();
-        screen.Configure(new InventoryScreenState(items, failedEggs));
-        screen.DiscardFailedEggRequested += eggId =>
-        {
-            _session.DiscardFailedEgg(eggId);
-            // Reopen on the next idle frame: the current signal emitter belongs to the modal
-            // subtree and ModalHost intentionally defers freeing that subtree until dispatch ends.
-            CallDeferred(nameof(ShowInventory));
-        };
+        screen.Configure(new InventoryScreenState(items, failedEggs, eggShells, incubationSkipCount, incubatingEggs));
+        screen.DiscardFailedEggRequested += eggId => { _session.DiscardFailedEgg(eggId); CallDeferred(nameof(ShowInventory)); };
+        screen.SellEggShellRequested += shellId => { if (_session.SellEggShell(shellId)) CallDeferred(nameof(ShowInventory)); };
+        screen.UseIncubationSkipRequested += eggId => { if (_session.UseFullIncubationSkip(eggId)) CallDeferred(nameof(ShowInventory)); };
         box.AddChild(screen);
     }
 }
