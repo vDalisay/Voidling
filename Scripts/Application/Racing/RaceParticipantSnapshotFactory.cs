@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Voidling.Domain.Racing;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
@@ -37,6 +36,6 @@ public sealed class RaceParticipantSnapshotFactory
             Stamina: _stats.GetEffectiveStat(creature, "stamina"),
             VisualTypeId: appearance.VisualTypeId,
             PaletteHue: appearance.PaletteHue,
-            LayerIds: appearance.LayerIds.Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
+            LayerIdsKey: RaceParticipantSnapshot.BuildLayerIdsKey(appearance.LayerIds));
     }
 }
