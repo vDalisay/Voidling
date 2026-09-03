@@ -15,27 +15,36 @@ public readonly record struct RacePickerVoidlingViewState(
     int OtherMutationCount,
     string StatSummary);
 
+public readonly record struct RacePickerCourseViewState(
+    string Id,
+    int Version,
+    string Name,
+    string Summary);
+
 public sealed record RacePickerScreenState(
     IReadOnlyList<RacePickerVoidlingViewState> Voidlings,
-    string SelectedId);
+    string SelectedId,
+    IReadOnlyList<RacePickerCourseViewState> Courses,
+    string SelectedCourseId,
+    int SelectedCourseVersion);
 
 /// <summary>
-/// Standalone race-selection view. It renders immutable, presentation-ready participant snapshots
-/// and emits the selected creature ID. Appearance remains semantic until the shared visual factory
-/// composes the portrait/card, so typed bodies and layers cannot drift from the race itself.
+/// Standalone race-selection view. Appearance remains semantic until the shared visual factory
+/// composes portraits/cards; course selection likewise emits only stable semantic IDs/versions.
 /// </summary>
 public partial class RacePickerScreen : VBoxContainer
 {
-    public event Action<string>? RaceRequested;
+    public event Action<string, string, int>? RaceRequested;
 
     private RacePickerScreenState? _state;
     private string _selectedId = string.Empty;
+    private string _selectedCourseId = string.Empty;
+    private int _selectedCourseVersion;
 
     public void Configure(RacePickerScreenState state)
     {
         if (IsInsideTree())
             throw new InvalidOperationException("RacePickerScreen must be configured before it enters the scene tree.");
-
         _state = state ?? throw new ArgumentNullException(nameof(state));
     }
 
@@ -52,17 +61,59 @@ public partial class RacePickerScreen : VBoxContainer
             AddChild(UiFactory.CreateLabel(Tr("UI_RACE_PICKER_EMPTY"), 9));
             return;
         }
+        if (_state.Courses.Count == 0)
+        {
+            AddChild(UiFactory.CreateLabel(Tr("UI_RACE_PICKER_NO_COURSES"), 9));
+            return;
+        }
 
         _selectedId = _state.Voidlings.Any(v => v.Id == _state.SelectedId)
             ? _state.SelectedId
             : _state.Voidlings[0].Id;
+        var selectedCourse = _state.Courses.FirstOrDefault(course =>
+            course.Id == _state.SelectedCourseId && course.Version == _state.SelectedCourseVersion);
+        if (string.IsNullOrWhiteSpace(selectedCourse.Id))
+            selectedCourse = _state.Courses[0];
+        _selectedCourseId = selectedCourse.Id;
+        _selectedCourseVersion = selectedCourse.Version;
 
         AddChild(UiFactory.CreateLabel(Tr("UI_RACE_PICKER_HINT"), 7));
-        BuildPicker(_state.Voidlings);
+        BuildPicker(_state.Voidlings, _state.Courses);
     }
 
-    private void BuildPicker(IReadOnlyList<RacePickerVoidlingViewState> voidlings)
+    private void BuildPicker(
+        IReadOnlyList<RacePickerVoidlingViewState> voidlings,
+        IReadOnlyList<RacePickerCourseViewState> courses)
     {
+        var courseRow = new HBoxContainer();
+        courseRow.AddThemeConstantOverride("separation", 7);
+        courseRow.AddChild(UiFactory.CreateLabel(Tr("UI_RACE_PICKER_COURSE"), 7));
+
+        var courseOption = new OptionButton { CustomMinimumSize = new Vector2(185, 24) };
+        UiFactory.ApplyPixelFont(courseOption, 7);
+        UiFactory.ApplyButtonChrome(courseOption);
+        var selectedCourseIndex = 0;
+        for (var i = 0; i < courses.Count; i++)
+        {
+            courseOption.AddItem(courses[i].Name);
+            if (courses[i].Id == _selectedCourseId && courses[i].Version == _selectedCourseVersion)
+                selectedCourseIndex = i;
+        }
+        courseOption.Select(selectedCourseIndex);
+        courseRow.AddChild(courseOption);
+        AddChild(courseRow);
+
+        var courseSummary = UiFactory.CreateLabel(courses[selectedCourseIndex].Summary, 6);
+        courseSummary.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        AddChild(courseSummary);
+        courseOption.ItemSelected += index =>
+        {
+            var selectedCourse = courses[(int)index];
+            _selectedCourseId = selectedCourse.Id;
+            _selectedCourseVersion = selectedCourse.Version;
+            courseSummary.Text = selectedCourse.Summary;
+        };
+
         var scroll = new ScrollContainer
         {
             CustomMinimumSize = new Vector2(510, 90),
@@ -94,7 +145,6 @@ public partial class RacePickerScreen : VBoxContainer
         AddChild(previewRow);
 
         var cardButtons = new Dictionary<string, Button>(StringComparer.Ordinal);
-
         void UpdatePreview(RacePickerVoidlingViewState candidate)
         {
             _selectedId = candidate.Id;
@@ -105,7 +155,6 @@ public partial class RacePickerScreen : VBoxContainer
                 candidate.OtherMutationCount);
             previewName.Text = candidate.Name;
             previewStats.Text = candidate.StatSummary;
-
             foreach (var pair in cardButtons)
                 pair.Value.ButtonPressed = pair.Key == candidate.Id;
         }
@@ -132,7 +181,10 @@ public partial class RacePickerScreen : VBoxContainer
 
         var start = UiFactory.CreateButton(Tr("UI_RACE_START"));
         start.CustomMinimumSize = new Vector2(170, 26);
-        start.Pressed += () => RaceRequested?.Invoke(_selectedId);
+        start.Pressed += () => RaceRequested?.Invoke(
+            _selectedId,
+            _selectedCourseId,
+            _selectedCourseVersion);
         AddChild(start);
     }
 }
