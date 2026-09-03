@@ -18,7 +18,7 @@ public sealed record LineageArchiveEntry(
     string TintHex,
     bool InbreedingHistoryFlag,
     string VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
-    float PaletteHue = -1.0f,
+    float PaletteHue = VoidlingAppearanceData.LegacyUninitializedPaletteHue,
     string LayerIdsKey = "")
 {
     [JsonIgnore]
