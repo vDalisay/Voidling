@@ -64,7 +64,7 @@ public sealed class BreedVoidlingsUseCase
         _relationships = new RelationshipService(rules.Genetics.RelatedAncestorDepth);
         _lineage = new LineageArchiveService();
         _burden = new InbreedingBurdenService();
-        _genomeInheritance = new GenomeInheritanceService(rules.Genetics);
+        _genomeInheritance = new GenomeInheritanceService(rules.Genetics, rules.Appearance);
         _rareTraits = new RareTraitInheritanceService(rules.Genetics);
         _viability = new HatchViabilityService(rules.Breeding);
         _colors = new ColorPhenotypeResolver(rules.Appearance);
@@ -109,6 +109,7 @@ public sealed class BreedVoidlingsUseCase
         var related = _relationships.AreRelated(first, second, _lineage.GetEffectiveLineage(state));
         var childBurden = _burden.ComputeChildBurden(first, second, related);
         var genome = _genomeInheritance.CreateChild(first, second, eggSeed);
+        var tint = _colors.ResolveTint(genome);
         var egg = new EggData
         {
             Id = eggId,
@@ -123,7 +124,15 @@ public sealed class BreedVoidlingsUseCase
             IsViable = _viability.RollViability(eggSeed, childBurden),
             FailureResolved = true,
             RequiredIncubationSeconds = _rules.Hatching.IncubationSeconds,
-            TintHex = _colors.ResolveTint(genome),
+            TintHex = tint,
+            Appearance = new VoidlingAppearanceData
+            {
+                // Newly hatched Voidlings currently begin from the neutral morphology. The visual
+                // catalog already supports later semantic type changes; the exact stat/evolution
+                // policy that changes normal -> water/fly/power is intentionally not invented here.
+                VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+                PaletteHue = _colors.ResolvePaletteHue(genome)
+            },
             RareTraits = _rareTraits.Inherit(first, second, eggSeed),
             WorldX = worldX,
             WorldY = worldY
