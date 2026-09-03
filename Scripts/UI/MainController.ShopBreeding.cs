@@ -5,6 +5,7 @@ using Voidling.Application.Breeding;
 using Voidling.Presentation.UI.Breeding;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Shop;
+using Voidling.Presentation.Voidlings;
 
 namespace VoidlingGame;
 
@@ -102,7 +103,7 @@ public partial class MainController : Node
         return new BreedingParentViewState(
             Id: data.Id,
             Name: data.Name,
-            TintColor: GameRules.TintColor(data.TintHex),
+            Appearance: VoidlingVisualAppearance.From(data.Appearance, data.TintHex),
             HasAngelMutation: hasAngel,
             OtherMutationCount: otherMutations);
     }
