@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Voidling.Domain.Hatching;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Shop;
 using VoidlingGame;
 
 namespace Voidling.Application.Shop;
@@ -10,6 +11,11 @@ public enum ShopFailure
 {
     None,
     EggNotFound,
+    EggShellNotFound,
+    RareOfferNotFound,
+    UtilityItemNotOwned,
+    EggNotIncubating,
+    EggAlreadyReady,
     NotEnoughCurrency
 }
 
@@ -18,11 +24,12 @@ public sealed record StoreEggPurchaseResult(ShopFailure Failure, EggData? Purcha
     public bool Succeeded => Failure == ShopFailure.None && PurchasedEgg != null && ReplacementEgg != null;
 }
 
-/// <summary>
-/// Coordinates the store transaction while preserving the product rule that a store egg is a
-/// specific pre-rolled object. Purchase moves that same EggData into ownership and creates the
-/// next pre-rolled store listing from an explicit ID/seed.
-/// </summary>
+public readonly record struct EggShellSaleResult(ShopFailure Failure, int CoinsGained)
+{
+    public bool Succeeded => Failure == ShopFailure.None;
+}
+
+/// <summary>Coordinates fixed store transactions and the rotating rare convenience slot.</summary>
 public sealed class ShopUseCase
 {
     private readonly GameBalanceRules _rules;
@@ -37,43 +44,66 @@ public sealed class ShopUseCase
     public ShopFailure ValidateStoreEggPurchase(GameStateData state, string eggId)
     {
         ArgumentNullException.ThrowIfNull(state);
-        if (state.StoreEggs.All(egg => egg.Id != eggId))
-            return ShopFailure.EggNotFound;
-        return state.Coins < _rules.Shop.StoreEggPrice
-            ? ShopFailure.NotEnoughCurrency
-            : ShopFailure.None;
+        if (state.StoreEggs.All(egg => egg.Id != eggId)) return ShopFailure.EggNotFound;
+        return state.Coins < _rules.Shop.StoreEggPrice ? ShopFailure.NotEnoughCurrency : ShopFailure.None;
     }
 
-    public EggData CreateStoreInventoryEgg(string eggId, ulong eggSeed)
-        => _storeEggFactory.Create(eggId, eggSeed);
+    public EggData CreateStoreInventoryEgg(string eggId, ulong eggSeed) => _storeEggFactory.Create(eggId, eggSeed);
 
-    public StoreEggPurchaseResult BuyStoreEgg(
-        GameStateData state,
-        string eggId,
-        string replacementEggId,
-        ulong replacementEggSeed,
-        float worldX,
-        float worldY)
+    public StoreEggPurchaseResult BuyStoreEgg(GameStateData state, string eggId, string replacementEggId, ulong replacementEggSeed, float worldX, float worldY)
     {
         ArgumentNullException.ThrowIfNull(state);
         var failure = ValidateStoreEggPurchase(state, eggId);
-        if (failure != ShopFailure.None)
-            return new StoreEggPurchaseResult(failure, null, null);
-
+        if (failure != ShopFailure.None) return new StoreEggPurchaseResult(failure, null, null);
         var purchasedEgg = state.StoreEggs.First(egg => egg.Id == eggId);
         state.Coins -= _rules.Shop.StoreEggPrice;
         state.StoreEggs.Remove(purchasedEgg);
-
-        // Move the existing rolled egg. Do not recreate or mutate its genetics here.
         purchasedEgg.Source = EggSource.Store;
         purchasedEgg.IncubationSeconds = 0.0f;
         purchasedEgg.WorldX = worldX;
         purchasedEgg.WorldY = worldY;
         state.OwnedEggs.Add(purchasedEgg);
-
         var replacement = _storeEggFactory.Create(replacementEggId, replacementEggSeed);
         state.StoreEggs.Add(replacement);
-
         return new StoreEggPurchaseResult(ShopFailure.None, purchasedEgg, replacement);
+    }
+
+    public ShopFailure BuyRareOffer(GameStateData state, string itemId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (!string.Equals(itemId, ShopItemIds.FullIncubationSkip, StringComparison.Ordinal) ||
+            !string.Equals(state.ShopRareOfferItemId, itemId, StringComparison.Ordinal)) return ShopFailure.RareOfferNotFound;
+        var price = Math.Max(0, _rules.Shop.FullIncubationSkipPrice);
+        if (state.Coins < price) return ShopFailure.NotEnoughCurrency;
+        state.Coins -= price;
+        state.UtilityItems.TryGetValue(itemId, out var owned);
+        state.UtilityItems[itemId] = owned == int.MaxValue ? int.MaxValue : owned + 1;
+        state.ShopRareOfferItemId = string.Empty;
+        return ShopFailure.None;
+    }
+
+    public ShopFailure UseFullIncubationSkip(GameStateData state, string eggId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (!state.UtilityItems.TryGetValue(ShopItemIds.FullIncubationSkip, out var owned) || owned <= 0) return ShopFailure.UtilityItemNotOwned;
+        var egg = state.OwnedEggs.FirstOrDefault(candidate => string.Equals(candidate.Id, eggId, StringComparison.Ordinal));
+        if (egg == null || egg.State != EggState.Incubating) return ShopFailure.EggNotIncubating;
+        if (egg.IncubationSeconds >= egg.RequiredIncubationSeconds) return ShopFailure.EggAlreadyReady;
+        egg.IncubationSeconds = Math.Max(0.0f, egg.RequiredIncubationSeconds);
+        state.UtilityItems[ShopItemIds.FullIncubationSkip] = owned - 1;
+        return ShopFailure.None;
+    }
+
+    public EggShellSaleResult SellEggShell(GameStateData state, string shellId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var shell = state.EggShells.FirstOrDefault(candidate => candidate.Id == shellId);
+        if (shell == null) return new EggShellSaleResult(ShopFailure.EggShellNotFound, 0);
+        var saleValue = Math.Max(0, _rules.Shop.EggShellSalePrice);
+        var availableCoinCapacity = Math.Max(0L, (long)int.MaxValue - state.Coins);
+        var awarded = (int)Math.Min(saleValue, availableCoinCapacity);
+        state.EggShells.Remove(shell);
+        state.Coins += awarded;
+        return new EggShellSaleResult(ShopFailure.None, awarded);
     }
 }
