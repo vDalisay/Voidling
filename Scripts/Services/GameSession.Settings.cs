@@ -13,14 +13,32 @@ public partial class GameSession
         if (!_settings!.SetMasterVolume(State, value))
             return;
 
-        ApplyAudioSettings();
-        Save();
+        _audioSettings!.ApplyMasterVolume(State.MasterVolume);
+        Save(showFeedback: true);
+    }
+
+    public void SetSoundEffectVolume(float value)
+    {
+        if (!_settings!.SetSoundEffectVolume(State, value))
+            return;
+
+        _audioSettings!.ApplySoundEffectVolume(State.SoundEffectVolume);
+        Save(showFeedback: true);
+    }
+
+    public void SetUiSoundVolume(float value)
+    {
+        if (!_settings!.SetUiSoundVolume(State, value))
+            return;
+
+        _audioSettings!.ApplyUiSoundVolume(State.UiSoundVolume);
+        Save(showFeedback: true);
     }
 
     public void SetAutoFinishRaces(bool enabled)
     {
         if (_settings!.SetAutoFinishRaces(State, enabled))
-            Save();
+            Save(showFeedback: true);
     }
 
     public ulong CreateRaceSeed()

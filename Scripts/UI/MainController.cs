@@ -49,6 +49,7 @@ public partial class MainController : Node
         BuildTopBar();
         BuildToast();
         BuildGardenEventLog();
+        BuildSaveFeedbackIndicator();
 
         _modalHost = new ModalHost { ZIndex = 100 };
         _uiRoot.AddChild(_modalHost);
@@ -60,6 +61,7 @@ public partial class MainController : Node
         _session.GardenEventRaised += AppendGardenEvent;
         _gardenEventLog.Append(Tr("UI_GARDEN_LOG_STARTED"));
         RefreshUi();
+        Callable.From(StartFirstLaunchTutorialIfNeeded).CallDeferred();
     }
 
     public override void _ExitTree()
@@ -74,6 +76,7 @@ public partial class MainController : Node
         if (GodotObject.IsInstanceValid(_connectedZoneBridge))
             _connectedZoneBridge.StateChanged -= OnConnectedZoneStateChanged;
 
+        DetachSaveFeedbackIndicator();
         DetachMultiplayerRacePresentation();
         DetachTradePresentation();
     }
@@ -119,7 +122,7 @@ public partial class MainController : Node
         AddTopButton(row, Tr("UI_TOP_SHOP"), ShowShop, 0, 57);
         AddTopButton(row, Tr("UI_TOP_INVENTORY"), ShowInventory, 3, 68);
         AddTopButton(row, Tr("UI_TOP_BREED"), ShowBreeding, 6, 57);
-        AddTopButton(row, Tr("UI_TOP_RACE"), ShowRacePicker, 12, 57);
+        AddTopButton(row, Tr("UI_TOP_RACE"), ShowRacePickerWithCourses, 12, 57);
         AddTopButton(row, Tr("UI_TOP_ONLINE"), ShowConnectedZone, -1, 58);
         AddTopButton(row, Tr("UI_TOP_SETTINGS"), ShowSettingsExtended, -1, 67);
         AddTopButton(row, Tr("UI_TOP_CENTER"), _garden.ResetCamera, -1, 57);
@@ -232,8 +235,6 @@ public partial class MainController : Node
         _gardenEventLog.Append(string.Format(Tr("UI_GARDEN_LOG_RACE_RESULT"), placement));
         _session.ApplyRacePlacementReward(placement);
 
-        // Steam is only a best-time projection. The local race reward is already persisted above,
-        // and leaderboard failure cannot invalidate or roll back that single-player result.
         if (_race != null &&
             GodotObject.IsInstanceValid(_race) &&
             _race.TryGetPlayerFinishMilliseconds(out var finishedMilliseconds))
@@ -265,6 +266,7 @@ public partial class MainController : Node
 
         _selectedId = creatureId;
         RefreshUi();
+        OnTutorialVoidlingSelected();
     }
 
     private void DeselectVoidling()

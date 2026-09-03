@@ -29,7 +29,7 @@ public partial class RaceScreen : Node2D
     private const float JumpDurationSeconds = 0.58f;
     private const int MaxCatchUpStepsPerFrame = 30;
 
-    private static readonly RaceCourse Course = RaceCourse.Demo;
+    private RaceCourse Course => _entry?.CourseDefinition.Course ?? RaceCourse.Demo;
     private static readonly Texture2D WaterTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Tilesets/Water.png");
     private static readonly Texture2D FenceTexture = GD.Load<Texture2D>(
@@ -238,18 +238,22 @@ public partial class RaceScreen : Node2D
 
     private void BuildCoursePresentation()
     {
-        var swim = Course.Segments.Single(segment => segment.Kind == RaceSegmentKind.Swim);
-        var glide = Course.GlideSegment;
+        foreach (var swim in Course.Segments.Where(segment => segment.Kind == RaceSegmentKind.Swim))
+        {
+            AddWaterSection(swim.StartX, swim.EndX);
+            AddWorldLabel("SWIM", (swim.StartX + swim.EndX) * 0.5f, 108, SwimColor);
+        }
 
-        AddWaterSection(swim.StartX, swim.EndX);
-        AddWaterSection(glide.StartX, glide.EndX);
-        AddFlightRamp();
+        if (Course.HasGlideSegment)
+        {
+            var glide = Course.GlideSegment;
+            AddWaterSection(glide.StartX, glide.EndX);
+            AddFlightRamp();
+            AddWorldLabel("GLIDE / SWIM", (glide.StartX + glide.EndX) * 0.5f, 108, FlyColor);
+        }
 
         foreach (var obstacleX in Course.Obstacles)
             AddHurdle(obstacleX + 18.0f);
-
-        AddWorldLabel("SWIM", (swim.StartX + swim.EndX) * 0.5f, 108, SwimColor);
-        AddWorldLabel("GLIDE / SWIM", (glide.StartX + glide.EndX) * 0.5f, 108, FlyColor);
     }
 
     private void CreateEntrantVisuals(IReadOnlyList<RaceEntrant> entrants)
@@ -894,8 +898,13 @@ public partial class RaceScreen : Node2D
 
     private void AddFlightRamp()
     {
+        if (!Course.HasGlideSegment)
+            return;
+
         const float laneBandHeight = 28.0f;
         var width = Course.GlideSegment.StartX - Course.GlideLaunchStartX;
+        if (width <= 0.0f)
+            return;
         var centerX = (Course.GlideLaunchStartX + Course.GlideSegment.StartX) * 0.5f;
 
         for (var y = TrackTop; y < TrackBottom; y += laneBandHeight)
@@ -995,8 +1004,10 @@ public partial class RaceScreen : Node2D
             participant.LayerIds,
             participant.TintHex);
 
-    private static bool InLaunchRamp(float x)
-        => x >= Course.GlideLaunchStartX && x < Course.GlideSegment.StartX;
+    private bool InLaunchRamp(float x)
+        => Course.HasGlideSegment &&
+           x >= Course.GlideLaunchStartX &&
+           x < Course.GlideSegment.StartX;
 
     private static Color ParseTint(string html)
         => string.IsNullOrWhiteSpace(html) ? Colors.White : Color.FromHtml(html);

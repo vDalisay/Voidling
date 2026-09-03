@@ -2,11 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Voidling.Application.Breeding;
+using Voidling.Domain.Genetics;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
 using VoidlingGame;
 
 namespace Voidling.Application.Roster;
+
+public enum CreatureCareDemeanor
+{
+    Settled,
+    NeedsCare
+}
 
 public sealed record CreatureProfileStatProjection(
     string StatId,
@@ -15,13 +22,19 @@ public sealed record CreatureProfileStatProjection(
     int EffectiveValue,
     double TrainingProgress,
     string Dna1Rank,
-    string Dna2Rank);
+    string Dna2Rank)
+{
+    public int TrainingPoints { get; init; }
+    public int TrainingPointCap { get; init; }
+}
 
 public sealed record CreatureProfileRareTraitProjection(
     string TraitId,
     string FounderName,
     int GenerationFromFounder,
     bool CanTransmit);
+
+public sealed record CreaturePersonalityProjection(string TraitId, PersonalityPolarity Polarity);
 
 public sealed record CreatureProfileProjection(
     string CreatureId,
@@ -40,7 +53,13 @@ public sealed record CreatureProfileProjection(
     int ColorAlleleB,
     int ExpressedColorIndex,
     IReadOnlyList<CreatureProfileStatProjection> Stats,
-    IReadOnlyList<CreatureProfileRareTraitProjection> RareTraits);
+    IReadOnlyList<CreatureProfileRareTraitProjection> RareTraits)
+{
+    public CreatureCareDemeanor CareDemeanor { get; init; } = CreatureCareDemeanor.NeedsCare;
+    public string? DiscoveredFavoriteFoodId { get; init; }
+    public CreaturePersonalityProjection Personality { get; init; } =
+        new(string.Empty, PersonalityPolarity.Neutral);
+}
 
 /// <summary>
 /// Builds immutable player-information snapshots. Presentation receives already interpreted ranks,
@@ -51,12 +70,13 @@ public sealed class CreatureProfileProjectionService
 {
     private const string AngelMutationId = "Angel";
 
+    private readonly GameBalanceRules _rules;
     private readonly IReadOnlyList<string> _statIds;
     private readonly StatCalculator _stats;
 
     public CreatureProfileProjectionService(GameBalanceRules rules)
     {
-        ArgumentNullException.ThrowIfNull(rules);
+        _rules = rules ?? throw new ArgumentNullException(nameof(rules));
         _statIds = rules.Genetics.StatIds;
         _stats = new StatCalculator(rules.Stats);
     }
@@ -83,7 +103,11 @@ public sealed class CreatureProfileProjectionService
                 Math.Clamp((int)MathF.Round(_stats.GetEffectiveStat(creature, statId)), 0, 100),
                 _stats.GetLevelProgress(creature, statId),
                 GradeName(gene.AlleleA),
-                GradeName(gene.AlleleB));
+                GradeName(gene.AlleleB))
+            {
+                TrainingPoints = _stats.GetTrainingPoints(creature, statId),
+                TrainingPointCap = _stats.GetTrainingPointCap(creature, statId)
+            };
         }).ToArray();
 
         var rareTraits = creature.RareTraits?
@@ -100,6 +124,7 @@ public sealed class CreatureProfileProjectionService
             string.Equals(trait.TraitId, AngelMutationId, StringComparison.OrdinalIgnoreCase));
         var appearance = (creature.Appearance ?? new VoidlingAppearanceData()).CreateCanonicalCopy();
         var layerIds = appearance.LayerIds.ToArray();
+        var personality = PersonalityGenetics.ResolveDominant(creature.Genome);
 
         return new CreatureProfileProjection(
             creature.Id,
@@ -119,7 +144,18 @@ public sealed class CreatureProfileProjectionService
             creature.Genome.ColorAlleleB,
             creature.Genome.ExpressedColorIndex,
             Array.AsReadOnly(stats),
-            Array.AsReadOnly(rareTraits));
+            Array.AsReadOnly(rareTraits))
+        {
+            CareDemeanor = creature.Needs.Happiness >= _rules.Reincarnation.MinimumHappiness &&
+                           creature.Needs.Stress <= _rules.Reincarnation.MaximumStress
+                ? CreatureCareDemeanor.Settled
+                : CreatureCareDemeanor.NeedsCare,
+            DiscoveredFavoriteFoodId = creature.FavoriteFoodDiscovered &&
+                                       _statIds.Contains(creature.FavoriteFoodId ?? string.Empty)
+                ? creature.FavoriteFoodId
+                : null,
+            Personality = new CreaturePersonalityProjection(personality.TraitId, personality.Polarity)
+        };
     }
 
     private static Dictionary<string, string> BuildLineageNameIndex(GameStateData state)
@@ -134,9 +170,7 @@ public sealed class CreatureProfileProjectionService
         foreach (var archive in state.LineageArchive)
         {
             if (!string.IsNullOrWhiteSpace(archive.CreatureId) && !names.ContainsKey(archive.CreatureId))
-                names.Add(
-                    archive.CreatureId,
-                    string.IsNullOrWhiteSpace(archive.DisplayName) ? "Unknown" : archive.DisplayName);
+                names.Add(archive.CreatureId, string.IsNullOrWhiteSpace(archive.DisplayName) ? "Unknown" : archive.DisplayName);
         }
 
         return names;
