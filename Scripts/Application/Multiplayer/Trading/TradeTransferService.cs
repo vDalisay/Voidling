@@ -18,7 +18,9 @@ public sealed class TradeTransferService
 {
     public const int MaxAssetsPerSide = 8;
     public const int MaxLineageEntriesPerBundle = 256;
-    public const int MaxAppearanceLayers = 32;
+    public const int MaxAppearanceLayers = 16;
+    public const int MaxAppearanceLayerIdLength = 128;
+    public const int MaxVisualTypeIdLength = 64;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -52,6 +54,11 @@ public sealed class TradeTransferService
                 {
                     var creature = state.Voidlings.First(v =>
                         string.Equals(v.Id, asset.AssetId, StringComparison.Ordinal));
+                    if (!IsValidIncomingCreature(creature))
+                    {
+                        error = $"Voidling '{creature.Id}' has invalid transfer state.";
+                        return false;
+                    }
                     voidlings.Add(Clone(creature));
                     lineageRoots.Add(creature.Id);
                     break;
@@ -60,6 +67,11 @@ public sealed class TradeTransferService
                 {
                     var egg = state.OwnedEggs.First(e =>
                         string.Equals(e.Id, asset.AssetId, StringComparison.Ordinal));
+                    if (!IsValidIncomingEgg(egg))
+                    {
+                        error = $"Egg '{egg.Id}' has invalid transfer state.";
+                        return false;
+                    }
                     eggs.Add(Clone(egg));
                     if (!string.IsNullOrWhiteSpace(egg.ParentAId))
                         lineageRoots.Add(egg.ParentAId);
@@ -413,17 +425,15 @@ public sealed class TradeTransferService
     private static bool IsValidAppearance(VoidlingAppearanceData? appearance)
     {
         if (appearance == null ||
-            string.IsNullOrWhiteSpace(appearance.VisualTypeId) ||
-            appearance.VisualTypeId.Length > 64 ||
-            !(appearance.PaletteHue == -1.0f || VoidlingAppearanceData.IsValidHue(appearance.PaletteHue)))
+            !VoidlingAppearanceData.IsValidSemanticId(appearance.VisualTypeId, MaxVisualTypeIdLength) ||
+            !VoidlingAppearanceData.IsValidStoredHue(appearance.PaletteHue))
         {
             return false;
         }
 
         var layers = appearance.LayerIds ?? new List<string>();
-        if (layers.Count > MaxAppearanceLayers)
-            return false;
-        return layers.All(id => !string.IsNullOrWhiteSpace(id) && id.Length <= 128);
+        return layers.Count <= MaxAppearanceLayers &&
+               layers.All(id => VoidlingAppearanceData.IsValidSemanticId(id, MaxAppearanceLayerIdLength));
     }
 
     private static bool HasLineageRoot(
