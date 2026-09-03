@@ -61,10 +61,8 @@ public sealed class SharedVoidlingSnapshotFactory
             .Take(ConnectedZoneValidation.MaxRareTraits)
             .Cast<string>()
             .ToArray();
-        var appearance = creature.Appearance ?? new VoidlingAppearanceData();
-        appearance.Normalize();
+        var appearance = (creature.Appearance ?? new VoidlingAppearanceData()).CreateCanonicalCopy();
         var layerIds = appearance.LayerIds
-            .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(ConnectedZoneValidation.MaxAppearanceLayers)
             .ToArray();
 
