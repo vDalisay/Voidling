@@ -10,7 +10,7 @@ public readonly record struct SharedVoidlingKey(PlatformUserId OwnerId, string C
 
 /// <summary>
 /// Minimal network-facing creature data required to render and identify a Voidling in a connected
-/// Garden. This is deliberately not a save DTO and is never inserted into another player's save.
+/// Garden. Appearance fields are semantic only; peers resolve local catalog assets themselves.
 /// </summary>
 public sealed record SharedVoidlingSnapshot(
     string CreatureId,
@@ -21,7 +21,10 @@ public sealed record SharedVoidlingSnapshot(
     int FamilyGeneration,
     string[] RareTraitIds,
     float ZoneX,
-    float ZoneY)
+    float ZoneY,
+    string VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+    float PaletteHue = -1.0f,
+    string[]? LayerIds = null)
 {
     public SharedVoidlingKey Key => new(OwnerId, CreatureId);
 }
@@ -48,11 +51,6 @@ public sealed record ConnectedZoneOperationResult(bool Success, string? Error)
         => new(false, error);
 }
 
-/// <summary>
-/// Transient replicated state for one connected Garden session. It never owns local gameplay data.
-/// The host orders mutations through Revision; every peer keeps enough replicated state to become
-/// the next casual session host after Steam lobby-owner migration.
-/// </summary>
 public sealed class ConnectedZoneState
 {
     private readonly Dictionary<SharedVoidlingKey, SharedVoidlingSnapshot> _voidlings = new();
@@ -68,7 +66,6 @@ public sealed class ConnectedZoneState
     public void Reset(LobbySnapshot lobby)
     {
         ArgumentNullException.ThrowIfNull(lobby);
-
         LobbyId = lobby.LobbyId;
         HostId = lobby.OwnerId;
         AuthorityEpoch = 1;
@@ -89,7 +86,6 @@ public sealed class ConnectedZoneState
     {
         if (!IsInitialized || newHost.Value == 0 || newHost == HostId)
             return;
-
         HostId = newHost;
         AuthorityEpoch++;
     }
@@ -106,59 +102,43 @@ public sealed class ConnectedZoneState
     {
         if (ownerId.Value == 0 || string.IsNullOrWhiteSpace(creatureId))
             return Revision;
-
         if (_voidlings.Remove(new SharedVoidlingKey(ownerId, creatureId)))
             Revision++;
-
         return Revision;
     }
 
     public bool RetainOwners(IReadOnlySet<PlatformUserId> allowedOwners)
     {
         ArgumentNullException.ThrowIfNull(allowedOwners);
-
         var removed = false;
         foreach (var key in _voidlings.Keys.ToArray())
         {
             if (allowedOwners.Contains(key.OwnerId))
                 continue;
-
             _voidlings.Remove(key);
             removed = true;
         }
-
         if (removed)
             Revision++;
-
         return removed;
     }
 
-    public ZoneDeltaApplyResult ApplyPublished(
-        long authorityEpoch,
-        long revision,
-        SharedVoidlingSnapshot snapshot)
+    public ZoneDeltaApplyResult ApplyPublished(long authorityEpoch, long revision, SharedVoidlingSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-
         var sequence = CheckSequence(authorityEpoch, revision);
         if (sequence != ZoneDeltaApplyResult.Applied)
             return sequence;
-
         _voidlings[snapshot.Key] = snapshot;
         Revision = revision;
         return ZoneDeltaApplyResult.Applied;
     }
 
-    public ZoneDeltaApplyResult ApplyRemoved(
-        long authorityEpoch,
-        long revision,
-        PlatformUserId ownerId,
-        string creatureId)
+    public ZoneDeltaApplyResult ApplyRemoved(long authorityEpoch, long revision, PlatformUserId ownerId, string creatureId)
     {
         var sequence = CheckSequence(authorityEpoch, revision);
         if (sequence != ZoneDeltaApplyResult.Applied)
             return sequence;
-
         _voidlings.Remove(new SharedVoidlingKey(ownerId, creatureId));
         Revision = revision;
         return ZoneDeltaApplyResult.Applied;
@@ -167,7 +147,6 @@ public sealed class ConnectedZoneState
     public bool TryApplySnapshot(ConnectedZoneSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-
         if (snapshot.LobbyId == 0 || snapshot.LobbyId != LobbyId || snapshot.HostId.Value == 0)
             return false;
         if (snapshot.AuthorityEpoch < AuthorityEpoch)
@@ -179,13 +158,11 @@ public sealed class ConnectedZoneState
         AuthorityEpoch = snapshot.AuthorityEpoch;
         Revision = snapshot.Revision;
         _voidlings.Clear();
-
         foreach (var voidling in snapshot.Voidlings ?? Array.Empty<SharedVoidlingSnapshot>())
         {
             if (ConnectedZoneValidation.IsValidSharedVoidling(voidling))
                 _voidlings[voidling.Key] = voidling;
         }
-
         return true;
     }
 
@@ -195,7 +172,6 @@ public sealed class ConnectedZoneState
             .OrderBy(v => v.OwnerId.Value)
             .ThenBy(v => v.CreatureId, StringComparer.Ordinal)
             .ToArray();
-
         return new ConnectedZoneSnapshot(LobbyId, HostId, AuthorityEpoch, Revision, ordered);
     }
 
@@ -203,13 +179,9 @@ public sealed class ConnectedZoneState
     {
         if (authorityEpoch < AuthorityEpoch ||
             (authorityEpoch == AuthorityEpoch && revision <= Revision))
-        {
             return ZoneDeltaApplyResult.Stale;
-        }
-
         if (authorityEpoch != AuthorityEpoch || revision != Revision + 1)
             return ZoneDeltaApplyResult.RequiresSnapshot;
-
         return ZoneDeltaApplyResult.Applied;
     }
 }
@@ -219,6 +191,8 @@ public static class ConnectedZoneValidation
     public const int MaxCreatureIdLength = 128;
     public const int MaxDisplayNameLength = 64;
     public const int MaxTintLength = 16;
+    public const int MaxVisualTypeIdLength = 64;
+    public const int MaxAppearanceLayers = 16;
     public const int MaxRareTraits = 32;
 
     public static bool IsValidSharedVoidling(SharedVoidlingSnapshot? snapshot)
@@ -231,6 +205,9 @@ public static class ConnectedZoneValidation
             snapshot.DisplayName.Length > MaxDisplayNameLength ||
             string.IsNullOrWhiteSpace(snapshot.TintHex) ||
             snapshot.TintHex.Length > MaxTintLength ||
+            string.IsNullOrWhiteSpace(snapshot.VisualTypeId) ||
+            snapshot.VisualTypeId.Length > MaxVisualTypeIdLength ||
+            (!VoidlingAppearanceData.IsValidHue(snapshot.PaletteHue) && snapshot.PaletteHue >= 0.0f) ||
             !float.IsFinite(snapshot.ZoneX) ||
             !float.IsFinite(snapshot.ZoneY) ||
             snapshot.FamilyGeneration < 0)
@@ -238,16 +215,18 @@ public static class ConnectedZoneValidation
             return false;
         }
 
+        var layers = snapshot.LayerIds ?? Array.Empty<string>();
+        if (layers.Length > MaxAppearanceLayers || layers.Any(id => string.IsNullOrWhiteSpace(id) || id.Length > 128))
+            return false;
+
         var rareTraits = snapshot.RareTraitIds ?? Array.Empty<string>();
         if (rareTraits.Length > MaxRareTraits)
             return false;
-
         foreach (var traitId in rareTraits)
         {
             if (string.IsNullOrWhiteSpace(traitId) || traitId.Length > 128)
                 return false;
         }
-
         return true;
     }
 }
