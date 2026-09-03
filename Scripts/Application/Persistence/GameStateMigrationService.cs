@@ -70,14 +70,14 @@ public sealed class GameStateMigrationService
             }
 
             creature.RareTraits ??= new List<RareTraitData>();
-            NormalizeAppearance(creature.Genome, ref creature.Appearance, creature.TintHex);
+            creature.Appearance = NormalizeAppearance(creature.Genome, creature.Appearance);
         }
 
         foreach (var egg in state.OwnedEggs.Concat(state.StoreEggs))
         {
             egg.Genome ??= new GenomeData();
             egg.RareTraits ??= new List<RareTraitData>();
-            NormalizeAppearance(egg.Genome, ref egg.Appearance, egg.TintHex);
+            egg.Appearance = NormalizeAppearance(egg.Genome, egg.Appearance);
         }
 
         // Version 5 introduced a minimal persistent ancestry graph. Populate it from every full
@@ -123,15 +123,15 @@ public sealed class GameStateMigrationService
         state.SaveVersion = CurrentSaveVersion;
     }
 
-    private void NormalizeAppearance(
+    private VoidlingAppearanceData NormalizeAppearance(
         GenomeData genome,
-        ref VoidlingAppearanceData appearance,
-        string legacyTintHex)
+        VoidlingAppearanceData? appearance)
     {
         _colors.EnsurePaletteGenes(genome);
         appearance ??= new VoidlingAppearanceData();
         appearance.Normalize();
         if (!VoidlingAppearanceData.IsValidHue(appearance.PaletteHue))
             appearance.PaletteHue = _colors.ResolvePaletteHue(genome);
+        return appearance;
     }
 }
