@@ -46,7 +46,7 @@ public partial class MainController : Node
                 return;
 
             CloseModal();
-            StartRace(creatureId, courseId, courseVersion);
+            StartRaceWithCourse(creatureId, courseId, courseVersion);
         };
         box.AddChild(screen);
     }
