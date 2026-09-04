@@ -1,9 +1,9 @@
-[gd_resource type="TileSet" load_steps=9 format=3 uid="uid://b8w5f8bb1vvc6"]
+[gd_resource type="TileSet" format=3 uid="uid://b8w5f8bb1vvc6"]
 
-[ext_resource type="Texture2D" uid="uid://ce1l5xu8gqqps" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Grass_Hill_Tiles_v2.png" id="1_egdy5"]
-[ext_resource type="Texture2D" uid="uid://ufnqdfkhjnwb" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Grass_tiles_v2.png" id="2_h30o8"]
-[ext_resource type="Texture2D" uid="uid://bg4y3jrgal50c" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Grass_Tile_layers2.png" id="3_bp2xk"]
-[ext_resource type="Texture2D" uid="uid://bpde2r7k5xd4m" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Grass_Tile_Layers.png" id="4_4cu3h"]
+[ext_resource type="Texture2D" uid="uid://ce1l5xu8gqqps" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Grass_Hill_Tiles_v2.png" id="1_egdy5"]
+[ext_resource type="Texture2D" uid="uid://ufnqdfkhjnwb" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Grass_tiles_v2.png" id="2_h30o8"]
+[ext_resource type="Texture2D" uid="uid://bg4y3jrgal50c" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Grass_Tile_layers2.png" id="3_bp2xk"]
+[ext_resource type="Texture2D" uid="uid://bpde2r7k5xd4m" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Grass_Tile_Layers.png" id="4_4cu3h"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_pep2m"]
 texture = ExtResource("1_egdy5")

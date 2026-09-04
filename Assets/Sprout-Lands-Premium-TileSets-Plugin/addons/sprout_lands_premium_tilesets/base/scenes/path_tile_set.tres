@@ -1,7 +1,7 @@
-[gd_resource type="TileSet" load_steps=5 format=3 uid="uid://dmic1h12aascn"]
+[gd_resource type="TileSet" format=3 uid="uid://dmic1h12aascn"]
 
-[ext_resource type="Texture2D" uid="uid://u4luqywdtoci" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/Building parts/Paths.png" id="1_x0tyk"]
-[ext_resource type="Texture2D" uid="uid://uwurcl8gy0gi" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/Building parts/Stone_Path.png" id="2_fal3b"]
+[ext_resource type="Texture2D" uid="uid://u4luqywdtoci" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/Building parts/Paths.png" id="1_x0tyk"]
+[ext_resource type="Texture2D" uid="uid://uwurcl8gy0gi" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/Building parts/Stone_Path.png" id="2_fal3b"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_evwfr"]
 texture = ExtResource("1_x0tyk")

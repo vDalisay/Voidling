@@ -1,9 +1,9 @@
-[gd_resource type="TileSet" load_steps=9 format=3 uid="uid://dbjjxavpke7hr"]
+[gd_resource type="TileSet" format=3 uid="uid://dbjjxavpke7hr"]
 
-[ext_resource type="Texture2D" uid="uid://c8updtnm3hq5b" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Darker_Grass_Hills_Tiles_v2.png" id="1_vpb3c"]
-[ext_resource type="Texture2D" uid="uid://bs2uqycv7c0y8" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Darker_Grass_Tiles_v2.png" id="2_754jo"]
-[ext_resource type="Texture2D" uid="uid://c1876fh3jo1du" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Darker_Grass_Tile_Layers2.png" id="3_5lqem"]
-[ext_resource type="Texture2D" uid="uid://busjmqab7kugx" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Darker_Grass_Tile_Layers.png" id="4_nc1hm"]
+[ext_resource type="Texture2D" uid="uid://c8updtnm3hq5b" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Darker_Grass_Hills_Tiles_v2.png" id="1_vpb3c"]
+[ext_resource type="Texture2D" uid="uid://bs2uqycv7c0y8" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Darker_Grass_Tiles_v2.png" id="2_754jo"]
+[ext_resource type="Texture2D" uid="uid://c1876fh3jo1du" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Darker_Grass_Tile_Layers2.png" id="3_5lqem"]
+[ext_resource type="Texture2D" uid="uid://busjmqab7kugx" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Darker_Grass_Tile_Layers.png" id="4_nc1hm"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_04fn0"]
 texture = ExtResource("1_vpb3c")

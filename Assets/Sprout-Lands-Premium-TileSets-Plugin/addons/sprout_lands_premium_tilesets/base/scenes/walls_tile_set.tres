@@ -1,6 +1,6 @@
-[gd_resource type="TileSet" load_steps=3 format=3 uid="uid://bwu2j7r7pyan5"]
+[gd_resource type="TileSet" format=3 uid="uid://bwu2j7r7pyan5"]
 
-[ext_resource type="Texture2D" uid="uid://bgu6420meb442" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/Building parts/Wooden_House_Walls_Tilset.png" id="1_tyjoh"]
+[ext_resource type="Texture2D" uid="uid://bgu6420meb442" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/Building parts/Wooden_House_Walls_Tilset.png" id="1_tyjoh"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_u5ho4"]
 texture = ExtResource("1_tyjoh")

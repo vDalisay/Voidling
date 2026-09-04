@@ -1,11 +1,10 @@
-[gd_resource type="TileSet" load_steps=5 format=3]
+[gd_resource type="TileSet" format=3 uid="uid://byoms3aooayvy"]
 
-[ext_resource type="Texture2D" path="res://Assets/Sprout Lands - Sprites - Basic pack/Tilesets/Grass.png" id="1_grass"]
-[ext_resource type="Texture2D" path="res://Assets/Sprout Lands - Sprites - Basic pack/Tilesets/Water.png" id="2_water"]
+[ext_resource type="Texture2D" uid="uid://cgg64k345hoib" path="res://Assets/Sprout Lands - Sprites - Basic pack/Tilesets/Grass.png" id="1_grass"]
+[ext_resource type="Texture2D" uid="uid://dpy2dnixy1piv" path="res://Assets/Sprout Lands - Sprites - Basic pack/Tilesets/Water.png" id="2_water"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_grass"]
 texture = ExtResource("1_grass")
-texture_region_size = Vector2i(16, 16)
 0:0/0 = 0
 1:0/0 = 0
 2:0/0 = 0
@@ -122,14 +121,12 @@ texture_region_size = Vector2i(16, 16)
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_water"]
 texture = ExtResource("2_water")
-texture_region_size = Vector2i(16, 16)
 0:0/0 = 0
 1:0/0 = 0
 2:0/0 = 0
 3:0/0 = 0
 
 [resource]
-tile_size = Vector2i(16, 16)
 terrain_set_0/mode = 0
 terrain_set_0/terrain_0/name = "Grass"
 terrain_set_0/terrain_0/color = Color(0.39, 0.61, 0.25, 1)

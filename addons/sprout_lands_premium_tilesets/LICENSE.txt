@@ -1,0 +1,8 @@
+Copyright (c) 2024-present Marek Belski.
+
+ - You can modify the plugin. 
+ - You can use this plugin in any kind of non-commercial and commercial projects. 
+ 
+ - You can NOT include the addon in an open source distribution of your project.
+ - You can NOT redistribute the plugin or resell it on other platforms, even if modified.
+ - You can NOT use the plugin in any way that breaks international or local laws.

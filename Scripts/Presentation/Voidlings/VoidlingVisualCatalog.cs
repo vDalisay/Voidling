@@ -16,7 +16,8 @@ public static class VoidlingVisualCatalog
 
     private const int PipFrameWidth = 32;
     private const int PipFrameHeight = 32;
-    private const int PipFrameCount = 5;
+    private const int PipFrameCount = 6;
+    private const double PipAnimationFps = 10.0;
 
     private static readonly Texture2D LegacyTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Characters/Basic Charakter Spritesheet.png");
@@ -73,8 +74,8 @@ public static class VoidlingVisualCatalog
         {
             var frames = new SpriteFrames();
             frames.RemoveAnimation("default");
-            AddPipAnimation(frames, "run", 9.0);
-            AddPipAnimation(frames, "swim", 7.0);
+            AddPipAnimation(frames, "run", PipAnimationFps);
+            AddPipAnimation(frames, "swim", PipAnimationFps);
             return frames;
         }
 
@@ -94,10 +95,10 @@ public static class VoidlingVisualCatalog
     {
         var frames = new SpriteFrames();
         frames.RemoveAnimation("default");
-        AddPipAnimation(frames, "walk_down", 8.0);
-        AddPipAnimation(frames, "walk_up", 8.0);
-        AddPipAnimation(frames, "walk_left", 8.0);
-        AddPipAnimation(frames, "walk_right", 8.0);
+        AddPipAnimation(frames, "walk_down", PipAnimationFps);
+        AddPipAnimation(frames, "walk_up", PipAnimationFps);
+        AddPipAnimation(frames, "walk_left", PipAnimationFps);
+        AddPipAnimation(frames, "walk_right", PipAnimationFps);
         return frames;
     }
 

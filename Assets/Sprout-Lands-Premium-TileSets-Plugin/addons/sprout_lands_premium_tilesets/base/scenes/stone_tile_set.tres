@@ -1,7 +1,7 @@
-[gd_resource type="TileSet" load_steps=5 format=3 uid="uid://bkcb3a7b6ggfu"]
+[gd_resource type="TileSet" format=3 uid="uid://bkcb3a7b6ggfu"]
 
-[ext_resource type="Texture2D" uid="uid://citi1pn687nue" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Stone_Ground_Hills_Tiles.png" id="3_oxpru"]
-[ext_resource type="Texture2D" uid="uid://bn2np6d4r0dqe" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Stone_Ground_Tiles.png" id="4_tmfod"]
+[ext_resource type="Texture2D" uid="uid://citi1pn687nue" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Stone_Ground_Hills_Tiles.png" id="3_oxpru"]
+[ext_resource type="Texture2D" uid="uid://bn2np6d4r0dqe" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Stone_Ground_Tiles.png" id="4_tmfod"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_nb8qn"]
 texture = ExtResource("3_oxpru")

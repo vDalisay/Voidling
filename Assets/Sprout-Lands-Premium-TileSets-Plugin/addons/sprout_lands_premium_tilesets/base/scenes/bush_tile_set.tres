@@ -1,6 +1,6 @@
-[gd_resource type="TileSet" load_steps=3 format=3 uid="uid://blpppkiffse27"]
+[gd_resource type="TileSet" format=3 uid="uid://blpppkiffse27"]
 
-[ext_resource type="Texture2D" uid="uid://c7rebe4wo1757" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Bush_Tiles.png" id="2_r8ytn"]
+[ext_resource type="Texture2D" uid="uid://c7rebe4wo1757" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Bush_Tiles.png" id="2_r8ytn"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_553lq"]
 texture = ExtResource("2_r8ytn")

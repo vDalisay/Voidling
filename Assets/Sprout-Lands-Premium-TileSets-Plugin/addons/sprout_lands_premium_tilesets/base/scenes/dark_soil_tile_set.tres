@@ -1,7 +1,7 @@
-[gd_resource type="TileSet" load_steps=5 format=3 uid="uid://b0mmolxvhu2ug"]
+[gd_resource type="TileSet" format=3 uid="uid://b0mmolxvhu2ug"]
 
-[ext_resource type="Texture2D" uid="uid://1c4y26ix066f" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Darker_Soil_Ground_Hills_Tiles.png" id="3_vde2n"]
-[ext_resource type="Texture2D" uid="uid://b2diw7sxuk3ir" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Darker_Soil_Ground_Tiles.png" id="4_cktue"]
+[ext_resource type="Texture2D" uid="uid://1c4y26ix066f" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Darker_Soil_Ground_Hills_Tiles.png" id="3_vde2n"]
+[ext_resource type="Texture2D" uid="uid://b2diw7sxuk3ir" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/New tiles/Darker_Soil_Ground_Tiles.png" id="4_cktue"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_cpyxd"]
 texture = ExtResource("3_vde2n")

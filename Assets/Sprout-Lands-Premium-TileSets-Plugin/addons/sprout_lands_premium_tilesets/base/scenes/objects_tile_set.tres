@@ -1,9 +1,9 @@
-[gd_resource type="TileSet" load_steps=9 format=3 uid="uid://d2ko6dfc7nim7"]
+[gd_resource type="TileSet" format=3 uid="uid://d2ko6dfc7nim7"]
 
-[ext_resource type="Texture2D" uid="uid://eabn6jx0w5es" path="res://addons/sprout_lands_premium_tilesets/assets/Objects/Farming Plants.png" id="1_s1qfa"]
-[ext_resource type="Texture2D" uid="uid://by2wejwjcji5x" path="res://addons/sprout_lands_premium_tilesets/assets/Objects/Mushrooms, Flowers, Stones.png" id="2_gd12a"]
-[ext_resource type="Texture2D" uid="uid://dq4anlv4ufqgs" path="res://addons/sprout_lands_premium_tilesets/assets/Objects/Trees, stumps and bushes.png" id="3_ww4s6"]
-[ext_resource type="Texture2D" uid="uid://dofmhjug1hvja" path="res://addons/sprout_lands_premium_tilesets/assets/Objects/Water Objects.png" id="4_efbpy"]
+[ext_resource type="Texture2D" uid="uid://eabn6jx0w5es" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Objects/Farming Plants.png" id="1_s1qfa"]
+[ext_resource type="Texture2D" uid="uid://by2wejwjcji5x" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Objects/Mushrooms, Flowers, Stones.png" id="2_gd12a"]
+[ext_resource type="Texture2D" uid="uid://dq4anlv4ufqgs" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Objects/Trees, stumps and bushes.png" id="3_ww4s6"]
+[ext_resource type="Texture2D" uid="uid://dofmhjug1hvja" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Objects/Water Objects.png" id="4_efbpy"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_7ti8y"]
 texture = ExtResource("1_s1qfa")

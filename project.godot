@@ -3,7 +3,7 @@
 ; since the parameters that go here are not all obvious.
 ;
 ; Format:
-;   [section] ; section between []
+;   [section] ; section goes between []
 ;   param=value ; assign values to parameters
 
 config_version=5
@@ -32,6 +32,10 @@ window/handheld/orientation=1
 
 project/assembly_name="Voidling"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/sprout_lands_premium_tilesets/plugin.cfg")
+
 [internationalization]
 
 locale/translations=PackedStringArray("res://Localization/en.po")
@@ -46,3 +50,11 @@ textures/canvas_textures/default_texture_filter=0
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+
+[sprout_lands_premium_tilesets]
+
+disable_plugin_dialogues=true
+
+[sprout_lands_tilemap]
+
+disable_plugin_dialogues=true

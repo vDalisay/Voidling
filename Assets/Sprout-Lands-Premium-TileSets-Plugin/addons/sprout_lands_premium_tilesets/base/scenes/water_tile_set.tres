@@ -1,6 +1,6 @@
-[gd_resource type="TileSet" load_steps=3 format=3 uid="uid://dp7w6nsvbk7cd"]
+[gd_resource type="TileSet" format=3 uid="uid://dp7w6nsvbk7cd"]
 
-[ext_resource type="Texture2D" uid="uid://slp11rqyxyqx" path="res://addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/water frames/Water.png" id="1_3dx6s"]
+[ext_resource type="Texture2D" uid="uid://slp11rqyxyqx" path="res://Assets/Sprout-Lands-Premium-TileSets-Plugin/addons/sprout_lands_premium_tilesets/assets/Tilesets/ground tiles/water frames/Water.png" id="1_3dx6s"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ipp0a"]
 texture = ExtResource("1_3dx6s")
