@@ -33,6 +33,23 @@ public partial class MainController
             RequireOnScreen(_detailsPanel!);
             if (_quickMenu.Visible) throw new InvalidOperationException("Roster overlaps the inspector.");
             await CaptureGardenUi("companion");
+            var inspectorScroll = _detailsPanel!.GetChild<VBoxContainer>(0).GetNode<ScrollContainer>("ProfileScroll");
+            inspectorScroll.ScrollVertical = 40;
+            await SettleGardenUi();
+            var scrollPosition = inspectorScroll.ScrollVertical;
+            if (scrollPosition <= 0) throw new InvalidOperationException("Inspector did not scroll.");
+            for (var refresh = 0; refresh < 3; refresh++)
+            {
+                RefreshUi();
+                await SettleGardenUi();
+                if (_detailsPanel!.GetChild<VBoxContainer>(0).GetNode<ScrollContainer>("ProfileScroll") != inspectorScroll ||
+                    inspectorScroll.ScrollVertical != scrollPosition)
+                    throw new InvalidOperationException("Inspector refresh replaced or reset the scrollbar.");
+            }
+            OnQuickMenuVoidlingPicked(_session.State.Voidlings.Last().Id);
+            await SettleGardenUi();
+            if (_detailsPanel!.GetChild<VBoxContainer>(0).GetNode<ScrollContainer>("ProfileScroll").ScrollVertical != 0)
+                throw new InvalidOperationException("A different Voidling inherited the previous scroll position.");
             DeselectVoidling();
 
             var dock = _uiRoot.GetNode<PanelContainer>("GardenDock").GetChild<HBoxContainer>(0);

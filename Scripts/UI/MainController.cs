@@ -182,9 +182,9 @@ public partial class MainController : Node
     {
         _gardenEventLog = new GardenEventLog
         {
-            Position = new Vector2(12, 232),
-            Size = new Vector2(376, 62),
-            CustomMinimumSize = new Vector2(376, 62),
+            Position = new Vector2(12, 244),
+            Size = new Vector2(280, 50),
+            CustomMinimumSize = new Vector2(280, 50),
             ZIndex = 6
         };
         _uiRoot.AddChild(_gardenEventLog);

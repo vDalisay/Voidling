@@ -24,6 +24,11 @@ public partial class GardenEventLog : Control
         MouseFilter = MouseFilterEnum.Pass;
 
         var panel = UiFactory.CreatePanel(Vector2.Zero);
+        var background = (StyleBoxTexture)panel.GetThemeStylebox("panel").Duplicate();
+        background.ModulateColor = new Color(1, 1, 1, 0.45f);
+        background.ContentMarginTop = background.ContentMarginBottom = 6;
+        background.ContentMarginLeft = background.ContentMarginRight = 9;
+        panel.AddThemeStyleboxOverride("panel", background);
         panel.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         AddChild(panel);
         var column = new VBoxContainer();

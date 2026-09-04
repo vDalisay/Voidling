@@ -39,27 +39,45 @@ public partial class MainController : Node
             _profileProgressCreatureId = data.Id;
         }
 
-        if (_detailsPanel != null && GodotObject.IsInstanceValid(_detailsPanel))
-            _detailsPanel.QueueFree();
-        _detailsPanel = null;
-
-        _detailsPanel = UiFactory.CreatePanel(new Vector2(226, 290));
-        _detailsPanel.Position = new Vector2(sameCreature ? DetailsPanelRestX : DetailsPanelHiddenX, 58);
-        _detailsPanel.Size = new Vector2(226, 290);
-        _uiRoot.AddChild(_detailsPanel);
-
-        var layout = new VBoxContainer();
-        layout.AddThemeConstantOverride("separation", 6);
-        _detailsPanel.AddChild(layout);
-
-        var scroll = new ScrollContainer
+        VBoxContainer layout;
+        ScrollContainer scroll;
+        if (sameCreature && _detailsPanel != null && GodotObject.IsInstanceValid(_detailsPanel))
         {
-            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill
-        };
-        layout.AddChild(scroll);
-        UiFactory.StyleScroll(scroll);
+            layout = _detailsPanel.GetChild<VBoxContainer>(0);
+            scroll = layout.GetNode<ScrollContainer>("ProfileScroll");
+            // Keep the scrollbar (including an active thumb drag) alive across simulation updates.
+            foreach (var parent in new Node[] { layout, scroll })
+            {
+                foreach (var child in parent.GetChildren())
+                {
+                    if (child == scroll) continue;
+                    parent.RemoveChild(child);
+                    child.QueueFree();
+                }
+            }
+        }
+        else
+        {
+            if (_detailsPanel != null && GodotObject.IsInstanceValid(_detailsPanel))
+                _detailsPanel.QueueFree();
+            _detailsPanel = UiFactory.CreatePanel(new Vector2(226, 290));
+            _detailsPanel.Position = new Vector2(sameCreature ? DetailsPanelRestX : DetailsPanelHiddenX, 58);
+            _detailsPanel.Size = new Vector2(226, 290);
+            _uiRoot.AddChild(_detailsPanel);
+            layout = new VBoxContainer();
+            layout.AddThemeConstantOverride("separation", 6);
+            _detailsPanel.AddChild(layout);
+            scroll = new ScrollContainer
+            {
+                Name = "ProfileScroll",
+                HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+                SizeFlagsVertical = Control.SizeFlags.ExpandFill
+            };
+            layout.AddChild(scroll);
+            UiFactory.StyleScroll(scroll);
+        }
+        _detailsPanel.Visible = true;
         var box = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         box.AddThemeConstantOverride("separation", 4);
         scroll.AddChild(box);
