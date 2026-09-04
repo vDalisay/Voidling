@@ -218,6 +218,12 @@ public partial class RaceScreen : Node2D
         UpdateZoom((float)delta);
         QueueRedraw();
 
+        // Keep the framing on the player between the countdown and the podium too, so a zoom taken
+        // on the start line or after the finish is centred on the same Voidling. The flyover owns
+        // the camera while it is running.
+        if (!_running && !_flyoverRunning)
+            UpdatePlayerTracking();
+
         if (!_running || _playerVisual == null)
             return;
 
@@ -1237,12 +1243,27 @@ public partial class RaceScreen : Node2D
         _camera.Zoom = new Vector2(_zoom, _zoom);
     }
 
+    /// <summary>
+    /// Keeps the camera on the player's own Voidling.
+    ///
+    /// Vertically it centres on the creature but never past the edge of the wide framing, so at the
+    /// furthest zoom the view is byte-for-byte the one the race has always had, and every step in
+    /// follows the Voidling up the cliff, off the ramp and down through a glide instead of leaving
+    /// it to drift off the top of a zoomed-in screen.
+    /// </summary>
     private void UpdatePlayerTracking()
     {
         if (_playerVisual == null || !TryGetPlayerState(out var player))
             return;
 
-        _camera.Position = new Vector2(player.X, ScreenHeight * 0.5f);
+        // The sprite's origin is its frame centre; the creature sits a little below that.
+        var focusY = _playerVisual.Sprite.Position.Y + 9.0f;
+        var halfHeight = ScreenHeight * 0.5f / Math.Max(0.001f, _zoom);
+        var cameraY = halfHeight >= ScreenHeight * 0.5f
+            ? ScreenHeight * 0.5f
+            : Mathf.Clamp(focusY, halfHeight, ScreenHeight - halfHeight);
+
+        _camera.Position = new Vector2(player.X, cameraY);
         _playerMarker.Position = new Vector2(player.X, _playerVisual.Sprite.Position.Y - 21.0f);
     }
 

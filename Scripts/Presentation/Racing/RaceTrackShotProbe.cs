@@ -120,6 +120,16 @@ public partial class RaceTrackShotProbe : Node
 
                 pending.Remove(hit);
 
+                // Wheel the zoom in through the real input path, so the shot proves the camera
+                // follows the player's own Voidling rather than a camera the probe placed by hand.
+                if (hit.Name.EndsWith("-zoom", StringComparison.Ordinal))
+                {
+                    for (var notch = 0; notch < 5; notch++)
+                        Input.ParseInputEvent(Wheel(MouseButton.WheelUp));
+                    for (var frame = 0; frame < 40; frame++)
+                        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                }
+
                 // The cheer burst only exists while the button has just been pressed, so press it.
                 if (hit.Name.EndsWith("-cheer", StringComparison.Ordinal))
                 {
@@ -133,6 +143,12 @@ public partial class RaceTrackShotProbe : Node
                 var actionPath = $"{OutputDirectory}/{prefix}-{hit.Name}.png";
                 GetViewport().GetTexture().GetImage().SavePng(actionPath);
                 GD.Print($"[race-shots] wrote {ProjectSettings.GlobalizePath(actionPath)}");
+
+                if (hit.Name.EndsWith("-zoom", StringComparison.Ordinal))
+                {
+                    for (var notch = 0; notch < 5; notch++)
+                        Input.ParseInputEvent(Wheel(MouseButton.WheelDown));
+                }
             }
 
             // Finally the podium, which is where portrait alignment shows up.
@@ -181,6 +197,10 @@ public partial class RaceTrackShotProbe : Node
         for (var i = 0; i < course.Obstacles.Count; i++)
             shots.Add(($"live-hurdle-{i}", course.Obstacles[i] + 14.0f));
 
+        var climb = course.Segments.FirstOrDefault(segment => segment.Kind == RaceSegmentKind.Climb);
+        if (climb.EndX > climb.StartX)
+            shots.Add(("live-climb-zoom", Mathf.Lerp(climb.StartX, climb.EndX, 0.75f)));
+
         var firstGround = course.Segments.First(segment => segment.Kind == RaceSegmentKind.Ground);
         shots.Add(("live-running", Mathf.Lerp(firstGround.StartX, firstGround.EndX, 0.45f)));
         shots.Add(("live-cheer", Mathf.Lerp(firstGround.StartX, firstGround.EndX, 0.7f)));
@@ -188,6 +208,9 @@ public partial class RaceTrackShotProbe : Node
 
         return shots.OrderBy(shot => shot.Item2).ToArray();
     }
+
+    private static InputEventMouseButton Wheel(MouseButton button)
+        => new() { ButtonIndex = button, Pressed = true };
 
     private static Button? FindCheerButton(Node race)
     {
