@@ -50,33 +50,45 @@ If later art needs separate independently colored regions or more complicated pa
 
 Wings, crowns and similar combinatorial parts are separate layer sprites registered on the owning body definition.
 
-For the cleanest pipeline, every overlay sheet should use the **same canvas size, frame size, animation rows and frame timing/layout as its base body definition**. Transparent pixels fill the unused area. That lets the renderer mirror the base animation/frame exactly.
+Every overlay sheet must use the **same canvas size, frame size, animation rows and frame timing/layout as its base body definition**. Transparent pixels fill unused space. The layer atlas is the registration contract: Garden, races and every portrait surface consume those same frame coordinates instead of applying page-specific positioning.
+
+For animated bodies, each overlay frame must also follow the body frame's authored pixel motion. If the body bobs down by one pixel on a particular animation frame, attached wings/crowns must move by the same one pixel in that overlay frame. Do not repeat one static accessory frame across an animated strip unless the accessory is intentionally world-space/floating. This avoids the apparent accessory position changing depending on which animation frame a Voidling happens to be displaying.
 
 Each `VoidlingVisualLayerDefinition` has:
 
 - `LayerId` — stable variant ID such as `wings_golden`;
 - `SlotId` — replacement group such as `wings` or `crown`;
 - base/swim atlas references;
-- Z-order, small offset and scale adjustments;
+- relative Z-order, small offset and scale adjustments;
 - palette participation and optional layer-specific source palette slots.
 
 A body definition can set default layers. A phenotype can select another registered layer in the same slot; it replaces the default rather than stacking two wing sets accidentally.
 
-Only developer-approved variants should be registered. Gameplay/breeding code later selects semantic layer IDs; it does not know image paths.
+Only developer-approved variants should be registered. Gameplay/breeding code selects semantic layer IDs; it does not know image paths.
 
 ## Current production `normal` art
 
-The production `normal` definition now uses the neutral two-tone 6-frame Voidling sheet plus the golden wings and crown supplied with it.
+The production `normal` definition uses the neutral two-tone 6-frame Voidling sheet plus the supplied golden wings and crown.
 
 The artist files are retained alongside canonical runtime atlases:
 
 - `Base/Normal/neutral_two_tone_voidling_source.png` is the original 192x32 six-frame body sheet.
 - `Layers/Wings/golden_wings_source.png` and `Layers/Crown/golden_crown_source.png` are the original 32x64 alignment canvases.
-- The matching runtime PNGs normalize those sources to a shared 32x48 frame grid. The body is placed at y=14 in that frame; the source accessory canvases are cropped by the same 16 transparent top rows and repeated across all six animation frames.
+- The matching runtime PNGs normalize those sources to the shared 32x48 frame grid used by the completed-art reference.
 
-That normalization preserves the exact body/wing/crown registration shown in the completed-art reference while satisfying the pipeline invariant that every composited layer has the same frame grid. Wings render behind the body and the crown renders in front. The cyan body palette is DNA-recolorable; the gold/tan markings and accessory pixels remain authored colors.
+Frame 2 of the supplied body strip is the completed-art registration reference. The body sits at y=14, the crown at its supplied registration, and the golden wing layer is two pixels higher than the first ingestion. The accessory runtime strips then follow the body's per-frame vertical bob (`0, 0, +1, +2, +1, +1`) so the assembled silhouette stays attached instead of appearing to float differently on each Voidling.
+
+The golden wing is intentionally in front of the body where the reference pixels overlap; the crown is above both. The cyan body palette is DNA-recolorable while the gold/tan markings and accessory pixels remain authored colors.
 
 The supplied animation has one semantic direction, so `walk_down`, `walk_up`, `walk_left`, `walk_right`, `run` and `swim` currently resolve to the same six-frame row. Dedicated directional/swim art can be introduced later by changing only the canonical definition/source atlases.
+
+## One appearance recipe everywhere
+
+`VoidlingVisualFactory` resolves the semantic body, palette and layer list once. Garden actors, remote Garden actors and race sprites use that recipe through `ApplyAppearance`. All UI creature representations use `VoidlingPortraitComposer`, which resolves the same definition and layer list.
+
+Portrait composition keeps the body and overlays as sibling render items and preserves the same relative Z-order as world sprites. A UI panel therefore cannot accidentally swallow a behind-body layer. Inspector, family tree, breeding, trade, race picker/results and other cards must not configure creature assets independently.
+
+The visual smoke test checks the resolved layer count and relative Z-order for world sprites, race sprites and portraits. A layer disappearing from one context while remaining in another is a CI failure.
 
 ## Replacing art later
 

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 using VoidlingGame;
 
@@ -20,7 +21,8 @@ public partial class VoidlingVisualSmokeProbe : Node
                 ValidateRaceFrames(visualTypeId);
                 ValidatePortrait(visualTypeId);
                 ValidateGeometry(visualTypeId);
-                ValidateComposedSprite(visualTypeId);
+                ValidateComposedSprite(visualTypeId, race: false);
+                ValidateComposedSprite(visualTypeId, race: true);
             }
 
             GD.Print(
@@ -50,12 +52,39 @@ public partial class VoidlingVisualSmokeProbe : Node
             new Vector2(48.0f, 48.0f));
         AddChild(portrait);
 
-        if (portrait.Texture == null || portrait.Texture.GetWidth() <= 0 || portrait.Texture.GetHeight() <= 0)
-            throw new InvalidOperationException($"Portrait for '{visualTypeId}' resolved with invalid dimensions.");
-        if (definition.SourcePaletteColors.Count > 0 && portrait.Material == null)
+        var body = portrait.GetNodeOrNull<TextureRect>(VoidlingPortraitComposer.BodyNodeName);
+        if (body == null || body.Texture == null || body.Texture.GetWidth() <= 0 || body.Texture.GetHeight() <= 0)
+            throw new InvalidOperationException($"Portrait for '{visualTypeId}' resolved with invalid body dimensions.");
+        if (definition.SourcePaletteColors.Count > 0 && body.Material == null)
             throw new InvalidOperationException($"Palette-enabled portrait '{visualTypeId}' did not receive a palette material.");
         if (portrait.GetNodeOrNull<Control>("__mutation_badge") == null)
             throw new InvalidOperationException($"Portrait mutation overlay for '{visualTypeId}' was not composed.");
+
+        var expectedLayers = VoidlingVisualFactory.ResolveLayers(definition, appearance.LayerIds);
+        var portraitLayers = portrait.GetChildren()
+            .OfType<TextureRect>()
+            .Where(child => child.Name.ToString().StartsWith(
+                VoidlingPortraitComposer.LayerNodePrefix,
+                StringComparison.Ordinal))
+            .ToArray();
+        if (portraitLayers.Length != expectedLayers.Count)
+        {
+            throw new InvalidOperationException(
+                $"Portrait '{visualTypeId}' resolved {portraitLayers.Length} visual layers; expected {expectedLayers.Count}.");
+        }
+
+        for (var i = 0; i < expectedLayers.Count; i++)
+        {
+            var expected = expectedLayers[i];
+            var actual = portraitLayers[i];
+            if (actual.Texture == null)
+                throw new InvalidOperationException($"Portrait layer '{expected.LayerId}' for '{visualTypeId}' has no texture.");
+            if (actual.ZIndex - body.ZIndex != expected.ZIndexOffset)
+            {
+                throw new InvalidOperationException(
+                    $"Portrait layer '{expected.LayerId}' for '{visualTypeId}' changed relative Z order.");
+            }
+        }
 
         portrait.QueueFree();
     }
@@ -97,26 +126,60 @@ public partial class VoidlingVisualSmokeProbe : Node
         _ = VoidlingMutationVisualMetrics.ForPortrait(48.0f, new Vector2(48.0f, 48.0f), visualTypeId);
     }
 
-    private void ValidateComposedSprite(string visualTypeId)
+    private void ValidateComposedSprite(string visualTypeId, bool race)
     {
         var definition = VoidlingVisualFactory.ResolveDefinition(visualTypeId);
         var hue = definition.SourcePaletteColors.Count > 0 ? 0.63f : -1.0f;
+        var appearance = new VoidlingVisualAppearance(
+            visualTypeId,
+            hue,
+            definition.DefaultLayerIds,
+            "#F6F0C9");
         var sprite = new AnimatedSprite2D();
-        VoidlingVisualFactory.ApplyAppearance(
-            sprite,
-            new VoidlingVisualAppearance(
-                visualTypeId,
-                hue,
-                definition.DefaultLayerIds,
-                "#F6F0C9"),
-            race: false);
+        VoidlingVisualFactory.ApplyAppearance(sprite, appearance, race);
         AddChild(sprite);
-        sprite.Play("walk_down");
 
-        if (sprite.SpriteFrames == null || !sprite.SpriteFrames.HasAnimation("walk_down"))
-            throw new InvalidOperationException($"Composed world visual for '{visualTypeId}' has no movement frames.");
+        StringName animation = race ? "run" : "walk_down";
+        sprite.Play(animation);
+
+        if (sprite.SpriteFrames == null || !sprite.SpriteFrames.HasAnimation(animation))
+        {
+            throw new InvalidOperationException(
+                $"Composed {(race ? "race" : "world")} visual for '{visualTypeId}' has no '{animation}' frames.");
+        }
         if (definition.SourcePaletteColors.Count > 0 && sprite.Material == null)
             throw new InvalidOperationException($"Palette-enabled visual '{visualTypeId}' did not receive a palette material.");
+
+        var expectedLayers = VoidlingVisualFactory.ResolveLayers(definition, appearance.LayerIds);
+        var layerRoot = sprite.GetNodeOrNull<VoidlingVisualLayerSync2D>("__voidling_layers");
+        if (layerRoot == null)
+        {
+            throw new InvalidOperationException(
+                $"Composed {(race ? "race" : "world")} visual for '{visualTypeId}' has no canonical layer root.");
+        }
+
+        var actualLayers = layerRoot.GetChildren().OfType<AnimatedSprite2D>().ToArray();
+        if (actualLayers.Length != expectedLayers.Count)
+        {
+            throw new InvalidOperationException(
+                $"{(race ? "Race" : "World")} visual '{visualTypeId}' resolved {actualLayers.Length} layers; expected {expectedLayers.Count}.");
+        }
+
+        for (var i = 0; i < expectedLayers.Count; i++)
+        {
+            var expected = expectedLayers[i];
+            var actual = actualLayers[i];
+            if (actual.ZIndex != expected.ZIndexOffset)
+            {
+                throw new InvalidOperationException(
+                    $"{(race ? "Race" : "World")} layer '{expected.LayerId}' for '{visualTypeId}' changed relative Z order.");
+            }
+            if (actual.SpriteFrames == null || !actual.SpriteFrames.HasAnimation(animation))
+            {
+                throw new InvalidOperationException(
+                    $"{(race ? "Race" : "World")} layer '{expected.LayerId}' for '{visualTypeId}' has no '{animation}' frames.");
+            }
+        }
 
         sprite.QueueFree();
     }

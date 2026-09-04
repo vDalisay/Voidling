@@ -10,7 +10,8 @@ namespace Voidling.Presentation.Voidlings;
 /// </summary>
 public static class VoidlingPortraitComposer
 {
-    private const string LayerPrefix = "__voidling_portrait_layer_";
+    internal const string BodyNodeName = "__voidling_portrait_body";
+    internal const string LayerNodePrefix = "__voidling_portrait_layer_";
 
     public static TextureRect Create(VoidlingVisualAppearance appearance, Vector2 minimumSize)
     {
@@ -29,29 +30,56 @@ public static class VoidlingPortraitComposer
     {
         ArgumentNullException.ThrowIfNull(portrait);
         var definition = VoidlingVisualFactory.ResolveDefinition(appearance.VisualTypeId);
-        portrait.Texture = VoidlingVisualFactory.CreatePortraitTexture(definition.DefinitionId);
-        ApplyBasePalette(portrait, appearance);
+        var resolvedLayers = VoidlingVisualFactory.ResolveLayers(definition, appearance.LayerIds);
+
+        // The portrait root is deliberately transparent. Body and overlays are sibling children so
+        // negative-Z layers stay behind the body without accidentally falling behind the containing
+        // panel/window. A bias preserves exactly the same relative Z ordering used by world sprites.
+        portrait.Texture = null;
+        portrait.Material = null;
 
         foreach (var child in portrait.GetChildren())
         {
-            if (child is Node node && node.Name.ToString().StartsWith(LayerPrefix, StringComparison.Ordinal))
+            if (child is not Node node)
+                continue;
+
+            var name = node.Name.ToString();
+            if (name == BodyNodeName || name.StartsWith(LayerNodePrefix, StringComparison.Ordinal))
             {
                 portrait.RemoveChild(node);
                 node.Free();
             }
         }
 
+        var minimumRelativeZ = 0;
+        foreach (var layerDefinition in resolvedLayers)
+            minimumRelativeZ = Math.Min(minimumRelativeZ, layerDefinition.ZIndexOffset);
+        var zBias = -minimumRelativeZ;
+
+        var body = new TextureRect
+        {
+            Name = BodyNodeName,
+            Texture = VoidlingVisualFactory.CreatePortraitTexture(definition.DefinitionId),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            ZIndex = zBias
+        };
+        body.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        ApplyBasePalette(body, appearance);
+        portrait.AddChild(body);
+
         var layerIndex = 0;
-        foreach (var layerDefinition in VoidlingVisualFactory.ResolveLayers(definition, appearance.LayerIds))
+        foreach (var layerDefinition in resolvedLayers)
         {
             var layer = new TextureRect
             {
-                Name = $"{LayerPrefix}{layerIndex++}",
+                Name = $"{LayerNodePrefix}{layerIndex++}",
                 Texture = CreateLayerPortraitTexture(definition, layerDefinition),
                 ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                 StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                 MouseFilter = Control.MouseFilterEnum.Ignore,
-                ZIndex = layerDefinition.ZIndexOffset
+                ZIndex = zBias + layerDefinition.ZIndexOffset
             };
             layer.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
             layer.Position += layerDefinition.OffsetAtScaleOne;
@@ -61,15 +89,15 @@ public static class VoidlingPortraitComposer
         }
     }
 
-    private static void ApplyBasePalette(TextureRect portrait, VoidlingVisualAppearance appearance)
+    private static void ApplyBasePalette(TextureRect body, VoidlingVisualAppearance appearance)
     {
         // Reuse the canonical palette implementation rather than maintaining a portrait-specific
         // shader calculation. The temporary sprite is never added to the tree; only its immutable
-        // material/modulate result is retained by the TextureRect.
+        // body material/modulate result is retained by the TextureRect.
         var probe = new AnimatedSprite2D();
         VoidlingVisualFactory.ApplyAppearance(probe, appearance, race: false);
-        portrait.Material = probe.Material;
-        portrait.Modulate = probe.Modulate;
+        body.Material = probe.Material;
+        body.Modulate = probe.Modulate;
         probe.Free();
     }
 
