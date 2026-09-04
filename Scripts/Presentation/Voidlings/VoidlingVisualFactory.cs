@@ -106,6 +106,22 @@ public static class VoidlingVisualFactory
         return definition.WorldSpriteCenterYOffsetAtScaleOne * definition.RaceScale;
     }
 
+    /// <summary>
+    /// Where a portrait's feet land inside its box, in box pixels from the top.
+    ///
+    /// A portrait keeps the source aspect and is centred, so the ground pivot is not the bottom of
+    /// the box. Anything that stands a portrait on a surface (the podium, most obviously) reads this
+    /// instead of carrying its own guessed offset, which is how the podium ended up with the
+    /// creatures sunk into the blocks when the art changed.
+    /// </summary>
+    public static float PortraitGroundYOffset(Vector2 boxSize, string? visualTypeId = null)
+    {
+        var definition = ResolveDefinition(visualTypeId);
+        var scale = Math.Min(boxSize.X / definition.FrameWidth, boxSize.Y / definition.FrameHeight);
+        var drawnTop = (boxSize.Y - definition.FrameHeight * scale) * 0.5f;
+        return drawnTop + (definition.FrameHeight * 0.5f - definition.WorldSpriteCenterYOffsetAtScaleOne) * scale;
+    }
+
     public static float ShadowCenterYOffset(float spriteScale, string? visualTypeId = null)
         => ResolveDefinition(visualTypeId).ShadowCenterYOffsetAtScaleOne * spriteScale;
 
