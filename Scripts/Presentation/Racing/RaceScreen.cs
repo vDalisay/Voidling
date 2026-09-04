@@ -53,6 +53,15 @@ public partial class RaceScreen : Node2D
     private const float FinishOverrunMin = 22.0f;
     private const float FinishOverrunMax = 66.0f;
     private const float FinishCoastSeconds = 0.85f;
+
+    /// <summary>
+    /// Camera zoom range. One is the framing the race has always used and stays the furthest out,
+    /// so zooming can only ever bring the player closer and never reveals more than the track art
+    /// is drawn for.
+    /// </summary>
+    private const float MinZoom = 1.0f;
+    private const float MaxZoom = 3.2f;
+    private const float ZoomStepFactor = 1.18f;
     private const int MaxCatchUpStepsPerFrame = 30;
 
     /// <summary>Canvas layer the results overlay lives on. The CI completion probe looks for it.</summary>
@@ -94,6 +103,8 @@ public partial class RaceScreen : Node2D
     private RacerVisual? _playerVisual;
     private Random _vfxRandom = new(1);
     private float _waterPhase;
+    private float _zoom = MinZoom;
+    private float _zoomTarget = MinZoom;
     private Camera2D _camera = null!;
     private Polygon2D _playerMarker = null!;
     private Button _cheerButton = null!;
@@ -201,8 +212,10 @@ public partial class RaceScreen : Node2D
 
     public override void _Process(double delta)
     {
-        // The stream keeps flowing on the start line and on the results screen.
+        // The stream keeps flowing, and the camera keeps answering the wheel, on the start line,
+        // during the opening flyover and on the results screen.
         _waterPhase = (_waterPhase + (float)delta * 2.2f) % 1.0f;
+        UpdateZoom((float)delta);
         QueueRedraw();
 
         if (!_running || _playerVisual == null)
@@ -1199,12 +1212,36 @@ public partial class RaceScreen : Node2D
         _faultPlaque.Visible = true;
     }
 
+    /// <summary>Wheel zoom. Steps multiply, so each notch feels the same at any distance.</summary>
+    internal void HandleZoomInput(InputEvent inputEvent)
+    {
+        if (inputEvent is not InputEventMouseButton { Pressed: true } wheel)
+            return;
+
+        var factor = wheel.ButtonIndex switch
+        {
+            MouseButton.WheelUp => ZoomStepFactor,
+            MouseButton.WheelDown => 1.0f / ZoomStepFactor,
+            _ => 1.0f
+        };
+        if (Mathf.IsEqualApprox(factor, 1.0f))
+            return;
+
+        _zoomTarget = Mathf.Clamp(_zoomTarget * factor, MinZoom, MaxZoom);
+    }
+
+    /// <summary>Eases towards the requested zoom at a rate that does not depend on the frame rate.</summary>
+    private void UpdateZoom(float delta)
+    {
+        _zoom = Mathf.Lerp(_zoom, _zoomTarget, 1.0f - Mathf.Pow(0.002f, delta));
+        _camera.Zoom = new Vector2(_zoom, _zoom);
+    }
+
     private void UpdatePlayerTracking()
     {
         if (_playerVisual == null || !TryGetPlayerState(out var player))
             return;
 
-        _camera.Zoom = Vector2.One;
         _camera.Position = new Vector2(player.X, ScreenHeight * 0.5f);
         _playerMarker.Position = new Vector2(player.X, _playerVisual.Sprite.Position.Y - 21.0f);
     }

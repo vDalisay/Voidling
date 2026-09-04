@@ -19,18 +19,26 @@ public partial class RaceScreen
     /// </summary>
     public override void _Input(InputEvent inputEvent)
     {
+        HandleZoomInput(inputEvent);
+
         if (!_flyoverRunning)
             return;
 
         _flyoverSkipped = inputEvent switch
         {
             InputEventKey key => key.Pressed && !key.Echo,
-            InputEventMouseButton mouse => mouse.Pressed,
+            // Wheel notches are zoom, not a skip: scrolling to look closer at the course during the
+            // flyover must not cut the flyover short.
+            InputEventMouseButton mouse => mouse.Pressed && !IsWheel(mouse.ButtonIndex),
             InputEventJoypadButton pad => pad.Pressed,
             InputEventScreenTouch touch => touch.Pressed,
             _ => _flyoverSkipped
         };
     }
+
+    private static bool IsWheel(MouseButton button)
+        => button is MouseButton.WheelUp or MouseButton.WheelDown
+            or MouseButton.WheelLeft or MouseButton.WheelRight;
 
     private async void PlayRaceIntro()
     {

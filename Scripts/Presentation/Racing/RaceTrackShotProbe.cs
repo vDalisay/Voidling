@@ -88,6 +88,20 @@ public partial class RaceTrackShotProbe : Node
                 GD.Print($"[race-shots] wrote {ProjectSettings.GlobalizePath(path)}");
             }
 
+            // A zoomed still, so the wheel zoom's framing gets the same review as the wide shot.
+            var climb = course.Segments.FirstOrDefault(segment => segment.Kind == RaceSegmentKind.Climb);
+            camera.Zoom = new Vector2(2.2f, 2.2f);
+            camera.Position = new Vector2(
+                climb.EndX > climb.StartX ? (climb.StartX + climb.EndX) * 0.5f : course.StartX + 120.0f,
+                180.0f);
+            for (var frame = 0; frame < 4; frame++)
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+            var zoomPath = $"{OutputDirectory}/{prefix}-zoomed.png";
+            GetViewport().GetTexture().GetImage().SavePng(zoomPath);
+            GD.Print($"[race-shots] wrote {ProjectSettings.GlobalizePath(zoomPath)}");
+            camera.Zoom = Vector2.One;
+
             // Second pass: let the race run and capture the racers actually crossing each feature,
             // which is the only way to check that sprites, shadows and terrain agree in motion.
             race.ProcessMode = ProcessModeEnum.Inherit;
