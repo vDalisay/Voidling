@@ -41,6 +41,15 @@ public partial class GameBootstrap
         }
 
         if (Array.Exists(args, arg =>
+                string.Equals(arg, "--voidling-race-shots", StringComparison.OrdinalIgnoreCase)))
+        {
+            AddChild(new RaceTrackShotProbe
+            {
+                Name = nameof(RaceTrackShotProbe)
+            });
+        }
+
+        if (Array.Exists(args, arg =>
                 string.Equals(arg, "--voidling-family-tree-smoke", StringComparison.OrdinalIgnoreCase)))
         {
             AddChild(new FamilyTreeSmokeProbe

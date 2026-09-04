@@ -9,7 +9,6 @@ namespace Voidling.Presentation.Racing;
 public partial class RaceScreen
 {
     private bool _resultPresentationPolished;
-    private bool _coursePresentationPolished;
 
     public override void _EnterTree()
     {
@@ -22,74 +21,11 @@ public partial class RaceScreen
 
     internal void ApplyPostRaceScreenPresentationFrame()
     {
-        if (!_coursePresentationPolished && _visuals.Count > 0)
-        {
-            _coursePresentationPolished = true;
-            ReplaceSegmentedRampWithUnifiedRamp();
-        }
-
         if (_resultsShown && !_resultPresentationPolished)
         {
             _resultPresentationPolished = true;
             PolishResultPresentation();
         }
-    }
-
-    private void ReplaceSegmentedRampWithUnifiedRamp()
-    {
-        var oldRampColor = Color.FromHtml("#D99B63");
-        foreach (var polygon in GetChildren().OfType<Polygon2D>().Where(polygon =>
-                     polygon.ZIndex == 4 && ColorsClose(polygon.Color, oldRampColor)).ToList())
-        {
-            // Hide the legacy lane-band ramp immediately before deferred deletion. The polish
-            // driver runs before the first rendered race frame, so the player only ever sees the
-            // single depth-spanning ramp below rather than one frame containing all four bands.
-            polygon.Visible = false;
-            polygon.QueueFree();
-        }
-
-        var startX = Course.GlideLaunchStartX;
-        var endX = Course.GlideSegment.StartX;
-        var ramp = new Polygon2D
-        {
-            Name = "UnifiedFlightRamp",
-            Polygon = new[]
-            {
-                new Vector2(startX, TrackTop + 25.0f),
-                new Vector2(endX, TrackTop),
-                new Vector2(endX, TrackBottom),
-                new Vector2(startX, TrackBottom - 8.0f)
-            },
-            Color = oldRampColor,
-            ZIndex = 4
-        };
-        AddChild(ramp);
-
-        var topEdge = new Line2D
-        {
-            Width = 2.0f,
-            DefaultColor = Color.FromHtml("#8D654F"),
-            Points = new[]
-            {
-                new Vector2(startX, TrackTop + 25.0f),
-                new Vector2(endX, TrackTop)
-            },
-            ZIndex = 5
-        };
-        AddChild(topEdge);
-
-        var bottomEdge = new Line2D
-        {
-            Width = 2.0f,
-            DefaultColor = Color.FromHtml("#8D654F"),
-            Points = new[]
-            {
-                new Vector2(startX, TrackBottom - 8.0f),
-                new Vector2(endX, TrackBottom)
-            },
-            ZIndex = 5
-        };
-        AddChild(bottomEdge);
     }
 
     private void PolishResultPresentation()
@@ -331,11 +267,6 @@ public partial class RaceScreen
         fall.TweenProperty(drop, "modulate:a", 0.0f, 0.24);
         fall.Finished += drop.QueueFree;
     }
-
-    private static bool ColorsClose(Color left, Color right)
-        => Math.Abs(left.R - right.R) < 0.01f &&
-           Math.Abs(left.G - right.G) < 0.01f &&
-           Math.Abs(left.B - right.B) < 0.01f;
 
     private static T? FindDescendant<T>(Node root, Func<T, bool> predicate) where T : Node
     {

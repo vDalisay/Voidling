@@ -37,10 +37,8 @@ public partial class RaceScreen : Node2D
     internal const int ResultsCanvasLayer = 50;
 
     private RaceCourse Course => _entry?.CourseDefinition.Course ?? RaceCourse.Demo;
-    private static readonly Texture2D WaterTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Tilesets/Water.png");
-    private static readonly Texture2D FenceTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Tilesets/Fences.png");
+
+    private static RaceTrackLayout Layout => new(TrackTop, TrackBottom, ScreenWidth, ScreenHeight, RaceTrackArt.ClimbHeight);
 
     private static readonly Color RunColor = Color.FromHtml("#78C96A");
     private static readonly Color SwimColor = Color.FromHtml("#F2D45C");
@@ -48,7 +46,9 @@ public partial class RaceScreen : Node2D
     private static readonly Color ClimbColor = Color.FromHtml("#E7655A");
     private static readonly Color StaminaColor = Color.FromHtml("#F7F3E7");
 
-    private readonly float[] _racerOffsets = { -16.0f, -5.0f, 6.0f, 17.0f };
+    // Lanes spread across the full dirt band. The old 33px cluster stacked four racers on top of
+    // each other on the start line and left most of the track empty.
+    private readonly float[] _racerOffsets = { -30.0f, -10.0f, 10.0f, 30.0f };
     private readonly Dictionary<string, RacerVisual> _visuals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, float> _cheerParticleAccumulators = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _previousObstacleIndices = new(StringComparer.Ordinal);
@@ -67,6 +67,7 @@ public partial class RaceScreen : Node2D
     private string _playerId = "";
     private RacerVisual? _playerVisual;
     private Random _vfxRandom = new(1);
+    private float _waterPhase;
     private Camera2D _camera = null!;
     private Polygon2D _playerMarker = null!;
     private Button _cheerButton = null!;
@@ -133,6 +134,9 @@ public partial class RaceScreen : Node2D
                 _entry.SimulationSeed);
         }
 
+        // Tiled DrawTextureRect needs repeat sampling on this canvas item.
+        TextureRepeat = TextureRepeatEnum.Enabled;
+
         BuildCoursePresentation();
         CreateEntrantVisuals(_entry.Entrants);
         CreateCamera();
@@ -152,6 +156,10 @@ public partial class RaceScreen : Node2D
 
     public override void _Process(double delta)
     {
+        // The stream keeps flowing on the start line and on the results screen.
+        _waterPhase = (_waterPhase + (float)delta * 2.2f) % 1.0f;
+        QueueRedraw();
+
         if (!_running || _playerVisual == null)
             return;
 
@@ -218,32 +226,7 @@ public partial class RaceScreen : Node2D
     }
 
     public override void _Draw()
-    {
-        var worldLeft = -ScreenWidth;
-        var worldWidth = Course.EndX + ScreenWidth * 2.0f;
-
-        DrawRect(new Rect2(worldLeft, 0, worldWidth, ScreenHeight), Color.FromHtml("#A7D8C7"));
-        DrawRect(new Rect2(worldLeft, 102, worldWidth, 166), Color.FromHtml("#8EBE85"));
-        DrawRect(new Rect2(worldLeft, TrackTop, worldWidth, TrackBottom - TrackTop), Color.FromHtml("#D9774E"));
-        DrawLine(new Vector2(worldLeft, TrackTop), new Vector2(worldLeft + worldWidth, TrackTop), Color.FromHtml("#E9B777"), 4.0f);
-        DrawLine(new Vector2(worldLeft, TrackBottom), new Vector2(worldLeft + worldWidth, TrackBottom), Color.FromHtml("#9C6049"), 4.0f);
-
-        for (var x = worldLeft + 40.0f; x < worldLeft + worldWidth; x += 80.0f)
-            DrawLine(new Vector2(x, TrackY), new Vector2(x + 28, TrackY), new Color(0.95f, 0.72f, 0.52f, 0.30f), 2.0f);
-
-        DrawRect(new Rect2(Course.EndX - 10, TrackTop - 8, 20, TrackBottom - TrackTop + 16), Color.FromHtml("#F5F0DE"));
-        const float square = 10.0f;
-        for (var row = 0; row < 13; row++)
-        {
-            for (var col = 0; col < 2; col++)
-            {
-                if ((row + col) % 2 == 0)
-                    DrawRect(new Rect2(Course.EndX - 10 + col * square, TrackTop - 6 + row * square, square, square), Color.FromHtml("#39423D"));
-            }
-        }
-        DrawLine(new Vector2(Course.EndX - 14, TrackTop - 10), new Vector2(Course.EndX - 14, TrackBottom + 10), Color.FromHtml("#68584B"), 4.0f);
-        DrawLine(new Vector2(Course.EndX + 14, TrackTop - 10), new Vector2(Course.EndX + 14, TrackBottom + 10), Color.FromHtml("#68584B"), 4.0f);
-    }
+        => RaceTrackArt.Paint(this, Course, Layout, _waterPhase);
 
     /// <summary>
     /// What a segment kind looks like on the track. Ground needs no extra geometry because the track
@@ -275,23 +258,30 @@ public partial class RaceScreen : Node2D
 
     private void BuildCoursePresentation()
     {
+        // Terrain is painted in _Draw by RaceTrackArt; only nodes that sit above the racers or
+        // need their own Z order are built here.
         foreach (var segment in Course.Segments)
         {
             var visual = VisualFor(segment.Kind);
-            if (visual.Water)
-                AddWaterSection(segment.StartX, segment.EndX);
-            if (visual.Climb)
-                AddClimbSection(segment.StartX, segment.EndX);
-            if (visual.Ramp)
-                AddFlightRamp();
-            if (visual.LabelKey != null)
-            {
-                AddWorldLabel(
-                    Tr(visual.LabelKey),
-                    (segment.StartX + segment.EndX) * 0.5f,
-                    108,
-                    SegmentLabelColor(segment.Kind));
-            }
+            if (visual.LabelKey == null)
+                continue;
+
+            // A climb label rides above its own raised plateau instead of over the cliff face.
+            var labelY = visual.Climb ? 108.0f - RaceTrackArt.ClimbHeight : 108.0f;
+            AddWorldLabel(
+                Tr(visual.LabelKey),
+                (segment.StartX + segment.EndX) * 0.5f,
+                labelY,
+                SegmentLabelColor(segment.Kind));
+        }
+
+        if (Course.HasGlideSegment)
+        {
+            AddWorldLabel(
+                Tr("UI_RACE_SECTION_TAKEOFF"),
+                (Course.GlideLaunchStartX + Course.GlideSegment.StartX) * 0.5f,
+                108.0f,
+                FlyColor);
         }
 
         foreach (var obstacleX in Course.Obstacles)
@@ -509,15 +499,19 @@ public partial class RaceScreen : Node2D
             shadowAlpha = 0.15f;
         }
 
+        // A climb raises the ground itself, so sprite and shadow move together and the racer stays
+        // planted on the cliff face and plateau that RaceTrackArt draws.
+        var groundLift = ClimbRiseAt(state.X);
+
         var visualTypeId = visual.Appearance.VisualTypeId;
         visual.Sprite.Position = new Vector2(
             state.X,
-            visual.BaseY + VoidlingVisualFactory.RaceSpriteCenterYOffset(visualTypeId) + yOffset);
+            visual.BaseY + VoidlingVisualFactory.RaceSpriteCenterYOffset(visualTypeId) + yOffset - groundLift);
         visual.Shadow.Position = new Vector2(
             state.X,
             visual.BaseY + VoidlingVisualFactory.ShadowCenterYOffset(
                 VoidlingVisualFactory.RaceScaleFor(visualTypeId),
-                visualTypeId));
+                visualTypeId) - groundLift);
         visual.Shadow.Scale = shadowScale;
         var shadowColor = visual.Shadow.Color;
         shadowColor.A = shadowAlpha;
@@ -556,6 +550,15 @@ public partial class RaceScreen : Node2D
         title.Position = new Vector2(255, 8);
         title.Size = new Vector2(180, 24);
         canvas.AddChild(title);
+
+        // The section name sits over the track, so it needs its own plaque to stay readable on grass.
+        canvas.AddChild(new ColorRect
+        {
+            Color = new Color(0.16f, 0.20f, 0.17f, 0.62f),
+            Position = new Vector2(292, 35),
+            Size = new Vector2(120, 16),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        });
 
         _sectionLabel = UiFactory.CreateLabel("RUN", 8);
         _sectionLabel.Position = new Vector2(292, 34);
@@ -924,180 +927,13 @@ public partial class RaceScreen : Node2D
             entrant.OtherMutationCount,
             size);
 
-    private void AddWaterSection(float startX, float endX)
-    {
-        var tile = new AtlasTexture
-        {
-            Atlas = WaterTexture,
-            Region = new Rect2(0, 0, 16, 16)
-        };
-
-        for (var x = startX + 8.0f; x < endX; x += 16.0f)
-        {
-            for (var y = TrackTop + 8.0f; y < TrackBottom; y += 16.0f)
-            {
-                AddChild(new Sprite2D
-                {
-                    Texture = tile,
-                    Position = new Vector2(x, y),
-                    ZIndex = 2
-                });
-            }
-        }
-    }
-
-    /// <summary>
-    /// A climbing wall the racers scale, not a slab lying on the ground. The face is a stone panel
-    /// with mortar courses, a capped top rail and footing, and staggered grip holds; the holds are
-    /// what make it read as a wall rather than another patch of terrain.
-    /// </summary>
-    private void AddClimbSection(float startX, float endX)
-    {
-        var width = endX - startX;
-        if (width <= 0.0f)
-            return;
-
-        const float railHeight = 7.0f;
-        const float footingHeight = 6.0f;
-        var faceTop = TrackTop + railHeight;
-        var faceBottom = TrackBottom - footingHeight;
-
-        AddChild(FilledRect(startX, TrackTop, endX, TrackBottom, Color.FromHtml("#9A8F80"), zIndex: 2));
-
-        // Mortar courses read as the horizontal joints of a climbed face.
-        for (var y = faceTop + 11.0f; y < faceBottom; y += 11.0f)
-        {
-            AddChild(new Line2D
-            {
-                Width = 1.0f,
-                DefaultColor = Color.FromHtml("#877C6E"),
-                Points = new[] { new Vector2(startX, y), new Vector2(endX, y) },
-                ZIndex = 3
-            });
-        }
-
-        // Capped top rail and footing give the flat face its depth.
-        AddChild(FilledRect(startX, TrackTop, endX, TrackTop + railHeight, Color.FromHtml("#6E655B"), zIndex: 4));
-        AddChild(FilledRect(startX, faceBottom, endX, TrackBottom, Color.FromHtml("#5E564D"), zIndex: 4));
-        AddChild(new Line2D
-        {
-            Width = 2.0f,
-            DefaultColor = Color.FromHtml("#4E4740"),
-            Points = new[] { new Vector2(startX, faceTop), new Vector2(endX, faceTop) },
-            ZIndex = 5
-        });
-
-        // Staggered grip holds. Placement is a pure function of the grid indices so the wall looks
-        // identical every run without touching the VFX random stream.
-        var holdColors = new[]
-        {
-            Color.FromHtml("#E7655A"),
-            Color.FromHtml("#F2D45C"),
-            Color.FromHtml("#78C96A"),
-            Color.FromHtml("#B47AE5")
-        };
-
-        var column = 0;
-        for (var x = startX + 9.0f; x < endX - 4.0f; x += 15.0f, column++)
-        {
-            var row = 0;
-            for (var y = faceTop + 7.0f; y < faceBottom - 3.0f; y += 13.0f, row++)
-            {
-                if ((column + row) % 2 != 0)
-                    continue;
-
-                var jitter = ((column * 7 + row * 3) % 5) - 2;
-                AddChild(new Polygon2D
-                {
-                    Polygon = BuildHoldPolygon(),
-                    Position = new Vector2(x + jitter, y),
-                    Color = holdColors[(column + row * 2) % holdColors.Length],
-                    ZIndex = 5
-                });
-            }
-        }
-    }
-
-    // Small wedge-shaped grip, wider at the top like a real bolt-on hold.
-    private static Vector2[] BuildHoldPolygon() => new[]
-    {
-        new Vector2(-3.0f, -2.0f),
-        new Vector2(3.0f, -2.0f),
-        new Vector2(2.0f, 2.5f),
-        new Vector2(-2.0f, 2.5f)
-    };
-
-    private static Polygon2D FilledRect(float left, float top, float right, float bottom, Color color, int zIndex)
-        => new()
-        {
-            Polygon = new[]
-            {
-                new Vector2(left, top),
-                new Vector2(right, top),
-                new Vector2(right, bottom),
-                new Vector2(left, bottom)
-            },
-            Color = color,
-            ZIndex = zIndex
-        };
-
-    private void AddFlightRamp()
-    {
-        if (!Course.HasGlideSegment)
-            return;
-
-        const float laneBandHeight = 28.0f;
-        var width = Course.GlideSegment.StartX - Course.GlideLaunchStartX;
-        if (width <= 0.0f)
-            return;
-        var centerX = (Course.GlideLaunchStartX + Course.GlideSegment.StartX) * 0.5f;
-
-        for (var y = TrackTop; y < TrackBottom; y += laneBandHeight)
-        {
-            var bandHeight = Math.Min(laneBandHeight, TrackBottom - y);
-            var ramp = new Polygon2D
-            {
-                Polygon = new[]
-                {
-                    new Vector2(-width * 0.5f, bandHeight * 0.45f),
-                    new Vector2(width * 0.5f, -bandHeight * 0.45f),
-                    new Vector2(width * 0.5f, bandHeight * 0.5f),
-                    new Vector2(-width * 0.5f, bandHeight * 0.5f)
-                },
-                Color = Color.FromHtml("#D99B63"),
-                Position = new Vector2(centerX, y + bandHeight * 0.5f),
-                ZIndex = 4
-            };
-            AddChild(ramp);
-
-            var edge = new Line2D
-            {
-                Width = 2.0f,
-                DefaultColor = Color.FromHtml("#8D654F"),
-                Points = new[]
-                {
-                    new Vector2(-width * 0.5f, bandHeight * 0.45f),
-                    new Vector2(width * 0.5f, -bandHeight * 0.45f)
-                },
-                ZIndex = 5
-            };
-            ramp.AddChild(edge);
-        }
-    }
-
     private void AddHurdle(float x)
     {
-        var tile = new AtlasTexture
-        {
-            Atlas = FenceTexture,
-            Region = new Rect2(0, 0, 16, 16)
-        };
-
         for (var y = TrackTop + 9.0f; y < TrackBottom; y += 18.0f)
         {
             AddChild(new Sprite2D
             {
-                Texture = tile,
+                Texture = RaceTrackArt.FencePost,
                 Position = new Vector2(x, y),
                 Scale = new Vector2(1.15f, 1.15f),
                 ZIndex = 6
@@ -1107,6 +943,20 @@ public partial class RaceScreen : Node2D
 
     private void AddWorldLabel(string text, float x, float y, Color color)
     {
+        // A plaque behind the text: section names sat green-on-green over the grass without it.
+        AddChild(new Polygon2D
+        {
+            Polygon = new[]
+            {
+                new Vector2(x - 44, y + 1),
+                new Vector2(x + 44, y + 1),
+                new Vector2(x + 44, y + 15),
+                new Vector2(x - 44, y + 15)
+            },
+            Color = new Color(0.16f, 0.20f, 0.17f, 0.62f),
+            ZIndex = 3
+        });
+
         var label = UiFactory.CreateLabel(text, 8);
         label.Position = new Vector2(x - 45, y);
         label.Size = new Vector2(90, 16);
@@ -1148,6 +998,18 @@ public partial class RaceScreen : Node2D
             participant.PaletteHue,
             participant.LayerIds,
             participant.TintHex);
+
+    /// <summary>Height of the raised climb plateau under <paramref name="x"/>, or zero off a climb.</summary>
+    private float ClimbRiseAt(float x)
+    {
+        foreach (var segment in Course.Segments)
+        {
+            if (segment.Kind == RaceSegmentKind.Climb && segment.Contains(x))
+                return RaceTrackArt.ClimbRise(segment, x);
+        }
+
+        return 0.0f;
+    }
 
     private bool InLaunchRamp(float x)
         => Course.HasGlideSegment &&
