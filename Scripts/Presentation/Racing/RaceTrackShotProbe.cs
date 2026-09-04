@@ -81,6 +81,9 @@ public partial class RaceTrackShotProbe : Node
             // Second pass: let the race run and capture the racers actually crossing each feature,
             // which is the only way to check that sprites, shadows and terrain agree in motion.
             race.ProcessMode = ProcessModeEnum.Inherit;
+            // The camera is still parked at the last still. Let the race put it back on the player
+            // before polling, or every shot behind that point fires on the first frame.
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             var pending = ActionShots(course).ToList();
             var raceDeadline = Time.GetTicksMsec() + 120000;
             while (pending.Count > 0 && Time.GetTicksMsec() < raceDeadline)
@@ -92,11 +95,34 @@ public partial class RaceTrackShotProbe : Node
                     continue;
 
                 pending.Remove(hit);
+
+                // The cheer burst only exists while the button has just been pressed, so press it.
+                if (hit.Name.EndsWith("-cheer", StringComparison.Ordinal))
+                {
+                    var cheer = FindCheerButton(race);
+                    cheer?.EmitSignal(BaseButton.SignalName.Pressed);
+                    for (var frame = 0; frame < 4; frame++)
+                        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                }
+
                 await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
                 var actionPath = $"{OutputDirectory}/{prefix}-{hit.Name}.png";
                 GetViewport().GetTexture().GetImage().SavePng(actionPath);
                 GD.Print($"[race-shots] wrote {ProjectSettings.GlobalizePath(actionPath)}");
             }
+
+            // Finally the podium, which is where portrait alignment shows up.
+            var resultsDeadline = Time.GetTicksMsec() + 90000;
+            Engine.TimeScale = 8.0;
+            while (!race.ResultsShown && Time.GetTicksMsec() < resultsDeadline)
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            Engine.TimeScale = 1.0;
+            for (var frame = 0; frame < 40; frame++)
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+            var podiumPath = $"{OutputDirectory}/{prefix}-results.png";
+            GetViewport().GetTexture().GetImage().SavePng(podiumPath);
+            GD.Print($"[race-shots] wrote {ProjectSettings.GlobalizePath(podiumPath)}");
 
             race.QueueFree();
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -128,7 +154,40 @@ public partial class RaceTrackShotProbe : Node
         if (course.HasGlideSegment)
             shots.Add(("live-launch-ramp", Mathf.Lerp(course.GlideLaunchStartX, course.GlideSegment.StartX, 0.7f)));
 
+        for (var i = 0; i < course.Obstacles.Count; i++)
+            shots.Add(($"live-hurdle-{i}", course.Obstacles[i] + 14.0f));
+
+        var firstGround = course.Segments.First(segment => segment.Kind == RaceSegmentKind.Ground);
+        shots.Add(("live-running", Mathf.Lerp(firstGround.StartX, firstGround.EndX, 0.45f)));
+        shots.Add(("live-cheer", Mathf.Lerp(firstGround.StartX, firstGround.EndX, 0.7f)));
+
         return shots.OrderBy(shot => shot.Item2).ToArray();
+    }
+
+    private static Button? FindCheerButton(Node race)
+    {
+        foreach (var layer in race.GetChildren().OfType<CanvasLayer>().Where(layer => layer.Layer == 20))
+        {
+            var button = FirstButton(layer);
+            if (button != null)
+                return button;
+        }
+
+        return null;
+    }
+
+    private static Button? FirstButton(Node node)
+    {
+        foreach (var child in node.GetChildren())
+        {
+            if (child is Button button)
+                return button;
+            var nested = FirstButton(child);
+            if (nested != null)
+                return nested;
+        }
+
+        return null;
     }
 
     private static (string Name, float X)[] Stops(RaceCourse course)

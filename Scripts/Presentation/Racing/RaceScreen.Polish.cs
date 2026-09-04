@@ -70,12 +70,6 @@ public partial class RaceScreen
             }
         }
 
-        var stage = FindDescendant<Control>(panel, control =>
-            Math.Abs(control.CustomMinimumSize.X - 480.0f) < 1.0f &&
-            Math.Abs(control.CustomMinimumSize.Y - 192.0f) < 1.0f);
-        if (stage != null)
-            AlignPodiumEntrants(stage);
-
         var returnButton = FindDescendant<Button>(panel, button =>
             string.Equals(button.Text, "Return to Garden", StringComparison.Ordinal));
         if (returnButton != null)
@@ -87,49 +81,6 @@ public partial class RaceScreen
             SpawnAnimeSweatDrop(canvas);
         else
             SpawnCelebrationParticles(canvas, selectedPlace == 1 ? 38 : 24);
-    }
-
-    private static void AlignPodiumEntrants(Control stage)
-    {
-        var portraits = stage.GetChildren().OfType<TextureRect>().OrderBy(p => p.Position.X).ToList();
-        var names = stage.GetChildren().OfType<Label>().OrderBy(label => label.Position.X).ToList();
-        var podiums = stage.GetChildren().OfType<PanelContainer>()
-            .Where(block => block.Size.Y > 20.0f)
-            .OrderBy(block => block.Position.X)
-            .ToList();
-        var puddle = stage.GetChildren().OfType<PanelContainer>()
-            .FirstOrDefault(block => block.Size.Y <= 20.0f);
-
-        if (portraits.Count < 4 || podiums.Count < 3 || puddle == null)
-            return;
-
-        // Existing creation order along X is second, first, third, fourth. Keep entrant/place
-        // identity intact and only place each portrait's feet directly on its award surface.
-        for (var i = 0; i < 3; i++)
-        {
-            var surface = podiums[i];
-            var portrait = portraits[i];
-            portrait.Position = new Vector2(
-                surface.Position.X + (surface.Size.X - portrait.Size.X) * 0.5f,
-                surface.Position.Y - 35.0f);
-            if (i < names.Count)
-            {
-                names[i].Position = new Vector2(
-                    surface.Position.X + (surface.Size.X - names[i].Size.X) * 0.5f,
-                    portrait.Position.Y - 13.0f);
-            }
-        }
-
-        var fourthPortrait = portraits[3];
-        fourthPortrait.Position = new Vector2(
-            puddle.Position.X + (puddle.Size.X - fourthPortrait.Size.X) * 0.5f,
-            puddle.Position.Y - 34.0f);
-        if (names.Count >= 4)
-        {
-            names[3].Position = new Vector2(
-                puddle.Position.X + (puddle.Size.X - names[3].Size.X) * 0.5f,
-                fourthPortrait.Position.Y - 13.0f);
-        }
     }
 
     private void AnimateResultPanel(Control panel, bool isLast)
