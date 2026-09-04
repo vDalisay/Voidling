@@ -132,7 +132,7 @@ public partial class MainController
                     "This side panel is the quick profile. Training, passive training and the deeper Details view all start here.",
                     "Open Details",
                     true,
-                    new Rect2(399, 28, 237, 326));
+                    new Rect2(399, 54, 237, 298));
                 break;
             case FirstLaunchTutorialStep.Details:
                 _tutorialOverlay.ShowStep(

@@ -76,6 +76,7 @@ public partial class MainController : Node
             SizeFlagsVertical = Control.SizeFlags.ExpandFill
         };
         box.AddChild(stall);
+        UiFactory.StyleScroll(stall);
 
         var screen = new ShopScreen();
         screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rotationRemaining, rareOffer, landTiles));

@@ -63,6 +63,8 @@ public partial class MainController : Node
         _gardenEventLog.Append(Tr("UI_GARDEN_LOG_STARTED"));
         RefreshUi();
         Callable.From(StartFirstLaunchTutorialIfNeeded).CallDeferred();
+        if (Array.Exists(OS.GetCmdlineUserArgs(), arg => arg == "--voidling-garden-ui-smoke"))
+            Callable.From(RunGardenUiSmoke).CallDeferred();
     }
 
     public override void _ExitTree()
@@ -108,27 +110,49 @@ public partial class MainController : Node
 
     private void BuildTopBar()
     {
-        var panel = UiFactory.CreatePanel(new Vector2(624, 44));
-        panel.Position = new Vector2(8, 7);
-        panel.Size = new Vector2(624, 44);
+        var panel = UiFactory.CreatePanel(new Vector2(236, 44));
+        panel.Name = "GardenStatus";
+        panel.Position = new Vector2(12, 10);
+        panel.Size = new Vector2(236, 44);
         _uiRoot.AddChild(panel);
 
-        var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-        row.AddThemeConstantOverride("separation", 4);
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 12);
         panel.AddChild(row);
 
-        _coinsLabel = UiFactory.CreateLabel(string.Format(Tr("UI_TOP_SPROUTS"), 0), 9);
-        _coinsLabel.CustomMinimumSize = new Vector2(84, 22);
+        var title = UiFactory.CreateTitle(Tr("UI_GARDEN_HOME"));
+        title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        row.AddChild(title);
+        _coinsLabel = UiFactory.CreateLabel(string.Format(Tr("UI_TOP_SPROUTS"), 0), 8);
+        _coinsLabel.VerticalAlignment = VerticalAlignment.Center;
         row.AddChild(_coinsLabel);
 
-        AddTopButton(row, Tr("UI_TOP_SHOP"), ShowShop, 0, 57);
-        AddTopButton(row, Tr("UI_TOP_INVENTORY"), ShowInventory, 3, 68);
-        AddTopButton(row, Tr("UI_TOP_BREED"), ShowBreeding, 6, 57);
-        AddTopButton(row, Tr("UI_TOP_RACE"), ShowRacePickerWithCourses, 12, 57);
-        AddTopButton(row, Tr("UI_TOP_ONLINE"), ShowConnectedZone, -1, 58);
-        AddTopButton(row, Tr("UI_TOP_SETTINGS"), ShowSettingsExtended, -1, 67);
-        AddTopButton(row, Tr("UI_TOP_CENTER"), _garden.ResetCamera, -1, 57);
-        AddTopButton(row, Tr("UI_TOP_RESET"), ShowResetConfirm, -1, 54);
+        var utilities = new HBoxContainer { Name = "GardenUtilities", Position = new Vector2(400, 18) };
+        utilities.AddThemeConstantOverride("separation", 6);
+        _uiRoot.AddChild(utilities);
+        AddTopButton(utilities, Tr("UI_TOP_ONLINE"), ShowConnectedZone, -1, 70);
+        AddTopButton(utilities, Tr("UI_TOP_CENTER"), _garden.ResetCamera, -1, 70);
+        AddTopButton(utilities, Tr("UI_TOP_SETTINGS"), ShowSettingsExtended, -1, 76);
+
+        var dock = UiFactory.CreatePanel(new Vector2(376, 46));
+        dock.Name = "GardenDock";
+        dock.Position = new Vector2(12, 302);
+        dock.Size = new Vector2(376, 46);
+        _uiRoot.AddChild(dock);
+        var actions = new HBoxContainer();
+        actions.AddThemeConstantOverride("separation", 6);
+        dock.AddChild(actions);
+        AddTopButton(actions, Tr("UI_TOP_SHOP"), ShowShop, -1, 82);
+        AddTopButton(actions, Tr("UI_TOP_INVENTORY"), ShowInventory, -1, 92);
+        AddTopButton(actions, Tr("UI_TOP_BREED"), ShowBreeding, -1, 82);
+        AddTopButton(actions, Tr("UI_TOP_RACE"), ShowRacePickerWithCourses, -1, 78);
+        var glyphs = new[] { new Vector2I(7, 6), new Vector2I(7, 7), new Vector2I(4, 4), new Vector2I(6, 0) };
+        for (var i = 0; i < glyphs.Length; i++)
+        {
+            actions.GetChild<Button>(i).Icon = UiFactory.CreateGardenIcon(glyphs[i].X, glyphs[i].Y);
+            actions.GetChild<Button>(i).ExpandIcon = true;
+            actions.GetChild<Button>(i).AddThemeConstantOverride("icon_max_width", 14);
+        }
     }
 
     private static void AddTopButton(HBoxContainer row, string text, Action action, int iconIndex, float width)
@@ -143,8 +167,9 @@ public partial class MainController : Node
     private void BuildToast()
     {
         _toastLabel = UiFactory.CreateLabel("", 9);
-        _toastLabel.Position = new Vector2(18, 244);
-        _toastLabel.Size = new Vector2(390, 16);
+        _toastLabel.Position = new Vector2(24, 200);
+        _toastLabel.Size = new Vector2(352, 28);
+        _toastLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _toastLabel.AddThemeColorOverride("font_color", Color.FromHtml("#F9F4D8"));
         _toastLabel.AddThemeColorOverride("font_shadow_color", Color.FromHtml("#465247"));
         _toastLabel.AddThemeConstantOverride("shadow_offset_x", 1);
@@ -157,9 +182,9 @@ public partial class MainController : Node
     {
         _gardenEventLog = new GardenEventLog
         {
-            Position = new Vector2(12, 276),
-            Size = new Vector2(388, 72),
-            CustomMinimumSize = new Vector2(388, 72),
+            Position = new Vector2(12, 232),
+            Size = new Vector2(376, 62),
+            CustomMinimumSize = new Vector2(376, 62),
             ZIndex = 6
         };
         _uiRoot.AddChild(_gardenEventLog);

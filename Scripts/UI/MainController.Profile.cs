@@ -43,14 +43,35 @@ public partial class MainController : Node
             _detailsPanel.QueueFree();
         _detailsPanel = null;
 
-        _detailsPanel = UiFactory.CreatePanel(new Vector2(226, 318));
-        _detailsPanel.Position = new Vector2(sameCreature ? DetailsPanelRestX : DetailsPanelHiddenX, 33);
-        _detailsPanel.Size = new Vector2(226, 318);
+        _detailsPanel = UiFactory.CreatePanel(new Vector2(226, 290));
+        _detailsPanel.Position = new Vector2(sameCreature ? DetailsPanelRestX : DetailsPanelHiddenX, 58);
+        _detailsPanel.Size = new Vector2(226, 290);
         _uiRoot.AddChild(_detailsPanel);
 
-        var box = new VBoxContainer();
-        box.AddThemeConstantOverride("separation", 2);
-        _detailsPanel.AddChild(box);
+        var layout = new VBoxContainer();
+        layout.AddThemeConstantOverride("separation", 6);
+        _detailsPanel.AddChild(layout);
+
+        var scroll = new ScrollContainer
+        {
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill
+        };
+        layout.AddChild(scroll);
+        UiFactory.StyleScroll(scroll);
+        var box = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        box.AddThemeConstantOverride("separation", 4);
+        scroll.AddChild(box);
+
+        var portraitRow = new HBoxContainer();
+        portraitRow.AddThemeConstantOverride("separation", 8);
+        portraitRow.AddChild(UiFactory.CreatePortrait(data, new Vector2(32, 32)));
+        var identity = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        identity.AddChild(UiFactory.CreateLabel(Tr("UI_GARDEN_COMPANION"), 6));
+        portraitRow.AddChild(identity);
+        layout.AddChild(portraitRow);
+        layout.MoveChild(portraitRow, 0);
 
         var heading = new HBoxContainer();
         heading.AddThemeConstantOverride("separation", 4);
@@ -59,12 +80,14 @@ public partial class MainController : Node
         {
             Text = data.Name,
             Flat = true,
-            FocusMode = Control.FocusModeEnum.None,
+            FocusMode = Control.FocusModeEnum.All,
+            AutoTranslateMode = AutoTranslateModeEnum.Disabled,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
-            TooltipText = "Click to rename"
+            TooltipText = Tr("UI_GARDEN_RENAME")
         };
-        UiFactory.ApplyPixelFont(nameButton, 14);
+        UiFactory.ApplyButtonChrome(nameButton);
+        UiFactory.ApplyPixelFont(nameButton, 11);
         nameButton.AddThemeColorOverride("font_color", Color.FromHtml("#3B5044"));
         nameButton.AddThemeColorOverride("font_hover_color", Color.FromHtml("#263B31"));
         nameButton.AddThemeColorOverride("font_pressed_color", Color.FromHtml("#263B31"));
@@ -73,7 +96,7 @@ public partial class MainController : Node
 
         var follow = UiFactory.CreateButton("◉");
         follow.CustomMinimumSize = new Vector2(28, 23);
-        follow.TooltipText = "Follow this Voidling with the camera";
+        follow.TooltipText = Tr("UI_GARDEN_FOLLOW");
         follow.ToggleMode = true;
         follow.ButtonPressed = _garden.IsFollowing(data.Id);
         follow.Pressed += () =>
@@ -87,7 +110,7 @@ public partial class MainController : Node
         close.CustomMinimumSize = new Vector2(28, 23);
         close.Pressed += DeselectVoidling;
         heading.AddChild(close);
-        box.AddChild(heading);
+        identity.AddChild(heading);
 
         var personalityLabel = PersonalityPresentationCatalog.LabelFor(profile.Personality);
         var stage = data.Stage == LifeStage.Adult
@@ -104,7 +127,7 @@ public partial class MainController : Node
                 : "Seems restless and could use some attention.",
             6);
         demeanor.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        demeanor.CustomMinimumSize = new Vector2(194, 15);
+        demeanor.CustomMinimumSize = new Vector2(186, 15);
         box.AddChild(demeanor);
 
         if (!string.IsNullOrWhiteSpace(profile.DiscoveredFavoriteFoodId))
@@ -112,7 +135,7 @@ public partial class MainController : Node
             var favoriteFood = UiFactory.CreateLabel(
                 string.Format(Tr("UI_PROFILE_FAVORITE_FOOD"), StatPresentationCatalog.NameFor(profile.DiscoveredFavoriteFoodId)),
                 6);
-            favoriteFood.CustomMinimumSize = new Vector2(194, 15);
+            favoriteFood.CustomMinimumSize = new Vector2(186, 15);
             box.AddChild(favoriteFood);
         }
 
@@ -121,35 +144,35 @@ public partial class MainController : Node
         foreach (var statId in GameRules.StatIds)
             box.AddChild(CreateProfileStatBlock(data, statId, sameCreature));
 
-        var details = UiFactory.CreateButton("Details");
-        details.CustomMinimumSize = new Vector2(194, 22);
+        var details = UiFactory.CreateButton(Tr("UI_GARDEN_DETAILS"));
+        details.CustomMinimumSize = new Vector2(186, 22);
         UiFactory.ApplyPixelFont(details, 8);
         details.Pressed += ShowDetails;
-        box.AddChild(details);
+        layout.AddChild(details);
 
         var parentText = data.ParentAId.Length > 0
             ? $"Parents: {_session.NameFor(data.ParentAId)} + {_session.NameFor(data.ParentBId)}"
             : "Parents: starter/store line";
         var parents = UiFactory.CreateLabel(parentText, 6);
         parents.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        parents.CustomMinimumSize = new Vector2(194, 18);
+        parents.CustomMinimumSize = new Vector2(186, 18);
         box.AddChild(parents);
 
         var actions = new HBoxContainer();
         actions.AddThemeConstantOverride("separation", 5);
-        var familyTree = UiFactory.CreateButton("Family tree");
+        var familyTree = UiFactory.CreateButton(Tr("UI_GARDEN_FAMILY"));
         familyTree.CustomMinimumSize = new Vector2(103, 21);
         UiFactory.ApplyPixelFont(familyTree, 7);
         familyTree.Pressed += ShowFamilyTree;
         actions.AddChild(familyTree);
 
-        var goodbye = UiFactory.CreateButton("Goodbye");
+        var goodbye = UiFactory.CreateButton(Tr("UI_GARDEN_GOODBYE"));
         goodbye.CustomMinimumSize = new Vector2(86, 21);
         UiFactory.ApplyPixelFont(goodbye, 7);
         goodbye.AddThemeColorOverride("font_color", Color.FromHtml("#9C514B"));
         goodbye.Pressed += () => ShowGoodbyeFirst(data.Id);
         actions.AddChild(goodbye);
-        box.AddChild(actions);
+        layout.AddChild(actions);
 
         if (!sameCreature)
             SlideInDetailsPanel(_detailsPanel);
@@ -161,7 +184,7 @@ public partial class MainController : Node
     /// </summary>
     private Control CreatePassiveTrainingRow(VoidlingData data)
     {
-        var row = new HBoxContainer { CustomMinimumSize = new Vector2(194, 22) };
+        var row = new HBoxContainer { CustomMinimumSize = new Vector2(186, 22) };
         row.AddThemeConstantOverride("separation", 4);
 
         var training = data.PassiveTrainingStatId.Length > 0;
@@ -211,6 +234,7 @@ public partial class MainController : Node
         var panel = _detailsPanel;
         _detailsPanel = null;
         panel.MouseFilter = Control.MouseFilterEnum.Ignore;
+        panel.Visible = false;
         var tween = CreateTween().SetParallel(true);
         tween.TweenProperty(panel, "position:x", DetailsPanelHiddenX, DetailsPanelExitSeconds).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.In);
         tween.TweenProperty(panel, "modulate:a", 0.92f, DetailsPanelExitSeconds);
@@ -245,7 +269,7 @@ public partial class MainController : Node
 
     private Control CreateProfileStatBlock(VoidlingData data, string statId, bool animateProgress)
     {
-        var container = new VBoxContainer { CustomMinimumSize = new Vector2(194, 28) };
+        var container = new VBoxContainer { CustomMinimumSize = new Vector2(186, 28) };
         container.AddThemeConstantOverride("separation", 1);
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 4);
@@ -253,13 +277,9 @@ public partial class MainController : Node
         var effective = (int)Math.Round(GameRules.EffectiveStat(data, statId));
         var level = GameRules.StatLevel(data, statId);
         var count = _session.State.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0;
-        var color = StatPresentationCatalog.ColorFor(statId);
         var statName = StatPresentationCatalog.NameFor(statId);
-        var label = UiFactory.CreateLabel($"{statName.ToUpperInvariant(),-7} {GameRules.GradeName(gene.ExpressedValue)}  LV{level:00}  {effective:00}", 7);
-        label.CustomMinimumSize = new Vector2(142, 17);
-        label.AddThemeColorOverride("font_color", color);
-        label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
-        label.AddThemeConstantOverride("outline_size", statId == "stamina" ? 2 : 1);
+        var label = UiFactory.CreateLabel($"{statName,-7} {GameRules.GradeName(gene.ExpressedValue)}  LV{level:00}  {effective:00}", 7);
+        label.CustomMinimumSize = new Vector2(134, 17);
         label.TooltipText = $"DNA {GameRules.GradeName(gene.AlleleA)}/{GameRules.GradeName(gene.AlleleB)} • training {GameRules.GetTrainingPoints(data, statId)}";
         row.AddChild(label);
         var use = UiFactory.CreateButton(TrainingItemEffectPresentation.BaseEffectText);
@@ -271,7 +291,7 @@ public partial class MainController : Node
         use.Pressed += () => _session.UseTrainingItem(_selectedId, capturedStat);
         row.AddChild(use);
         container.AddChild(row);
-        container.AddChild(CreateStatProgressBar(data, statId, new Vector2(142, 6), animateProgress));
+        container.AddChild(CreateStatProgressBar(data, statId, new Vector2(134, 6), animateProgress));
         return container;
     }
 
@@ -281,7 +301,7 @@ public partial class MainController : Node
         var start = animateProgress && _profileDisplayedProgress.TryGetValue(statId, out var previous) ? previous : target;
         _profileDisplayedProgress[statId] = target;
         var bar = new ProgressBar { MinValue = 0, MaxValue = 1, Value = start, ShowPercentage = false, CustomMinimumSize = size };
-        var background = new StyleBoxFlat { BgColor = Color.FromHtml("#6D6658") };
+        var background = new StyleBoxFlat { BgColor = Color.FromHtml("#C5B798") };
         var fill = new StyleBoxFlat { BgColor = StatPresentationCatalog.ColorFor(statId) };
         background.CornerRadiusTopLeft = background.CornerRadiusTopRight = background.CornerRadiusBottomLeft = background.CornerRadiusBottomRight = 1;
         fill.CornerRadiusTopLeft = fill.CornerRadiusTopRight = fill.CornerRadiusBottomLeft = fill.CornerRadiusBottomRight = 1;

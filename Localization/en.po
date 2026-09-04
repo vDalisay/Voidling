@@ -779,3 +779,27 @@ msgstr "Stop"
 
 msgid "UI_PROFILE_PASSIVE_HINT"
 msgstr "Drop this Voidling onto a land tile in the Garden to train that stat."
+
+msgid "UI_GARDEN_HOME"
+msgstr "My garden"
+
+msgid "UI_GARDEN_JOURNAL"
+msgstr "Garden journal"
+
+msgid "UI_GARDEN_COMPANION"
+msgstr "YOUR COMPANION"
+
+msgid "UI_GARDEN_RENAME"
+msgstr "Choose a new name"
+
+msgid "UI_GARDEN_FOLLOW"
+msgstr "Follow this Voidling with the camera"
+
+msgid "UI_GARDEN_DETAILS"
+msgstr "View details"
+
+msgid "UI_GARDEN_FAMILY"
+msgstr "Family tree"
+
+msgid "UI_GARDEN_GOODBYE"
+msgstr "Goodbye"
