@@ -30,25 +30,59 @@ public partial class RaceScreen : Node2D
     private const float TrackTop = 126.0f;
     private const float TrackBottom = 244.0f;
     private const float FlightAltitude = 38.0f;
-    private const float JumpDurationSeconds = 0.58f;
+    private const float JumpMinPeak = 15.0f;
+    private const float JumpMaxPeak = 31.0f;
+    private const float JumpMinDurationSeconds = 0.50f;
+    private const float JumpMaxDurationSeconds = 0.74f;
+
+    /// <summary>A refused hurdle: a real attempt, but a short scuffed hop that does not clear it.</summary>
+    private const float FailedJumpPeak = 7.0f;
+    private const float FailedJumpDurationSeconds = 0.30f;
+
+    /// <summary>How long a racer spends backing up to line the hurdle up again.</summary>
+    private const float RetreatSeconds = 0.42f;
+
+    /// <summary>
+    /// Forward travel between dust clouds. Distance, not time: the simulation is fixed-step, so a
+    /// racer's X only changes on some frames, and a time-based trail had its accumulator reset by
+    /// every frame in between and so never fired outside the slow walk back from a refused hurdle.
+    /// </summary>
+    private const float DustSpacingPixels = 7.0f;
+
+    /// <summary>Racers coast a random distance past the line rather than all stopping on it.</summary>
+    private const float FinishOverrunMin = 22.0f;
+    private const float FinishOverrunMax = 66.0f;
+    private const float FinishCoastSeconds = 0.85f;
+
+    /// <summary>
+    /// Camera zoom range. One is the framing the race has always used and stays the furthest out,
+    /// so zooming can only ever bring the player closer and never reveals more than the track art
+    /// is drawn for.
+    /// </summary>
+    private const float MinZoom = 1.0f;
+    private const float MaxZoom = 3.2f;
+    private const float ZoomStepFactor = 1.18f;
     private const int MaxCatchUpStepsPerFrame = 30;
 
     /// <summary>Canvas layer the results overlay lives on. The CI completion probe looks for it.</summary>
     internal const int ResultsCanvasLayer = 50;
 
     private RaceCourse Course => _entry?.CourseDefinition.Course ?? RaceCourse.Demo;
-    private static readonly Texture2D WaterTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Tilesets/Water.png");
-    private static readonly Texture2D FenceTexture = GD.Load<Texture2D>(
-        "res://Assets/Sprout Lands - Sprites - Basic pack/Tilesets/Fences.png");
 
-    private static readonly Color RunColor = Color.FromHtml("#78C96A");
-    private static readonly Color SwimColor = Color.FromHtml("#F2D45C");
-    private static readonly Color FlyColor = Color.FromHtml("#B47AE5");
-    private static readonly Color ClimbColor = Color.FromHtml("#E7655A");
+    private static RaceTrackLayout Layout => new(TrackTop, TrackBottom, ScreenWidth, ScreenHeight, RaceTrackArt.ClimbHeight);
+
+    /// <summary>
+    /// The river's own colour, drawn over a swimmer's submerged body. Matching the water exactly is
+    /// what keeps the overlay from reading as a tinted box floating on the surface.
+    /// </summary>
+    private static readonly Color SubmergedWater = new(0.608f, 0.831f, 0.765f, 0.56f);
+    private static readonly Color WakeRipple = new(1.0f, 1.0f, 1.0f, 0.42f);
+
     private static readonly Color StaminaColor = Color.FromHtml("#F7F3E7");
 
-    private readonly float[] _racerOffsets = { -16.0f, -5.0f, 6.0f, 17.0f };
+    // Lanes spread across the full dirt band. The old 33px cluster stacked four racers on top of
+    // each other on the start line and left most of the track empty.
+    private readonly float[] _racerOffsets = { -30.0f, -10.0f, 10.0f, 30.0f };
     private readonly Dictionary<string, RacerVisual> _visuals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, float> _cheerParticleAccumulators = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _previousObstacleIndices = new(StringComparer.Ordinal);
@@ -65,14 +99,19 @@ public partial class RaceScreen : Node2D
     private bool _resultsShown;
     private bool _completionReported;
     private string _playerId = "";
+    private string? _firstFinisherId;
     private RacerVisual? _playerVisual;
     private Random _vfxRandom = new(1);
+    private float _waterPhase;
+    private float _zoom = MinZoom;
+    private float _zoomTarget = MinZoom;
     private Camera2D _camera = null!;
     private Polygon2D _playerMarker = null!;
     private Button _cheerButton = null!;
     private ProgressBar _staminaBar = null!;
     private Label _staminaLabel = null!;
-    private Label _sectionLabel = null!;
+    private Label _faultLabel = null!;
+    private ColorRect _faultPlaque = null!;
     private RaceMiniMap _miniMap = null!;
 
     private sealed class RacerVisual
@@ -83,6 +122,24 @@ public partial class RaceScreen : Node2D
         public Polygon2D Shadow { get; init; } = null!;
         public float BaseY { get; init; }
         public float JumpSeconds { get; set; }
+        public float JumpDuration { get; set; } = JumpMaxDurationSeconds;
+        public float JumpPeak { get; set; } = JumpMaxPeak;
+
+        /// <summary>Counts down through the scuffed hop and the walk back after a refused hurdle.</summary>
+        public float RecoverySeconds { get; set; }
+        public float RetreatFromX { get; set; }
+
+        /// <summary>Water drawn over the submerged part of the body while swimming.</summary>
+        public Polygon2D Submersion { get; init; } = null!;
+        public float DustDistance { get; set; }
+
+        /// <summary>How far past the line this racer coasts, and how far through that coast it is.</summary>
+        public bool Finished { get; set; }
+        public float FinishOverrun { get; set; }
+        public float FinishSeconds { get; set; }
+        public bool Celebrates { get; set; }
+        public float WindSeconds { get; set; }
+        public float LastX { get; set; }
         public string VisualMode { get; set; } = "run";
     }
 
@@ -133,6 +190,9 @@ public partial class RaceScreen : Node2D
                 _entry.SimulationSeed);
         }
 
+        // Tiled DrawTextureRect needs repeat sampling on this canvas item.
+        TextureRepeat = TextureRepeatEnum.Enabled;
+
         BuildCoursePresentation();
         CreateEntrantVisuals(_entry.Entrants);
         CreateCamera();
@@ -152,6 +212,18 @@ public partial class RaceScreen : Node2D
 
     public override void _Process(double delta)
     {
+        // The stream keeps flowing, and the camera keeps answering the wheel, on the start line,
+        // during the opening flyover and on the results screen.
+        _waterPhase = (_waterPhase + (float)delta * 2.2f) % 1.0f;
+        UpdateZoom((float)delta);
+        QueueRedraw();
+
+        // Keep the framing on the player between the countdown and the podium too, so a zoom taken
+        // on the start line or after the finish is centred on the same Voidling. The flyover owns
+        // the camera while it is running.
+        if (!_running && !_flyoverRunning)
+            UpdatePlayerTracking();
+
         if (!_running || _playerVisual == null)
             return;
 
@@ -190,7 +262,7 @@ public partial class RaceScreen : Node2D
             if (!advanced.Success)
             {
                 _running = false;
-                SetSectionLabel(Tr("UI_MP_RACE_SYNC_ERROR"), Color.FromHtml("#9C514B"));
+                ShowFault(Tr("UI_MP_RACE_SYNC_ERROR"));
                 return;
             }
             _multiplayerTickAccumulator -= steps * RaceSimulation.FixedStepSeconds;
@@ -218,38 +290,13 @@ public partial class RaceScreen : Node2D
     }
 
     public override void _Draw()
-    {
-        var worldLeft = -ScreenWidth;
-        var worldWidth = Course.EndX + ScreenWidth * 2.0f;
-
-        DrawRect(new Rect2(worldLeft, 0, worldWidth, ScreenHeight), Color.FromHtml("#A7D8C7"));
-        DrawRect(new Rect2(worldLeft, 102, worldWidth, 166), Color.FromHtml("#8EBE85"));
-        DrawRect(new Rect2(worldLeft, TrackTop, worldWidth, TrackBottom - TrackTop), Color.FromHtml("#D9774E"));
-        DrawLine(new Vector2(worldLeft, TrackTop), new Vector2(worldLeft + worldWidth, TrackTop), Color.FromHtml("#E9B777"), 4.0f);
-        DrawLine(new Vector2(worldLeft, TrackBottom), new Vector2(worldLeft + worldWidth, TrackBottom), Color.FromHtml("#9C6049"), 4.0f);
-
-        for (var x = worldLeft + 40.0f; x < worldLeft + worldWidth; x += 80.0f)
-            DrawLine(new Vector2(x, TrackY), new Vector2(x + 28, TrackY), new Color(0.95f, 0.72f, 0.52f, 0.30f), 2.0f);
-
-        DrawRect(new Rect2(Course.EndX - 10, TrackTop - 8, 20, TrackBottom - TrackTop + 16), Color.FromHtml("#F5F0DE"));
-        const float square = 10.0f;
-        for (var row = 0; row < 13; row++)
-        {
-            for (var col = 0; col < 2; col++)
-            {
-                if ((row + col) % 2 == 0)
-                    DrawRect(new Rect2(Course.EndX - 10 + col * square, TrackTop - 6 + row * square, square, square), Color.FromHtml("#39423D"));
-            }
-        }
-        DrawLine(new Vector2(Course.EndX - 14, TrackTop - 10), new Vector2(Course.EndX - 14, TrackBottom + 10), Color.FromHtml("#68584B"), 4.0f);
-        DrawLine(new Vector2(Course.EndX + 14, TrackTop - 10), new Vector2(Course.EndX + 14, TrackBottom + 10), Color.FromHtml("#68584B"), 4.0f);
-    }
+        => RaceTrackArt.Paint(this, Course, Layout, _waterPhase);
 
     /// <summary>
     /// What a segment kind looks like on the track. Ground needs no extra geometry because the track
     /// itself is the ground surface; every other kind must name the geometry it adds.
     /// </summary>
-    internal readonly record struct SegmentVisual(bool Water, bool Climb, bool Ramp, string? LabelKey);
+    internal readonly record struct SegmentVisual(bool Water, bool Climb, bool Ramp);
 
     /// <summary>
     /// The single declaration of race terrain geometry. BuildCoursePresentation renders from it and
@@ -258,42 +305,17 @@ public partial class RaceScreen : Node2D
     /// </summary>
     internal static SegmentVisual VisualFor(RaceSegmentKind kind) => kind switch
     {
-        RaceSegmentKind.Ground => new SegmentVisual(false, false, false, null),
-        RaceSegmentKind.Swim => new SegmentVisual(true, false, false, "UI_RACE_SECTION_SWIM"),
-        RaceSegmentKind.Climb => new SegmentVisual(false, true, false, "UI_RACE_SECTION_CLIMB"),
-        RaceSegmentKind.Glide => new SegmentVisual(true, false, true, "UI_RACE_SECTION_GLIDE_SWIM"),
+        RaceSegmentKind.Ground => new SegmentVisual(false, false, false),
+        RaceSegmentKind.Swim => new SegmentVisual(true, false, false),
+        RaceSegmentKind.Climb => new SegmentVisual(false, true, false),
+        RaceSegmentKind.Glide => new SegmentVisual(true, false, true),
         _ => throw new InvalidOperationException($"Race segment kind '{kind}' has no track presentation.")
-    };
-
-    private static Color SegmentLabelColor(RaceSegmentKind kind) => kind switch
-    {
-        RaceSegmentKind.Swim => SwimColor,
-        RaceSegmentKind.Climb => ClimbColor,
-        RaceSegmentKind.Glide => FlyColor,
-        _ => RunColor
     };
 
     private void BuildCoursePresentation()
     {
-        foreach (var segment in Course.Segments)
-        {
-            var visual = VisualFor(segment.Kind);
-            if (visual.Water)
-                AddWaterSection(segment.StartX, segment.EndX);
-            if (visual.Climb)
-                AddClimbSection(segment.StartX, segment.EndX);
-            if (visual.Ramp)
-                AddFlightRamp();
-            if (visual.LabelKey != null)
-            {
-                AddWorldLabel(
-                    Tr(visual.LabelKey),
-                    (segment.StartX + segment.EndX) * 0.5f,
-                    108,
-                    SegmentLabelColor(segment.Kind));
-            }
-        }
-
+        // Terrain is painted in _Draw by RaceTrackArt. The HUD names the section the player is in,
+        // so the track itself carries no signposting.
         foreach (var obstacleX in Course.Obstacles)
             AddHurdle(obstacleX + 18.0f);
     }
@@ -339,13 +361,33 @@ public partial class RaceScreen : Node2D
                 visualTypeId);
             AddChild(mutationAdornment);
 
+            // Drawn over the sprite, inside it, so only what is above the waterline stays visible.
+            // Frame-local units, so it follows the sprite's own scale and any art revision with it.
+            var submersion = new Polygon2D
+            {
+                Polygon = BuildSubmersionPolygon(),
+                Color = SubmergedWater,
+                ZIndex = 5,
+                Visible = false
+            };
+            submersion.AddChild(new Line2D
+            {
+                Points = BuildRipplePolygon(),
+                Closed = true,
+                Width = 1.4f,
+                DefaultColor = WakeRipple
+            });
+            sprite.AddChild(submersion);
+
             var visual = new RacerVisual
             {
                 Entrant = entrant,
                 Appearance = appearance,
                 Sprite = sprite,
                 Shadow = shadow,
-                BaseY = baseY
+                BaseY = baseY,
+                Submersion = submersion,
+                LastX = Course.StartX
             };
             _visuals.Add(entrant.Participant.CreatureId, visual);
 
@@ -362,13 +404,54 @@ public partial class RaceScreen : Node2D
             {
                 case RaceObstacleResolvedEvent obstacle:
                     if (_visuals.TryGetValue(obstacle.ParticipantId, out var visual))
-                        visual.JumpSeconds = JumpDurationSeconds;
+                        StartJump(visual, obstacle);
                     break;
                 case RaceParticipantFinishedEvent finished:
-                    if (_visuals.TryGetValue(finished.ParticipantId, out var finisher))
-                        finisher.Sprite.Stop();
+                    // The coast past the line and any celebration are driven per frame, so the
+                    // sprite is not stopped here.
+                    _ = finished;
                     break;
             }
+        }
+    }
+
+    /// <summary>
+    /// Starts the hurdle animation for one resolved obstacle.
+    ///
+    /// A cleared hurdle varies in height and hang time so four racers do not jump in lockstep; the
+    /// variation is a hash of who jumped and which hurdle, never the VFX random stream, so a replay
+    /// of the same race jumps the same way. A refused hurdle is a short scuffed hop followed by the
+    /// racer backing up to line the jump up again, which is the rollback the simulation already
+    /// applied being shown rather than teleported through.
+    /// </summary>
+    private static void StartJump(RacerVisual visual, RaceObstacleResolvedEvent obstacle)
+    {
+        if (!obstacle.Avoided)
+        {
+            visual.JumpPeak = FailedJumpPeak;
+            visual.JumpDuration = FailedJumpDurationSeconds;
+            visual.JumpSeconds = FailedJumpDurationSeconds;
+            visual.RetreatFromX = visual.Sprite.Position.X;
+            visual.RecoverySeconds = FailedJumpDurationSeconds + RetreatSeconds;
+            return;
+        }
+
+        var variation = JumpVariation(obstacle.ParticipantId, obstacle.ObstacleIndex);
+        visual.JumpPeak = Mathf.Lerp(JumpMinPeak, JumpMaxPeak, variation);
+        visual.JumpDuration = Mathf.Lerp(JumpMinDurationSeconds, JumpMaxDurationSeconds, variation);
+        visual.JumpSeconds = visual.JumpDuration;
+        visual.RecoverySeconds = 0.0f;
+    }
+
+    private static float JumpVariation(string participantId, int obstacleIndex)
+    {
+        unchecked
+        {
+            var hash = 2166136261u;
+            foreach (var character in participantId)
+                hash = (hash ^ character) * 16777619u;
+            hash = (hash ^ (uint)obstacleIndex) * 16777619u;
+            return hash % 1000u / 1000.0f;
         }
     }
 
@@ -426,7 +509,12 @@ public partial class RaceScreen : Node2D
                 participant.ParticipantId,
                 participant.NextObstacleIndex);
             if (participant.NextObstacleIndex > previousObstacleIndex && !participant.Finished)
-                visual.JumpSeconds = JumpDurationSeconds;
+            {
+                StartJump(visual, new RaceObstacleResolvedEvent(
+                    participant.ParticipantId,
+                    previousObstacleIndex,
+                    Avoided: true));
+            }
             _previousObstacleIndices[participant.ParticipantId] = participant.NextObstacleIndex;
 
             UpdateRacerVisual(visual, new RaceParticipantStateSnapshot(
@@ -449,8 +537,11 @@ public partial class RaceScreen : Node2D
     {
         if (visual.JumpSeconds > 0.0f)
             visual.JumpSeconds = Math.Max(0.0f, visual.JumpSeconds - delta);
+        if (visual.RecoverySeconds > 0.0f)
+            visual.RecoverySeconds = Math.Max(0.0f, visual.RecoverySeconds - delta);
 
-        if (state.Finished)
+        var finishOffset = UpdateFinish(visual, state, delta);
+        if (state.Finished && !visual.Celebrates && visual.FinishSeconds >= FinishCoastSeconds)
             visual.Sprite.Stop();
         else if (state.Terrain is RaceTerrain.Swim or RaceTerrain.FailedGlideSwim)
             SetVisualMode(visual, "swim");
@@ -462,10 +553,16 @@ public partial class RaceScreen : Node2D
         var yOffset = 0.0f;
         var swimming = state.Terrain is RaceTerrain.Swim or RaceTerrain.FailedGlideSwim;
 
-        if (visual.JumpSeconds > 0.0f)
+        if (visual.Celebrates && state.Finished && visual.FinishSeconds >= FinishCoastSeconds)
         {
-            var normalized = 1.0f - visual.JumpSeconds / JumpDurationSeconds;
-            yOffset = -Mathf.Sin(normalized * Mathf.Pi) * 17.0f;
+            // Hopping on the spot, over and over, for as long as the podium takes to appear.
+            var hop = Mathf.Abs(Mathf.Sin((visual.FinishSeconds - FinishCoastSeconds) * 6.4f));
+            yOffset = -hop * 13.0f;
+        }
+        else if (visual.JumpSeconds > 0.0f)
+        {
+            var normalized = 1.0f - visual.JumpSeconds / visual.JumpDuration;
+            yOffset = -Mathf.Sin(normalized * Mathf.Pi) * visual.JumpPeak;
         }
         else if (swimming)
         {
@@ -474,12 +571,12 @@ public partial class RaceScreen : Node2D
         }
         else if (InLaunchRamp(state.X))
         {
+            // The ramp is a surface the racer runs up, not altitude: the lift below carries it, and
+            // only the lean forward is animation.
             var progress = Mathf.Clamp(
                 (state.X - Course.GlideLaunchStartX) / (Course.GlideSegment.StartX - Course.GlideLaunchStartX),
                 0.0f,
                 1.0f);
-            progress = progress * progress * (3.0f - 2.0f * progress);
-            yOffset = -FlightAltitude * progress;
             visual.Sprite.Rotation = -0.09f * progress;
         }
         else if (state.Terrain == RaceTerrain.Glide)
@@ -489,9 +586,18 @@ public partial class RaceScreen : Node2D
             var easedDescent = Mathf.Pow(glideProgress, 1.35f);
             var fallsIntoWater = state.GlideEndX < Course.GlideSegment.EndX - 1.0f;
             var destinationY = fallsIntoWater ? 7.0f : 0.0f;
-            yOffset = Mathf.Lerp(-FlightAltitude, destinationY, easedDescent) +
-                      Mathf.Sin((float)Time.GetTicksMsec() / 210.0f + visual.BaseY) * 1.2f * (1.0f - glideProgress);
-            visual.Sprite.Rotation = Mathf.Lerp(-0.08f, 0.08f, glideProgress);
+            // The glide starts at exactly the height the ramp lip left the racer at, so a take-off
+            // from a clifftop launches from the clifftop rather than snapping back to ground level.
+            var seconds = (float)Time.GetTicksMsec() / 1000.0f;
+            var gust = Mathf.Sin(seconds * 5.1f + visual.BaseY) * 0.6f +
+                       Mathf.Sin(seconds * 11.3f + visual.BaseY * 0.5f) * 0.3f;
+            yOffset = Mathf.Lerp(-RaceTrackArt.LaunchHeight(Course), destinationY, easedDescent) +
+                      gust * 2.2f * (1.0f - glideProgress * 0.6f);
+
+            // Nose held up into the headwind, buffeted by the gusts, easing level as the lift runs
+            // out. The old linear tilt read as a falling brick rather than a glide.
+            visual.Sprite.Rotation = Mathf.Lerp(-0.20f, 0.06f, easedDescent) + gust * 0.045f;
+            SpawnHeadwind(visual, glideProgress, delta);
         }
         else
         {
@@ -500,7 +606,10 @@ public partial class RaceScreen : Node2D
 
         // One altitude rule for every airborne branch: the shadow shrinks and fades on the way up
         // and grows back on the way down, so jump, ramp and glide cannot drift apart.
-        var altitude = Mathf.Clamp(-yOffset / FlightAltitude, 0.0f, 1.0f);
+        var altitude = Mathf.Clamp(
+            -yOffset / Math.Max(FlightAltitude, RaceTrackArt.LaunchHeight(Course)),
+            0.0f,
+            1.0f);
         var shadowScale = Vector2.One * Mathf.Lerp(1.0f, 0.42f, altitude);
         var shadowAlpha = Mathf.Lerp(0.34f, 0.10f, altitude);
         if (swimming)
@@ -509,19 +618,357 @@ public partial class RaceScreen : Node2D
             shadowAlpha = 0.15f;
         }
 
+        // The clifftop and the launch ramp raise the ground itself, so sprite and shadow move
+        // together and the racer stays planted on the surface RaceTrackArt draws.
+        var groundLift = SurfaceLiftAt(state.X);
+
         var visualTypeId = visual.Appearance.VisualTypeId;
+        var drawX = RetreatX(visual, state.X) + finishOffset;
+        UpdateSubmersion(visual, swimming);
+        HandleRunningDust(visual, state, drawX, swimming);
+
         visual.Sprite.Position = new Vector2(
-            state.X,
-            visual.BaseY + VoidlingVisualFactory.RaceSpriteCenterYOffset(visualTypeId) + yOffset);
+            drawX,
+            visual.BaseY + VoidlingVisualFactory.RaceSpriteCenterYOffset(visualTypeId) + yOffset - groundLift);
         visual.Shadow.Position = new Vector2(
-            state.X,
+            drawX,
             visual.BaseY + VoidlingVisualFactory.ShadowCenterYOffset(
                 VoidlingVisualFactory.RaceScaleFor(visualTypeId),
-                visualTypeId));
+                visualTypeId) - groundLift);
         visual.Shadow.Scale = shadowScale;
         var shadowColor = visual.Shadow.Color;
         shadowColor.A = shadowAlpha;
         visual.Shadow.Color = shadowColor;
+    }
+
+    /// <summary>
+    /// Carries a racer through the finish: it coasts a random distance past the line instead of
+    /// stopping dead on it, and the first one over sometimes celebrates by hopping on the spot.
+    ///
+    /// The distance is a hash of the racer, not the VFX random stream, so a replay of the same race
+    /// puts everyone in the same place. Driven from the snapshot rather than the finish event, so
+    /// multiplayer frames get the same behaviour without one.
+    /// </summary>
+    private float UpdateFinish(RacerVisual visual, RaceParticipantStateSnapshot state, float delta)
+    {
+        if (!state.Finished)
+        {
+            visual.Finished = false;
+            visual.FinishSeconds = 0.0f;
+            return 0.0f;
+        }
+
+        if (!visual.Finished)
+        {
+            visual.Finished = true;
+            var id = visual.Entrant.Participant.CreatureId;
+            var variation = JumpVariation(id, 977);
+            visual.FinishOverrun = Mathf.Lerp(FinishOverrunMin, FinishOverrunMax, variation);
+
+            if (_firstFinisherId == null)
+            {
+                _firstFinisherId = id;
+                visual.Celebrates = JumpVariation(id, 4211) < 0.6f;
+            }
+        }
+
+        visual.FinishSeconds += Math.Max(0.0f, delta);
+        var coast = Mathf.Clamp(visual.FinishSeconds / FinishCoastSeconds, 0.0f, 1.0f);
+        // Decelerating, so they roll to a stop rather than sliding at full speed and freezing.
+        return visual.FinishOverrun * (1.0f - (1.0f - coast) * (1.0f - coast));
+    }
+
+    /// <summary>
+    /// Where a racer is drawn while recovering from a refused hurdle. The simulation snaps X back
+    /// the instant the jump fails; this walks that rollback out so the racer visibly scuffs the
+    /// hurdle, then backs up to take another run at it, facing the way it is moving.
+    /// </summary>
+    private static float RetreatX(RacerVisual visual, float stateX)
+    {
+        var scale = VoidlingVisualFactory.RaceScaleFor(visual.Appearance.VisualTypeId);
+        if (visual.RecoverySeconds <= 0.0f)
+        {
+            visual.Sprite.Scale = new Vector2(scale, scale);
+            return stateX;
+        }
+
+        // Still scuffing the hurdle: hold the take-off point rather than snapping backwards mid-hop.
+        if (visual.RecoverySeconds > RetreatSeconds)
+        {
+            visual.Sprite.Scale = new Vector2(scale, scale);
+            return visual.RetreatFromX;
+        }
+
+        visual.Sprite.Scale = new Vector2(-scale, scale);
+        var walked = 1.0f - visual.RecoverySeconds / RetreatSeconds;
+        return Mathf.Lerp(visual.RetreatFromX, stateX, walked * walked * (3.0f - 2.0f * walked));
+    }
+
+    /// <summary>
+    /// Sinks a swimmer up to the neck. The overlay is a child of the sprite in frame-local units,
+    /// so only the head stays clear of the water whatever the creature's scale or art revision.
+    /// </summary>
+    private static void UpdateSubmersion(RacerVisual visual, bool swimming)
+    {
+        visual.Submersion.Visible = swimming;
+        if (!swimming)
+            return;
+
+        // Waterline just under the head, bobbing with the swell.
+        var waterline = -4.0f + Mathf.Sin((float)Time.GetTicksMsec() / 190.0f + visual.BaseY) * 1.2f;
+        visual.Submersion.Position = new Vector2(0.0f, waterline);
+    }
+
+    private void HandleRunningDust(RacerVisual visual, RaceParticipantStateSnapshot state, float drawX, bool swimming)
+    {
+        var moved = drawX - visual.LastX;
+        visual.LastX = drawX;
+
+        var grounded = !swimming &&
+                       state.Terrain != RaceTerrain.Glide &&
+                       visual.JumpSeconds <= 0.0f &&
+                       !state.Finished;
+        if (!grounded)
+        {
+            visual.DustDistance = 0.0f;
+            return;
+        }
+
+        visual.DustDistance += Math.Abs(moved);
+        if (visual.DustDistance < DustSpacingPixels)
+            return;
+
+        visual.DustDistance = 0.0f;
+        SpawnDust(visual, drawX, 0.8f);
+    }
+
+    // Chunky pixel-art dust, in the Pokeathlon idiom: solid overlapping blobs with a dark rim that
+    // hold their opacity while they grow, rather than soft translucent smudges that vanish on a
+    // pastel track.
+    private static readonly Color DustRim = new(0.60f, 0.56f, 0.47f, 1.0f);
+    private static readonly Color[] DustFills =
+    {
+        new(0.96f, 0.94f, 0.88f, 1.0f),
+        new(0.87f, 0.83f, 0.74f, 1.0f),
+        new(0.78f, 0.72f, 0.61f, 1.0f)
+    };
+
+    /// <summary>
+    /// A cloud of dust kicked out behind the feet. <paramref name="force"/> scales the whole thing,
+    /// so one routine covers the running trail and the burst a cheer digs out of the track.
+    /// </summary>
+    private void SpawnDust(RacerVisual visual, float x, float force)
+    {
+        var blobs = Math.Clamp(3 + (int)(force * 2.0f), 3, 9);
+        var cloud = new Node2D
+        {
+            Position = new Vector2(
+                x - (8.0f + (float)_vfxRandom.NextDouble() * 6.0f) * force,
+                visual.Shadow.Position.Y - 3.0f - (float)_vfxRandom.NextDouble() * 4.0f),
+            Scale = Vector2.One * 0.75f,
+            ZIndex = 9
+        };
+        AddChild(cloud);
+
+        for (var i = 0; i < blobs; i++)
+        {
+            var radius = (3.8f + (float)_vfxRandom.NextDouble() * 3.4f) * force;
+            var offset = new Vector2(
+                (float)(_vfxRandom.NextDouble() * 2.0 - 1.0) * 9.0f * force,
+                (float)(_vfxRandom.NextDouble() * 2.0 - 1.0) * 5.0f * force);
+
+            // Rim first, fill on top: two circles are cheaper than outlining a polygon and give the
+            // hard pixel-art edge the soft ellipses were missing.
+            cloud.AddChild(new Polygon2D
+            {
+                Polygon = BuildCircle(radius + 1.6f),
+                Color = DustRim,
+                Position = offset
+            });
+            cloud.AddChild(new Polygon2D
+            {
+                Polygon = BuildCircle(radius),
+                Color = DustFills[(i + _vfxRandom.Next(DustFills.Length)) % DustFills.Length],
+                Position = offset
+            });
+        }
+
+        var drift = new Vector2(
+            -(10.0f + (float)_vfxRandom.NextDouble() * 12.0f) * force,
+            -(3.0f + (float)_vfxRandom.NextDouble() * 6.0f) * force);
+        var life = 0.30 + _vfxRandom.NextDouble() * 0.18 * force;
+
+        var grow = CreateTween().SetParallel(true);
+        grow.TweenProperty(cloud, "position", cloud.Position + drift, life)
+            .SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+        grow.TweenProperty(cloud, "scale", Vector2.One * (1.25f + 0.35f * force), life)
+            .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+
+        // Held solid for most of its life, then out quickly, so it never reads as a smudge.
+        var fade = CreateTween();
+        fade.TweenInterval(life * 0.62);
+        fade.TweenProperty(cloud, "modulate:a", 0.0f, life * 0.38);
+        fade.Finished += cloud.QueueFree;
+    }
+
+    /// <summary>
+    /// The burst a cheered racer tears out of the track: a wide cloud, a speed wedge driving out of
+    /// it and stones thrown up behind.
+    /// </summary>
+    private void SpawnDustBurst(RacerVisual visual, float x)
+    {
+        for (var i = 0; i < 4; i++)
+            SpawnDust(visual, x - i * 6.0f, 1.4f + (float)_vfxRandom.NextDouble() * 0.6f);
+
+        SpawnSpeedWedge(visual, x);
+
+        for (var i = 0; i < 8; i++)
+            SpawnKickedStone(visual, x);
+    }
+
+    private void SpawnSpeedWedge(RacerVisual visual, float x)
+    {
+        var wedge = new Polygon2D
+        {
+            Polygon = new[]
+            {
+                new Vector2(0.0f, 0.0f),
+                new Vector2(-26.0f, -9.0f),
+                new Vector2(-17.0f, -1.0f),
+                new Vector2(-29.0f, 4.0f),
+                new Vector2(-16.0f, 4.0f),
+                new Vector2(-24.0f, 11.0f)
+            },
+            Color = new Color(1.0f, 0.86f, 0.31f, 1.0f),
+            Position = new Vector2(x - 8.0f, visual.Shadow.Position.Y - 4.0f),
+            ZIndex = 12,
+            Scale = new Vector2(0.5f, 0.5f)
+        };
+        AddChild(wedge);
+
+        var punch = CreateTween().SetParallel(true);
+        punch.TweenProperty(wedge, "scale", new Vector2(1.7f, 1.35f), 0.16)
+            .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+        punch.TweenProperty(wedge, "position:x", wedge.Position.X - 16.0f, 0.30)
+            .SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+
+        var fade = CreateTween();
+        fade.TweenInterval(0.14);
+        fade.TweenProperty(wedge, "modulate:a", 0.0f, 0.18);
+        fade.Finished += wedge.QueueFree;
+    }
+
+    private void SpawnKickedStone(RacerVisual visual, float x)
+    {
+        var size = 2.4f + (float)_vfxRandom.NextDouble() * 2.6f;
+        var stone = new Polygon2D
+        {
+            Polygon = BuildCircle(size),
+            Color = _vfxRandom.Next(2) == 0
+                ? new Color(0.72f, 0.75f, 0.76f, 1.0f)
+                : new Color(0.85f, 0.74f, 0.54f, 1.0f),
+            Position = new Vector2(x - 6.0f, visual.Shadow.Position.Y - 2.0f),
+            ZIndex = 13
+        };
+        stone.AddChild(new Polygon2D
+        {
+            Polygon = BuildCircle(size * 0.45f),
+            Color = new Color(1.0f, 1.0f, 1.0f, 0.55f),
+            Position = new Vector2(-size * 0.25f, -size * 0.2f)
+        });
+        AddChild(stone);
+
+        var target = stone.Position + new Vector2(
+            -(16.0f + (float)_vfxRandom.NextDouble() * 40.0f),
+            -(30.0f + (float)_vfxRandom.NextDouble() * 48.0f));
+        var life = 0.40 + _vfxRandom.NextDouble() * 0.30;
+
+        var toss = CreateTween().SetParallel(true);
+        toss.TweenProperty(stone, "position", target, life)
+            .SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+        toss.TweenProperty(stone, "rotation", (float)(_vfxRandom.NextDouble() * 6.0 - 3.0), life);
+
+        var fade = CreateTween();
+        fade.TweenInterval(life * 0.6);
+        fade.TweenProperty(stone, "modulate:a", 0.0f, life * 0.4);
+        fade.Finished += stone.QueueFree;
+    }
+
+    /// <summary>Air torn past a glider, so a glide reads as pushing into a headwind.</summary>
+    private void SpawnHeadwind(RacerVisual visual, float glideProgress, float delta)
+    {
+        if (delta <= 0.0f)
+            return;
+
+        // Its own accumulator: the running-dust timer is reset every airborne frame, so sharing it
+        // meant a glide produced barely a streak.
+        visual.WindSeconds += delta;
+        if (visual.WindSeconds < 0.05f)
+            return;
+
+        visual.WindSeconds = 0.0f;
+        var y = visual.Sprite.Position.Y + (float)(_vfxRandom.NextDouble() * 22.0 - 9.0);
+        var length = 12.0f + (float)_vfxRandom.NextDouble() * 16.0f;
+        var streak = new Line2D
+        {
+            Width = 1.2f,
+            DefaultColor = new Color(1.0f, 1.0f, 1.0f, 0.62f * (1.0f - glideProgress * 0.4f)),
+            ZIndex = 9,
+            Points = new[]
+            {
+                new Vector2(visual.Sprite.Position.X - 10.0f - length, y),
+                new Vector2(visual.Sprite.Position.X - 10.0f, y)
+            }
+        };
+        AddChild(streak);
+
+        var blow = CreateTween().SetParallel(true);
+        blow.TweenProperty(streak, "position:x", -34.0f, 0.30)
+            .SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+        blow.TweenProperty(streak, "modulate:a", 0.0f, 0.30);
+        blow.Finished += streak.QueueFree;
+    }
+
+    /// <summary>
+    /// The water a swimmer sits in: a soft waterline curved over the shoulders, straight sides down.
+    /// A plain rectangle read as a pane of glass laid over the creature.
+    /// </summary>
+    private static Vector2[] BuildSubmersionPolygon()
+    {
+        var points = new List<Vector2>();
+        const float halfWidth = 13.0f;
+        for (var i = 0; i <= 12; i++)
+        {
+            var t = i / 12.0f;
+            var x = Mathf.Lerp(-halfWidth, halfWidth, t);
+            points.Add(new Vector2(x, -Mathf.Sin(t * Mathf.Pi) * 3.4f));
+        }
+        points.Add(new Vector2(halfWidth, 30.0f));
+        points.Add(new Vector2(-halfWidth, 30.0f));
+        return points.ToArray();
+    }
+
+    /// <summary>The wake ring where the body breaks the surface.</summary>
+    private static Vector2[] BuildRipplePolygon()
+    {
+        var points = new Vector2[16];
+        for (var i = 0; i < points.Length; i++)
+        {
+            var angle = Mathf.Tau * i / points.Length;
+            points[i] = new Vector2(Mathf.Cos(angle) * 12.0f, Mathf.Sin(angle) * 2.4f);
+        }
+        return points;
+    }
+
+    private static Vector2[] BuildCircle(float radius)
+    {
+        var points = new Vector2[10];
+        for (var i = 0; i < points.Length; i++)
+        {
+            var angle = Mathf.Tau * i / points.Length;
+            points[i] = new Vector2(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius * 0.82f);
+        }
+        return points;
     }
 
     private void CreateCamera()
@@ -557,11 +1004,24 @@ public partial class RaceScreen : Node2D
         title.Size = new Vector2(180, 24);
         canvas.AddChild(title);
 
-        _sectionLabel = UiFactory.CreateLabel("RUN", 8);
-        _sectionLabel.Position = new Vector2(292, 34);
-        _sectionLabel.Size = new Vector2(120, 18);
-        _sectionLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        canvas.AddChild(_sectionLabel);
+        // The track no longer names its own sections. This strip only appears to report a fault the
+        // player has to know about, such as multiplayer losing sync.
+        _faultPlaque = new ColorRect
+        {
+            Color = new Color(0.16f, 0.20f, 0.17f, 0.72f),
+            Position = new Vector2(212, 35),
+            Size = new Vector2(216, 16),
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Visible = false
+        };
+        canvas.AddChild(_faultPlaque);
+
+        _faultLabel = UiFactory.CreateLabel(string.Empty, 8);
+        _faultLabel.Position = new Vector2(212, 34);
+        _faultLabel.Size = new Vector2(216, 18);
+        _faultLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        _faultLabel.Visible = false;
+        canvas.AddChild(_faultLabel);
 
         var cheerPanel = UiFactory.CreatePanel(new Vector2(228, 70));
         cheerPanel.Position = new Vector2(14, 276);
@@ -621,7 +1081,7 @@ public partial class RaceScreen : Node2D
             var result = _multiplayerBridge.RequestCheer(_multiplayerChallengeId);
             if (!result.Success)
             {
-                SetSectionLabel(result.Error ?? Tr("UI_MP_RACE_CHEER_FAILED"), Color.FromHtml("#9C514B"));
+                ShowFault(result.Error ?? Tr("UI_MP_RACE_CHEER_FAILED"));
                 return;
             }
         }
@@ -634,6 +1094,7 @@ public partial class RaceScreen : Node2D
         {
             _cheerParticleAccumulators[_playerId] = 0.0f;
             SpawnCheerSpeedParticle(playerState, _playerVisual);
+            SpawnDustBurst(_playerVisual, _playerVisual.Sprite.Position.X);
         }
         UpdateHud();
     }
@@ -700,11 +1161,6 @@ public partial class RaceScreen : Node2D
         _cheerButton.Disabled = !_running || player.Finished || player.CheerSeconds > 0.0f || player.CurrentStamina < _entry.Rules.CheerCost;
         _cheerButton.Text = player.CheerSeconds > 0.0f ? "CHEERING!" : "CHEER!";
 
-        if (InLaunchRamp(player.X) && player.Terrain == RaceTerrain.Ground)
-            SetSectionLabel(Tr("UI_RACE_SECTION_TAKEOFF"), FlyColor);
-        else
-            SetSectionLabel(SectionLabel(player.Terrain), SectionColor(player.Terrain));
-
         var points = _entry.Entrants.Select(entrant =>
         {
             var state = GetParticipantState(entrant);
@@ -754,30 +1210,60 @@ public partial class RaceScreen : Node2D
         return true;
     }
 
-    private string SectionLabel(RaceTerrain terrain)
-        => Tr(RaceCoursePresentationCatalog.SectionKeyFor(terrain));
-
-    private static Color SectionColor(RaceTerrain terrain) => terrain switch
+    private void ShowFault(string text)
     {
-        RaceTerrain.Swim or RaceTerrain.FailedGlideSwim => SwimColor,
-        RaceTerrain.Climb => ClimbColor,
-        RaceTerrain.Glide => FlyColor,
-        _ => RunColor
-    };
-
-    private void SetSectionLabel(string text, Color color)
-    {
-        _sectionLabel.Text = text;
-        _sectionLabel.AddThemeColorOverride("font_color", color);
+        _faultLabel.Text = text;
+        _faultLabel.AddThemeColorOverride("font_color", Color.FromHtml("#F2B6AF"));
+        _faultLabel.Visible = true;
+        _faultPlaque.Visible = true;
     }
 
+    /// <summary>Wheel zoom. Steps multiply, so each notch feels the same at any distance.</summary>
+    internal void HandleZoomInput(InputEvent inputEvent)
+    {
+        if (inputEvent is not InputEventMouseButton { Pressed: true } wheel)
+            return;
+
+        var factor = wheel.ButtonIndex switch
+        {
+            MouseButton.WheelUp => ZoomStepFactor,
+            MouseButton.WheelDown => 1.0f / ZoomStepFactor,
+            _ => 1.0f
+        };
+        if (Mathf.IsEqualApprox(factor, 1.0f))
+            return;
+
+        _zoomTarget = Mathf.Clamp(_zoomTarget * factor, MinZoom, MaxZoom);
+    }
+
+    /// <summary>Eases towards the requested zoom at a rate that does not depend on the frame rate.</summary>
+    private void UpdateZoom(float delta)
+    {
+        _zoom = Mathf.Lerp(_zoom, _zoomTarget, 1.0f - Mathf.Pow(0.002f, delta));
+        _camera.Zoom = new Vector2(_zoom, _zoom);
+    }
+
+    /// <summary>
+    /// Keeps the camera on the player's own Voidling.
+    ///
+    /// Vertically it centres on the creature but never past the edge of the wide framing, so at the
+    /// furthest zoom the view is byte-for-byte the one the race has always had, and every step in
+    /// follows the Voidling up the cliff, off the ramp and down through a glide instead of leaving
+    /// it to drift off the top of a zoomed-in screen.
+    /// </summary>
     private void UpdatePlayerTracking()
     {
         if (_playerVisual == null || !TryGetPlayerState(out var player))
             return;
 
-        _camera.Zoom = Vector2.One;
-        _camera.Position = new Vector2(player.X, ScreenHeight * 0.5f);
+        // The sprite's origin is its frame centre; the creature sits a little below that.
+        var focusY = _playerVisual.Sprite.Position.Y + 9.0f;
+        var halfHeight = ScreenHeight * 0.5f / Math.Max(0.001f, _zoom);
+        var cameraY = halfHeight >= ScreenHeight * 0.5f
+            ? ScreenHeight * 0.5f
+            : Mathf.Clamp(focusY, halfHeight, ScreenHeight - halfHeight);
+
+        _camera.Position = new Vector2(player.X, cameraY);
         _playerMarker.Position = new Vector2(player.X, _playerVisual.Sprite.Position.Y - 21.0f);
     }
 
@@ -854,6 +1340,8 @@ public partial class RaceScreen : Node2D
         }
     }
 
+    private static readonly Vector2 PodiumPortraitSize = new(48, 48);
+
     private static void AddPodiumSlot(Control stage, RaceEntrant entrant, int place, Vector2 blockPosition, Vector2 blockSize)
     {
         var block = new PanelContainer { Position = blockPosition, Size = blockSize };
@@ -873,27 +1361,14 @@ public partial class RaceScreen : Node2D
         placeLabel.VerticalAlignment = VerticalAlignment.Center;
         block.AddChild(placeLabel);
 
-        var portraitX = blockPosition.X + (blockSize.X - 48.0f) * 0.5f;
-        var portraitY = blockPosition.Y - 49.0f;
-        var portrait = CreateEntrantPortrait(entrant, new Vector2(48, 48));
-        portrait.Position = new Vector2(portraitX, portraitY);
-        portrait.Size = new Vector2(48, 48);
-        stage.AddChild(portrait);
-
-        var name = UiFactory.CreateLabel(entrant.Participant.DisplayName, 6);
-        name.Position = new Vector2(blockPosition.X + (blockSize.X - 100.0f) * 0.5f, portraitY - 15.0f);
-        name.Size = new Vector2(100, 14);
-        name.HorizontalAlignment = HorizontalAlignment.Center;
-        stage.AddChild(name);
+        StandPortraitOn(stage, entrant, blockPosition, blockSize, blockPosition.Y);
     }
 
     private static void AddFourthPlacePuddle(Control stage, RaceEntrant entrant, Vector2 position)
     {
-        var puddle = new PanelContainer
-        {
-            Position = new Vector2(position.X - 8, position.Y + 41),
-            Size = new Vector2(62, 14)
-        };
+        var puddleSize = new Vector2(62, 14);
+        var puddlePosition = new Vector2(position.X - 8, position.Y + 41);
+        var puddle = new PanelContainer { Position = puddlePosition, Size = puddleSize };
         var puddleStyle = new StyleBoxFlat
         {
             BgColor = Color.FromHtml("#7FC5C8"),
@@ -905,14 +1380,37 @@ public partial class RaceScreen : Node2D
         puddle.AddThemeStyleboxOverride("panel", puddleStyle);
         stage.AddChild(puddle);
 
-        var portrait = CreateEntrantPortrait(entrant, new Vector2(48, 48));
-        portrait.Position = position;
-        portrait.Size = new Vector2(48, 48);
+        // Fourth place stands in the puddle rather than on it.
+        StandPortraitOn(stage, entrant, puddlePosition, puddleSize, puddlePosition.Y + 6.0f, $"4th • {entrant.Participant.DisplayName}");
+    }
+
+    /// <summary>
+    /// Places an entrant's portrait with its feet on <paramref name="groundY"/> and its name above
+    /// it, both centred on the award surface. The foot offset comes from the shared portrait pivot,
+    /// so new creature art cannot leave the podium standing in mid-air or sunk into the blocks.
+    /// </summary>
+    private static void StandPortraitOn(
+        Control stage,
+        RaceEntrant entrant,
+        Vector2 surfacePosition,
+        Vector2 surfaceSize,
+        float groundY,
+        string? nameText = null)
+    {
+        var portrait = CreateEntrantPortrait(entrant, PodiumPortraitSize);
+        portrait.Size = PodiumPortraitSize;
+        portrait.Position = new Vector2(
+            surfacePosition.X + (surfaceSize.X - PodiumPortraitSize.X) * 0.5f,
+            groundY - VoidlingVisualFactory.PortraitGroundYOffset(
+                PodiumPortraitSize,
+                entrant.Participant.VisualTypeId));
         stage.AddChild(portrait);
 
-        var name = UiFactory.CreateLabel($"4th • {entrant.Participant.DisplayName}", 6);
-        name.Position = new Vector2(position.X - 18, position.Y - 17);
-        name.Size = new Vector2(84, 14);
+        var name = UiFactory.CreateLabel(nameText ?? entrant.Participant.DisplayName, 6);
+        name.Size = new Vector2(100, 14);
+        name.Position = new Vector2(
+            surfacePosition.X + (surfaceSize.X - name.Size.X) * 0.5f,
+            portrait.Position.Y - 12.0f);
         name.HorizontalAlignment = HorizontalAlignment.Center;
         stage.AddChild(name);
     }
@@ -924,198 +1422,20 @@ public partial class RaceScreen : Node2D
             entrant.OtherMutationCount,
             size);
 
-    private void AddWaterSection(float startX, float endX)
-    {
-        var tile = new AtlasTexture
-        {
-            Atlas = WaterTexture,
-            Region = new Rect2(0, 0, 16, 16)
-        };
-
-        for (var x = startX + 8.0f; x < endX; x += 16.0f)
-        {
-            for (var y = TrackTop + 8.0f; y < TrackBottom; y += 16.0f)
-            {
-                AddChild(new Sprite2D
-                {
-                    Texture = tile,
-                    Position = new Vector2(x, y),
-                    ZIndex = 2
-                });
-            }
-        }
-    }
-
-    /// <summary>
-    /// A climbing wall the racers scale, not a slab lying on the ground. The face is a stone panel
-    /// with mortar courses, a capped top rail and footing, and staggered grip holds; the holds are
-    /// what make it read as a wall rather than another patch of terrain.
-    /// </summary>
-    private void AddClimbSection(float startX, float endX)
-    {
-        var width = endX - startX;
-        if (width <= 0.0f)
-            return;
-
-        const float railHeight = 7.0f;
-        const float footingHeight = 6.0f;
-        var faceTop = TrackTop + railHeight;
-        var faceBottom = TrackBottom - footingHeight;
-
-        AddChild(FilledRect(startX, TrackTop, endX, TrackBottom, Color.FromHtml("#9A8F80"), zIndex: 2));
-
-        // Mortar courses read as the horizontal joints of a climbed face.
-        for (var y = faceTop + 11.0f; y < faceBottom; y += 11.0f)
-        {
-            AddChild(new Line2D
-            {
-                Width = 1.0f,
-                DefaultColor = Color.FromHtml("#877C6E"),
-                Points = new[] { new Vector2(startX, y), new Vector2(endX, y) },
-                ZIndex = 3
-            });
-        }
-
-        // Capped top rail and footing give the flat face its depth.
-        AddChild(FilledRect(startX, TrackTop, endX, TrackTop + railHeight, Color.FromHtml("#6E655B"), zIndex: 4));
-        AddChild(FilledRect(startX, faceBottom, endX, TrackBottom, Color.FromHtml("#5E564D"), zIndex: 4));
-        AddChild(new Line2D
-        {
-            Width = 2.0f,
-            DefaultColor = Color.FromHtml("#4E4740"),
-            Points = new[] { new Vector2(startX, faceTop), new Vector2(endX, faceTop) },
-            ZIndex = 5
-        });
-
-        // Staggered grip holds. Placement is a pure function of the grid indices so the wall looks
-        // identical every run without touching the VFX random stream.
-        var holdColors = new[]
-        {
-            Color.FromHtml("#E7655A"),
-            Color.FromHtml("#F2D45C"),
-            Color.FromHtml("#78C96A"),
-            Color.FromHtml("#B47AE5")
-        };
-
-        var column = 0;
-        for (var x = startX + 9.0f; x < endX - 4.0f; x += 15.0f, column++)
-        {
-            var row = 0;
-            for (var y = faceTop + 7.0f; y < faceBottom - 3.0f; y += 13.0f, row++)
-            {
-                if ((column + row) % 2 != 0)
-                    continue;
-
-                var jitter = ((column * 7 + row * 3) % 5) - 2;
-                AddChild(new Polygon2D
-                {
-                    Polygon = BuildHoldPolygon(),
-                    Position = new Vector2(x + jitter, y),
-                    Color = holdColors[(column + row * 2) % holdColors.Length],
-                    ZIndex = 5
-                });
-            }
-        }
-    }
-
-    // Small wedge-shaped grip, wider at the top like a real bolt-on hold.
-    private static Vector2[] BuildHoldPolygon() => new[]
-    {
-        new Vector2(-3.0f, -2.0f),
-        new Vector2(3.0f, -2.0f),
-        new Vector2(2.0f, 2.5f),
-        new Vector2(-2.0f, 2.5f)
-    };
-
-    private static Polygon2D FilledRect(float left, float top, float right, float bottom, Color color, int zIndex)
-        => new()
-        {
-            Polygon = new[]
-            {
-                new Vector2(left, top),
-                new Vector2(right, top),
-                new Vector2(right, bottom),
-                new Vector2(left, bottom)
-            },
-            Color = color,
-            ZIndex = zIndex
-        };
-
-    private void AddFlightRamp()
-    {
-        if (!Course.HasGlideSegment)
-            return;
-
-        const float laneBandHeight = 28.0f;
-        var width = Course.GlideSegment.StartX - Course.GlideLaunchStartX;
-        if (width <= 0.0f)
-            return;
-        var centerX = (Course.GlideLaunchStartX + Course.GlideSegment.StartX) * 0.5f;
-
-        for (var y = TrackTop; y < TrackBottom; y += laneBandHeight)
-        {
-            var bandHeight = Math.Min(laneBandHeight, TrackBottom - y);
-            var ramp = new Polygon2D
-            {
-                Polygon = new[]
-                {
-                    new Vector2(-width * 0.5f, bandHeight * 0.45f),
-                    new Vector2(width * 0.5f, -bandHeight * 0.45f),
-                    new Vector2(width * 0.5f, bandHeight * 0.5f),
-                    new Vector2(-width * 0.5f, bandHeight * 0.5f)
-                },
-                Color = Color.FromHtml("#D99B63"),
-                Position = new Vector2(centerX, y + bandHeight * 0.5f),
-                ZIndex = 4
-            };
-            AddChild(ramp);
-
-            var edge = new Line2D
-            {
-                Width = 2.0f,
-                DefaultColor = Color.FromHtml("#8D654F"),
-                Points = new[]
-                {
-                    new Vector2(-width * 0.5f, bandHeight * 0.45f),
-                    new Vector2(width * 0.5f, -bandHeight * 0.45f)
-                },
-                ZIndex = 5
-            };
-            ramp.AddChild(edge);
-        }
-    }
-
     private void AddHurdle(float x)
     {
-        var tile = new AtlasTexture
-        {
-            Atlas = FenceTexture,
-            Region = new Rect2(0, 0, 16, 16)
-        };
-
+        // Hurdles stand on the running surface, which is a clifftop wherever a climb has raised it.
+        var lift = SurfaceLiftAt(x);
         for (var y = TrackTop + 9.0f; y < TrackBottom; y += 18.0f)
         {
             AddChild(new Sprite2D
             {
-                Texture = tile,
-                Position = new Vector2(x, y),
+                Texture = RaceTrackArt.FencePost,
+                Position = new Vector2(x, y - lift),
                 Scale = new Vector2(1.15f, 1.15f),
                 ZIndex = 6
             });
         }
-    }
-
-    private void AddWorldLabel(string text, float x, float y, Color color)
-    {
-        var label = UiFactory.CreateLabel(text, 8);
-        label.Position = new Vector2(x - 45, y);
-        label.Size = new Vector2(90, 16);
-        label.HorizontalAlignment = HorizontalAlignment.Center;
-        label.AddThemeColorOverride("font_color", color);
-        label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
-        label.AddThemeConstantOverride("outline_size", 1);
-        label.ZIndex = 4;
-        AddChild(label);
     }
 
     private static void SetVisualMode(RacerVisual visual, string mode)
@@ -1148,6 +1468,9 @@ public partial class RaceScreen : Node2D
             participant.PaletteHue,
             participant.LayerIds,
             participant.TintHex);
+
+    /// <summary>How far the running surface sits above the base track band at <paramref name="x"/>.</summary>
+    private float SurfaceLiftAt(float x) => RaceTrackArt.SurfaceLift(Course, x);
 
     private bool InLaunchRamp(float x)
         => Course.HasGlideSegment &&
