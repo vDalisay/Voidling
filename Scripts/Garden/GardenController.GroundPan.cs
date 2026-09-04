@@ -8,9 +8,12 @@ public partial class GardenController
 
     public override void _EnterTree()
     {
-        // Install after the scene's normal _Ready pass so the camera and actor roots
-        // have already been resolved by GardenController._Ready().
+        // Install after the scene's normal _Ready pass so the camera, session and actor roots
+        // have already been resolved by GardenController._Ready(). Keeping these presentation
+        // installers here also prevents implemented partials from silently becoming dead code.
         CallDeferred(nameof(InstallLmbGroundPan));
+        CallDeferred(nameof(InstallGardenEnvironmentPresentation));
+        CallDeferred(nameof(InstallLifecyclePresentation));
     }
 
     private void InstallLmbGroundPan()
