@@ -9,6 +9,10 @@ public partial class GardenController
 
     public override void _PhysicsProcess(double delta)
     {
+        // _Ready owns the Garden/session wiring. The first physics tick is therefore a safe,
+        // non-invasive place for optional presentation systems in other partials to subscribe.
+        EnsureAmbientBehaviorInstalled();
+
         if (!_inputEnabled || !_session.State.EdgePanning || _camera == null || !_camera.Enabled)
             return;
 
