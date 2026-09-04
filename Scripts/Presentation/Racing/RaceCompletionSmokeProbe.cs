@@ -25,6 +25,7 @@ public partial class RaceCompletionSmokeProbe : Node
 
     public override async void _Ready()
     {
+        RaceScreen? race = null;
         try
         {
             var rules = GameBalanceRules.DemoDefaults;
@@ -40,7 +41,7 @@ public partial class RaceCompletionSmokeProbe : Node
             var completedPlacement = 0;
             var returnRequested = false;
 
-            var race = new RaceScreen();
+            race = new RaceScreen();
             race.Configure(entry, autoFinish: true);
             race.RaceCompleted += placement => completedPlacement = placement;
             race.ReturnRequested += () => returnRequested = true;
@@ -67,12 +68,27 @@ public partial class RaceCompletionSmokeProbe : Node
                 throw new InvalidOperationException("The results return control did not ask its owner to leave the race.");
 
             GD.Print($"[race-completion-smoke] RACE_COMPLETION_SMOKE_SUCCESS placement={completedPlacement}");
+
+            // The completed RaceScreen owns a large tree of sprites, controls and transient tweens.
+            // Let Godot dispose that tree before shutting the headless process down. Quitting on the
+            // same frame as the results button used to hit a Godot 4.6 native cleanup race after the
+            // success marker had already been emitted (signal 11 in pthread_mutex_lock).
+            race.QueueFree();
+            race = null;
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             GetTree().Quit(0);
         }
         catch (Exception exception)
         {
             GD.PrintErr($"[race-completion-smoke] RACE_COMPLETION_SMOKE_FAILED: {exception}");
+            if (race != null && GodotObject.IsInstanceValid(race))
+                race.QueueFree();
             GetTree().Quit(8);
+        }
+        finally
+        {
+            Engine.TimeScale = 1.0;
         }
     }
 
