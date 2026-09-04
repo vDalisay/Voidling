@@ -23,6 +23,7 @@ public partial class VoidlingVisualSmokeProbe : Node
                 ValidateGeometry(visualTypeId);
                 ValidateComposedSprite(visualTypeId, race: false);
                 ValidateComposedSprite(visualTypeId, race: true);
+                ValidateLayerMotionContract(visualTypeId);
             }
 
             GD.Print(
@@ -181,7 +182,84 @@ public partial class VoidlingVisualSmokeProbe : Node
             }
         }
 
+        if (!race)
+            ValidateHorizontalFacing(sprite, layerRoot, actualLayers, visualTypeId);
+
         sprite.QueueFree();
+    }
+
+    private static void ValidateHorizontalFacing(
+        AnimatedSprite2D sprite,
+        VoidlingVisualLayerSync2D layerRoot,
+        AnimatedSprite2D[] layers,
+        string visualTypeId)
+    {
+        sprite.Play("walk_left");
+        layerRoot._Process(0.0);
+        if (!sprite.FlipH || layers.Any(layer => !layer.FlipH))
+        {
+            throw new InvalidOperationException(
+                $"World visual '{visualTypeId}' does not mirror the complete assembly for walk_left.");
+        }
+
+        sprite.Play("walk_right");
+        layerRoot._Process(0.0);
+        if (sprite.FlipH || layers.Any(layer => layer.FlipH))
+        {
+            throw new InvalidOperationException(
+                $"World visual '{visualTypeId}' does not restore authored facing for walk_right.");
+        }
+    }
+
+    private static void ValidateLayerMotionContract(string visualTypeId)
+    {
+        var definition = VoidlingVisualFactory.ResolveDefinition(visualTypeId);
+        var layers = VoidlingVisualFactory.ResolveLayers(definition, definition.DefaultLayerIds);
+
+        foreach (var group in layers
+                     .Where(layer => !string.IsNullOrWhiteSpace(layer.MotionGroupId))
+                     .GroupBy(layer => layer.MotionGroupId, StringComparer.OrdinalIgnoreCase))
+        {
+            var first = group.First();
+            if (first.VerticalFollowLagSeconds <= 0.0f || first.MaxVerticalLagAtScaleOne <= 0.0f)
+            {
+                throw new InvalidOperationException(
+                    $"Motion group '{group.Key}' on '{visualTypeId}' has no positive follow-lag configuration.");
+            }
+
+            if (group.Any(layer =>
+                    !Mathf.IsEqualApprox(layer.VerticalFollowLagSeconds, first.VerticalFollowLagSeconds) ||
+                    !Mathf.IsEqualApprox(layer.MaxVerticalLagAtScaleOne, first.MaxVerticalLagAtScaleOne)))
+            {
+                throw new InvalidOperationException(
+                    $"Motion group '{group.Key}' on '{visualTypeId}' does not share one rigid follow-lag configuration.");
+            }
+        }
+
+        if (!string.Equals(visualTypeId, "normal", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var back = layers.SingleOrDefault(layer => layer.LayerId == "wings_golden_back")
+            ?? throw new InvalidOperationException("Normal Voidling is missing the canonical back wing.");
+        var front = layers.SingleOrDefault(layer => layer.LayerId == "wings_golden_front")
+            ?? throw new InvalidOperationException("Normal Voidling is missing the canonical front wing.");
+        var crown = layers.SingleOrDefault(layer => layer.LayerId == "crown_golden")
+            ?? throw new InvalidOperationException("Normal Voidling is missing the canonical crown.");
+
+        if (!(crown.ZIndexOffset > front.ZIndexOffset &&
+              front.ZIndexOffset > 0 &&
+              back.ZIndexOffset < 0))
+        {
+            throw new InvalidOperationException(
+                "Normal Voidling Z order must be crown > front wing > body > back wing.");
+        }
+
+        if (!string.Equals(back.MotionGroupId, front.MotionGroupId, StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(back.MotionGroupId))
+        {
+            throw new InvalidOperationException(
+                "Normal Voidling front/back wings must share one motion group.");
+        }
     }
 
     private static void RequireAnimation(SpriteFrames frames, StringName animation)
