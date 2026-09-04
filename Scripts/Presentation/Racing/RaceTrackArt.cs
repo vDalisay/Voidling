@@ -61,7 +61,9 @@ internal static class RaceTrackArt
         Load(Premium + "Tilesets/ground tiles/water frames/Water_4.png")
     };
 
-    private static readonly Texture2D Planks = Slice(Premium + "Tilesets/Building parts/Wooden_Bridge_v2.png", 0, 32, 16, 16);
+    // Rows 33-46 of the bridge deck: the tile's own top row is transparent, and tiling that left a
+    // grass-coloured seam every 16px straight through the ramp.
+    private static readonly Texture2D Planks = Slice(Premium + "Tilesets/Building parts/Wooden_Bridge_v2.png", 0, 33, 16, 14);
 
     // Fences. Column 0 is a vertical run (hurdles across the track), row 0 columns 1-3 are the
     // left/middle/right pieces of a horizontal run (ramp and finish rails).
@@ -76,29 +78,86 @@ internal static class RaceTrackArt
     private static readonly Color Shade = new(0.10f, 0.13f, 0.11f, 0.30f);
     private static readonly Color Foam = new(0.92f, 0.98f, 1.00f, 0.75f);
     private static readonly Color RockWash = new(0.42f, 0.32f, 0.25f, 0.30f);
-    private static readonly Color Strata = new(0.30f, 0.22f, 0.17f, 0.55f);
-    private static readonly Color StrataLight = new(0.86f, 0.74f, 0.58f, 0.35f);
+    private static readonly Color Strata = new(0.28f, 0.20f, 0.15f, 0.40f);
+    private static readonly Color StrataLight = new(0.86f, 0.74f, 0.58f, 0.18f);
 
-    /// <summary>
-    /// Vertical rise, in world pixels, of a climb segment's raised track band. Both the cliff art
-    /// and the racer's climb arc read it, so the sprite always lands on the surface that is drawn.
-    /// </summary>
+    /// <summary>Vertical rise, in world pixels, of the clifftop the climb section leads onto.</summary>
     internal const float ClimbHeight = 56.0f;
 
-    /// <summary>Fractions of a climb segment spent going up the west face and down the east face.</summary>
-    internal const float ClimbAscendFraction = 0.28f;
-    internal const float ClimbDescendFraction = 0.22f;
+    /// <summary>Vertical rise of the glide launch ramp above whatever surface it stands on.</summary>
+    internal const float RampHeight = 38.0f;
 
-    /// <summary>How far a climb segment's raised band is lifted for a racer at <paramref name="x"/>.</summary>
-    internal static float ClimbRise(RaceCourseSegment climb, float x)
+    /// <summary>
+    /// How much X a racer spends scaling a cliff. Short, so the wall is steep: the projection cannot
+    /// draw a face that is edge-on to the direction of travel, and stretching the rise over the whole
+    /// section turns the cliff into a gentle hill.
+    /// </summary>
+    private const float WallSpan = 20.0f;
+
+    /// <summary>
+    /// A stretch of course raised onto a clifftop: from the climb that leads up it to wherever the
+    /// ground has to come back down, which is the next water or glide crossing.
+    /// </summary>
+    private readonly record struct Plateau(float StartX, float EndX, bool DropsAtEnd);
+
+    /// <summary>
+    /// Where the course sits above its base band at <paramref name="x"/>: the clifftop a climb leads
+    /// onto plus the launch ramp's own slope. Art and racers both read this one function, so a racer
+    /// cannot walk through the surface it is standing on.
+    /// </summary>
+    internal static float SurfaceLift(RaceCourse course, float x)
     {
-        var span = Math.Max(1.0f, climb.EndX - climb.StartX);
-        var progress = Mathf.Clamp((x - climb.StartX) / span, 0.0f, 1.0f);
-        if (progress < ClimbAscendFraction)
-            return ClimbHeight * Smooth(progress / ClimbAscendFraction);
-        if (progress > 1.0f - ClimbDescendFraction)
-            return ClimbHeight * Smooth((1.0f - progress) / ClimbDescendFraction);
-        return ClimbHeight;
+        var lift = 0.0f;
+
+        foreach (var plateau in Plateaus(course))
+        {
+            if (x < plateau.StartX || x > plateau.EndX)
+                continue;
+
+            var up = Smooth((x - plateau.StartX) / WallSpan);
+            var down = plateau.DropsAtEnd ? Smooth((plateau.EndX - x) / WallSpan) : 1.0f;
+            lift += ClimbHeight * Math.Min(up, down);
+        }
+
+        if (course.HasGlideSegment && x >= course.GlideLaunchStartX && x < course.GlideSegment.StartX)
+        {
+            var span = Math.Max(1.0f, course.GlideSegment.StartX - course.GlideLaunchStartX);
+            lift += RampHeight * Smooth((x - course.GlideLaunchStartX) / span);
+        }
+
+        return lift;
+    }
+
+    /// <summary>Height a glider leaves the ramp lip at, measured from the base track band.</summary>
+    internal static float LaunchHeight(RaceCourse course)
+        => course.HasGlideSegment ? SurfaceLift(course, course.GlideSegment.StartX - 0.5f) : RampHeight;
+
+    /// <summary>
+    /// Each climb raises the course until the next crossing it cannot stay raised over. A clifftop
+    /// that ran straight into the glide launch does not drop: the racers leap off it.
+    /// </summary>
+    private static IEnumerable<Plateau> Plateaus(RaceCourse course)
+    {
+        foreach (var climb in course.Segments)
+        {
+            if (climb.Kind != RaceSegmentKind.Climb)
+                continue;
+
+            var endX = course.EndX;
+            foreach (var next in course.Segments)
+            {
+                if (next.StartX >= climb.EndX && next.Kind != RaceSegmentKind.Ground)
+                {
+                    endX = next.StartX;
+                    break;
+                }
+            }
+
+            var launchesFromTop = course.HasGlideSegment &&
+                                  course.GlideLaunchStartX >= climb.StartX &&
+                                  course.GlideLaunchStartX < endX;
+            yield return new Plateau(climb.StartX, endX, !launchesFromTop);
+        }
     }
 
     internal static void Paint(CanvasItem canvas, RaceCourse course, RaceTrackLayout layout, float waterPhase)
@@ -110,24 +169,81 @@ internal static class RaceTrackArt
         Tile(canvas, GrassTufts, new Rect2(left, 0, width, 48.0f));
         Scatter(canvas, course, layout, behindTrack: true);
 
-        PaintDirtBand(canvas, new Rect2(left, layout.TrackTop, width, layout.TrackBottom - layout.TrackTop));
+        PaintSurface(canvas, course, layout);
 
         foreach (var segment in course.Segments)
         {
-            var visual = RaceScreen.VisualFor(segment.Kind);
-            if (visual.Water)
+            if (RaceScreen.VisualFor(segment.Kind).Water)
                 PaintStream(canvas, segment, layout, waterPhase);
-            if (visual.Climb)
-                PaintCliff(canvas, segment, layout);
         }
 
+        PaintFootholds(canvas, course, layout);
         if (course.HasGlideSegment)
-            PaintLaunchRamp(canvas, course, layout);
+            PaintRampDressing(canvas, course, layout);
 
         PaintStartGate(canvas, course, layout);
         PaintFinishLine(canvas, course, layout);
         Scatter(canvas, course, layout, behindTrack: false);
     }
+
+    /// <summary>
+    /// Walks the course and lays the running surface at whatever height <see cref="SurfaceLift"/>
+    /// puts it, dropping a cliff wall wherever that is above the base band. Runs of equal height
+    /// merge into one draw, so only the wall and the ramp slope cost a strip each.
+    /// </summary>
+    private static void PaintSurface(CanvasItem canvas, RaceCourse course, RaceTrackLayout layout)
+    {
+        const float step = 4.0f;
+        var left = -layout.ScreenWidth;
+        var right = course.EndX + layout.ScreenWidth;
+
+        var runStart = left;
+        var runLift = SurfaceLift(course, left);
+        var runPlanked = OnLaunchRamp(course, left);
+
+        for (var x = left + step; x < right; x += step)
+        {
+            var lift = SurfaceLift(course, x);
+            var planked = OnLaunchRamp(course, x);
+            if (Mathf.IsEqualApprox(lift, runLift) && planked == runPlanked)
+                continue;
+
+            PaintBandRun(canvas, layout, runStart, x, runLift, runPlanked);
+            runStart = x;
+            runLift = lift;
+            runPlanked = planked;
+        }
+
+        PaintBandRun(canvas, layout, runStart, right, runLift, runPlanked);
+    }
+
+    private static void PaintBandRun(CanvasItem canvas, RaceTrackLayout layout, float x0, float x1, float lift, bool planked)
+    {
+        var width = x1 - x0;
+        if (width <= 0.0f)
+            return;
+
+        var band = new Rect2(x0, layout.TrackTop - lift, width, layout.TrackBottom - layout.TrackTop);
+
+        if (lift > 0.5f)
+        {
+            Face(canvas, new Rect2(x0, band.End.Y, width, lift));
+            canvas.DrawRect(new Rect2(x0, layout.TrackBottom, width, 7.0f), Shade);
+        }
+
+        if (planked)
+        {
+            Tile(canvas, Planks, band);
+            canvas.DrawRect(new Rect2(band.Position.X, band.Position.Y, width, 2.0f), new Color(0.29f, 0.20f, 0.15f, 0.9f));
+            canvas.DrawRect(new Rect2(band.Position.X, band.End.Y - 2.0f, width, 2.0f), new Color(0.29f, 0.20f, 0.15f, 0.9f));
+            return;
+        }
+
+        PaintDirtBand(canvas, band);
+    }
+
+    private static bool OnLaunchRamp(RaceCourse course, float x)
+        => course.HasGlideSegment && x >= course.GlideLaunchStartX && x < course.GlideSegment.StartX;
 
     private static void PaintDirtBand(CanvasItem canvas, Rect2 band)
     {
@@ -200,33 +316,23 @@ internal static class RaceTrackArt
     /// and a real cliff face is drawn under it. The height is what makes the section read as a wall
     /// the racers scale rather than another patch of ground with decoration painted on it.
     /// </summary>
-    private static void PaintCliff(CanvasItem canvas, RaceCourseSegment segment, RaceTrackLayout layout)
+    /// <summary>Worn holds up each wall, marking the line a racer takes to the top.</summary>
+    private static void PaintFootholds(CanvasItem canvas, RaceCourse course, RaceTrackLayout layout)
     {
-        const float overhang = 14.0f;
-        var startX = segment.StartX - overhang;
-        var endX = segment.EndX + overhang;
-        var raisedTop = layout.TrackTop - ClimbHeight;
-        var raisedBottom = layout.TrackBottom - ClimbHeight;
-
-        // The block's south wall is the only face a top-down view can show, so it carries the whole
-        // plateau width and the racers scale it diagonally as they advance.
-        Face(canvas, new Rect2(startX, raisedBottom, endX - startX, layout.TrackBottom - raisedBottom));
-
-        // A short skirt of shade where the wall meets the ground it stands on.
-        canvas.DrawRect(new Rect2(startX, layout.TrackBottom, endX - startX, 7.0f), Shade);
-
-        // The raised running surface on top.
-        PaintDirtBand(canvas, new Rect2(startX, raisedTop, endX - startX, raisedBottom - raisedTop));
-
-        // Worn footholds climbing the wall, marking the line a racer takes up it.
-        var span = Math.Max(1.0f, segment.EndX - segment.StartX) * ClimbAscendFraction;
-        var holds = Math.Max(3, (int)(ClimbHeight / 12.0f));
-        for (var i = 0; i < holds; i++)
+        foreach (var plateau in Plateaus(course))
         {
-            var t = (i + 0.5f) / holds;
-            canvas.DrawRect(
-                new Rect2(segment.StartX + span * t - 5.0f, layout.TrackBottom - 6.0f - t * (ClimbHeight - 8.0f), 11.0f, 4.0f),
-                new Color(0.30f, 0.22f, 0.16f, 0.80f));
+            const int holds = 5;
+            for (var i = 0; i < holds; i++)
+            {
+                var t = (i + 0.5f) / holds;
+                canvas.DrawRect(
+                    new Rect2(
+                        plateau.StartX + WallSpan * t - 5.0f,
+                        layout.TrackBottom - 6.0f - Smooth(t) * (ClimbHeight - 8.0f),
+                        11.0f,
+                        4.0f),
+                    new Color(0.30f, 0.22f, 0.16f, 0.80f));
+            }
         }
     }
 
@@ -244,10 +350,10 @@ internal static class RaceTrackArt
         Tile(canvas, CliffBody, rect);
         canvas.DrawRect(rect, RockWash);
 
-        for (var y = rect.Position.Y + 13.0f; y < rect.End.Y - 4.0f; y += 15.0f)
+        for (var y = rect.Position.Y + 21.0f; y < rect.End.Y - 6.0f; y += 24.0f)
         {
-            canvas.DrawLine(new Vector2(rect.Position.X, y), new Vector2(rect.End.X, y), Strata, 2.0f);
-            canvas.DrawLine(new Vector2(rect.Position.X, y + 2.0f), new Vector2(rect.End.X, y + 2.0f), StrataLight, 1.0f);
+            canvas.DrawLine(new Vector2(rect.Position.X, y), new Vector2(rect.End.X, y), Strata, 1.0f);
+            canvas.DrawLine(new Vector2(rect.Position.X, y + 1.0f), new Vector2(rect.End.X, y + 1.0f), StrataLight, 1.0f);
         }
 
         // Deeper in shadow the further down the face, so the mass has weight.
@@ -265,38 +371,43 @@ internal static class RaceTrackArt
     }
 
     /// <summary>
-    /// The glide take-off is a planked launch deck with rails and take-off chevrons. Height is sold
-    /// by the racer lifting off it and its shadow staying behind, which is the only honest way to
-    /// show a rise in a top-down view.
+    /// Dressing for the launch ramp. The slope itself comes from <see cref="SurfaceLift"/>, so this
+    /// only adds the rails that follow it up, the take-off chevrons and the lip the racer leaves.
     /// </summary>
-    private static void PaintLaunchRamp(CanvasItem canvas, RaceCourse course, RaceTrackLayout layout)
+    private static void PaintRampDressing(CanvasItem canvas, RaceCourse course, RaceTrackLayout layout)
     {
         var startX = course.GlideLaunchStartX;
         var endX = course.GlideSegment.StartX;
         if (endX <= startX)
             return;
 
-        var deck = new Rect2(startX, layout.TrackTop, endX - startX, layout.TrackBottom - layout.TrackTop);
-        Tile(canvas, Planks, deck);
+        var height = layout.TrackBottom - layout.TrackTop;
 
-        // Take-off chevrons, one row per racing lane, brightening towards the lip.
-        for (var x = deck.Position.X + 8.0f; x < deck.End.X - 10.0f; x += 15.0f)
+        // Rails ride the slope, which is what makes the deck read as rising. One fence tile per
+        // tile width: stepping finer just stacks the sprite on itself into a solid hatch.
+        for (var x = startX - 8.0f; x < endX + 8.0f; x += 14.0f)
         {
-            var tone = Mathf.InverseLerp(deck.Position.X, deck.End.X, x);
+            var top = layout.TrackTop - SurfaceLift(course, Mathf.Clamp(x, startX, endX - 0.5f));
+            canvas.DrawTextureRect(FenceRail, new Rect2(x, top - 12.0f, 16.0f, 16.0f), false);
+            canvas.DrawTextureRect(FenceRail, new Rect2(x, top + height - 5.0f, 16.0f, 16.0f), false);
+        }
+
+        for (var x = startX + 8.0f; x < endX - 10.0f; x += 15.0f)
+        {
+            var top = layout.TrackTop - SurfaceLift(course, x);
+            var tone = Mathf.InverseLerp(startX, endX, x);
             var color = new Color(1.0f, 0.93f, 0.55f, 0.28f + tone * 0.55f);
-            for (var y = deck.Position.Y + 22.0f; y < deck.End.Y - 18.0f; y += 26.0f)
+            for (var y = top + 22.0f; y < top + height - 18.0f; y += 26.0f)
             {
                 canvas.DrawLine(new Vector2(x, y - 5.0f), new Vector2(x + 6.0f, y), color, 2.0f);
                 canvas.DrawLine(new Vector2(x + 6.0f, y), new Vector2(x, y + 5.0f), color, 2.0f);
             }
         }
 
-        // The lip, and the drop the racer leaves behind it.
-        canvas.DrawRect(new Rect2(deck.End.X - 4.0f, deck.Position.Y, 4.0f, deck.Size.Y), new Color(0.98f, 0.90f, 0.70f, 0.95f));
-        canvas.DrawRect(new Rect2(deck.End.X, deck.Position.Y, 9.0f, deck.Size.Y), Shade);
-
-        Rail(canvas, deck.Position.X - 8.0f, deck.End.X + 8.0f, deck.Position.Y - 7.0f);
-        Rail(canvas, deck.Position.X - 8.0f, deck.End.X + 8.0f, deck.End.Y - 9.0f);
+        // The lip, and the drop beyond it.
+        var lipTop = layout.TrackTop - SurfaceLift(course, endX - 0.5f);
+        canvas.DrawRect(new Rect2(endX - 4.0f, lipTop, 4.0f, height), new Color(0.98f, 0.90f, 0.70f, 0.95f));
+        canvas.DrawRect(new Rect2(endX, lipTop, 9.0f, height), Shade);
     }
 
     private static void PaintStartGate(CanvasItem canvas, RaceCourse course, RaceTrackLayout layout)
@@ -420,8 +531,11 @@ internal static class RaceTrackArt
         }
     }
 
+    /// <summary>Ground that belongs to the track: water, cliff, clifftop or ramp. Nothing grows here.</summary>
     private static bool IsFeature(RaceCourse course, float x)
-        => course.SegmentKindAt(x) is RaceSegmentKind.Swim or RaceSegmentKind.Climb or RaceSegmentKind.Glide;
+        => course.SegmentKindAt(x) is RaceSegmentKind.Swim or RaceSegmentKind.Climb or RaceSegmentKind.Glide ||
+           SurfaceLift(course, x) > 0.0f ||
+           OnLaunchRamp(course, x);
 
     private static void Tile(CanvasItem canvas, Texture2D texture, Rect2 rect)
         => canvas.DrawTextureRect(texture, rect, tile: true);

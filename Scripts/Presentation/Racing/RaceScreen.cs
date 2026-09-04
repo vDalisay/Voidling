@@ -232,7 +232,7 @@ public partial class RaceScreen : Node2D
     /// What a segment kind looks like on the track. Ground needs no extra geometry because the track
     /// itself is the ground surface; every other kind must name the geometry it adds.
     /// </summary>
-    internal readonly record struct SegmentVisual(bool Water, bool Climb, bool Ramp, string? LabelKey);
+    internal readonly record struct SegmentVisual(bool Water, bool Climb, bool Ramp);
 
     /// <summary>
     /// The single declaration of race terrain geometry. BuildCoursePresentation renders from it and
@@ -241,49 +241,17 @@ public partial class RaceScreen : Node2D
     /// </summary>
     internal static SegmentVisual VisualFor(RaceSegmentKind kind) => kind switch
     {
-        RaceSegmentKind.Ground => new SegmentVisual(false, false, false, null),
-        RaceSegmentKind.Swim => new SegmentVisual(true, false, false, "UI_RACE_SECTION_SWIM"),
-        RaceSegmentKind.Climb => new SegmentVisual(false, true, false, "UI_RACE_SECTION_CLIMB"),
-        RaceSegmentKind.Glide => new SegmentVisual(true, false, true, "UI_RACE_SECTION_GLIDE_SWIM"),
+        RaceSegmentKind.Ground => new SegmentVisual(false, false, false),
+        RaceSegmentKind.Swim => new SegmentVisual(true, false, false),
+        RaceSegmentKind.Climb => new SegmentVisual(false, true, false),
+        RaceSegmentKind.Glide => new SegmentVisual(true, false, true),
         _ => throw new InvalidOperationException($"Race segment kind '{kind}' has no track presentation.")
-    };
-
-    private static Color SegmentLabelColor(RaceSegmentKind kind) => kind switch
-    {
-        RaceSegmentKind.Swim => SwimColor,
-        RaceSegmentKind.Climb => ClimbColor,
-        RaceSegmentKind.Glide => FlyColor,
-        _ => RunColor
     };
 
     private void BuildCoursePresentation()
     {
-        // Terrain is painted in _Draw by RaceTrackArt; only nodes that sit above the racers or
-        // need their own Z order are built here.
-        foreach (var segment in Course.Segments)
-        {
-            var visual = VisualFor(segment.Kind);
-            if (visual.LabelKey == null)
-                continue;
-
-            // A climb label rides above its own raised plateau instead of over the cliff face.
-            var labelY = visual.Climb ? 108.0f - RaceTrackArt.ClimbHeight : 108.0f;
-            AddWorldLabel(
-                Tr(visual.LabelKey),
-                (segment.StartX + segment.EndX) * 0.5f,
-                labelY,
-                SegmentLabelColor(segment.Kind));
-        }
-
-        if (Course.HasGlideSegment)
-        {
-            AddWorldLabel(
-                Tr("UI_RACE_SECTION_TAKEOFF"),
-                (Course.GlideLaunchStartX + Course.GlideSegment.StartX) * 0.5f,
-                108.0f,
-                FlyColor);
-        }
-
+        // Terrain is painted in _Draw by RaceTrackArt. The HUD names the section the player is in,
+        // so the track itself carries no signposting.
         foreach (var obstacleX in Course.Obstacles)
             AddHurdle(obstacleX + 18.0f);
     }
@@ -464,12 +432,12 @@ public partial class RaceScreen : Node2D
         }
         else if (InLaunchRamp(state.X))
         {
+            // The ramp is a surface the racer runs up, not altitude: the lift below carries it, and
+            // only the lean forward is animation.
             var progress = Mathf.Clamp(
                 (state.X - Course.GlideLaunchStartX) / (Course.GlideSegment.StartX - Course.GlideLaunchStartX),
                 0.0f,
                 1.0f);
-            progress = progress * progress * (3.0f - 2.0f * progress);
-            yOffset = -FlightAltitude * progress;
             visual.Sprite.Rotation = -0.09f * progress;
         }
         else if (state.Terrain == RaceTerrain.Glide)
@@ -479,7 +447,9 @@ public partial class RaceScreen : Node2D
             var easedDescent = Mathf.Pow(glideProgress, 1.35f);
             var fallsIntoWater = state.GlideEndX < Course.GlideSegment.EndX - 1.0f;
             var destinationY = fallsIntoWater ? 7.0f : 0.0f;
-            yOffset = Mathf.Lerp(-FlightAltitude, destinationY, easedDescent) +
+            // The glide starts at exactly the height the ramp lip left the racer at, so a take-off
+            // from a clifftop launches from the clifftop rather than snapping back to ground level.
+            yOffset = Mathf.Lerp(-RaceTrackArt.LaunchHeight(Course), destinationY, easedDescent) +
                       Mathf.Sin((float)Time.GetTicksMsec() / 210.0f + visual.BaseY) * 1.2f * (1.0f - glideProgress);
             visual.Sprite.Rotation = Mathf.Lerp(-0.08f, 0.08f, glideProgress);
         }
@@ -490,7 +460,10 @@ public partial class RaceScreen : Node2D
 
         // One altitude rule for every airborne branch: the shadow shrinks and fades on the way up
         // and grows back on the way down, so jump, ramp and glide cannot drift apart.
-        var altitude = Mathf.Clamp(-yOffset / FlightAltitude, 0.0f, 1.0f);
+        var altitude = Mathf.Clamp(
+            -yOffset / Math.Max(FlightAltitude, RaceTrackArt.LaunchHeight(Course)),
+            0.0f,
+            1.0f);
         var shadowScale = Vector2.One * Mathf.Lerp(1.0f, 0.42f, altitude);
         var shadowAlpha = Mathf.Lerp(0.34f, 0.10f, altitude);
         if (swimming)
@@ -499,9 +472,9 @@ public partial class RaceScreen : Node2D
             shadowAlpha = 0.15f;
         }
 
-        // A climb raises the ground itself, so sprite and shadow move together and the racer stays
-        // planted on the cliff face and plateau that RaceTrackArt draws.
-        var groundLift = ClimbRiseAt(state.X);
+        // The clifftop and the launch ramp raise the ground itself, so sprite and shadow move
+        // together and the racer stays planted on the surface RaceTrackArt draws.
+        var groundLift = SurfaceLiftAt(state.X);
 
         var visualTypeId = visual.Appearance.VisualTypeId;
         visual.Sprite.Position = new Vector2(
@@ -929,43 +902,18 @@ public partial class RaceScreen : Node2D
 
     private void AddHurdle(float x)
     {
+        // Hurdles stand on the running surface, which is a clifftop wherever a climb has raised it.
+        var lift = SurfaceLiftAt(x);
         for (var y = TrackTop + 9.0f; y < TrackBottom; y += 18.0f)
         {
             AddChild(new Sprite2D
             {
                 Texture = RaceTrackArt.FencePost,
-                Position = new Vector2(x, y),
+                Position = new Vector2(x, y - lift),
                 Scale = new Vector2(1.15f, 1.15f),
                 ZIndex = 6
             });
         }
-    }
-
-    private void AddWorldLabel(string text, float x, float y, Color color)
-    {
-        // A plaque behind the text: section names sat green-on-green over the grass without it.
-        AddChild(new Polygon2D
-        {
-            Polygon = new[]
-            {
-                new Vector2(x - 44, y + 1),
-                new Vector2(x + 44, y + 1),
-                new Vector2(x + 44, y + 15),
-                new Vector2(x - 44, y + 15)
-            },
-            Color = new Color(0.16f, 0.20f, 0.17f, 0.62f),
-            ZIndex = 3
-        });
-
-        var label = UiFactory.CreateLabel(text, 8);
-        label.Position = new Vector2(x - 45, y);
-        label.Size = new Vector2(90, 16);
-        label.HorizontalAlignment = HorizontalAlignment.Center;
-        label.AddThemeColorOverride("font_color", color);
-        label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
-        label.AddThemeConstantOverride("outline_size", 1);
-        label.ZIndex = 4;
-        AddChild(label);
     }
 
     private static void SetVisualMode(RacerVisual visual, string mode)
@@ -999,17 +947,8 @@ public partial class RaceScreen : Node2D
             participant.LayerIds,
             participant.TintHex);
 
-    /// <summary>Height of the raised climb plateau under <paramref name="x"/>, or zero off a climb.</summary>
-    private float ClimbRiseAt(float x)
-    {
-        foreach (var segment in Course.Segments)
-        {
-            if (segment.Kind == RaceSegmentKind.Climb && segment.Contains(x))
-                return RaceTrackArt.ClimbRise(segment, x);
-        }
-
-        return 0.0f;
-    }
+    /// <summary>How far the running surface sits above the base track band at <paramref name="x"/>.</summary>
+    private float SurfaceLiftAt(float x) => RaceTrackArt.SurfaceLift(Course, x);
 
     private bool InLaunchRamp(float x)
         => Course.HasGlideSegment &&

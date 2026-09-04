@@ -33,8 +33,17 @@ public partial class RaceTrackShotProbe : Node
                 Genome = new GenomeFactory(rules.Genetics).CreateRandom(4242UL)
             };
 
-            var entry = new RaceEntryFactory(rules).Create(racer, 4242UL, RaceCourseCatalog.Demo);
+            DirAccess.MakeDirRecursiveAbsolute(ProjectSettings.GlobalizePath(OutputDirectory));
+            var factory = new RaceEntryFactory(rules);
+
+            // Every authored course, because course shape decides how the elevation profile behaves:
+            // the demo's clifftop runs straight into the glide launch, the long course's has to drop
+            // back down into a river.
+            foreach (var definition in RaceCourseCatalog.All)
+            {
+            var entry = factory.Create(racer, 4242UL, definition);
             var course = entry.CourseDefinition.Course;
+            var prefix = definition.Id;
 
             var race = new RaceScreen();
             race.Configure(entry, autoFinish: true);
@@ -55,7 +64,6 @@ public partial class RaceTrackShotProbe : Node
             race.ProcessMode = ProcessModeEnum.Disabled;
 
             var camera = race.GetChildren().OfType<Camera2D>().Single();
-            DirAccess.MakeDirRecursiveAbsolute(ProjectSettings.GlobalizePath(OutputDirectory));
 
             foreach (var stop in Stops(course))
             {
@@ -64,7 +72,7 @@ public partial class RaceTrackShotProbe : Node
                     await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
                 await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
 
-                var path = $"{OutputDirectory}/{stop.Name}.png";
+                var path = $"{OutputDirectory}/{prefix}-{stop.Name}.png";
                 var image = GetViewport().GetTexture().GetImage();
                 image.SavePng(path);
                 GD.Print($"[race-shots] wrote {ProjectSettings.GlobalizePath(path)}");
@@ -85,9 +93,13 @@ public partial class RaceTrackShotProbe : Node
 
                 pending.Remove(hit);
                 await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
-                var actionPath = $"{OutputDirectory}/{hit.Name}.png";
+                var actionPath = $"{OutputDirectory}/{prefix}-{hit.Name}.png";
                 GetViewport().GetTexture().GetImage().SavePng(actionPath);
                 GD.Print($"[race-shots] wrote {ProjectSettings.GlobalizePath(actionPath)}");
+            }
+
+            race.QueueFree();
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             }
 
             GD.Print("[race-shots] RACE_SHOTS_SUCCESS");
