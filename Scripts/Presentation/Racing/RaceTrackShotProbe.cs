@@ -46,24 +46,34 @@ public partial class RaceTrackShotProbe : Node
             var prefix = definition.Id;
 
             var race = new RaceScreen();
-            race.Configure(entry, autoFinish: true);
+            race.Configure(entry, autoFinish: false);
             AddChild(race);
 
             // The menu scene would otherwise sit on top of the track.
             GetTree().CurrentScene?.QueueFree();
 
-            // Run the intro out at speed, then freeze the screen so the camera stays where it is put.
+            var camera = race.GetChildren().OfType<Camera2D>().Single();
+
+            // Run the intro out at speed, catching the opening flyover on its way past mid-course.
             Engine.TimeScale = 12.0;
             var deadline = Time.GetTicksMsec() + 20000;
+            var flyoverCaught = false;
+            var midCourse = (course.StartX + course.EndX) * 0.5f;
             while (race.GetChildren().OfType<CanvasLayer>().Any(layer => layer.Layer == 100) &&
                    Time.GetTicksMsec() < deadline)
             {
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                if (flyoverCaught || camera.Position.X < midCourse)
+                    continue;
+
+                flyoverCaught = true;
+                await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+                var flyoverPath = $"{OutputDirectory}/{prefix}-flyover.png";
+                GetViewport().GetTexture().GetImage().SavePng(flyoverPath);
+                GD.Print($"[race-shots] wrote {ProjectSettings.GlobalizePath(flyoverPath)}");
             }
             Engine.TimeScale = 1.0;
             race.ProcessMode = ProcessModeEnum.Disabled;
-
-            var camera = race.GetChildren().OfType<Camera2D>().Single();
 
             foreach (var stop in Stops(course))
             {
@@ -160,6 +170,7 @@ public partial class RaceTrackShotProbe : Node
         var firstGround = course.Segments.First(segment => segment.Kind == RaceSegmentKind.Ground);
         shots.Add(("live-running", Mathf.Lerp(firstGround.StartX, firstGround.EndX, 0.45f)));
         shots.Add(("live-cheer", Mathf.Lerp(firstGround.StartX, firstGround.EndX, 0.7f)));
+        shots.Add(("live-finish", course.EndX - 90.0f));
 
         return shots.OrderBy(shot => shot.Item2).ToArray();
     }

@@ -6,6 +6,32 @@ namespace Voidling.Presentation.Racing;
 
 public partial class RaceScreen
 {
+    /// <summary>How long the opening flyover takes, whatever the course is worth in world pixels.</summary>
+    private const double FlyoverSeconds = 5.0;
+
+    private bool _flyoverSkipped;
+    private bool _flyoverRunning;
+
+    /// <summary>
+    /// Any key, button, tap or click cuts the opening flyover short. This runs ahead of the UI on
+    /// purpose: a HUD panel under the pointer would otherwise swallow the click, and the player
+    /// would be stuck watching a pan they asked to skip.
+    /// </summary>
+    public override void _Input(InputEvent inputEvent)
+    {
+        if (!_flyoverRunning)
+            return;
+
+        _flyoverSkipped = inputEvent switch
+        {
+            InputEventKey key => key.Pressed && !key.Echo,
+            InputEventMouseButton mouse => mouse.Pressed,
+            InputEventJoypadButton pad => pad.Pressed,
+            InputEventScreenTouch touch => touch.Pressed,
+            _ => _flyoverSkipped
+        };
+    }
+
     private async void PlayRaceIntro()
     {
         if (_entry == null)
@@ -66,6 +92,10 @@ public partial class RaceScreen
             return;
         loading.QueueFree();
 
+        await PlayCourseFlyover();
+        if (!IsInsideTree())
+            return;
+
         var countdown = UiFactory.CreateTitle(string.Empty);
         countdown.Position = new Vector2(220, 132);
         countdown.Size = new Vector2(200, 80);
@@ -94,6 +124,40 @@ public partial class RaceScreen
         layer.QueueFree();
         _running = true;
         UpdateHud();
+    }
+
+    /// <summary>
+    /// Runs the camera from the start line to the finish so the player sees what they are about to
+    /// race, then snaps back to the grid for the countdown. Always the same five seconds regardless
+    /// of course length, and any press cuts it short.
+    /// </summary>
+    private async System.Threading.Tasks.Task PlayCourseFlyover()
+    {
+        _flyoverSkipped = false;
+        _flyoverRunning = true;
+        var elapsed = 0.0;
+
+        while (elapsed < FlyoverSeconds && !_flyoverSkipped)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            if (!IsInsideTree())
+            {
+                _flyoverRunning = false;
+                return;
+            }
+
+            elapsed += GetProcessDeltaTime();
+            var progress = Mathf.Clamp((float)(elapsed / FlyoverSeconds), 0.0f, 1.0f);
+            // Eased at both ends so the sweep starts and settles rather than jerking into motion.
+            var eased = progress * progress * (3.0f - 2.0f * progress);
+            _camera.Position = new Vector2(
+                Mathf.Lerp(Course.StartX, Course.EndX, eased),
+                ScreenHeight * 0.5f);
+        }
+
+        _flyoverRunning = false;
+        _camera.Position = new Vector2(Course.StartX, ScreenHeight * 0.5f);
+        UpdatePlayerTracking();
     }
 
     private static Polygon2D CreateSawtoothEdge(float edgeX, float toothX, Color color)

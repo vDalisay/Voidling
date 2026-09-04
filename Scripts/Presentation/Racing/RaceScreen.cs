@@ -48,6 +48,11 @@ public partial class RaceScreen : Node2D
     /// every frame in between and so never fired outside the slow walk back from a refused hurdle.
     /// </summary>
     private const float DustSpacingPixels = 7.0f;
+
+    /// <summary>Racers coast a random distance past the line rather than all stopping on it.</summary>
+    private const float FinishOverrunMin = 22.0f;
+    private const float FinishOverrunMax = 66.0f;
+    private const float FinishCoastSeconds = 0.85f;
     private const int MaxCatchUpStepsPerFrame = 30;
 
     /// <summary>Canvas layer the results overlay lives on. The CI completion probe looks for it.</summary>
@@ -85,6 +90,7 @@ public partial class RaceScreen : Node2D
     private bool _resultsShown;
     private bool _completionReported;
     private string _playerId = "";
+    private string? _firstFinisherId;
     private RacerVisual? _playerVisual;
     private Random _vfxRandom = new(1);
     private float _waterPhase;
@@ -115,6 +121,12 @@ public partial class RaceScreen : Node2D
         /// <summary>Water drawn over the submerged part of the body while swimming.</summary>
         public Polygon2D Submersion { get; init; } = null!;
         public float DustDistance { get; set; }
+
+        /// <summary>How far past the line this racer coasts, and how far through that coast it is.</summary>
+        public bool Finished { get; set; }
+        public float FinishOverrun { get; set; }
+        public float FinishSeconds { get; set; }
+        public bool Celebrates { get; set; }
         public float WindSeconds { get; set; }
         public float LastX { get; set; }
         public string VisualMode { get; set; } = "run";
@@ -376,8 +388,9 @@ public partial class RaceScreen : Node2D
                         StartJump(visual, obstacle);
                     break;
                 case RaceParticipantFinishedEvent finished:
-                    if (_visuals.TryGetValue(finished.ParticipantId, out var finisher))
-                        finisher.Sprite.Stop();
+                    // The coast past the line and any celebration are driven per frame, so the
+                    // sprite is not stopped here.
+                    _ = finished;
                     break;
             }
         }
@@ -508,7 +521,8 @@ public partial class RaceScreen : Node2D
         if (visual.RecoverySeconds > 0.0f)
             visual.RecoverySeconds = Math.Max(0.0f, visual.RecoverySeconds - delta);
 
-        if (state.Finished)
+        var finishOffset = UpdateFinish(visual, state, delta);
+        if (state.Finished && !visual.Celebrates && visual.FinishSeconds >= FinishCoastSeconds)
             visual.Sprite.Stop();
         else if (state.Terrain is RaceTerrain.Swim or RaceTerrain.FailedGlideSwim)
             SetVisualMode(visual, "swim");
@@ -520,7 +534,13 @@ public partial class RaceScreen : Node2D
         var yOffset = 0.0f;
         var swimming = state.Terrain is RaceTerrain.Swim or RaceTerrain.FailedGlideSwim;
 
-        if (visual.JumpSeconds > 0.0f)
+        if (visual.Celebrates && state.Finished && visual.FinishSeconds >= FinishCoastSeconds)
+        {
+            // Hopping on the spot, over and over, for as long as the podium takes to appear.
+            var hop = Mathf.Abs(Mathf.Sin((visual.FinishSeconds - FinishCoastSeconds) * 6.4f));
+            yOffset = -hop * 13.0f;
+        }
+        else if (visual.JumpSeconds > 0.0f)
         {
             var normalized = 1.0f - visual.JumpSeconds / visual.JumpDuration;
             yOffset = -Mathf.Sin(normalized * Mathf.Pi) * visual.JumpPeak;
@@ -584,7 +604,7 @@ public partial class RaceScreen : Node2D
         var groundLift = SurfaceLiftAt(state.X);
 
         var visualTypeId = visual.Appearance.VisualTypeId;
-        var drawX = RetreatX(visual, state.X);
+        var drawX = RetreatX(visual, state.X) + finishOffset;
         UpdateSubmersion(visual, swimming);
         HandleRunningDust(visual, state, drawX, swimming);
 
@@ -600,6 +620,43 @@ public partial class RaceScreen : Node2D
         var shadowColor = visual.Shadow.Color;
         shadowColor.A = shadowAlpha;
         visual.Shadow.Color = shadowColor;
+    }
+
+    /// <summary>
+    /// Carries a racer through the finish: it coasts a random distance past the line instead of
+    /// stopping dead on it, and the first one over sometimes celebrates by hopping on the spot.
+    ///
+    /// The distance is a hash of the racer, not the VFX random stream, so a replay of the same race
+    /// puts everyone in the same place. Driven from the snapshot rather than the finish event, so
+    /// multiplayer frames get the same behaviour without one.
+    /// </summary>
+    private float UpdateFinish(RacerVisual visual, RaceParticipantStateSnapshot state, float delta)
+    {
+        if (!state.Finished)
+        {
+            visual.Finished = false;
+            visual.FinishSeconds = 0.0f;
+            return 0.0f;
+        }
+
+        if (!visual.Finished)
+        {
+            visual.Finished = true;
+            var id = visual.Entrant.Participant.CreatureId;
+            var variation = JumpVariation(id, 977);
+            visual.FinishOverrun = Mathf.Lerp(FinishOverrunMin, FinishOverrunMax, variation);
+
+            if (_firstFinisherId == null)
+            {
+                _firstFinisherId = id;
+                visual.Celebrates = JumpVariation(id, 4211) < 0.6f;
+            }
+        }
+
+        visual.FinishSeconds += Math.Max(0.0f, delta);
+        var coast = Mathf.Clamp(visual.FinishSeconds / FinishCoastSeconds, 0.0f, 1.0f);
+        // Decelerating, so they roll to a stop rather than sliding at full speed and freezing.
+        return visual.FinishOverrun * (1.0f - (1.0f - coast) * (1.0f - coast));
     }
 
     /// <summary>
