@@ -50,6 +50,19 @@ public sealed class BreedVoidlingsTransactionTests
     }
 
     [Fact]
+    public void PreviewAndExecute_RejectBreedingWhenGardenIsFull()
+    {
+        var state = CreateBreedingState();
+        while (state.Voidlings.Count < Rules.Garden.MaxPopulation)
+            state.Voidlings.Add(CreateAdult($"extra-{state.Voidlings.Count}", (ulong)state.Voidlings.Count));
+        var useCase = new BreedVoidlingsUseCase(Rules);
+
+        Assert.Equal(BreedingFailure.GardenFull, useCase.Preview(state, "a", "b").Failure);
+        Assert.Equal(BreedingFailure.GardenFull, useCase.Execute(state, "a", "b", 12UL, "egg", 0, 0).Failure);
+        Assert.Empty(state.OwnedEggs);
+    }
+
+    [Fact]
     public void ExecuteAndPersist_SavesFrozenEggAndCooldownsExactlyOnce()
     {
         var state = CreateBreedingState();

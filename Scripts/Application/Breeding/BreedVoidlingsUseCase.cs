@@ -14,6 +14,7 @@ public enum BreedingFailure
     None,
     ParentNotFound,
     SameParent,
+    GardenFull,
     ParentNotAdult,
     ParentOnCooldown,
     InvalidEggId,
@@ -196,7 +197,7 @@ public sealed class BreedVoidlingsUseCase
         }
     }
 
-    private static (BreedingFailure Failure, VoidlingData? First, VoidlingData? Second) Validate(
+    private (BreedingFailure Failure, VoidlingData? First, VoidlingData? Second) Validate(
         GameStateData state,
         string firstId,
         string secondId)
@@ -207,6 +208,8 @@ public sealed class BreedVoidlingsUseCase
             return (BreedingFailure.ParentNotFound, first, second);
         if (first.Id == second.Id)
             return (BreedingFailure.SameParent, first, second);
+        if (state.Voidlings.Count >= Math.Max(1, _rules.Garden.MaxPopulation))
+            return (BreedingFailure.GardenFull, first, second);
         if (first.Stage != LifeStage.Adult || second.Stage != LifeStage.Adult)
             return (BreedingFailure.ParentNotAdult, first, second);
         if (first.BreedCooldownSeconds > 0.0f || second.BreedCooldownSeconds > 0.0f)

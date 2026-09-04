@@ -181,6 +181,7 @@ public partial class MainController : Node
             text = preview.Failure switch
             {
                 BreedingFailure.SameParent => Tr("UI_BREED_DIFFERENT_PARENTS"),
+                BreedingFailure.GardenFull => Tr("UI_BREED_GARDEN_FULL"),
                 BreedingFailure.ParentNotAdult => Tr("UI_BREED_ADULTS_ONLY"),
                 BreedingFailure.ParentOnCooldown => Tr("UI_BREED_COOLDOWN"),
                 _ => Tr("UI_BREED_CHOOSE_TWO")

@@ -23,6 +23,7 @@ public partial class GameSession
             return preview.Failure switch
             {
                 BreedingFailure.SameParent => "Choose two different Voidlings.",
+                BreedingFailure.GardenFull => "The Garden is full. Say goodbye to a Voidling before breeding.",
                 BreedingFailure.ParentNotAdult => "Both parents must be adults.",
                 BreedingFailure.ParentOnCooldown => "One parent is still on breeding cooldown.",
                 _ => "Choose two adults."
@@ -62,6 +63,7 @@ public partial class GameSession
             ToastRequested?.Invoke(result.Failure switch
             {
                 BreedingFailure.SameParent => "Choose two different Voidlings.",
+                BreedingFailure.GardenFull => "The Garden is full. Say goodbye to a Voidling before breeding.",
                 BreedingFailure.ParentNotAdult => "Both parents must be adults.",
                 BreedingFailure.ParentOnCooldown => "A parent is still on breeding cooldown.",
                 BreedingFailure.PersistenceFailed => "Could not save the new egg. Breeding was rolled back.",

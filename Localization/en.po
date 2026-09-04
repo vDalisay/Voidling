@@ -132,6 +132,9 @@ msgstr "Choose two adults."
 msgid "UI_BREED_DIFFERENT_PARENTS"
 msgstr "Choose two different Voidlings."
 
+msgid "UI_BREED_GARDEN_FULL"
+msgstr "The Garden is full. Say goodbye to a Voidling before breeding."
+
 msgid "UI_BREED_ADULTS_ONLY"
 msgstr "Both parents must be adults."
 

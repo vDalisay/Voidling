@@ -34,6 +34,7 @@ public partial class BreedingScreen : VBoxContainer
     private TextureRect? _portraitA;
     private TextureRect? _portraitB;
     private Label? _preview;
+    private Button? _breed;
     private BreedingPreviewViewState _currentPreview;
 
     public void Configure(BreedingScreenState state)
@@ -93,15 +94,16 @@ public partial class BreedingScreen : VBoxContainer
         _parentA.ItemSelected += _ => UpdateSelectionAndEmit();
         _parentB.ItemSelected += _ => UpdateSelectionAndEmit();
 
-        var breed = UiFactory.CreateButton(Tr("UI_BREED_ACTION"));
-        breed.CustomMinimumSize = new Vector2(120, 26);
-        breed.Pressed += () =>
+        _breed = UiFactory.CreateButton(Tr("UI_BREED_ACTION"));
+        _breed.CustomMinimumSize = new Vector2(120, 26);
+        _breed.Disabled = !_currentPreview.CanBreed;
+        _breed.Pressed += () =>
         {
             var pair = CurrentPair();
             if (pair != null)
                 BreedRequested?.Invoke(pair.Value.First.Id, pair.Value.Second.Id);
         };
-        AddChild(breed);
+        AddChild(_breed);
     }
 
     public void SetPreview(BreedingPreviewViewState preview)
@@ -109,6 +111,8 @@ public partial class BreedingScreen : VBoxContainer
         _currentPreview = preview;
         if (_preview != null && GodotObject.IsInstanceValid(_preview))
             _preview.Text = preview.Text;
+        if (_breed != null && GodotObject.IsInstanceValid(_breed))
+            _breed.Disabled = !preview.CanBreed;
     }
 
     private void UpdateSelectionAndEmit()
