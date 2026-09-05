@@ -34,6 +34,7 @@ public partial class MainController
 
         _garden.EggPlacementModeChanged += placing => ShowPlacementHint(placing, "UI_GARDEN_PLACE_EGG_HINT");
         _garden.LandPlacementModeChanged += placing => ShowPlacementHint(placing, "UI_GARDEN_PLACE_LAND_HINT");
+        _garden.LandHexSelected += ShowLandHexMenu;
     }
 
     private void ShowPlacementHint(bool placing, string hintKey)

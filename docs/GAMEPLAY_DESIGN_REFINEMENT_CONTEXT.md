@@ -304,7 +304,10 @@ Use a Digimon Championship DS-inspired modular Garden system.
 - player chooses placement and upgrades;
 - module choice determines visual themes and may affect passive stat training.
 
-Exact geometry/rates remain unresolved.
+Geometry resolved: a flat-top hex 210x180 world units, roughly a Voidling's living space. The island
+starts as one free hex of plain ground; the shop sells pieces of one to three connected hexes that
+must be placed touching the island, and a placed hex is turned into training ground for one stat
+separately. One Voidling trains per training hex. Rates remain as authored in `GameBalanceRules`.
 
 ## 5.3 No routine cleaning chores
 

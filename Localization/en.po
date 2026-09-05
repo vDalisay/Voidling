@@ -736,34 +736,82 @@ msgid "UI_GARDEN_LOG_TRADE_COMPLETE"
 msgstr "Trade complete — sent {0}, received {1}."
 
 msgid "UI_GARDEN_PLACE_LAND_HINT"
-msgstr "Click where the island should grow. Right-click to cancel."
+msgstr "Click where the island should grow. R rotates the piece, right-click cancels."
 
 msgid "UI_SHOP_LAND_TITLE"
 msgstr "LAND"
 
 msgid "UI_SHOP_LAND_SUBTITLE"
-msgstr "Hex tiles that extend the island and train the stat they are cut for."
+msgstr "Pieces of ground that extend the island. Each hex can become training ground for one Voidling."
 
 msgid "UI_INVENTORY_LAND"
 msgstr "LAND TO PLACE"
 
 msgid "UI_INVENTORY_LAND_TILE"
-msgstr "{0} land tile"
+msgstr "{0} ({1} hex)"
+
+msgid "UI_INVENTORY_LAND_PLAIN"
+msgstr "Plain ground  \u2022  {0}"
+
+msgid "UI_INVENTORY_LAND_TRAINED"
+msgstr "{0} ground L{1}  \u2022  {2}"
 
 msgid "UI_INVENTORY_LAND_HINT"
-msgstr "Place a tile against the island, then drop a Voidling on it to train there."
+msgstr "Place a piece against the island. R rotates it. Then click a hex to build training ground on it."
 
 msgid "UI_LAND_TITLE"
 msgstr "Island land"
 
 msgid "UI_LAND_SUMMARY"
-msgstr "{0} placed  •  {1} in inventory  •  {2} sprouts"
+msgstr "{0} hexes  •  {1} training  •  {2} in inventory  •  {3} sprouts"
 
 msgid "UI_LAND_HINT"
-msgstr "Buy land in the Shop, place it from the Inventory, then drop a Voidling onto a tile to start training there."
+msgstr "Buy land in the Shop and place it from the Inventory. Click a hex to build training ground on it, then drop a Voidling there."
 
-msgid "UI_LAND_EMPTY"
-msgstr "No land yet. Buy a hex tile in the Shop, then place it from your Inventory."
+msgid "UI_LAND_PLAIN_GROUND"
+msgstr "Plain ground"
+
+msgid "UI_LAND_BUILD"
+msgstr "Build"
+
+msgid "UI_LAND_MANAGE"
+msgstr "Manage"
+
+msgid "UI_LAND_UPGRADE"
+msgstr "Upgrade {0}"
+
+msgid "UI_LAND_MAX_LEVEL"
+msgstr "Max level"
+
+msgid "UI_LAND_HEX_TITLE"
+msgstr "Training ground"
+
+msgid "UI_LAND_HEX_EMPTY_TITLE"
+msgstr "Plain ground"
+
+msgid "UI_LAND_BUILD_PROMPT"
+msgstr "Build training ground here for {0} sprouts. One Voidling trains per hex."
+
+msgid "UI_LAND_HEX_RESIDENT"
+msgstr "Training here: {0}"
+
+msgid "UI_LAND_HEX_VACANT"
+msgstr "Nobody is training here yet. Carry a Voidling onto this hex."
+
+msgid "UI_LAND_SHAPE_SINGLE"
+msgstr "Single"
+
+msgid "UI_LAND_SHAPE_PAIR"
+msgstr "Double"
+
+msgid "UI_LAND_SHAPE_LINE"
+msgstr "Triple row"
+
+msgid "UI_LAND_SHAPE_BEND"
+msgstr "Triple bend"
+
+msgid "UI_LAND_SHAPE_CLUSTER"
+msgstr "Triple cluster"
 
 msgid "UI_LAND_STORED"
 msgstr "In inventory"
@@ -783,8 +831,8 @@ msgstr "Drop this Voidling onto a land tile in the Garden to train that stat."
 msgid "UI_GARDEN_HOME"
 msgstr "My garden"
 
-msgid "UI_GARDEN_JOURNAL"
-msgstr "Garden journal"
+msgid "UI_GARDEN_NAME_HINT"
+msgstr "Click to name your garden."
 
 msgid "UI_GARDEN_COMPANION"
 msgstr "YOUR COMPANION"

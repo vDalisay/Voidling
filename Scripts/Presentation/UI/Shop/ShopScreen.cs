@@ -10,8 +10,9 @@ namespace Voidling.Presentation.UI.Shop;
 public readonly record struct ShopTrainingItemViewState(string StatId, string DisplayName, Color IdentityColor, int Owned, int Price);
 public readonly record struct ShopEggViewState(string EggId, Color TintColor, int Number, int Price);
 public readonly record struct ShopRareOfferViewState(string ItemId, string DisplayName, string Tooltip, int Price);
-public readonly record struct ShopLandTileViewState(string StatId, string DisplayName, Color IdentityColor, int Stored, int Price);
-public sealed record ShopScreenState(int Coins, IReadOnlyList<ShopTrainingItemViewState> TrainingItems, IReadOnlyList<ShopEggViewState> Eggs, int EggRotationSecondsRemaining, ShopRareOfferViewState? RareOffer, IReadOnlyList<ShopLandTileViewState> LandTiles);
+/// <summary>A buyable piece of ground: its footprint in axial cells, what it costs and how many are owned.</summary>
+public readonly record struct ShopLandPieceViewState(string ShapeId, string DisplayName, IReadOnlyList<(int Q, int R)> Cells, int Stored, int Price);
+public sealed record ShopScreenState(int Coins, IReadOnlyList<ShopTrainingItemViewState> TrainingItems, IReadOnlyList<ShopEggViewState> Eggs, int EggRotationSecondsRemaining, ShopRareOfferViewState? RareOffer, IReadOnlyList<ShopLandPieceViewState> LandPieces);
 
 public partial class ShopScreen : VBoxContainer
 {
@@ -42,7 +43,7 @@ public partial class ShopScreen : VBoxContainer
         AddChild(BuildSectionLabel(Tr("UI_SHOP_EGGS_TITLE"), Tr("UI_SHOP_EGGS_SUBTITLE")));
         AddChild(BuildEggShelf(_state.Eggs));
         AddChild(BuildSectionLabel(Tr("UI_SHOP_LAND_TITLE"), Tr("UI_SHOP_LAND_SUBTITLE")));
-        AddChild(BuildLandShelf(_state.LandTiles));
+        AddChild(BuildLandShelf(_state.LandPieces));
     }
 
     private Control BuildSummary(ShopScreenState state)
@@ -84,29 +85,55 @@ public partial class ShopScreen : VBoxContainer
         var shelf = CreateStallShelf(); var grid = new GridContainer { Columns = 3 }; grid.AddThemeConstantOverride("h_separation", 7); grid.AddThemeConstantOverride("v_separation", 3); shelf.GetNode<VBoxContainer>("ShelfBox").AddChild(grid); foreach (var egg in eggs) grid.AddChild(BuildEggProduct(egg)); return shelf;
     }
 
-    private Control BuildLandShelf(IReadOnlyList<ShopLandTileViewState> tiles)
+    private Control BuildLandShelf(IReadOnlyList<ShopLandPieceViewState> pieces)
     {
-        var shelf = CreateStallShelf(); var grid = new GridContainer { Columns = 5 }; grid.AddThemeConstantOverride("h_separation", 5); grid.AddThemeConstantOverride("v_separation", 3); shelf.GetNode<VBoxContainer>("ShelfBox").AddChild(grid); foreach (var tile in tiles) grid.AddChild(BuildLandProduct(tile)); return shelf;
+        var shelf = CreateStallShelf(); var grid = new GridContainer { Columns = 5 }; grid.AddThemeConstantOverride("h_separation", 5); grid.AddThemeConstantOverride("v_separation", 3); shelf.GetNode<VBoxContainer>("ShelfBox").AddChild(grid); foreach (var piece in pieces) grid.AddChild(BuildLandProduct(piece)); return shelf;
     }
 
-    private Control BuildLandProduct(ShopLandTileViewState tile)
+    private Control BuildLandProduct(ShopLandPieceViewState piece)
     {
-        var card = CreateMarketCard(new Vector2(94, 70)); card.TooltipText = Tr("UI_SHOP_LAND_SUBTITLE"); var column = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; column.AddThemeConstantOverride("separation", 1); card.AddChild(column);
-        column.AddChild(BuildHexSwatch(tile.IdentityColor));
-        var name = UiFactory.CreateLabel(tile.DisplayName, 6); name.HorizontalAlignment = HorizontalAlignment.Center; name.AddThemeColorOverride("font_color", tile.IdentityColor.Darkened(0.35f)); column.AddChild(name);
-        var stock = UiFactory.CreateLabel(string.Format(Tr("UI_SHOP_OWNED"), tile.Stored), 5); stock.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(stock);
-        var buy = UiFactory.CreateButton(string.Format(Tr("UI_SHOP_BUY"), tile.Price)); buy.CustomMinimumSize = new Vector2(78, 19); UiFactory.ApplyPixelFont(buy, 6); buy.TooltipText = card.TooltipText; buy.Pressed += () => LandPurchaseRequested?.Invoke(tile.StatId); column.AddChild(buy); return card;
+        var card = CreateMarketCard(new Vector2(94, 78)); card.TooltipText = Tr("UI_SHOP_LAND_SUBTITLE"); var column = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; column.AddThemeConstantOverride("separation", 1); card.AddChild(column);
+        column.AddChild(BuildShapeSwatch(piece.Cells));
+        var name = UiFactory.CreateLabel(piece.DisplayName, 6); name.HorizontalAlignment = HorizontalAlignment.Center; name.AddThemeColorOverride("font_color", LandSwatchColor.Darkened(0.4f)); column.AddChild(name);
+        var stock = UiFactory.CreateLabel(string.Format(Tr("UI_SHOP_OWNED"), piece.Stored), 5); stock.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(stock);
+        var buy = UiFactory.CreateButton(string.Format(Tr("UI_SHOP_BUY"), piece.Price)); buy.CustomMinimumSize = new Vector2(78, 19); UiFactory.ApplyPixelFont(buy, 6); buy.TooltipText = card.TooltipText; buy.Pressed += () => LandPurchaseRequested?.Invoke(piece.ShapeId); column.AddChild(buy); return card;
     }
 
-    /// <summary>Small flat-top hex in tile proportions so the stall reads as the land it sells.</summary>
-    private static Control BuildHexSwatch(Color color)
+    private static readonly Color LandSwatchColor = Color.FromHtml("#8FC57E");
+
+    /// <summary>
+    /// The piece's own footprint, so the player buys the shape they can see rather than a word.
+    /// The hexes keep the island's proportions and are scaled down to fit the card, which is what
+    /// keeps a three-hex piece inside its own product tile.
+    /// </summary>
+    private static Control BuildShapeSwatch(IReadOnlyList<(int Q, int R)> cells)
     {
-        var holder = new Control { CustomMinimumSize = new Vector2(82, 26), MouseFilter = Control.MouseFilterEnum.Ignore };
-        var center = new Vector2(41, 13);
-        var polygon = HexShape.Corners(SwatchTopEdgeWidth, SwatchHeight); for (var i = 0; i < polygon.Length; i++) polygon[i] += center;
-        var outline = HexShape.Outline(SwatchTopEdgeWidth, SwatchHeight); for (var i = 0; i < outline.Length; i++) outline[i] += center;
-        holder.AddChild(new Polygon2D { Polygon = polygon, Color = color });
-        holder.AddChild(new Line2D { Points = outline, DefaultColor = color.Darkened(0.4f), Width = 1.5f, JointMode = Line2D.LineJointMode.Round });
+        const float boxWidth = 78.0f;
+        const float boxHeight = 38.0f;
+        var shapeRatio = SwatchHeight / SwatchTopEdgeWidth;
+
+        // Cell centres in tile units: a hex is 2 top edges wide and 1 height tall.
+        var units = cells.Select(cell => new Vector2(1.5f * cell.Q, cell.R + cell.Q * 0.5f)).ToArray();
+        var spanX = units.Max(unit => unit.X) - units.Min(unit => unit.X) + 2.0f;
+        var spanY = units.Max(unit => unit.Y) - units.Min(unit => unit.Y) + 1.0f;
+        var topEdge = Mathf.Min(boxWidth / spanX, boxHeight / (shapeRatio * spanY));
+        var height = topEdge * shapeRatio;
+
+        var centers = units.Select(unit => new Vector2(unit.X * topEdge, unit.Y * height)).ToArray();
+        var middle = new Vector2(
+            (centers.Max(center => center.X) + centers.Min(center => center.X)) * 0.5f,
+            (centers.Max(center => center.Y) + centers.Min(center => center.Y)) * 0.5f);
+        var origin = new Vector2(boxWidth * 0.5f, boxHeight * 0.5f) - middle;
+
+        var holder = new Control { CustomMinimumSize = new Vector2(boxWidth, boxHeight), MouseFilter = Control.MouseFilterEnum.Ignore };
+        foreach (var center in centers)
+        {
+            var polygon = HexShape.Corners(topEdge, height); for (var i = 0; i < polygon.Length; i++) polygon[i] += origin + center;
+            var outline = HexShape.Outline(topEdge, height); for (var i = 0; i < outline.Length; i++) outline[i] += origin + center;
+            holder.AddChild(new Polygon2D { Polygon = polygon, Color = LandSwatchColor });
+            holder.AddChild(new Line2D { Points = outline, DefaultColor = LandSwatchColor.Darkened(0.45f), Width = 1.5f, JointMode = Line2D.LineJointMode.Round });
+        }
+
         return holder;
     }
 

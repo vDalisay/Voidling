@@ -20,6 +20,9 @@ public sealed class GameStateData
     private List<GardenDecorationData> _gardenDecorations = new();
 
     public int SaveVersion { get; set; } = 20;
+
+    /// <summary>Player-authored name for the island. Blank falls back to the localized default.</summary>
+    public string GardenName { get; set; } = "";
     public int Coins { get; set; } = 120;
     public double GardenIncomeCoinRemainder { get; set; }
     public double ShopEggRotationElapsedSeconds { get; set; }

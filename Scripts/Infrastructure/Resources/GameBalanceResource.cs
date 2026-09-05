@@ -81,8 +81,13 @@ public partial class GameBalanceResource : Resource
     public int GardenMaxPopulation { get; set; } = 8;
 
     [ExportGroup("Garden Modules")]
+    /// <summary>Coins to turn one placed empty hex into training ground.</summary>
     [Export(PropertyHint.Range, "0,10000,1")]
     public int GardenModulePurchaseCost { get; set; } = 40;
+
+    /// <summary>Coins per hex of plain ground; a three-hex piece costs three of these.</summary>
+    [Export(PropertyHint.Range, "0,10000,1")]
+    public int GardenModuleEmptyHexCost { get; set; } = 25;
 
     [Export(PropertyHint.Range, "0,10000,1")]
     public int GardenModuleLevel2UpgradeCost { get; set; } = 25;
@@ -301,7 +306,10 @@ public partial class GameBalanceResource : Resource
                     NonNegative(GardenModuleLevel1PointsPerMinute),
                     NonNegative(GardenModuleLevel2PointsPerMinute),
                     NonNegative(GardenModuleLevel3PointsPerMinute)
-                })),
+                }))
+            {
+                EmptyHexCost = Math.Max(0, GardenModuleEmptyHexCost)
+            },
             Lifecycle = defaults.Lifecycle with
             {
                 ChildToAdultSeconds = Positive(ChildToAdultSeconds, 0.1f)

@@ -209,6 +209,7 @@ public partial class GameSession : Node
         };
         foreach (var statId in GameRules.StatIds) state.TrainingItems[statId] = 1;
         State = state;
+        TrainingUseCase.EnsureStarterHex(State);
         State.Voidlings.Add(CreateStarter("Pip", "#E7A6B6", StarterSpawnPosition(0)));
         State.Voidlings.Add(CreateStarter("Mallow", "#A9D5C0", StarterSpawnPosition(1)));
         EnsureAngelMutation();
@@ -236,13 +237,15 @@ public partial class GameSession : Node
         };
     }
 
-    private static Vector2 NestPosition(int index) => new(315 + (index % 5) * 26, 275 + (index / 5) * 24);
+    // Eggs nest on the starting hex, well inside its rim.
+    private static Vector2 NestPosition(int index) => new(376 + (index % 3) * 40, 272 + (index / 3) * 22);
     private EggData CreateStoreEgg() { var seed = NextSeed(); return _shop!.CreateStoreInventoryEgg(NewId(), seed); }
     private void ApplyAudioSettings()
     { _audioSettings!.ApplyMasterVolume(State.MasterVolume); _audioSettings.ApplySoundEffectVolume(State.SoundEffectVolume); _audioSettings.ApplyUiSoundVolume(State.UiSoundVolume); }
     private static Vector2 StarterSpawnPosition(int index)
     {
-        var p = new[] { new Vector2(300,185), new Vector2(420,210), new Vector2(250,250), new Vector2(485,160), new Vector2(360,290), new Vector2(530,250) };
+        // Spread around the middle of the starting hex, which is the whole island at first.
+        var p = new[] { new Vector2(380,215), new Vector2(452,258), new Vector2(400,285), new Vector2(462,205), new Vector2(368,262), new Vector2(430,230) };
         return p[index % p.Length];
     }
     private ulong NextSeed() { State.SeedCounter++; return unchecked((ulong)State.SeedCounter); }

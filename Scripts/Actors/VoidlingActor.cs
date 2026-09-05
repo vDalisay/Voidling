@@ -190,13 +190,30 @@ public partial class VoidlingActor : Node2D
         RefreshMovementState();
     }
 
+    /// <summary>
+    /// Pulls a free-roaming Voidling back onto land. The island is a cluster of hexes, not a
+    /// rectangle, so the box alone would let it stroll onto the water.
+    /// </summary>
+    public Func<Vector2, Vector2>? LandClamp { get; set; }
+
+    /// <summary>Widens the roaming area as the island grows.</summary>
+    public void SetWanderArea(Rect2 bounds)
+    {
+        if (_wanderBounds == bounds)
+            return;
+
+        _wanderBounds = bounds;
+        Position = ClampToWanderArea(Position);
+    }
+
     private Vector2 ClampToWanderArea(Vector2 position)
     {
         if (!IsOnTile)
         {
-            return new Vector2(
+            var boxed = new Vector2(
                 Mathf.Clamp(position.X, _wanderBounds.Position.X, _wanderBounds.End.X),
                 Mathf.Clamp(position.Y, _wanderBounds.Position.Y, _wanderBounds.End.Y));
+            return LandClamp?.Invoke(boxed) ?? boxed;
         }
 
         var offset = position - _tileCenter;
@@ -335,11 +352,18 @@ public partial class VoidlingActor : Node2D
         _target = IsOnTile
             ? _tileCenter + Vector2.Right.Rotated(_rng.RandfRange(0.0f, Mathf.Tau)) *
               _rng.RandfRange(0.0f, _tileRadius)
-            : new Vector2(
+            : ClampToWanderArea(new Vector2(
                 _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
-                _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y));
+                _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y)));
         _nextTargetSeconds = _rng.RandfRange(1.5f, 4.0f);
     }
+
+    /// <summary>
+    /// Any real sideways component decides which way a Voidling looks. The up and down animations
+    /// keep whatever horizontal facing came before them, so letting them win a mostly-vertical walk
+    /// leaves a creature drifting left while still facing right.
+    /// </summary>
+    private const float FacingDeadzone = 0.12f;
 
     private void PlayForDirection(Vector2 direction)
     {
@@ -347,14 +371,15 @@ public partial class VoidlingActor : Node2D
         // Facing comes from a flip there instead of a per-direction animation.
         if (IsOnTile)
         {
-            _sprite.FlipH = direction.X < 0.0f;
+            if (Mathf.Abs(direction.X) > FacingDeadzone)
+                _sprite.FlipH = direction.X < 0.0f;
             if (_sprite.Animation != _tileAnimation)
                 _sprite.Play(_tileAnimation);
             return;
         }
 
         StringName animation;
-        if (Mathf.Abs(direction.X) > Mathf.Abs(direction.Y))
+        if (Mathf.Abs(direction.X) > FacingDeadzone)
             animation = direction.X < 0.0f ? "walk_left" : "walk_right";
         else
             animation = direction.Y < 0.0f ? "walk_up" : "walk_down";

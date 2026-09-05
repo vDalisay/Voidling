@@ -45,10 +45,14 @@ public static class PlayerActionFailureText
         {
             GardenModuleFailure.None => string.Empty,
             GardenModuleFailure.UnknownStat => "That Garden training option is unavailable.",
+            GardenModuleFailure.UnknownShape => "That land piece is unavailable.",
             GardenModuleFailure.DuplicateModuleId => "Could not create that land tile. Please try again.",
             GardenModuleFailure.ModuleNotFound => "That land tile is no longer available.",
-            GardenModuleFailure.AlreadyPlaced => "That land tile is already part of the island.",
-            GardenModuleFailure.DoesNotFit => "Land has to touch the island and cannot overlap another tile.",
+            GardenModuleFailure.AlreadyPlaced => "That land piece is already part of the island.",
+            GardenModuleFailure.NotPlaced => "Put that land down on the island first.",
+            GardenModuleFailure.NotTrainingGround => "That hex is plain ground. Build training ground on it first.",
+            GardenModuleFailure.AlreadyTrainingGround => "That hex is already training ground.",
+            GardenModuleFailure.DoesNotFit => "Land has to touch the island and cannot overlap what is already there.",
             GardenModuleFailure.NotEnoughCurrency => "Not enough sprouts.",
             GardenModuleFailure.MaxLevel => "That land tile is already at its current maximum level.",
             _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)
@@ -60,8 +64,9 @@ public static class PlayerActionFailureText
             PassiveTrainingFailure.None => string.Empty,
             PassiveTrainingFailure.UnknownStat => "That passive training option is unavailable.",
             PassiveTrainingFailure.CreatureNotFound => MissingVoidling,
-            PassiveTrainingFailure.LandNotPlaced => "That land tile is not on the island yet.",
-            PassiveTrainingFailure.LandFull => "That land tile is already taken. One Voidling trains per tile.",
+            PassiveTrainingFailure.LandNotPlaced => "That land is not on the island yet.",
+            PassiveTrainingFailure.LandNotTrainingGround => "That hex is plain ground. Build training ground on it first.",
+            PassiveTrainingFailure.LandFull => "That hex is already taken. One Voidling trains per hex.",
             _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)
         };
 }
