@@ -98,6 +98,9 @@ public partial class GardenController
     /// <summary>Roughly the width of the drawn trunk: leaves are walk-through, wood is not.</summary>
     private const float TrunkRadius = 9.0f;
 
+    /// <summary>How far the canopy sits above the trunk it stands on.</summary>
+    private const float TreeSpriteRise = 22.0f;
+
     private Node2D _landRoot = null!;
     private Node2D? _coastRoot;
     private string _placingModuleId = "";
@@ -475,12 +478,17 @@ public partial class GardenController
         var trunk = hexCenter + new Vector2(
             rng.RandfRange(-58.0f, 58.0f),
             -Hex.Height * 0.22f + rng.RandfRange(-8.0f, 8.0f));
-        var tree = new Sprite2D
+        // The canopy has to be able to cover a Voidling, and z-index is checked before the y-sort:
+        // a tree left on the default layer would always lose to the actor sprites on layer 2. So the
+        // tree is built like an actor - a node at its feet carrying a sprite raised on that layer -
+        // and the two then sort against each other by how far down the island they stand.
+        var tree = new Node2D { Position = trunk };
+        tree.AddChild(new Sprite2D
         {
             Texture = TreeTexture,
-            Offset = new Vector2(0.0f, -22.0f),
-            Position = trunk
-        };
+            Position = new Vector2(0.0f, -TreeSpriteRise),
+            ZIndex = 2
+        });
         _actorsRoot.AddChild(tree);
         _treeProps.Add(tree);
         _treeTrunks.Add(trunk);
