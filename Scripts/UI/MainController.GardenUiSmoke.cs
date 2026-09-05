@@ -45,9 +45,12 @@ public partial class MainController
             await ClickGardenControl(_railToggle);
             await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
             RequireOnScreen(_railToggle);
-            if (rail.Visible || _gardenStatus.Visible || _dayNightDial.Visible || _gardenEventLog.Visible ||
+            if (rail.Visible || !_gardenStatus.Visible || !_dayNightDial.Visible || !_gardenEventLog.Visible ||
                 !_railToggle.HasFocus() || actions.GetChildren().OfType<Button>().Any(b => b.FocusMode != Control.FocusModeEnum.None))
-                throw new InvalidOperationException("Collapsed Garden HUD is still visible or keyboard focus is lost.");
+                throw new InvalidOperationException("Collapsed navigation hid persistent Garden HUD or keyboard focus is lost.");
+            foreach (var control in new Control[] { _gardenStatus, _dayNightDial, _gardenEventLog })
+                if (Mathf.Abs(control.Position.X - 10) > 1)
+                    throw new InvalidOperationException($"{control.Name} did not move into the free left-side space.");
             if (Mathf.Abs(_railToggle.Position.Y - (ScreenHeight - _railToggle.Size.Y) / 2) > 1)
                 throw new InvalidOperationException("Navigation handle is not centered on the screen edge.");
             await CaptureGardenUi("garden-collapsed");
@@ -57,6 +60,8 @@ public partial class MainController
             await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
             RequireOnScreen(rail);
             if (!rail.Visible || !_gardenStatus.Visible || !_dayNightDial.Visible || !_gardenEventLog.Visible ||
+                Mathf.Abs(_gardenStatus.Position.X - 110) > 1 || Mathf.Abs(_dayNightDial.Position.X - 110) > 1 ||
+                Mathf.Abs(_gardenEventLog.Position.X - 110) > 1 ||
                 actions.GetChildren().OfType<Button>().Any(b => b.FocusMode != Control.FocusModeEnum.All))
                 throw new InvalidOperationException("Navigation did not recover from interrupted animation.");
 

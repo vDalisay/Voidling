@@ -228,16 +228,13 @@ public partial class MainController : Node
         _railTween = CreateTween().SetParallel().SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
         _railTween.TweenProperty(_gardenRail, "position:x", _railCollapsed ? -96f : 0f, 0.22);
         _railTween.TweenProperty(_railToggle, "position:x", _railCollapsed ? 4f : 84f, 0.22);
-        _railTween.TweenProperty(_gardenStatus, "position:x", _railCollapsed ? -120f : 110f, 0.22);
-        _railTween.TweenProperty(_dayNightDial, "position:x", _railCollapsed ? -78f : 110f, 0.22);
-        _railTween.TweenProperty(_gardenEventLog, "position:x", _railCollapsed ? -300f : 110f, 0.22);
-        _railTween.TweenProperty(_saveStatusLabel, "position:x", _railCollapsed ? -84f : 12f, 0.22);
+        _railTween.TweenProperty(_gardenStatus, "position:x", _railCollapsed ? 10f : 110f, 0.22);
+        _railTween.TweenProperty(_dayNightDial, "position:x", _railCollapsed ? 10f : 110f, 0.22);
+        _railTween.TweenProperty(_gardenEventLog, "position:x", _railCollapsed ? 10f : 110f, 0.22);
         _railTween.Finished += () =>
         {
             _gardenRail.Visible = !_railCollapsed;
-            _gardenStatus.Visible = !_railCollapsed;
-            _dayNightDial.Visible = !_railCollapsed;
-            _gardenEventLog.Visible = !_railCollapsed && !_modalHost.IsOpen;
+            _gardenEventLog.Visible = !_modalHost.IsOpen;
         };
     }
 
@@ -313,7 +310,7 @@ public partial class MainController : Node
         RefreshQuickMenu();
 
         if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))
-            _gardenEventLog.Visible = !_modalHost.IsOpen && !_railCollapsed;
+            _gardenEventLog.Visible = !_modalHost.IsOpen;
 
         if (_modalHost.IsOpen)
             HideGardenHudPanels();
