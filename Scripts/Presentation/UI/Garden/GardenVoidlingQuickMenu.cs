@@ -16,7 +16,7 @@ public readonly record struct QuickMenuVoidlingViewState(
     int OtherMutationCount);
 
 /// <summary>
-/// Bottom-right roster shortcut. The button toggles a compact sidebar of every Voidling in the
+/// Rail-adjacent roster. The owner opens a compact sidebar of every Voidling in the
 /// Garden; picking one asks the owner to select and track it. Filtering is presentation-only text
 /// matching over the projected name and colour name.
 /// </summary>
@@ -31,12 +31,11 @@ public partial class GardenVoidlingQuickMenu : Control
     private LineEdit _search = null!;
     private VBoxContainer _list = null!;
     private Label _empty = null!;
-    private Button _toggle = null!;
 
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Ignore;
-        Size = new Vector2(PanelSize.X, PanelSize.Y + 26.0f);
+        Size = PanelSize;
 
         _panel = UiFactory.CreatePanel(PanelSize);
         _panel.Position = Vector2.Zero;
@@ -77,18 +76,14 @@ public partial class GardenVoidlingQuickMenu : Control
         _empty.Visible = false;
         column.AddChild(_empty);
 
-        _toggle = UiFactory.CreateButton(Tr("UI_GARDEN_VOIDLINGS"));
-        _toggle.CustomMinimumSize = new Vector2(PanelSize.X, 24);
-        UiFactory.ApplyPixelFont(_toggle, 8);
-        _toggle.Position = new Vector2(0, PanelSize.Y + 2.0f);
-        _toggle.Size = new Vector2(PanelSize.X, 24);
-        _toggle.Pressed += () =>
-        {
-            _panel.Visible = !_panel.Visible;
-            if (_panel.Visible)
-                RebuildList();
-        };
-        AddChild(_toggle);
+    }
+
+    public void Toggle()
+    {
+        _panel.Visible = !_panel.Visible;
+        if (!_panel.Visible) return;
+        RebuildList();
+        _search.GrabFocus();
     }
 
     public void SetVoidlings(IReadOnlyList<QuickMenuVoidlingViewState> voidlings)
@@ -110,7 +105,10 @@ public partial class GardenVoidlingQuickMenu : Control
     private void RebuildList()
     {
         foreach (var child in _list.GetChildren())
+        {
+            _list.RemoveChild(child);
             child.QueueFree();
+        }
 
         var filter = _search.Text.Trim();
         var matches = _voidlings.Where(candidate => Matches(candidate, filter)).ToList();

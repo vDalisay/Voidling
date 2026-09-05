@@ -7,7 +7,7 @@ public partial class MainController
 {
     private void ShowSettingsExtended()
     {
-        var box = OpenModal(Tr("UI_SETTINGS_TITLE"), new Vector2(410, 318));
+        var box = OpenModal(Tr("UI_SETTINGS_TITLE"), new Vector2(410, 318), ShowGardenMenu);
         var screen = new SettingsScreen();
         screen.Configure(new SettingsScreenState(
             _session.State.MasterVolume,

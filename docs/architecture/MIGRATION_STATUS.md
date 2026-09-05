@@ -80,6 +80,8 @@ The old `GameSession.Instance` service locator has been removed entirely. Scene-
 
 ### Presentation
 
+On `codex/ui-overhaul-managers-rail`, the compact Garden inspector has moved from root-built profile controls to `Presentation/UI/Garden/GardenInspector`. It renders `CreatureProfileProjection` and emits intent; the transitional root retains navigation, treatment invocation and inventory composition. The manager's rail/ESC menu are Garden presentation changes only. Shop and Racing layout migrations wait for their separate player-testing gates in `docs/UI_UX_IMPLEMENTATION_PLAN.md`.
+
 Standalone Presentation components now include:
 
 - `SettingsScreen`;

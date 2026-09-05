@@ -11,6 +11,7 @@ namespace Voidling.Presentation.UI.Garden;
 /// </summary>
 public partial class GardenEventLog : Control
 {
+    public event Action? ActivitiesRequested;
     private const int MaxEntries = 300;
 
     private sealed record Entry(string Id, string Text, Action? Action);
@@ -25,7 +26,6 @@ public partial class GardenEventLog : Control
 
         var panel = UiFactory.CreatePanel(Vector2.Zero);
         var background = (StyleBoxTexture)panel.GetThemeStylebox("panel").Duplicate();
-        background.ModulateColor = new Color(1, 1, 1, 0.45f);
         background.ContentMarginTop = background.ContentMarginBottom = 6;
         background.ContentMarginLeft = background.ContentMarginRight = 9;
         panel.AddThemeStyleboxOverride("panel", background);
@@ -34,6 +34,17 @@ public partial class GardenEventLog : Control
         var column = new VBoxContainer();
         column.AddThemeConstantOverride("separation", 3);
         panel.AddChild(column);
+        var heading = new HBoxContainer();
+        var title = UiFactory.CreateLabel(Tr("UI_GARDEN_LOG_TITLE"), 9);
+        title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        heading.AddChild(title);
+        var activities = UiFactory.CreateButton(Tr("UI_GARDEN_ACTIVITIES"));
+        activities.Name = "Activities";
+        activities.CustomMinimumSize = new Vector2(62, 18);
+        UiFactory.ApplyPixelFont(activities, 8);
+        activities.Pressed += () => ActivitiesRequested?.Invoke();
+        heading.AddChild(activities);
+        column.AddChild(heading);
         _history = new RichTextLabel
         {
             BbcodeEnabled = false,

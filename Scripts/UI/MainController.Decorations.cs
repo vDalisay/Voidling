@@ -9,7 +9,7 @@ public partial class MainController
 {
     private void ShowGardenDecorations()
     {
-        var box = OpenModal("DECORATE GARDEN", new Vector2(510, 350));
+        var box = OpenModal(Tr("UI_GARDEN_BUILD_DECORATE"), new Vector2(510, 350), ShowGardenBuild);
         box.AddThemeConstantOverride("separation", 6);
 
         var hint = UiFactory.CreateLabel(

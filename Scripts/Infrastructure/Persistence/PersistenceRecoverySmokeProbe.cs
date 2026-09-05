@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using Voidling.Application.Ports;
+using Voidling.Infrastructure.Multiplayer;
 using VoidlingGame;
 
 namespace Voidling.Infrastructure.Persistence;
@@ -13,6 +14,8 @@ namespace Voidling.Infrastructure.Persistence;
 public partial class PersistenceRecoverySmokeProbe : Node
 {
     private const string SmokePath = "user://voidling_persistence_recovery_smoke.json";
+    // The repository resolves the profile internally; corruption/cleanup must target that same file.
+    private static string ResolvedSmokePath => LanMultiplayerOptions.ResolveDevelopmentSavePath(SmokePath, OS.GetCmdlineUserArgs());
     private const string SuccessMarker = "PERSISTENCE_RECOVERY_SMOKE_SUCCESS";
 
     public override void _Ready()
@@ -56,7 +59,7 @@ public partial class PersistenceRecoverySmokeProbe : Node
 
     private static void CorruptPrimary()
     {
-        using var file = FileAccess.Open(SmokePath, FileAccess.ModeFlags.Write);
+        using var file = FileAccess.Open(ResolvedSmokePath, FileAccess.ModeFlags.Write);
         if (file == null)
             throw new InvalidOperationException("Could not open smoke primary for corruption step.");
         file.StoreString("{ definitely-not-valid-json");
@@ -65,9 +68,9 @@ public partial class PersistenceRecoverySmokeProbe : Node
 
     private static void Cleanup()
     {
-        RemoveIfExists(SmokePath);
-        RemoveIfExists(SmokePath + ".bak");
-        RemoveIfExists(SmokePath + ".tmp");
+        RemoveIfExists(ResolvedSmokePath);
+        RemoveIfExists(ResolvedSmokePath + ".bak");
+        RemoveIfExists(ResolvedSmokePath + ".tmp");
     }
 
     private static void RemoveIfExists(string path)

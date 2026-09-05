@@ -71,6 +71,12 @@ public partial class MainController : Node
         var screen = new DetailsScreen();
         screen.Configure(state);
         box.AddChild(screen);
+        var goodbye = UiFactory.CreateButton(Tr("UI_GARDEN_GOODBYE"));
+        goodbye.Name = "Goodbye";
+        goodbye.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd;
+        goodbye.AddThemeColorOverride("font_color", Color.FromHtml("#914E42"));
+        goodbye.Pressed += () => ShowGoodbyeFirst(profile.CreatureId);
+        box.AddChild(goodbye);
     }
 
     private void ShowFamilyTree()

@@ -15,17 +15,15 @@ public partial class MainController
     {
         _quickMenu = new GardenVoidlingQuickMenu
         {
-            // Bottom-right corner, opening upward. It sits above the details panel it shares that
-            // corner with, and closes on pick so the details panel is what the player ends up on.
-            Position = new Vector2(ScreenWidth - 208.0f, ScreenHeight - 214.0f),
+            Position = new Vector2(106, 82),
             ZIndex = 20
         };
         _quickMenu.VoidlingPicked += OnQuickMenuVoidlingPicked;
         _uiRoot.AddChild(_quickMenu);
 
         _placementHint = UiFactory.CreateLabel(Tr("UI_GARDEN_PLACE_EGG_HINT"), 8);
-        _placementHint.Position = new Vector2(18, 62);
-        _placementHint.Size = new Vector2(420, 16);
+        _placementHint.Position = new Vector2(110, 62);
+        _placementHint.Size = new Vector2(340, 16);
         _placementHint.AddThemeColorOverride("font_color", Color.FromHtml("#F9F4D8"));
         _placementHint.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
         _placementHint.AddThemeConstantOverride("outline_size", 2);
@@ -56,6 +54,8 @@ public partial class MainController
         RefreshUi();
         if (!_garden.IsFollowing(creatureId))
             _garden.ToggleFollowVoidling(creatureId);
+        RebuildDetailsPanel();
+        _detailsPanel?.FocusCare();
     }
 
     private void RefreshQuickMenu()
@@ -63,10 +63,7 @@ public partial class MainController
         if (_quickMenu == null || !GodotObject.IsInstanceValid(_quickMenu))
             return;
 
-        // The details side panel owns the same bottom-right corner, so the shortcut steps aside while
-        // that panel is up and comes back once it closes.
-        var cornerTaken = _modalHost.IsOpen ||
-                          (_detailsPanel != null && GodotObject.IsInstanceValid(_detailsPanel) && _detailsPanel.Visible);
+        var cornerTaken = _modalHost.IsOpen;
         _quickMenu.Visible = !cornerTaken;
         if (cornerTaken)
         {

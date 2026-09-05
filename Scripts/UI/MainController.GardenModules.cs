@@ -15,7 +15,7 @@ public partial class MainController
     private void ShowGardenModules()
     {
         var state = _session.State;
-        var box = OpenModal(Tr("UI_LAND_TITLE"), new Vector2(510, 320));
+        var box = OpenModal(Tr("UI_LAND_TITLE"), new Vector2(510, 320), ShowGardenBuild);
         box.AddThemeConstantOverride("separation", 5);
 
         var placed = state.GardenModules.Where(module => module.Placed).ToList();
