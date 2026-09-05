@@ -57,6 +57,12 @@ public partial class MainController
         modules.Pressed += ShowGardenModules;
         lowerRow.AddChild(modules);
 
+        var decorate = UiFactory.CreateButton("Decorate");
+        decorate.CustomMinimumSize = new Vector2(72, 19);
+        UiFactory.ApplyPixelFont(decorate, 6);
+        decorate.Pressed += ShowGardenDecorations;
+        lowerRow.AddChild(decorate);
+
         var missions = UiFactory.CreateButton("Missions");
         missions.CustomMinimumSize = new Vector2(74, 19);
         UiFactory.ApplyPixelFont(missions, 6);
