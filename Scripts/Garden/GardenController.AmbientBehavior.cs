@@ -6,9 +6,9 @@ namespace VoidlingGame;
 
 /// <summary>
 /// Reconciles the useful Garden-roaming portion of the old implementation-plan branch with the
-/// current Garden/hex-training architecture. Effective Run changes free-roam speed and Stamina
-/// changes how long a free-roaming Voidling pauses between destinations. Training-tile activity
-/// loops remain continuous.
+/// current Garden/hex-training architecture. Effective Run changes free-roam speed, Stamina changes
+/// pause duration, and Swim subtly biases free-roam destinations toward the shoreline. Training-tile
+/// activity loops remain continuous.
 /// </summary>
 public partial class GardenController
 {
@@ -85,7 +85,9 @@ public partial class GardenController
                 string.Equals(stat.StatId, "run", StringComparison.Ordinal))?.EffectiveValue ?? 0;
             var stamina = profile.Stats.FirstOrDefault(stat =>
                 string.Equals(stat.StatId, "stamina", StringComparison.Ordinal))?.EffectiveValue ?? 0;
-            actor.ApplyAmbientStats(run, stamina);
+            var swim = profile.Stats.FirstOrDefault(stat =>
+                string.Equals(stat.StatId, "swim", StringComparison.Ordinal))?.EffectiveValue ?? 0;
+            actor.ApplyAmbientStats(run, stamina, swim);
         }
 
         // A rebuilt actor must immediately rejoin its authored training tile rather than waiting for
