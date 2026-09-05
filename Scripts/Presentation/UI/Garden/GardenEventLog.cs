@@ -34,8 +34,6 @@ public partial class GardenEventLog : Control
         var column = new VBoxContainer();
         column.AddThemeConstantOverride("separation", 3);
         panel.AddChild(column);
-        column.AddChild(UiFactory.CreateLabel(Tr("UI_GARDEN_JOURNAL"), 7));
-
         _history = new RichTextLabel
         {
             BbcodeEnabled = false,

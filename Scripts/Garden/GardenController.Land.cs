@@ -88,6 +88,16 @@ public partial class GardenController
     private readonly Dictionary<string, LandVisual> _landVisuals = new(StringComparer.Ordinal);
     private readonly List<Node2D> _ghostCells = new();
 
+    /// <summary>
+    /// Trees live with the actors rather than in their hex, so a Voidling standing further back
+    /// than a trunk is drawn behind its leaves. Their trunks are the only solid thing on the island.
+    /// </summary>
+    private readonly List<Node2D> _treeProps = new();
+    private readonly List<Vector2> _treeTrunks = new();
+
+    /// <summary>Roughly the width of the drawn trunk: leaves are walk-through, wood is not.</summary>
+    private const float TrunkRadius = 9.0f;
+
     private Node2D _landRoot = null!;
     private Node2D? _coastRoot;
     private string _placingModuleId = "";
@@ -248,6 +258,14 @@ public partial class GardenController
             visual.Holder.QueueFree();
         _landVisuals.Clear();
 
+        foreach (var tree in _treeProps)
+        {
+            if (GodotObject.IsInstanceValid(tree))
+                tree.QueueFree();
+        }
+        _treeProps.Clear();
+        _treeTrunks.Clear();
+
         var occupied = placed.Select(module => (module.HexQ, module.HexR)).ToHashSet();
         BuildCoastline(placed, occupied);
         foreach (var module in placed)
@@ -282,7 +300,7 @@ public partial class GardenController
         var idleTint = trainingGround ? Colors.White.Lerp(identity, 0.30f) : Colors.White;
         var ground = new Node2D { Modulate = idleTint };
         ground.AddChild(CreateGroundFill(new Vector2(x, y)));
-        AddDecorations(ground, module, trainingGround);
+        AddDecorations(ground, module, trainingGround, new Vector2(x, y));
         holder.AddChild(ground);
 
         var highlight = CreateHexOutline(Colors.White, 3.0f);
@@ -427,7 +445,7 @@ public partial class GardenController
     /// Ground clutter from the premium pack, seeded by the hex coordinate so a hex looks the same
     /// every time the Garden opens. Training ground stays clear of trees: a Voidling lives there.
     /// </summary>
-    private static void AddDecorations(Node2D holder, GardenModuleData module, bool trainingGround)
+    private void AddDecorations(Node2D holder, GardenModuleData module, bool trainingGround, Vector2 hexCenter)
     {
         var rng = new RandomNumberGenerator
         {
@@ -452,15 +470,20 @@ public partial class GardenController
             return;
 
         // Plain ground gets a tree towards its back edge: it dresses the island without standing
-        // where a Voidling would be dropped.
-        holder.AddChild(new Sprite2D
+        // where a Voidling would be dropped. The sprite is offset so the node itself sits at the
+        // foot of the trunk, which is both what the y-sort compares and what blocks walking.
+        var trunk = hexCenter + new Vector2(
+            rng.RandfRange(-58.0f, 58.0f),
+            -Hex.Height * 0.22f + rng.RandfRange(-8.0f, 8.0f));
+        var tree = new Sprite2D
         {
             Texture = TreeTexture,
-            Position = new Vector2(
-                rng.RandfRange(-58.0f, 58.0f),
-                -Hex.Height * 0.22f + rng.RandfRange(-8.0f, 8.0f)),
-            ZIndex = 3
-        });
+            Offset = new Vector2(0.0f, -22.0f),
+            Position = trunk
+        };
+        _actorsRoot.AddChild(tree);
+        _treeProps.Add(tree);
+        _treeTrunks.Add(trunk);
     }
 
     /// <summary>A premium signboard names what the ground trains, and its level once upgraded.</summary>
@@ -505,13 +528,36 @@ public partial class GardenController
         return bounds;
     }
 
-    /// <summary>Keeps a wanderer on the island: an off-land spot falls back to the nearest hex.</summary>
+    /// <summary>
+    /// Keeps a wanderer on the island and out of the tree trunks: an off-land spot falls back to
+    /// the nearest hex, and a step into a trunk is pushed back out to its edge, which reads as
+    /// walking around the tree. Only the trunk is solid, so a Voidling can still stand in the leaves.
+    /// </summary>
     private Vector2 ClampToLand(Vector2 position)
     {
         var (q, r) = Hex.At(position.X, position.Y);
-        if (TrainingUseCase.IsHexOccupied(_session.State, q, r))
-            return position;
+        return TrainingUseCase.IsHexOccupied(_session.State, q, r)
+            ? PushOutOfTrunks(position)
+            : PushOutOfTrunks(NearestLandPoint(position));
+    }
 
+    private Vector2 PushOutOfTrunks(Vector2 position)
+    {
+        foreach (var trunk in _treeTrunks)
+        {
+            var delta = position - trunk;
+            var distance = delta.Length();
+            if (distance >= TrunkRadius)
+                continue;
+
+            position = trunk + (distance > 0.01f ? delta / distance : Vector2.Right) * TrunkRadius;
+        }
+
+        return position;
+    }
+
+    private Vector2 NearestLandPoint(Vector2 position)
+    {
         var nearest = position;
         var bestDistance = float.MaxValue;
         foreach (var module in _session.State.GardenModules)

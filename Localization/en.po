@@ -831,8 +831,8 @@ msgstr "Drop this Voidling onto a land tile in the Garden to train that stat."
 msgid "UI_GARDEN_HOME"
 msgstr "My garden"
 
-msgid "UI_GARDEN_JOURNAL"
-msgstr "Garden journal"
+msgid "UI_GARDEN_NAME_HINT"
+msgstr "Click to name your garden."
 
 msgid "UI_GARDEN_COMPANION"
 msgstr "YOUR COMPANION"

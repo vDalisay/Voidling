@@ -27,6 +27,9 @@ public sealed class GameStateMigrationService
 {
     public const int CurrentSaveVersion = 22;
 
+    /// <summary>Longest island name the header can show without truncating.</summary>
+    public const int GardenNameMaxLength = 22;
+
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
     private readonly CreatureNeedsService _needs = new();
@@ -83,6 +86,11 @@ public sealed class GameStateMigrationService
             // Tutorial was introduced later; do not interrupt established saves.
             state.TutorialCompleted = true;
         }
+
+        // A garden name is player-authored text: keep it as typed, only trimmed and bounded.
+        state.GardenName = (state.GardenName ?? string.Empty).Trim();
+        if (state.GardenName.Length > GardenNameMaxLength)
+            state.GardenName = state.GardenName[..GardenNameMaxLength];
 
         state.MasterVolume = NormalizeVolume(state.MasterVolume);
         state.SoundEffectVolume = NormalizeVolume(state.SoundEffectVolume);
