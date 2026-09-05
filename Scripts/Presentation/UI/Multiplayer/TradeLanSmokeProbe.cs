@@ -239,7 +239,7 @@ public partial class TradeLanSmokeProbe : Node
         return true;
     }
 
-    private void Succeed()
+    private async void Succeed()
     {
         if (_complete)
             return;
@@ -253,6 +253,26 @@ public partial class TradeLanSmokeProbe : Node
         GD.Print(
             $"[trade-lan-smoke] LAN_TRADE_SMOKE_SUCCESS negotiation={_negotiationId} " +
             $"outgoing={_localAssetId} incoming={_remoteAssetId}");
+
+        // Shut down ENet through the same presentation/application leave path the player uses before
+        // asking Godot to terminate. Quitting directly while the native peer is still alive can race
+        // Mono/native teardown and produce a SIGSEGV after the success marker on headless Linux.
+        try
+        {
+            var connectedZone = GetNodeOrNull<ConnectedZonePresentationBridge>(
+                "/root/GameBootstrap/ConnectedZonePresentationBridge");
+            if (connectedZone != null)
+                await connectedZone.LeaveAsync();
+
+            // Give deferred disconnect callbacks and native peer disposal one frame to settle.
+            if (IsInsideTree())
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+        catch (Exception exception)
+        {
+            GD.PushWarning($"LAN trade smoke cleanup before exit failed: {exception.Message}");
+        }
+
         GetTree().Quit(0);
     }
 
