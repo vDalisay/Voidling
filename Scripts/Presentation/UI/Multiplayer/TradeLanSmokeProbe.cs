@@ -259,7 +259,7 @@ public partial class TradeLanSmokeProbe : Node
         // this point on Linux. Exit the probe process directly so that native engine teardown cannot
         // turn a completed integration test into a false negative. Normal gameplay still uses the
         // regular connected-zone LeaveAsync path and is unaffected by this test-only exit.
-        Environment.Exit(0);
+        System.Environment.Exit(0);
     }
 
     private void PrintState(TradeLobbyViewState state)
