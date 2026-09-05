@@ -19,6 +19,8 @@ Items under **Product decisions required before implementation** are deliberate 
 - [x] Extend stat-driven ambient Garden behavior with confirmed Run/Stamina behavior and Swim shoreline affinity. Merged in PR #29.
 - [x] Add Cup/championship scaffolding: stable Cup IDs, stable NPC casts, progression/unlock hooks and authorable content. Merged in PR #31 with full CI green.
 - [ ] Continue production Voidling art ingestion through the centralized visual pipeline as new authored art revisions arrive.
+  - [x] Latest authored Normal-body outline palette revision is integrated on `main` (`9f971202` / merge `71b4c3a3`) and keeps the centralized palette/resource path intact.
+  - [ ] Ingest the next authored body/wing/crown/form revision when artwork is supplied; do not synthesize new production art or fork the visual pipeline.
 
 ## Product decisions required before implementation
 
@@ -30,4 +32,4 @@ Items under **Product decisions required before implementation** are deliberate 
 
 ## Current stopping point
 
-All currently confirmed implementation-ready systems are now implemented and merged. The only open implementation-ready item is ongoing production-art ingestion, which requires new authored art revisions. The remaining gameplay/system items are explicit product-decision stop conditions and should not be implemented by inventing rules.
+All currently confirmed implementation-ready gameplay/system work is implemented and merged. Production-art ingestion remains an ongoing pipeline task rather than a missing gameplay system: the latest authored outline revision is already integrated, and the next implementation step requires new authored art. The remaining gameplay/system items are explicit product-decision stop conditions and should not be implemented by inventing rules.
