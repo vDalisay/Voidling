@@ -22,8 +22,9 @@ public partial class MainController
         _uiRoot.AddChild(_quickMenu);
 
         _placementHint = UiFactory.CreateLabel(Tr("UI_GARDEN_PLACE_EGG_HINT"), 8);
-        _placementHint.Position = new Vector2(110, 62);
-        _placementHint.Size = new Vector2(340, 16);
+        _placementHint.Position = new Vector2(210, 66);
+        _placementHint.Size = new Vector2(248, 28);
+        _placementHint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _placementHint.AddThemeColorOverride("font_color", Color.FromHtml("#F9F4D8"));
         _placementHint.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
         _placementHint.AddThemeConstantOverride("outline_size", 2);

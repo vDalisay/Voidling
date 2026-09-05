@@ -89,3 +89,12 @@ godot --headless --path . -- --voidling-garden-ui-smoke --voidling-dev-profile=u
 ```
 
 Add `--voidling-garden-ui-shots` with a graphical renderer to capture the review states. Local verification logs are in `.godot/ui-checks/`; screenshot-probe logs also live in `.godot/`.
+
+### Garden feedback refinement
+
+- Added a premium weather-sheet sun/moon display below My garden, following the same local clock as Garden lighting (dawn, day, dusk, night).
+- Removed the floating notification line. Toast-only notices now reach the Garden log, while matching toast/event notifications within one deferred batch produce one entry.
+- Added a 0.22-second sliding rail toggle. The expand arrow stays on the left when hidden; hidden navigation leaves keyboard traversal, and repeated clicks can reverse the slide.
+- Extended the Garden smoke check with clock boundaries, collapse/expand and interrupted animation, keyboard access, and notification deduplication. All 236 tests and the CI-equivalent local checks passed; graphical review passed at 1280×720.
+
+Review captures: [expanded](ui-overhaul/garden-refined.png), [collapsed](ui-overhaul/garden-collapsed.png). Garden remains the active playtest gate before Shop implementation.

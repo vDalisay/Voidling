@@ -26,8 +26,12 @@ public partial class MainController : Node
     private GardenInspector? _detailsPanel;
     private GardenEventLog _gardenEventLog = null!;
     private LineEdit _gardenNameField = null!;
-    private Label _toastLabel = null!;
-    private float _toastSeconds;
+    private readonly List<string> _pendingGardenMessages = new();
+    private GardenDayNightDial _dayNightDial = null!;
+    private PanelContainer _gardenRail = null!;
+    private Button _railToggle = null!;
+    private bool _railCollapsed;
+    private Tween? _railTween;
     private string _selectedId = "";
     private RaceScreen? _race;
     private Action? _modalBack;
@@ -54,7 +58,6 @@ public partial class MainController : Node
         _uiLayer.AddChild(_uiRoot);
 
         BuildTopBar();
-        BuildToast();
         BuildGardenEventLog();
         BuildSaveFeedbackIndicator();
 
@@ -87,18 +90,10 @@ public partial class MainController : Node
             _connectedZoneBridge.StateChanged -= OnConnectedZoneStateChanged;
 
         DetachSaveFeedbackIndicator();
+        if (GodotObject.IsInstanceValid(_garden))
+            _garden.EnvironmentTimeChanged -= _dayNightDial.ShowTime;
         DetachMultiplayerRacePresentation();
         DetachTradePresentation();
-    }
-
-    public override void _Process(double delta)
-    {
-        if (_toastSeconds <= 0.0f)
-            return;
-
-        _toastSeconds -= (float)delta;
-        if (_toastSeconds <= 0.0f)
-            _toastLabel.Visible = false;
     }
 
     public override void _Input(InputEvent inputEvent)
@@ -153,6 +148,11 @@ public partial class MainController : Node
         _coinsLabel.VerticalAlignment = VerticalAlignment.Center;
         column.AddChild(_coinsLabel);
 
+        _dayNightDial = new GardenDayNightDial { Position = new Vector2(110, 66) };
+        _uiRoot.AddChild(_dayNightDial);
+        _dayNightDial.ShowTime(_garden.EnvironmentLocalTime);
+        _garden.EnvironmentTimeChanged += _dayNightDial.ShowTime;
+
         var utilities = new HBoxContainer { Name = "GardenUtilities", Position = new Vector2(514, 14) };
         utilities.AddThemeConstantOverride("separation", 6);
         _uiRoot.AddChild(utilities);
@@ -168,6 +168,7 @@ public partial class MainController : Node
         _uiRoot.AddChild(camera);
 
         var dock = UiFactory.CreatePanel(new Vector2(96, ScreenHeight), wood: true);
+        _gardenRail = dock;
         dock.Name = "GardenRail";
         dock.Position = Vector2.Zero;
         dock.Size = new Vector2(96, ScreenHeight);
@@ -199,6 +200,31 @@ public partial class MainController : Node
             actions.AddChild(button);
             if (destination.name == "Voidlings") _rosterButton = button;
         }
+        _railToggle = UiFactory.CreateButton("‹");
+        _railToggle.Name = "GardenRailToggle";
+        _railToggle.Position = new Vector2(66, 12);
+        _railToggle.CustomMinimumSize = new Vector2(24, 24);
+        _railToggle.TooltipText = Tr("UI_GARDEN_HIDE_RAIL");
+        _railToggle.Pressed += ToggleGardenRail;
+        _uiRoot.AddChild(_railToggle);
+    }
+
+    private void ToggleGardenRail()
+    {
+        _railCollapsed = !_railCollapsed;
+        _railTween?.Kill();
+        _quickMenu.Close();
+        _gardenRail.Visible = true;
+        foreach (var node in _gardenRail.FindChildren("*", "Button", true, false))
+            ((Button)node).FocusMode = _railCollapsed ? Control.FocusModeEnum.None : Control.FocusModeEnum.All;
+        _railToggle.Text = _railCollapsed ? "›" : "‹";
+        _railToggle.TooltipText = Tr(_railCollapsed ? "UI_GARDEN_SHOW_RAIL" : "UI_GARDEN_HIDE_RAIL");
+        _railToggle.GrabFocus();
+        _railTween = CreateTween().SetParallel().SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+        _railTween.TweenProperty(_gardenRail, "position:x", _railCollapsed ? -96f : 0f, 0.22);
+        _railTween.TweenProperty(_railToggle, "position:x", _railCollapsed ? 8f : 66f, 0.22);
+        _railTween.TweenProperty(_saveStatusLabel, "position:x", _railCollapsed ? -84f : 12f, 0.22);
+        _railTween.Finished += () => _gardenRail.Visible = !_railCollapsed;
     }
 
     /// <summary>
@@ -242,20 +268,6 @@ public partial class MainController : Node
         UiFactory.ApplyPixelFont(button, 7);
         button.Pressed += action;
         row.AddChild(button);
-    }
-
-    private void BuildToast()
-    {
-        _toastLabel = UiFactory.CreateLabel("", 9);
-        _toastLabel.Position = new Vector2(110, 232);
-        _toastLabel.Size = new Vector2(300, 28);
-        _toastLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        _toastLabel.AddThemeColorOverride("font_color", Color.FromHtml("#F9F4D8"));
-        _toastLabel.AddThemeColorOverride("font_shadow_color", Color.FromHtml("#465247"));
-        _toastLabel.AddThemeConstantOverride("shadow_offset_x", 1);
-        _toastLabel.AddThemeConstantOverride("shadow_offset_y", 1);
-        _toastLabel.Visible = false;
-        _uiRoot.AddChild(_toastLabel);
     }
 
     private void BuildGardenEventLog()
@@ -437,14 +449,19 @@ public partial class MainController : Node
     }
 
     private void ShowToast(string text)
-    {
-        _toastLabel.Text = text;
-        _toastLabel.Visible = true;
-        _toastSeconds = 3.0f;
-    }
+        => AppendGardenEvent(text);
 
     private void AppendGardenEvent(string text)
-        => _gardenEventLog.Append(text);
+    {
+        if (string.IsNullOrWhiteSpace(text) || _pendingGardenMessages.Contains(text)) return;
+        _pendingGardenMessages.Add(text);
+        if (_pendingGardenMessages.Count != 1) return;
+        Callable.From(() =>
+        {
+            foreach (var message in _pendingGardenMessages) _gardenEventLog.Append(message);
+            _pendingGardenMessages.Clear();
+        }).CallDeferred();
+    }
 
     private static void StyleOption(OptionButton option)
     {

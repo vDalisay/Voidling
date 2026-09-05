@@ -56,8 +56,6 @@ public partial class MainController
 
         var message = Tr(key);
         ShowToast(message);
-        if (GodotObject.IsInstanceValid(_gardenEventLog))
-            _gardenEventLog.Append(message);
     }
 
     private void HideSaveFeedback()

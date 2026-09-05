@@ -935,3 +935,23 @@ msgstr "Use the left rail to visit the Shop for treats, eggs and land. Activitie
 
 msgid "UI_TUTORIAL_GARDEN_BUILD"
 msgstr "Build groups your land and decorations. Open a land tile to manage its training, or place stored land from Inventory."
+msgid "UI_GARDEN_DAY"
+msgstr "Day"
+
+msgid "UI_GARDEN_NIGHT"
+msgstr "Night"
+
+msgid "UI_GARDEN_DAWN"
+msgstr "Dawn"
+
+msgid "UI_GARDEN_DUSK"
+msgstr "Dusk"
+
+msgid "UI_GARDEN_TIME_HINT"
+msgstr "{0} · follows your local time"
+
+msgid "UI_GARDEN_HIDE_RAIL"
+msgstr "Hide navigation"
+
+msgid "UI_GARDEN_SHOW_RAIL"
+msgstr "Show navigation"

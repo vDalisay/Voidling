@@ -32,6 +32,43 @@ public partial class MainController
             RequireSeparate(rail, _gardenEventLog);
             await CaptureGardenUi("garden");
 
+            RequireOnScreen(_dayNightDial);
+            RequireSeparate(_dayNightDial, _uiRoot.GetNode<Control>("GardenStatus"));
+            foreach (var (hour, key) in new[] { (0, "NIGHT"), (5, "DAWN"), (9, "DAY"), (18, "DUSK"), (22, "NIGHT") })
+            {
+                _dayNightDial.ShowTime(DateTime.Today.AddHours(hour));
+                if (_dayNightDial.FindChildren("*", "Label", true, false).OfType<Label>().Single().Text != Tr("UI_GARDEN_" + key))
+                    throw new InvalidOperationException("Garden clock shows the wrong period.");
+                await CaptureGardenUi("garden-" + key.ToLowerInvariant());
+            }
+            _dayNightDial.ShowTime(_garden.EnvironmentLocalTime);
+            await ClickGardenControl(_railToggle);
+            await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+            RequireOnScreen(_railToggle);
+            if (rail.Visible || !_railToggle.HasFocus() || actions.GetChildren().OfType<Button>().Any(b => b.FocusMode != Control.FocusModeEnum.None))
+                throw new InvalidOperationException("Collapsed navigation is still visible or keyboard focus is lost.");
+            await CaptureGardenUi("garden-collapsed");
+            await ClickGardenControl(_railToggle);
+            ToggleGardenRail();
+            ToggleGardenRail();
+            await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+            RequireOnScreen(rail);
+            if (!rail.Visible || actions.GetChildren().OfType<Button>().Any(b => b.FocusMode != Control.FocusModeEnum.All))
+                throw new InvalidOperationException("Navigation did not recover from interrupted animation.");
+
+            var history = _gardenEventLog.FindChildren("*", "RichTextLabel", true, false).OfType<RichTextLabel>().Single();
+            const string notification = "Garden notification probe";
+            ShowToast(notification);
+            AppendGardenEvent(notification);
+            await SettleGardenUi();
+            if (history.GetParsedText().Split(notification).Length != 2)
+                throw new InvalidOperationException("Garden notification was duplicated.");
+            AppendGardenEvent(notification);
+            ShowToast(notification);
+            await SettleGardenUi();
+            if (history.GetParsedText().Split(notification).Length != 3)
+                throw new InvalidOperationException("A later notification was incorrectly suppressed.");
+
             await ClickGardenControl(_rosterButton);
             await SettleGardenUi();
             if (!_quickMenu.IsOpen) throw new InvalidOperationException("Roster did not open.");
