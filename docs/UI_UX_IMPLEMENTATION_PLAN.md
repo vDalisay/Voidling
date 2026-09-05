@@ -95,7 +95,7 @@ Add `--voidling-garden-ui-shots` with a graphical renderer to capture the review
 - Added a premium weather-sheet sun/moon display below My garden, following the same local clock as Garden lighting (dawn, day, dusk, night).
 - Removed the floating notification line. Toast-only notices now reach the Garden log, while matching toast/event notifications within one deferred batch produce one entry.
 - Added a 0.22-second sliding rail toggle centered on the rail edge. When the rail closes, the Garden name/sprouts, day/night dial, and Garden log stay visible and slide left into the freed space; the centered expand arrow remains on the left edge. Hidden navigation leaves keyboard traversal, and repeated clicks can reverse the slide.
-- Removed the redundant “Garden log” heading, reduced the log panel artwork to 50% opacity, and added a keyboard-accessible top-left toggle that animates between the full history and a one-line view.
+- Removed the redundant “Garden log” heading, reduced the log panel artwork to 50% opacity, and added a keyboard-accessible top-left toggle that animates between the full history and a one-line view while keeping the panel against the bottom edge.
 - Extended the Garden smoke check with clock boundaries, collapse/expand and interrupted animation, keyboard access, and notification deduplication. All 236 tests and the CI-equivalent local checks passed; graphical review passed at 1280×720.
 
 Review captures: [expanded](ui-overhaul/garden-refined.png), [collapsed navigation](ui-overhaul/garden-collapsed.png), [one-line log](ui-overhaul/garden-log-compact.png). Garden remains the active playtest gate before Shop implementation.

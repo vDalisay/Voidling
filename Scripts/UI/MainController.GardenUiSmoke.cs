@@ -79,16 +79,19 @@ public partial class MainController
                 throw new InvalidOperationException("A later notification was incorrectly suppressed.");
 
             var logToggle = FindGardenButton(_gardenEventLog, "ToggleHeight");
+            var logBottom = _gardenEventLog.Position.Y + _gardenEventLog.Size.Y;
             await ClickGardenControl(logToggle);
             await ToSignal(GetTree().CreateTimer(0.25), SceneTreeTimer.SignalName.Timeout);
             if (!_gardenEventLog.IsCompact || Mathf.Abs(_gardenEventLog.Size.Y - 45) > 1 || history.Size.Y > 25 ||
                 !history.GetParsedText().Contains(notification, StringComparison.Ordinal) ||
-                history.GetParsedText().Trim().Contains('\n') || !logToggle.HasFocus())
+                history.GetParsedText().Trim().Contains('\n') ||
+                Mathf.Abs(_gardenEventLog.Position.Y + _gardenEventLog.Size.Y - logBottom) > 1 || !logToggle.HasFocus())
                 throw new InvalidOperationException("Garden log did not collapse to one readable line.");
             await CaptureGardenUi("garden-log-compact");
             await ClickGardenControl(logToggle);
             await ToSignal(GetTree().CreateTimer(0.25), SceneTreeTimer.SignalName.Timeout);
-            if (_gardenEventLog.IsCompact || Mathf.Abs(_gardenEventLog.Size.Y - 80) > 1)
+            if (_gardenEventLog.IsCompact || Mathf.Abs(_gardenEventLog.Size.Y - 80) > 1 ||
+                Mathf.Abs(_gardenEventLog.Position.Y + _gardenEventLog.Size.Y - logBottom) > 1)
                 throw new InvalidOperationException("Garden log did not expand again.");
 
             await ClickGardenControl(_rosterButton);

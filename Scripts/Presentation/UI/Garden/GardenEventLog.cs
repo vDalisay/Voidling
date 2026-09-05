@@ -22,11 +22,13 @@ public partial class GardenEventLog : Control
     private RichTextLabel _history = null!;
     private Button _heightToggle = null!;
     private Tween? _heightTween;
+    private float _bottom;
     private int _nextActionId;
     public bool IsCompact { get; private set; }
 
     public override void _Ready()
     {
+        _bottom = Position.Y + Size.Y;
         MouseFilter = MouseFilterEnum.Pass;
 
         var panel = UiFactory.CreatePanel(Vector2.Zero);
@@ -88,8 +90,10 @@ public partial class GardenEventLog : Control
         _history.ScrollActive = !IsCompact;
         RefreshText();
         _heightTween?.Kill();
-        _heightTween = CreateTween().SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
-        _heightTween.TweenProperty(this, "size:y", IsCompact ? CompactHeight : ExpandedHeight, 0.18);
+        var height = IsCompact ? CompactHeight : ExpandedHeight;
+        _heightTween = CreateTween().SetParallel().SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+        _heightTween.TweenProperty(this, "position:y", _bottom - height, 0.18);
+        _heightTween.TweenProperty(this, "size:y", height, 0.18);
     }
 
     public void Append(string message)
