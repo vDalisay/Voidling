@@ -22,5 +22,10 @@ public partial class MainController
         screen.EdgePanningChanged += _session.SetEdgePanning;
         screen.AutoFinishRacesChanged += _session.SetAutoFinishRaces;
         box.AddChild(screen);
+        var reset = UiFactory.CreateButton(Tr("UI_TOP_RESET"));
+        reset.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd;
+        reset.AddThemeColorOverride("font_color", Color.FromHtml("#914E42"));
+        reset.Pressed += ShowResetConfirm;
+        box.AddChild(reset);
     }
 }

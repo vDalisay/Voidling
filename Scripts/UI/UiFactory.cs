@@ -7,19 +7,21 @@ namespace VoidlingGame;
 
 public static class UiFactory
 {
-    public const string UiRoot = "res://Assets/Sprout Lands - UI Pack - Basic pack/Sprite sheets/";
-
-    private static readonly Texture2D PanelTexture =
-        GD.Load<Texture2D>(UiRoot + "Dialouge UI/dialog box big.png");
+    public const string UiRoot = "res://Assets/Sprout Lands - UI Pack - Premium pack/UI Sprites/";
 
     private static readonly Texture2D ButtonTexture =
-        GD.Load<Texture2D>(UiRoot + "buttons/Small Square Buttons.png");
+        GD.Load<Texture2D>(UiRoot + "buttons/square/Small Square Buttons.png");
 
     private static readonly Texture2D IconTexture =
-        GD.Load<Texture2D>(UiRoot + "Icons/All Icons.png");
+        GD.Load<Texture2D>("res://Assets/Sprout Lands - UI Pack - Basic pack/Sprite sheets/Icons/All Icons.png");
 
-    private static readonly Font PixelFont = GD.Load<Font>(
-        "res://Assets/Sprout Lands - UI Pack - Basic pack/fonts/pixelFont-7-8x14-sproutLands.ttf");
+    private static readonly Texture2D PremiumIcons = GD.Load<Texture2D>(UiRoot + "Icons/All Icons.png");
+
+    private static readonly Font InterfaceFont = new SystemFont
+    {
+        FontNames = new[] { "Segoe UI", "Noto Sans", "DejaVu Sans" },
+        FontWeight = 500
+    };
 
     public static PanelContainer CreatePanel(Vector2 minimumSize)
     {
@@ -35,7 +37,7 @@ public static class UiFactory
         {
             Text = useEyeIcon ? "" : text,
             CustomMinimumSize = new Vector2(72, 24),
-            FocusMode = Control.FocusModeEnum.None
+            FocusMode = Control.FocusModeEnum.All
         };
 
         ApplyButtonChrome(button);
@@ -59,18 +61,25 @@ public static class UiFactory
 
     public static void ApplyButtonChrome(Button button)
     {
-        button.AddThemeStyleboxOverride("normal", CreateButtonStyle(new Rect2(0, 0, 16, 16), Colors.White));
-        button.AddThemeStyleboxOverride("hover", CreateButtonStyle(new Rect2(0, 0, 16, 16), Color.FromHtml("#FFF6C9")));
-        button.AddThemeStyleboxOverride("pressed", CreateButtonStyle(new Rect2(16, 0, 16, 16), Colors.White));
-        button.AddThemeStyleboxOverride("hover_pressed", CreateButtonStyle(new Rect2(16, 0, 16, 16), Color.FromHtml("#FFF2B4")));
-        button.AddThemeStyleboxOverride("disabled", CreateButtonStyle(new Rect2(0, 0, 16, 16), new Color(0.72f, 0.74f, 0.68f, 0.78f)));
-        button.AddThemeStyleboxOverride("focus", CreateButtonStyle(new Rect2(0, 0, 16, 16), Color.FromHtml("#FFF6C9")));
+        button.AddThemeStyleboxOverride("normal", CreateButtonStyle(new Rect2(0, 32, 16, 16), Colors.White));
+        button.AddThemeStyleboxOverride("hover", CreateButtonStyle(new Rect2(0, 0, 16, 16), Colors.White));
+        button.AddThemeStyleboxOverride("pressed", CreateButtonStyle(new Rect2(16, 32, 16, 16), Colors.White));
+        button.AddThemeStyleboxOverride("hover_pressed", CreateButtonStyle(new Rect2(16, 0, 16, 16), Colors.White));
+        button.AddThemeStyleboxOverride("disabled", CreateButtonStyle(new Rect2(16, 32, 16, 16), new Color(0.88f, 0.88f, 0.84f, 0.65f)));
+        button.AddThemeStyleboxOverride("focus", new StyleBoxFlat
+        {
+            DrawCenter = false, BorderColor = Color.FromHtml("#426653"),
+            BorderWidthLeft = 2, BorderWidthRight = 2, BorderWidthTop = 2, BorderWidthBottom = 2,
+            CornerRadiusTopLeft = 4, CornerRadiusTopRight = 4,
+            CornerRadiusBottomLeft = 4, CornerRadiusBottomRight = 4
+        });
 
         button.AddThemeColorOverride("font_color", Color.FromHtml("#4F5948"));
         button.AddThemeColorOverride("font_hover_color", Color.FromHtml("#2F4437"));
         button.AddThemeColorOverride("font_pressed_color", Color.FromHtml("#2F4437"));
         button.AddThemeColorOverride("font_hover_pressed_color", Color.FromHtml("#2F4437"));
-        button.AddThemeColorOverride("font_disabled_color", Color.FromHtml("#8A927B"));
+        button.AddThemeColorOverride("font_disabled_color", Color.FromHtml("#756E60"));
+        button.AddThemeColorOverride("font_focus_color", Color.FromHtml("#2F4437"));
     }
 
     public static Label CreateLabel(string text, int size = 10)
@@ -245,6 +254,13 @@ public static class UiFactory
         };
     }
 
+    // Premium sheet: 16 columns, four colour variants per glyph. Keep legacy icon indices intact.
+    public static AtlasTexture CreateGardenIcon(int column, int row) => new()
+    {
+        Atlas = PremiumIcons,
+        Region = new Rect2(column * 16, row * 16, 16, 16)
+    };
+
     public static MarginContainer Pad(Control child, int margin = 10)
     {
         var container = new MarginContainer();
@@ -258,12 +274,17 @@ public static class UiFactory
 
     public static void ApplyPixelFont(Control control, int size)
     {
-        control.AddThemeFontOverride("font", PixelFont);
-        control.AddThemeFontSizeOverride("font_size", size);
+        // Keep the existing call sites and size hierarchy; use readable mixed-case UI type.
+        control.AddThemeFontOverride("font", InterfaceFont);
+        control.AddThemeFontSizeOverride("font_size", Math.Max(8, size));
+        if (control is RichTextLabel)
+        {
+            control.AddThemeFontOverride("normal_font", InterfaceFont);
+            control.AddThemeFontSizeOverride("normal_font_size", Math.Max(8, size));
+        }
     }
 
-    // The pixel font ships a single weight, so emphasis is a same-colour outline that thickens the
-    // glyphs instead of a second font file.
+    // Emphasize labels without introducing another font asset.
     public static void SetLabelBold(Label label, bool bold)
     {
         label.AddThemeConstantOverride("outline_size", bold ? 2 : 0);
@@ -285,16 +306,45 @@ public static class UiFactory
 
     private static StyleBoxTexture CreatePanelStyle()
     {
-        var style = new StyleBoxTexture { Texture = PanelTexture };
-        style.TextureMarginLeft = 8;
-        style.TextureMarginRight = 8;
-        style.TextureMarginTop = 8;
-        style.TextureMarginBottom = 8;
+        var style = new StyleBoxTexture
+        {
+            Texture = new AtlasTexture { Atlas = ButtonTexture, Region = new Rect2(0, 0, 16, 16) }
+        };
+        style.TextureMarginLeft = 7;
+        style.TextureMarginRight = 7;
+        style.TextureMarginTop = 7;
+        style.TextureMarginBottom = 7;
         style.ContentMarginLeft = 12;
         style.ContentMarginRight = 12;
         style.ContentMarginTop = 11;
         style.ContentMarginBottom = 11;
         return style;
+    }
+
+    public static void StyleScroll(ScrollContainer scroll)
+    {
+        var scrollbar = scroll.GetVScrollBar();
+        scrollbar.CustomMinimumSize = new Vector2(5, 0);
+        scrollbar.AddThemeStyleboxOverride("scroll", new StyleBoxEmpty());
+        scrollbar.AddThemeStyleboxOverride("scroll_focus", new StyleBoxEmpty());
+        var thumb = new StyleBoxFlat
+        {
+            BgColor = Color.FromHtml("#91A08A"),
+            ContentMarginLeft = 2, ContentMarginRight = 2, ContentMarginTop = 8, ContentMarginBottom = 8,
+            CornerRadiusTopLeft = 2, CornerRadiusTopRight = 2,
+            CornerRadiusBottomLeft = 2, CornerRadiusBottomRight = 2
+        };
+        scrollbar.AddThemeStyleboxOverride("grabber", thumb);
+        scrollbar.AddThemeStyleboxOverride("grabber_highlight", thumb);
+        scrollbar.AddThemeStyleboxOverride("grabber_pressed", thumb);
+    }
+
+    public static void StyleInput(LineEdit input)
+    {
+        input.AddThemeStyleboxOverride("normal", CreateButtonStyle(new Rect2(16, 0, 16, 16), Colors.White));
+        input.AddThemeColorOverride("font_color", Color.FromHtml("#2F4437"));
+        input.AddThemeColorOverride("font_placeholder_color", Color.FromHtml("#53634E"));
+        input.AddThemeColorOverride("caret_color", Color.FromHtml("#2F4437"));
     }
 
     private static StyleBoxTexture CreateButtonStyle(Rect2 region, Color modulate)
@@ -305,10 +355,10 @@ public static class UiFactory
             Texture = atlas,
             ModulateColor = modulate
         };
-        style.TextureMarginLeft = 4;
-        style.TextureMarginRight = 4;
-        style.TextureMarginTop = 4;
-        style.TextureMarginBottom = 4;
+        style.TextureMarginLeft = 7;
+        style.TextureMarginRight = 7;
+        style.TextureMarginTop = 7;
+        style.TextureMarginBottom = 7;
         style.ContentMarginLeft = 7;
         style.ContentMarginRight = 7;
         style.ContentMarginTop = 3;

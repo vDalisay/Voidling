@@ -108,6 +108,16 @@ jobs:
             exit 1
           fi
 
+      - name: Garden UI interaction and layout smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 20s godot --headless --path . -- --voidling-garden-ui-smoke --voidling-dev-profile=ci_garden_ui 2>&1 | tee garden-ui-smoke.log
+          grep -q 'GARDEN_UI_SMOKE_SUCCESS' garden-ui-smoke.log
+          if grep -E '^(ERROR|SCRIPT ERROR):' garden-ui-smoke.log; then
+            exit 1
+          fi
+
       # Every cataloged Voidling body family must resolve world/race/portrait output through the
       # production factory, so an art change cannot silently break a creature surface.
       - name: Voidling visual smoke test

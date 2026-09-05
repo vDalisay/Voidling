@@ -17,6 +17,7 @@ public sealed class GameStateData
 {
     private Dictionary<string, int> _utilityItems = new(StringComparer.Ordinal);
     private string _shopRareOfferItemId = string.Empty;
+    private List<GardenDecorationData> _gardenDecorations = new();
 
     public int SaveVersion { get; set; } = 20;
     public int Coins { get; set; } = 120;
@@ -44,6 +45,16 @@ public sealed class GameStateData
     }
 
     public List<GardenModuleData> GardenModules { get; set; } = new();
+
+    /// <summary>
+    /// Cosmetic Garden objects are persisted independently from functional training modules.
+    /// The non-null setter keeps older save files backward compatible without a migration-only default.
+    /// </summary>
+    public List<GardenDecorationData> GardenDecorations
+    {
+        get => _gardenDecorations;
+        set => _gardenDecorations = value ?? new List<GardenDecorationData>();
+    }
 
     // Multiplayer transaction durability. These remain harmless empty collections for players who
     // never use multiplayer and do not make Steam/network access part of save loading.

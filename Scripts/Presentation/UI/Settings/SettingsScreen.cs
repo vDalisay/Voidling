@@ -59,6 +59,12 @@ public partial class SettingsScreen : VBoxContainer
         volumeLabel.CustomMinimumSize = new Vector2(82, 22);
         row.AddChild(volumeLabel);
         var volume = new HSlider { MinValue = 0, MaxValue = 100, Step = 5, Value = currentValue * 100.0f, CustomMinimumSize = new Vector2(210, 22), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        var thumb = GD.Load<Texture2D>(UiFactory.UiRoot + "Other UI sprites/Sliders/slider_b_1.png");
+        volume.AddThemeIconOverride("grabber", thumb);
+        volume.AddThemeIconOverride("grabber_highlight", thumb);
+        var rail = new StyleBoxFlat { BgColor = Color.FromHtml("#B5BEA9"), ContentMarginTop = 2, ContentMarginBottom = 2 };
+        volume.AddThemeStyleboxOverride("slider", rail);
+        volume.AddThemeStyleboxOverride("grabber_area", new StyleBoxFlat { BgColor = Color.FromHtml("#708969"), ContentMarginTop = 2, ContentMarginBottom = 2 });
         volume.ValueChanged += value => { var normalized = (float)value / 100.0f; volumeLabel.Text = FormatVolume((float)value); changed(normalized); };
         row.AddChild(volume);
         return row;

@@ -7,12 +7,11 @@ using VoidlingGame;
 namespace Voidling.Presentation.UI.Garden;
 
 /// <summary>
-/// Session-only garden history presented like an MMO chat log: transparent over the world,
-/// compact timestamped lines, auto-following new activity, and still manually scrollable.
+/// Session-only garden journal with timestamped, scrollable activity and actionable invitations.
 /// </summary>
 public partial class GardenEventLog : Control
 {
-    private const int MaxEntries = 80;
+    private const int MaxEntries = 300;
 
     private sealed record Entry(string Id, string Text, Action? Action);
 
@@ -24,6 +23,19 @@ public partial class GardenEventLog : Control
     {
         MouseFilter = MouseFilterEnum.Pass;
 
+        var panel = UiFactory.CreatePanel(Vector2.Zero);
+        var background = (StyleBoxTexture)panel.GetThemeStylebox("panel").Duplicate();
+        background.ModulateColor = new Color(1, 1, 1, 0.45f);
+        background.ContentMarginTop = background.ContentMarginBottom = 6;
+        background.ContentMarginLeft = background.ContentMarginRight = 9;
+        panel.AddThemeStyleboxOverride("panel", background);
+        panel.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        AddChild(panel);
+        var column = new VBoxContainer();
+        column.AddThemeConstantOverride("separation", 3);
+        panel.AddChild(column);
+        column.AddChild(UiFactory.CreateLabel(Tr("UI_GARDEN_JOURNAL"), 7));
+
         _history = new RichTextLabel
         {
             BbcodeEnabled = false,
@@ -31,26 +43,17 @@ public partial class GardenEventLog : Control
             ScrollActive = true,
             ScrollFollowing = true,
             SelectionEnabled = true,
-            Position = Vector2.Zero,
-            Size = Size,
-            CustomMinimumSize = CustomMinimumSize,
+            CustomMinimumSize = new Vector2(0, 24),
+            SizeFlagsVertical = SizeFlags.ExpandFill,
             MouseFilter = MouseFilterEnum.Stop
         };
         _history.MetaClicked += HandleMetaClicked;
-        _history.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         UiFactory.ApplyPixelFont(_history, 6);
 
-        // MMO-chat style: no window chrome/background. Keep a small outline/shadow so text stays
-        // readable over water, grass and decorations without putting a beige panel behind it.
         _history.AddThemeStyleboxOverride("normal", new StyleBoxEmpty());
         _history.AddThemeColorOverride("default_color", Color.FromHtml("#31473C"));
-        _history.AddThemeColorOverride("font_outline_color", new Color(0.92f, 0.96f, 0.86f, 0.82f));
-        _history.AddThemeColorOverride("font_shadow_color", new Color(0.08f, 0.14f, 0.11f, 0.32f));
-        _history.AddThemeConstantOverride("outline_size", 1);
-        _history.AddThemeConstantOverride("shadow_offset_x", 1);
-        _history.AddThemeConstantOverride("shadow_offset_y", 1);
-        _history.AddThemeConstantOverride("line_separation", 1);
-        AddChild(_history);
+        _history.AddThemeConstantOverride("line_separation", 3);
+        column.AddChild(_history);
 
         CallDeferred(MethodName.StyleScrollbar);
         RefreshText();

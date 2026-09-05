@@ -38,6 +38,7 @@ public partial class InventoryScreen : VBoxContainer
         if (_state == null) throw new InvalidOperationException("InventoryScreen must be configured before AddChild.");
         AddThemeConstantOverride("separation", 7); SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; AddChild(UiFactory.CreateLabel(Tr("UI_INVENTORY_SUBTITLE"), 9));
         var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(340, 198), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ExpandFill }; AddChild(scroll);
+        UiFactory.StyleScroll(scroll);
         var list = new VBoxContainer(); list.AddThemeConstantOverride("separation", 5); scroll.AddChild(list);
         foreach (var item in _state.Items) list.AddChild(CreateInventoryRow(CreateItemIcon(item), item.DisplayName, item.Count));
         if (_state.StoredEggs.Count > 0)

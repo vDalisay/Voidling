@@ -57,6 +57,7 @@ public partial class GardenVoidlingQuickMenu : Control
             ClearButtonEnabled = true
         };
         UiFactory.ApplyPixelFont(_search, 7);
+        UiFactory.StyleInput(_search);
         _search.TextChanged += _ => RebuildList();
         column.AddChild(_search);
 
@@ -66,6 +67,7 @@ public partial class GardenVoidlingQuickMenu : Control
             HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled
         };
         column.AddChild(scroll);
+        UiFactory.StyleScroll(scroll);
 
         _list = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         _list.AddThemeConstantOverride("separation", 2);
@@ -137,6 +139,9 @@ public partial class GardenVoidlingQuickMenu : Control
         row.AddChild(portrait);
 
         var pick = UiFactory.CreateButton($"{candidate.Name}  ({candidate.ColorName})");
+        pick.AutoTranslateMode = AutoTranslateModeEnum.Disabled;
+        pick.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        pick.TooltipText = $"{candidate.Name} ({candidate.ColorName})";
         pick.CustomMinimumSize = new Vector2(148, 22);
         pick.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         UiFactory.ApplyPixelFont(pick, 7);

@@ -55,7 +55,7 @@ public partial class RacePickerScreen : VBoxContainer
         if (_state == null)
             throw new InvalidOperationException("RacePickerScreen must be configured before AddChild.");
 
-        AddThemeConstantOverride("separation", 7);
+        AddThemeConstantOverride("separation", 5);
         SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 
         if (_state.Voidlings.Count == 0)
@@ -105,7 +105,7 @@ public partial class RacePickerScreen : VBoxContainer
             {
                 ToggleMode = true,
                 CustomMinimumSize = new Vector2(168, 42),
-                FocusMode = Control.FocusModeEnum.None,
+                FocusMode = Control.FocusModeEnum.All,
                 ButtonPressed = key == CourseKey(_selectedCourseId, _selectedCourseVersion)
             };
             UiFactory.ApplyButtonChrome(card);
@@ -157,7 +157,7 @@ public partial class RacePickerScreen : VBoxContainer
             selected.Appearance,
             selected.HasAngelMutation,
             selected.OtherMutationCount,
-            new Vector2(72, 72));
+            new Vector2(48, 48));
         previewRow.AddChild(previewPortrait);
 
         var previewText = new VBoxContainer();
