@@ -24,9 +24,9 @@ public partial class FirstLaunchTutorialOverlay : Control
         MouseFilter = MouseFilterEnum.Ignore;
         ZIndex = 220;
 
-        var panel = UiFactory.CreatePanel(new Vector2(390, 70));
-        panel.Position = new Vector2(125, 278);
-        panel.Size = new Vector2(390, 70);
+        var panel = UiFactory.CreatePanel(new Vector2(342, 82));
+        panel.Position = new Vector2(110, 184);
+        panel.Size = new Vector2(342, 82);
         panel.MouseFilter = MouseFilterEnum.Stop;
         AddChild(panel);
 
@@ -35,7 +35,7 @@ public partial class FirstLaunchTutorialOverlay : Control
         panel.AddChild(content);
 
         _message = UiFactory.CreateLabel(string.Empty, 7);
-        _message.CustomMinimumSize = new Vector2(366, 32);
+        _message.CustomMinimumSize = new Vector2(318, 32);
         _message.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         content.AddChild(_message);
 

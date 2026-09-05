@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 using Voidling.Presentation.Racing;
 using Voidling.Presentation.UI.Common;
@@ -22,13 +23,21 @@ public partial class MainController : Node
     private Control _uiRoot = null!;
     private ModalHost _modalHost = null!;
     private Label _coinsLabel = null!;
-    private PanelContainer? _detailsPanel;
+    private GardenInspector? _detailsPanel;
     private GardenEventLog _gardenEventLog = null!;
     private LineEdit _gardenNameField = null!;
-    private Label _toastLabel = null!;
-    private float _toastSeconds;
+    private readonly List<string> _pendingGardenMessages = new();
+    private PanelContainer _gardenStatus = null!;
+    private GardenDayNightDial _dayNightDial = null!;
+    private PanelContainer _gardenRail = null!;
+    private Button _railToggle = null!;
+    private bool _railCollapsed;
+    private Tween? _railTween;
     private string _selectedId = "";
     private RaceScreen? _race;
+    private Action? _modalBack;
+    private Control? _modalReturnFocus;
+    private Button _rosterButton = null!;
 
     public override void _Ready()
     {
@@ -50,7 +59,6 @@ public partial class MainController : Node
         _uiLayer.AddChild(_uiRoot);
 
         BuildTopBar();
-        BuildToast();
         BuildGardenEventLog();
         BuildSaveFeedbackIndicator();
 
@@ -83,21 +91,13 @@ public partial class MainController : Node
             _connectedZoneBridge.StateChanged -= OnConnectedZoneStateChanged;
 
         DetachSaveFeedbackIndicator();
+        if (GodotObject.IsInstanceValid(_garden))
+            _garden.EnvironmentTimeChanged -= _dayNightDial.ShowTime;
         DetachMultiplayerRacePresentation();
         DetachTradePresentation();
     }
 
-    public override void _Process(double delta)
-    {
-        if (_toastSeconds <= 0.0f)
-            return;
-
-        _toastSeconds -= (float)delta;
-        if (_toastSeconds <= 0.0f)
-            _toastLabel.Visible = false;
-    }
-
-    public override void _UnhandledInput(InputEvent inputEvent)
+    public override void _Input(InputEvent inputEvent)
     {
         // A running race owns Escape: it opens its own pause menu so the player can leave mid-race.
         if (_race != null || _multiplayerRaceScreen != null || _tradeExchangeScreen != null ||
@@ -105,26 +105,42 @@ public partial class MainController : Node
             return;
 
         if (_modalHost.IsOpen)
-            CloseModal();
+            NavigateModalBack();
+        else if (_quickMenu.IsOpen)
+        {
+            _quickMenu.Close();
+            _rosterButton.GrabFocus();
+        }
+        else if (_garden.IsPlacingEgg)
+            _garden.CancelEggPlacement();
+        else if (_garden.IsPlacingLand)
+            _garden.CancelLandPlacement();
+        else if (_garden.IsPlacingDecoration)
+            _garden.CancelDecorationPlacement();
+        else if (GetViewport().GuiGetFocusOwner() is LineEdit editing)
+        {
+            editing.Text = editing == _gardenNameField ? _session.State.GardenName : _session.FindVoidling(_selectedId)?.Name ?? editing.Text;
+            editing.ReleaseFocus();
+        }
         else
-            ShowSettingsExtended();
+            ShowGardenMenu();
         GetViewport().SetInputAsHandled();
     }
 
     private void BuildTopBar()
     {
-        var panel = UiFactory.CreatePanel(new Vector2(120, 50));
-        panel.Name = "GardenStatus";
-        panel.Position = new Vector2(12, 10);
-        panel.Size = new Vector2(120, 50);
-        _uiRoot.AddChild(panel);
+        _gardenStatus = UiFactory.CreatePanel(new Vector2(120, 50));
+        _gardenStatus.Name = "GardenStatus";
+        _gardenStatus.Position = new Vector2(110, 10);
+        _gardenStatus.Size = new Vector2(120, 50);
+        _uiRoot.AddChild(_gardenStatus);
 
         // Name over sprouts rather than side by side: the island is the player's to name, so the
         // name gets the top line and the wallet reads underneath it.
         var column = new VBoxContainer();
         column.AddThemeConstantOverride("separation", 1);
         column.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        panel.AddChild(column);
+        _gardenStatus.AddChild(column);
 
         _gardenNameField = BuildGardenNameField();
         column.AddChild(_gardenNameField);
@@ -133,37 +149,93 @@ public partial class MainController : Node
         _coinsLabel.VerticalAlignment = VerticalAlignment.Center;
         column.AddChild(_coinsLabel);
 
-        var utilities = new HBoxContainer { Name = "GardenUtilities", Position = new Vector2(400, 18) };
+        _dayNightDial = new GardenDayNightDial { Position = new Vector2(110, 66) };
+        _uiRoot.AddChild(_dayNightDial);
+        _dayNightDial.ShowTime(_garden.EnvironmentLocalTime);
+        _garden.EnvironmentTimeChanged += _dayNightDial.ShowTime;
+
+        var utilities = new HBoxContainer { Name = "GardenUtilities", Position = new Vector2(514, 14) };
         utilities.AddThemeConstantOverride("separation", 6);
         _uiRoot.AddChild(utilities);
-        AddTopButton(utilities, Tr("UI_TOP_ONLINE"), ShowConnectedZone, -1, 70);
-        AddTopButton(utilities, Tr("UI_TOP_CENTER"), _garden.ResetCamera, -1, 70);
-        AddTopButton(utilities, Tr("UI_TOP_SETTINGS"), ShowSettingsExtended, -1, 76);
+        AddTopButton(utilities, Tr("UI_TOP_ONLINE"), ShowConnectedZone, -1, 54);
+        AddTopButton(utilities, Tr("UI_GARDEN_MENU_HINT"), ShowGardenMenu, -1, 54);
 
-        var dock = UiFactory.CreatePanel(new Vector2(376, 46));
-        dock.Name = "GardenDock";
-        dock.Position = new Vector2(12, 302);
-        dock.Size = new Vector2(376, 46);
+        var camera = UiFactory.CreateButton(Tr("UI_TOP_CENTER"));
+        camera.Name = "GardenCamera";
+        camera.Position = new Vector2(590, 50);
+        camera.CustomMinimumSize = new Vector2(40, 20);
+        UiFactory.ApplyPixelFont(camera, 8);
+        camera.Pressed += _garden.ResetCamera;
+        _uiRoot.AddChild(camera);
+
+        var dock = UiFactory.CreatePanel(new Vector2(96, ScreenHeight), wood: true);
+        _gardenRail = dock;
+        dock.Name = "GardenRail";
+        dock.Position = Vector2.Zero;
+        dock.Size = new Vector2(96, ScreenHeight);
         _uiRoot.AddChild(dock);
-        var actions = new HBoxContainer();
+        var actions = new VBoxContainer { Name = "Actions", SizeFlagsVertical = Control.SizeFlags.ShrinkCenter };
         actions.AddThemeConstantOverride("separation", 6);
         dock.AddChild(actions);
-        AddTopButton(actions, Tr("UI_TOP_SHOP"), ShowShop, -1, 82);
-        AddTopButton(actions, Tr("UI_TOP_INVENTORY"), ShowInventory, -1, 92);
-        AddTopButton(actions, Tr("UI_TOP_BREED"), ShowBreeding, -1, 82);
-        AddTopButton(actions, Tr("UI_TOP_RACE"), ShowRacePickerWithCourses, -1, 78);
-
-        // The premium glyphs stay (the Garden UI smoke gate requires them), but they no longer
-        // stretch: an expanding icon ate the button and shoved the label off to one side.
-        var glyphs = new[] { new Vector2I(7, 6), new Vector2I(7, 7), new Vector2I(4, 4), new Vector2I(6, 0) };
-        for (var i = 0; i < glyphs.Length; i++)
+        var destinations = new (string name, string key, Action action, Vector2I glyph)[]
         {
-            var button = actions.GetChild<Button>(i);
-            button.Icon = UiFactory.CreateGardenIcon(glyphs[i].X, glyphs[i].Y);
+            ("Voidlings", "UI_GARDEN_VOIDLINGS", () => _quickMenu.Toggle(), new(14, 5)),
+            ("Inventory", "UI_TOP_INVENTORY", ShowInventory, new(13, 5)),
+            ("Shop", "UI_TOP_SHOP", ShowShop, new(14, 6)),
+            ("Breed", "UI_TOP_BREED", ShowBreeding, new(12, 4)),
+            ("Races", "UI_TOP_RACE", ShowRacePickerWithCourses, new(13, 1)),
+            ("Build", "UI_GARDEN_BUILD", ShowGardenBuild, new(15, 1))
+        };
+        foreach (var destination in destinations)
+        {
+            var button = UiFactory.CreateButton(Tr(destination.key));
+            button.Name = destination.name;
+            button.CustomMinimumSize = new Vector2(72, 27);
+            button.Alignment = HorizontalAlignment.Left;
+            UiFactory.ApplyPixelFont(button, 8);
+            button.Icon = UiFactory.CreateGardenIcon(destination.glyph.X, destination.glyph.Y);
             button.ExpandIcon = false;
             button.IconAlignment = HorizontalAlignment.Left;
-            button.AddThemeConstantOverride("icon_max_width", 14);
+            button.AddThemeConstantOverride("icon_max_width", 10);
+            button.Pressed += destination.action;
+            actions.AddChild(button);
+            if (destination.name == "Voidlings") _rosterButton = button;
         }
+        _railToggle = UiFactory.CreateButton("‹");
+        _railToggle.Name = "GardenRailToggle";
+        _railToggle.Position = new Vector2(84, (ScreenHeight - 24) / 2);
+        _railToggle.CustomMinimumSize = new Vector2(24, 24);
+        _railToggle.ZIndex = 20;
+        _railToggle.TooltipText = Tr("UI_GARDEN_HIDE_RAIL");
+        _railToggle.Pressed += ToggleGardenRail;
+        _uiRoot.AddChild(_railToggle);
+    }
+
+    private void ToggleGardenRail()
+    {
+        _railCollapsed = !_railCollapsed;
+        _railTween?.Kill();
+        _quickMenu.Close();
+        _gardenRail.Visible = true;
+        _gardenStatus.Visible = true;
+        _dayNightDial.Visible = true;
+        _gardenEventLog.Visible = true;
+        foreach (var node in _gardenRail.FindChildren("*", "Button", true, false))
+            ((Button)node).FocusMode = _railCollapsed ? Control.FocusModeEnum.None : Control.FocusModeEnum.All;
+        _railToggle.Text = _railCollapsed ? "›" : "‹";
+        _railToggle.TooltipText = Tr(_railCollapsed ? "UI_GARDEN_SHOW_RAIL" : "UI_GARDEN_HIDE_RAIL");
+        _railToggle.GrabFocus();
+        _railTween = CreateTween().SetParallel().SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+        _railTween.TweenProperty(_gardenRail, "position:x", _railCollapsed ? -96f : 0f, 0.22);
+        _railTween.TweenProperty(_railToggle, "position:x", _railCollapsed ? 4f : 84f, 0.22);
+        _railTween.TweenProperty(_gardenStatus, "position:x", _railCollapsed ? 10f : 110f, 0.22);
+        _railTween.TweenProperty(_dayNightDial, "position:x", _railCollapsed ? 10f : 110f, 0.22);
+        _railTween.TweenProperty(_gardenEventLog, "position:x", _railCollapsed ? 10f : 110f, 0.22);
+        _railTween.Finished += () =>
+        {
+            _gardenRail.Visible = !_railCollapsed;
+            _gardenEventLog.Visible = !_modalHost.IsOpen;
+        };
     }
 
     /// <summary>
@@ -201,7 +273,7 @@ public partial class MainController : Node
     private static void AddTopButton(HBoxContainer row, string text, Action action, int iconIndex, float width)
     {
         var button = UiFactory.CreateButton(text, iconIndex);
-        // The label sits in the middle of the button; the dock reads as four even tiles.
+        // Quiet utilities stay separate from the recurring destinations in the rail.
         button.Alignment = HorizontalAlignment.Center;
         button.CustomMinimumSize = new Vector2(width, 24);
         UiFactory.ApplyPixelFont(button, 7);
@@ -209,30 +281,17 @@ public partial class MainController : Node
         row.AddChild(button);
     }
 
-    private void BuildToast()
-    {
-        _toastLabel = UiFactory.CreateLabel("", 9);
-        _toastLabel.Position = new Vector2(24, 164);
-        _toastLabel.Size = new Vector2(352, 28);
-        _toastLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        _toastLabel.AddThemeColorOverride("font_color", Color.FromHtml("#F9F4D8"));
-        _toastLabel.AddThemeColorOverride("font_shadow_color", Color.FromHtml("#465247"));
-        _toastLabel.AddThemeConstantOverride("shadow_offset_x", 1);
-        _toastLabel.AddThemeConstantOverride("shadow_offset_y", 1);
-        _toastLabel.Visible = false;
-        _uiRoot.AddChild(_toastLabel);
-    }
-
     private void BuildGardenEventLog()
     {
         // Wide and tall enough to read the last handful of entries without scrolling.
         _gardenEventLog = new GardenEventLog
         {
-            Position = new Vector2(12, 214),
-            Size = new Vector2(320, 82),
-            CustomMinimumSize = new Vector2(320, 82),
+            Position = new Vector2(110, 270),
+            Size = new Vector2(300, 80),
+            CustomMinimumSize = new Vector2(300, 45),
             ZIndex = 6
         };
+        _gardenEventLog.ActivitiesRequested += ShowGardenActivities;
         _uiRoot.AddChild(_gardenEventLog);
     }
 
@@ -267,8 +326,13 @@ public partial class MainController : Node
     {
         if (_modalHost.IsOpen)
             CloseModal(false);
+        else
+            _modalReturnFocus = GetViewport().GuiGetFocusOwner();
+        _modalBack = backRequested;
+        var box = _modalHost.Open(title, size, NavigateModalBack, backRequested);
         HideGardenHudPanels();
-        return _modalHost.Open(title, size, CloseModal, backRequested);
+        Callable.From(() => FocusFirstModalControl(box)).CallDeferred();
+        return box;
     }
 
     private void HideGardenHudPanels()
@@ -289,9 +353,46 @@ public partial class MainController : Node
     private void CloseModal(bool restoreGardenHud)
     {
         _modalHost.Close();
+        _modalBack = null;
 
         if (restoreGardenHud && _race == null && _multiplayerRaceScreen == null && _uiRoot != null && _uiRoot.Visible)
+        {
             RefreshUi();
+            if (_modalReturnFocus != null && GodotObject.IsInstanceValid(_modalReturnFocus) && _modalReturnFocus.IsVisibleInTree())
+                _modalReturnFocus.GrabFocus();
+            _modalReturnFocus = null;
+        }
+    }
+
+    private void NavigateModalBack()
+    {
+        var back = _modalBack;
+        if (back != null) back();
+        else CloseModal();
+    }
+
+    private static void FocusFirstModalControl(Node node)
+    {
+        if (!GodotObject.IsInstanceValid(node) || node.IsQueuedForDeletion()) return;
+        var controls = new List<Control>();
+        CollectModalControls(node, controls);
+        for (var i = 0; i < controls.Count; i++)
+        {
+            controls[i].FocusNext = controls[(i + 1) % controls.Count].GetPath();
+            controls[i].FocusPrevious = controls[(i + controls.Count - 1) % controls.Count].GetPath();
+        }
+        if (controls.Count > 0) controls[0].GrabFocus();
+    }
+
+    private static void CollectModalControls(Node node, List<Control> controls)
+    {
+        foreach (var child in node.GetChildren())
+        {
+            if (child.IsQueuedForDeletion()) continue;
+            if (child is Control control && control.IsVisibleInTree() && control.FocusMode == Control.FocusModeEnum.All &&
+                child is not BaseButton { Disabled: true }) controls.Add(control);
+            CollectModalControls(child, controls);
+        }
     }
 
     private void StartRace(VoidlingData selected)
@@ -359,14 +460,19 @@ public partial class MainController : Node
     }
 
     private void ShowToast(string text)
-    {
-        _toastLabel.Text = text;
-        _toastLabel.Visible = true;
-        _toastSeconds = 3.0f;
-    }
+        => AppendGardenEvent(text);
 
     private void AppendGardenEvent(string text)
-        => _gardenEventLog.Append(text);
+    {
+        if (string.IsNullOrWhiteSpace(text) || _pendingGardenMessages.Contains(text)) return;
+        _pendingGardenMessages.Add(text);
+        if (_pendingGardenMessages.Count != 1) return;
+        Callable.From(() =>
+        {
+            foreach (var message in _pendingGardenMessages) _gardenEventLog.Append(message);
+            _pendingGardenMessages.Clear();
+        }).CallDeferred();
+    }
 
     private static void StyleOption(OptionButton option)
     {

@@ -208,7 +208,7 @@ msgid "UI_SHOP_EGG_BOUGHT"
 msgstr "EGG ADDED TO INVENTORY"
 
 msgid "UI_GARDEN_VOIDLINGS"
-msgstr "VOIDLINGS"
+msgstr "Voidlings"
 
 msgid "UI_GARDEN_VOIDLINGS_SEARCH"
 msgstr "Search name or colour"
@@ -340,7 +340,13 @@ msgid "UI_RACE_RETURN"
 msgstr "Return to Garden"
 
 msgid "UI_GARDEN_LOG_TITLE"
-msgstr "GARDEN LOG"
+msgstr "Garden log"
+
+msgid "UI_GARDEN_LOG_COLLAPSE"
+msgstr "Show one log line"
+
+msgid "UI_GARDEN_LOG_EXPAND"
+msgstr "Show more log lines"
 
 msgid "UI_GARDEN_LOG_STARTED"
 msgstr "Garden session started."
@@ -844,10 +850,114 @@ msgid "UI_GARDEN_FOLLOW"
 msgstr "Follow this Voidling with the camera"
 
 msgid "UI_GARDEN_DETAILS"
-msgstr "View details"
+msgstr "Details"
 
 msgid "UI_GARDEN_FAMILY"
 msgstr "Family tree"
 
 msgid "UI_GARDEN_GOODBYE"
 msgstr "Goodbye"
+
+msgid "UI_GARDEN_MENU_HINT"
+msgstr "ESC · Menu"
+
+msgid "UI_GARDEN_MENU_TITLE"
+msgstr "Garden menu"
+
+msgid "UI_GARDEN_MENU_RUNNING"
+msgstr "Your Garden keeps growing while this menu is open."
+
+msgid "UI_GARDEN_RETURN"
+msgstr "Return to garden"
+
+msgid "UI_GARDEN_BUILD"
+msgstr "Build"
+
+msgid "UI_GARDEN_BUILD_LAND"
+msgstr "Land & training grounds"
+
+msgid "UI_GARDEN_BUILD_DECORATE"
+msgstr "Decorate"
+
+msgid "UI_GARDEN_ACTIVITIES"
+msgstr "Activities"
+
+msgid "UI_GARDEN_MISSIONS"
+msgstr "Daily missions"
+
+msgid "UI_GARDEN_CHECK_IN_STREAK"
+msgstr "Daily check-in · streak {0}"
+
+msgid "UI_GARDEN_CHECK_IN_CLAIM"
+msgstr "Claim +{0} sprouts"
+
+msgid "UI_GARDEN_CHECK_IN_CLAIMED"
+msgstr "Claimed today"
+
+msgid "UI_GARDEN_CHECK_IN_NEXT"
+msgstr "Next check-in: +{0} sprouts"
+
+msgid "UI_PROFILE_TRAINED_STAT"
+msgstr "Trained stat"
+
+msgid "UI_PROFILE_RANK"
+msgstr "Rank"
+
+msgid "UI_PROFILE_LEVEL"
+msgstr "Level"
+
+msgid "UI_PROFILE_LEVEL_VALUE"
+msgstr "Lv {0}"
+
+msgid "UI_PROFILE_ADULT_PERSONALITY"
+msgstr "Adult · {0}"
+
+msgid "UI_PROFILE_CHILD_PERSONALITY"
+msgstr "Child · {0}"
+
+msgid "UI_PROFILE_CONTENT"
+msgstr "Seems content and at ease."
+
+msgid "UI_PROFILE_RESTLESS"
+msgstr "Seems restless and could use some attention."
+
+msgid "UI_PROFILE_GIVE_TREAT"
+msgstr "Give treat"
+
+msgid "UI_PROFILE_GIVE"
+msgstr "Give"
+
+msgid "UI_PROFILE_FOLLOW"
+msgstr "Follow"
+
+msgid "UI_PROFILE_TREAT_STOCK"
+msgstr "{0} treat · {1} owned"
+
+msgid "UI_TUTORIAL_GARDEN_PROFILE"
+msgstr "This profile keeps care and training close to your selected Voidling. Give treat chooses an owned treat; Details shows the full stats and DNA."
+
+msgid "UI_TUTORIAL_GARDEN_SHOP"
+msgstr "Use the left rail to visit the Shop for treats, eggs and land. Activities beside the Garden log opens daily check-ins and missions."
+
+msgid "UI_TUTORIAL_GARDEN_BUILD"
+msgstr "Build groups your land and decorations. Open a land tile to manage its training, or place stored land from Inventory."
+msgid "UI_GARDEN_DAY"
+msgstr "Day"
+
+msgid "UI_GARDEN_NIGHT"
+msgstr "Night"
+
+msgid "UI_GARDEN_DAWN"
+msgstr "Dawn"
+
+msgid "UI_GARDEN_DUSK"
+msgstr "Dusk"
+
+msgid "UI_GARDEN_TIME_HINT"
+msgstr "{0} · follows your local time"
+
+msgid "UI_GARDEN_HIDE_RAIL"
+msgstr "Hide navigation"
+
+msgid "UI_GARDEN_SHOW_RAIL"
+msgstr "Show navigation"

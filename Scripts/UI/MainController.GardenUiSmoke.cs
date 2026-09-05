@@ -17,62 +17,207 @@ public partial class MainController
                 throw new InvalidOperationException("Garden UI smoke requires an isolated development save profile.");
             SkipFirstLaunchTutorial();
             await SettleGardenUi();
-            foreach (var name in new[] { "GardenStatus", "GardenUtilities", "GardenDock" })
+            var rail = _uiRoot.GetNode<PanelContainer>("GardenRail");
+            var actions = rail.GetNode<VBoxContainer>("Actions");
+            foreach (var name in new[] { "GardenStatus", "GardenUtilities", "GardenRail", "GardenCamera" })
                 RequireOnScreen(_uiRoot.GetNode<Control>(name));
-            var sampleIcon = _uiRoot.GetNode<PanelContainer>("GardenDock").GetChild<HBoxContainer>(0).GetChild<Button>(0).Icon;
-            if (sampleIcon == null || !sampleIcon.GetImage().GetUsedRect().HasArea())
-                throw new InvalidOperationException("Premium dock icon is missing or empty.");
+            foreach (var button in actions.GetChildren().OfType<Button>())
+            {
+                RequireOnScreen(button);
+                if (button.Icon == null || !button.Icon.GetImage().GetUsedRect().HasArea())
+                    throw new InvalidOperationException("Premium rail icon is missing or empty.");
+                if (button.FocusMode != Control.FocusModeEnum.All)
+                    throw new InvalidOperationException("Rail action is not keyboard accessible.");
+            }
+            RequireSeparate(rail, _gardenEventLog);
             await CaptureGardenUi("garden");
 
-            _quickMenu.GetChildren().OfType<Button>().Single().EmitSignal(BaseButton.SignalName.Pressed);
+            RequireOnScreen(_dayNightDial);
+            RequireSeparate(_dayNightDial, _uiRoot.GetNode<Control>("GardenStatus"));
+            foreach (var (hour, key) in new[] { (0, "NIGHT"), (5, "DAWN"), (9, "DAY"), (18, "DUSK"), (22, "NIGHT") })
+            {
+                _dayNightDial.ShowTime(DateTime.Today.AddHours(hour));
+                if (_dayNightDial.FindChildren("*", "Label", true, false).OfType<Label>().Single().Text != Tr("UI_GARDEN_" + key))
+                    throw new InvalidOperationException("Garden clock shows the wrong period.");
+                await CaptureGardenUi("garden-" + key.ToLowerInvariant());
+            }
+            _dayNightDial.ShowTime(_garden.EnvironmentLocalTime);
+            await ClickGardenControl(_railToggle);
+            await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+            RequireOnScreen(_railToggle);
+            if (rail.Visible || !_gardenStatus.Visible || !_dayNightDial.Visible || !_gardenEventLog.Visible ||
+                !_railToggle.HasFocus() || actions.GetChildren().OfType<Button>().Any(b => b.FocusMode != Control.FocusModeEnum.None))
+                throw new InvalidOperationException("Collapsed navigation hid persistent Garden HUD or keyboard focus is lost.");
+            foreach (var control in new Control[] { _gardenStatus, _dayNightDial, _gardenEventLog })
+                if (Mathf.Abs(control.Position.X - 10) > 1)
+                    throw new InvalidOperationException($"{control.Name} did not move into the free left-side space.");
+            if (Mathf.Abs(_railToggle.Position.Y - (ScreenHeight - _railToggle.Size.Y) / 2) > 1)
+                throw new InvalidOperationException("Navigation handle is not centered on the screen edge.");
+            await CaptureGardenUi("garden-collapsed");
+            await ClickGardenControl(_railToggle);
+            ToggleGardenRail();
+            ToggleGardenRail();
+            await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+            RequireOnScreen(rail);
+            if (!rail.Visible || !_gardenStatus.Visible || !_dayNightDial.Visible || !_gardenEventLog.Visible ||
+                Mathf.Abs(_gardenStatus.Position.X - 110) > 1 || Mathf.Abs(_dayNightDial.Position.X - 110) > 1 ||
+                Mathf.Abs(_gardenEventLog.Position.X - 110) > 1 ||
+                actions.GetChildren().OfType<Button>().Any(b => b.FocusMode != Control.FocusModeEnum.All))
+                throw new InvalidOperationException("Navigation did not recover from interrupted animation.");
+
+            var history = _gardenEventLog.FindChildren("*", "RichTextLabel", true, false).OfType<RichTextLabel>().Single();
+            const string notification = "Garden notification probe";
+            ShowToast(notification);
+            AppendGardenEvent(notification);
+            await SettleGardenUi();
+            if (history.GetParsedText().Split(notification).Length != 2)
+                throw new InvalidOperationException("Garden notification was duplicated.");
+            AppendGardenEvent(notification);
+            ShowToast(notification);
+            await SettleGardenUi();
+            if (history.GetParsedText().Split(notification).Length != 3)
+                throw new InvalidOperationException("A later notification was incorrectly suppressed.");
+
+            var logToggle = FindGardenButton(_gardenEventLog, "ToggleHeight");
+            var logBottom = _gardenEventLog.Position.Y + _gardenEventLog.Size.Y;
+            await ClickGardenControl(logToggle);
+            await ToSignal(GetTree().CreateTimer(0.25), SceneTreeTimer.SignalName.Timeout);
+            if (!_gardenEventLog.IsCompact || Mathf.Abs(_gardenEventLog.Size.Y - 45) > 1 || history.Size.Y > 25 ||
+                !history.GetParsedText().Contains(notification, StringComparison.Ordinal) ||
+                history.GetParsedText().Trim().Contains('\n') ||
+                Mathf.Abs(_gardenEventLog.Position.Y + _gardenEventLog.Size.Y - logBottom) > 1 || !logToggle.HasFocus())
+                throw new InvalidOperationException("Garden log did not collapse to one readable line.");
+            await CaptureGardenUi("garden-log-compact");
+            await ClickGardenControl(logToggle);
+            await ToSignal(GetTree().CreateTimer(0.25), SceneTreeTimer.SignalName.Timeout);
+            if (_gardenEventLog.IsCompact || Mathf.Abs(_gardenEventLog.Size.Y - 80) > 1 ||
+                Mathf.Abs(_gardenEventLog.Position.Y + _gardenEventLog.Size.Y - logBottom) > 1)
+                throw new InvalidOperationException("Garden log did not expand again.");
+
+            await ClickGardenControl(_rosterButton);
             await SettleGardenUi();
             if (!_quickMenu.IsOpen) throw new InvalidOperationException("Roster did not open.");
+            RequireOnScreen(_quickMenu);
             await CaptureGardenUi("roster");
+            await PressGardenEscape();
+            if (_quickMenu.IsOpen || _modalHost.IsOpen || !_rosterButton.HasFocus())
+                throw new InvalidOperationException("Escape did not close roster and return rail focus.");
             OnQuickMenuVoidlingPicked(_session.State.Voidlings.First().Id);
-            await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
-            RequireOnScreen(_detailsPanel!);
-            if (_quickMenu.Visible) throw new InvalidOperationException("Roster overlaps the inspector.");
-            await CaptureGardenUi("companion");
-            var inspectorScroll = _detailsPanel!.GetChild<VBoxContainer>(0).GetNode<ScrollContainer>("ProfileScroll");
-            inspectorScroll.ScrollVertical = 40;
             await SettleGardenUi();
-            var scrollPosition = inspectorScroll.ScrollVertical;
-            if (scrollPosition <= 0) throw new InvalidOperationException("Inspector did not scroll.");
+            RequireOnScreen(_detailsPanel!);
+            RequireSeparate(_detailsPanel!, rail);
+            RequireSeparate(_detailsPanel!, _gardenEventLog);
+            RequireSeparate(_detailsPanel!, _uiRoot.GetNode<Control>("GardenCamera"));
+            await CaptureGardenUi("companion");
+            var inspector = _detailsPanel!;
+            var expandedProfile = _session.CreateCreatureProfileProjection(inspector.CreatureId)! with
+            {
+                Name = "MMMMMMMMMMMMMMMMMM",
+                DiscoveredFavoriteFoodId = GameRules.StatIds[0],
+                CareDemeanor = Voidling.Application.Roster.CreatureCareDemeanor.NeedsCare
+            };
+            inspector.Render(expandedProfile, GameRules.StatIds[0], true);
+            await SettleGardenUi();
+            RequireOnScreen(inspector);
+            RequireSeparate(inspector, _saveStatusLabel);
+            await CaptureGardenUi("companion-expanded");
+            RefreshUi();
+            await SettleGardenUi();
+            var giveTreat = FindGardenButton(inspector, "GiveTreat");
+            giveTreat.GrabFocus();
             for (var refresh = 0; refresh < 3; refresh++)
             {
                 RefreshUi();
                 await SettleGardenUi();
-                if (_detailsPanel!.GetChild<VBoxContainer>(0).GetNode<ScrollContainer>("ProfileScroll") != inspectorScroll ||
-                    inspectorScroll.ScrollVertical != scrollPosition)
-                    throw new InvalidOperationException("Inspector refresh replaced or reset the scrollbar.");
+                if (_detailsPanel != inspector || !giveTreat.HasFocus())
+                    throw new InvalidOperationException("Simulation refresh replaced inspector or lost keyboard focus.");
             }
+            _session.BuyTrainingItem(GameRules.StatIds[0]);
+            var stock = _session.State.TrainingItems[GameRules.StatIds[0]];
+            giveTreat.EmitSignal(BaseButton.SignalName.Pressed);
+            await SettleGardenUi();
+            RequireOnScreen(ModalPanel());
+            await CaptureGardenUi("treats");
+            FindGardenButton(_modalHost, "Give_" + GameRules.StatIds[0]).EmitSignal(BaseButton.SignalName.Pressed);
+            await SettleGardenUi();
+            if (_session.State.TrainingItems[GameRules.StatIds[0]] != stock - 1 || _modalHost.IsOpen)
+                throw new InvalidOperationException("Treat chooser did not consume one owned treat and return.");
+            if (!giveTreat.HasFocus()) throw new InvalidOperationException("Treat action lost focus on return.");
+            ShowDetails();
+            await SettleGardenUi();
+            RequireOnScreen(ModalPanel());
+            FindGardenButton(_modalHost, "Goodbye");
+            await CaptureGardenUi("details");
+            CloseModal();
             OnQuickMenuVoidlingPicked(_session.State.Voidlings.Last().Id);
             await SettleGardenUi();
-            if (_detailsPanel!.GetChild<VBoxContainer>(0).GetNode<ScrollContainer>("ProfileScroll").ScrollVertical != 0)
-                throw new InvalidOperationException("A different Voidling inherited the previous scroll position.");
+            if (_detailsPanel!.CreatureId != _session.State.Voidlings.Last().Id)
+                throw new InvalidOperationException("Inspector retained previous creature.");
             DeselectVoidling();
+            await SettleGardenUi();
 
-            var dock = _uiRoot.GetNode<PanelContainer>("GardenDock").GetChild<HBoxContainer>(0);
-            foreach (var button in dock.GetChildren().OfType<Button>())
+            foreach (var button in actions.GetChildren().OfType<Button>().Skip(1))
             {
-                if (button.FocusMode != Control.FocusModeEnum.All)
-                    throw new InvalidOperationException("Dock action is not keyboard accessible.");
-                button.EmitSignal(BaseButton.SignalName.Pressed);
+                button.GrabFocus();
+                await ClickGardenControl(button);
                 await SettleGardenUi();
                 if (!_modalHost.IsOpen || _gardenEventLog.Visible)
-                    throw new InvalidOperationException("Dock action did not open an unobstructed modal.");
-                var center = _modalHost.GetChildren().OfType<CenterContainer>().Single();
-                RequireOnScreen(center.GetChild<PanelContainer>(0));
-                await CaptureGardenUi($"menu-{button.GetIndex()}");
+                    throw new InvalidOperationException("Rail destination did not open an unobstructed modal.");
+                RequireOnScreen(ModalPanel());
+                await CaptureGardenUi($"menu-{button.Name}");
                 CloseModal();
                 await SettleGardenUi();
+                if (!button.HasFocus()) throw new InvalidOperationException("Destination return lost rail focus.");
             }
-            ShowSettingsExtended();
-            await SettleGardenUi();
-            RequireOnScreen(_modalHost.GetChildren().OfType<CenterContainer>().Single().GetChild<PanelContainer>(0));
-            await CaptureGardenUi("settings");
+            var decorationCount = _session.State.GardenDecorations.Count;
+            _garden.BeginDecorationPlacement("tree");
+            if (!_garden.IsPlacingDecoration) throw new InvalidOperationException("Decoration probe did not enter placement.");
+            await ClickGardenControl(actions.GetNode<Button>("Build"));
+            if (!_modalHost.IsOpen || _session.State.GardenDecorations.Count != decorationCount || !_garden.IsPlacingDecoration)
+                throw new InvalidOperationException("Rail click placed a decoration through the UI.");
             CloseModal();
+            await PressGardenEscape();
+            if (_garden.IsPlacingDecoration || _modalHost.IsOpen)
+                throw new InvalidOperationException("Escape did not cancel decoration placement before opening a menu.");
+            ShowGardenBuild();
             await SettleGardenUi();
+            FindGardenButton(_modalHost, "Land").EmitSignal(BaseButton.SignalName.Pressed);
+            await SettleGardenUi();
+            RequireOnScreen(ModalPanel());
+            CloseModal();
+            ShowGardenActivities();
+            await SettleGardenUi();
+            RequireOnScreen(ModalPanel());
+            await CaptureGardenUi("activities");
+            FindGardenButton(_modalHost, "Missions").EmitSignal(BaseButton.SignalName.Pressed);
+            await SettleGardenUi();
+            await PressGardenEscape();
+            FindGardenButton(_modalHost, "Claim");
+            CloseModal();
+            await PressGardenEscape();
+            FindGardenButton(_modalHost, "Resume");
+            var modalControls = new System.Collections.Generic.List<Control>();
+            CollectModalControls(_modalHost, modalControls);
+            foreach (var control in modalControls)
+            {
+                if (!modalControls.Contains(control.GetNode<Control>(control.FocusNext)) ||
+                    !modalControls.Contains(control.GetNode<Control>(control.FocusPrevious)))
+                    throw new InvalidOperationException("Tab navigation escapes the modal.");
+            }
+            await CaptureGardenUi("garden-menu");
+            var age = _session.State.Voidlings.First().AdultAgeSeconds;
+            await ToSignal(GetTree().CreateTimer(1.1), SceneTreeTimer.SignalName.Timeout);
+            if (_session.State.Voidlings.First().AdultAgeSeconds <= age)
+                throw new InvalidOperationException("Garden menu paused simulation.");
+            FindGardenButton(_modalHost, "Settings").EmitSignal(BaseButton.SignalName.Pressed);
+            await SettleGardenUi();
+            RequireOnScreen(ModalPanel());
+            await CaptureGardenUi("settings");
+            await PressGardenEscape();
+            FindGardenButton(_modalHost, "Resume");
+            await PressGardenEscape();
+            if (_modalHost.IsOpen || !_gardenEventLog.Visible)
+                throw new InvalidOperationException("Escape did not return from menu to Garden.");
             // This probe rebuilds many Godot collections in a few frames. Finalize their native
             // wrappers while the engine is alive, before the standalone probe shuts it down.
             GC.Collect();
@@ -87,6 +232,36 @@ public partial class MainController
         }
     }
 
+    private PanelContainer ModalPanel()
+        => _modalHost.GetChildren().OfType<CenterContainer>().Single(child => !child.IsQueuedForDeletion()).GetChild<PanelContainer>(0);
+
+    private static Button FindGardenButton(Node node, string name)
+        => node.FindChildren(name, "Button", true, false).OfType<Button>().First(button => !button.IsQueuedForDeletion() && button.IsVisibleInTree());
+
+    private async Task PressGardenEscape()
+    {
+        Input.ParseInputEvent(new InputEventKey { Keycode = Key.Escape, Pressed = true });
+        await SettleGardenUi();
+        Input.ParseInputEvent(new InputEventKey { Keycode = Key.Escape, Pressed = false });
+        await SettleGardenUi();
+    }
+
+    private async Task ClickGardenControl(Control control)
+    {
+        var position = control.GetGlobalRect().GetCenter();
+        GetViewport().PushInput(new InputEventMouseMotion { Position = position, GlobalPosition = position }, true);
+        GetViewport().PushInput(new InputEventMouseButton { Position = position, GlobalPosition = position, ButtonIndex = MouseButton.Left, Pressed = true }, true);
+        await SettleGardenUi();
+        GetViewport().PushInput(new InputEventMouseButton { Position = position, GlobalPosition = position, ButtonIndex = MouseButton.Left, Pressed = false }, true);
+        await SettleGardenUi();
+    }
+
+    private static void RequireSeparate(Control first, Control second)
+    {
+        if (first.GetGlobalRect().Intersects(second.GetGlobalRect()))
+            throw new InvalidOperationException($"{first.Name} {first.GetGlobalRect()} overlaps {second.Name} {second.GetGlobalRect()}.");
+    }
+
     private async Task SettleGardenUi()
     {
         for (var frame = 0; frame < 8; frame++)
@@ -97,7 +272,11 @@ public partial class MainController
     {
         var rect = control.GetGlobalRect();
         if (rect.Position.X < -1 || rect.Position.Y < -1 || rect.End.X > ScreenWidth + 1 || rect.End.Y > ScreenHeight + 1)
+        {
+            foreach (var child in control.FindChildren("*", "Control", true, false).OfType<Control>())
+                GD.Print($"LAYOUT {child.GetPath()}: min {child.GetCombinedMinimumSize()} size {child.Size}");
             throw new InvalidOperationException($"{control.Name} exceeds the viewport: {rect}");
+        }
     }
 
     private async Task CaptureGardenUi(string name)

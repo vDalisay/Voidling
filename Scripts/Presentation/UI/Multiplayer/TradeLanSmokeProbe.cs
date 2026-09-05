@@ -254,6 +254,14 @@ public partial class TradeLanSmokeProbe : Node
             $"[trade-lan-smoke] LAN_TRADE_SMOKE_SUCCESS negotiation={_negotiationId} " +
             $"outgoing={_localAssetId} incoming={_remoteAssetId}");
 
+        // On Windows, Environment.Exit from a native Godot callback can fail-fast during CLR
+        // shutdown (0xC0000409). Return from the callback and let the engine close normally.
+        if (OperatingSystem.IsWindows())
+        {
+            GetTree().Quit(0);
+            return;
+        }
+
         // This probe is a throwaway headless process and has already proven/persisted the complete
         // two-phase exchange. Godot 4.6 Mono can SIGSEGV while tearing an active ENet peer down after
         // this point on Linux. Exit the probe process directly so that native engine teardown cannot

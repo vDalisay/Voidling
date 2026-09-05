@@ -23,10 +23,13 @@ public static class UiFactory
         FontWeight = 500
     };
 
-    public static PanelContainer CreatePanel(Vector2 minimumSize)
+    public static PanelContainer CreatePanel(Vector2 minimumSize, bool wood = false)
     {
         var panel = new PanelContainer { CustomMinimumSize = minimumSize };
-        panel.AddThemeStyleboxOverride("panel", CreatePanelStyle());
+        var style = CreatePanelStyle();
+        if (wood)
+            style.Texture = new AtlasTexture { Atlas = ButtonTexture, Region = new Rect2(0, 80, 16, 16) };
+        panel.AddThemeStyleboxOverride("panel", style);
         return panel;
     }
 

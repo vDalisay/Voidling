@@ -125,14 +125,14 @@ public partial class MainController
                     "Click any Voidling in the Garden. Selecting one opens its quick profile without pausing the world.",
                     "Next",
                     false,
-                    new Rect2(12, 55, 382, 210));
+                    new Rect2(110, 82, 348, 180));
                 break;
             case FirstLaunchTutorialStep.SelectedVoidling:
                 _tutorialOverlay.ShowStep(
-                    "This side panel is the quick profile. Training, passive training and the deeper Details view all start here.",
+                    Tr("UI_TUTORIAL_GARDEN_PROFILE"),
                     "Open Details",
                     true,
-                    new Rect2(399, 54, 237, 298));
+                    new Rect2(468, 82, 162, 268));
                 break;
             case FirstLaunchTutorialStep.Details:
                 _tutorialOverlay.ShowStep(
@@ -143,14 +143,14 @@ public partial class MainController
                 break;
             case FirstLaunchTutorialStep.Shop:
                 _tutorialOverlay.ShowStep(
-                    "The Shop sells permanent training treats and rotating mystery eggs. Daily check-ins, missions and occasional rare offers also live here.",
-                    "See Modules",
+                    Tr("UI_TUTORIAL_GARDEN_SHOP"),
+                    Tr("UI_GARDEN_BUILD"),
                     true,
                     modalHighlight);
                 break;
             case FirstLaunchTutorialStep.Modules:
                 _tutorialOverlay.ShowStep(
-                    "Garden Modules are your slow open-game training system. Buy a stat module, place it in a logical slot, upgrade it, then assign a Voidling from its quick profile.",
+                    Tr("UI_TUTORIAL_GARDEN_BUILD"),
                     "Next",
                     true,
                     modalHighlight);
