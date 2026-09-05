@@ -17,20 +17,17 @@ Items under **Product decisions required before implementation** are deliberate 
 
 - [x] Add player-placeable Garden decorations, separate from functional training modules. Merged in PR #28.
 - [x] Extend stat-driven ambient Garden behavior with confirmed Run/Stamina behavior and Swim shoreline affinity. Merged in PR #29.
-- [ ] Add Cup/championship scaffolding: stable Cup IDs, stable NPC casts, progression/unlock hooks and authorable content. **Implementation is on `agent/cup-scaffolding`; awaiting CI/merge.**
-- [ ] Continue production Voidling art ingestion through the centralized visual pipeline as new art revisions arrive.
+- [x] Add Cup/championship scaffolding: stable Cup IDs, stable NPC casts, progression/unlock hooks and authorable content. Merged in PR #31 with full CI green.
+- [ ] Continue production Voidling art ingestion through the centralized visual pipeline as new authored art revisions arrive.
 
 ## Product decisions required before implementation
 
 - [ ] Lock the stat-driven morphology/evolution mapping (for example when/how `normal` changes toward water/fly/power forms).
 - [ ] Lock remaining appearance-inheritance probabilities, dominance, rare-trait depth and stacking rules.
 - [ ] Lock the final trophy/reincarnation transformation recipe.
-- [ ] Lock Cup entry-fee/refund/reward economy details. Cup scaffolding must keep these values/rules out until decided.
+- [ ] Lock Cup entry-fee/refund/reward economy details. Cup scaffolding keeps these values/rules out until decided.
 - [ ] Decide whether active-computer-use income should exist; do not implement activity monitoring until its privacy/platform/UX requirements are approved.
 
-## Execution order
+## Current stopping point
 
-1. Keep the integration/release baseline green before merging larger feature slices.
-2. Finish and verify Cup/championship scaffolding without forking the deterministic race simulator.
-3. Ingest production art only through the centralized visual catalog/factory as authored revisions arrive.
-4. Stop at unresolved product-decision items and request design input rather than choosing rules implicitly.
+All currently confirmed implementation-ready systems are now implemented and merged. The only open implementation-ready item is ongoing production-art ingestion, which requires new authored art revisions. The remaining gameplay/system items are explicit product-decision stop conditions and should not be implemented by inventing rules.
