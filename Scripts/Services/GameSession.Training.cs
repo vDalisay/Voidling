@@ -53,9 +53,9 @@ public partial class GameSession
         RaiseGardenEvent(message);
     }
 
-    public bool BuyGardenModule(string statId)
+    public bool BuyLandShape(string shapeId)
     {
-        var result = _training!.BuyGardenModule(State, NewId(), statId);
+        var result = _training!.BuyLandShape(State, NewId(), shapeId);
         if (!result.Succeeded)
         {
             ToastRequested?.Invoke(PlayerActionFailureText.ForGardenModule(result.Failure));
@@ -63,14 +63,14 @@ public partial class GameSession
         }
 
         RecordDailyMissionEvent(DailyMissionEventKind.PurchaseShopItem);
-        SaveAndNotify($"Bought a {DisplayStatId(statId)} land tile.");
-        RaiseGardenEvent($"A {DisplayStatId(statId)} land tile is waiting in your inventory.");
+        SaveAndNotify("Bought a piece of land.");
+        RaiseGardenEvent("A new piece of land is waiting in your inventory.");
         return true;
     }
 
-    public bool PlaceGardenModule(string moduleId, int hexQ, int hexR)
+    public bool PlaceGardenModule(string moduleId, int hexQ, int hexR, int rotationSteps = 0)
     {
-        var result = _training!.PlaceGardenModule(State, moduleId, hexQ, hexR);
+        var result = _training!.PlaceGardenModule(State, moduleId, hexQ, hexR, rotationSteps);
         if (!result.Succeeded)
         {
             ToastRequested?.Invoke(PlayerActionFailureText.ForGardenModule(result.Failure));
@@ -79,8 +79,23 @@ public partial class GameSession
         if (!result.Changed)
             return true;
 
-        var module = State.GardenModules.Find(candidate => candidate.Id == moduleId);
-        var message = $"Placed the {DisplayStatId(module?.StatId ?? string.Empty)} land tile.";
+        const string message = "The island just got bigger.";
+        SaveAndNotify(message);
+        RaiseGardenEvent(message);
+        return true;
+    }
+
+    /// <summary>Builds training ground for one stat on a placed empty hex.</summary>
+    public bool ConvertHexToTrainingGround(string moduleId, string statId)
+    {
+        var result = _training!.ConvertHexToTrainingGround(State, moduleId, statId);
+        if (!result.Succeeded)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.ForGardenModule(result.Failure));
+            return false;
+        }
+
+        var message = $"Built {DisplayStatId(statId)} training ground.";
         SaveAndNotify(message);
         RaiseGardenEvent(message);
         return true;

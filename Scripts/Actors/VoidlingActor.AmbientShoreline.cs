@@ -30,13 +30,18 @@ public partial class VoidlingActor
         var maxY = _wanderBounds.End.Y;
         var edge = _rng.RandiRange(0, 3);
 
-        _target = edge switch
+        var boxedTarget = edge switch
         {
             0 => new Vector2(minX + shorelineInset, _rng.RandfRange(minY, maxY)),
             1 => new Vector2(maxX - shorelineInset, _rng.RandfRange(minY, maxY)),
             2 => new Vector2(_rng.RandfRange(minX, maxX), minY + shorelineInset),
             _ => new Vector2(_rng.RandfRange(minX, maxX), maxY - shorelineInset)
         };
+
+        // Current Garden land is a player-grown cluster of large hex pieces rather than a fixed
+        // rectangle. Reuse the actor's authored land clamp so an edge-biased target lands on the
+        // actual island shoreline instead of asking the Voidling to walk over water.
+        _target = ClampToWanderArea(boxedTarget);
         _nextTargetSeconds = _rng.RandfRange(1.5f, 4.0f);
     }
 }

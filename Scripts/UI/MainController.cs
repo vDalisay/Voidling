@@ -5,6 +5,8 @@ using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Garden;
 using Voidling.Presentation.UI.Multiplayer;
 
+using Voidling.Application.Persistence;
+
 namespace VoidlingGame;
 
 public partial class MainController : Node
@@ -22,6 +24,7 @@ public partial class MainController : Node
     private Label _coinsLabel = null!;
     private PanelContainer? _detailsPanel;
     private GardenEventLog _gardenEventLog = null!;
+    private LineEdit _gardenNameField = null!;
     private Label _toastLabel = null!;
     private float _toastSeconds;
     private string _selectedId = "";
@@ -110,22 +113,25 @@ public partial class MainController : Node
 
     private void BuildTopBar()
     {
-        var panel = UiFactory.CreatePanel(new Vector2(236, 44));
+        var panel = UiFactory.CreatePanel(new Vector2(120, 50));
         panel.Name = "GardenStatus";
         panel.Position = new Vector2(12, 10);
-        panel.Size = new Vector2(236, 44);
+        panel.Size = new Vector2(120, 50);
         _uiRoot.AddChild(panel);
 
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 12);
-        panel.AddChild(row);
+        // Name over sprouts rather than side by side: the island is the player's to name, so the
+        // name gets the top line and the wallet reads underneath it.
+        var column = new VBoxContainer();
+        column.AddThemeConstantOverride("separation", 1);
+        column.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        panel.AddChild(column);
 
-        var title = UiFactory.CreateTitle(Tr("UI_GARDEN_HOME"));
-        title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        row.AddChild(title);
+        _gardenNameField = BuildGardenNameField();
+        column.AddChild(_gardenNameField);
+
         _coinsLabel = UiFactory.CreateLabel(string.Format(Tr("UI_TOP_SPROUTS"), 0), 8);
         _coinsLabel.VerticalAlignment = VerticalAlignment.Center;
-        row.AddChild(_coinsLabel);
+        column.AddChild(_coinsLabel);
 
         var utilities = new HBoxContainer { Name = "GardenUtilities", Position = new Vector2(400, 18) };
         utilities.AddThemeConstantOverride("separation", 6);
@@ -146,18 +152,57 @@ public partial class MainController : Node
         AddTopButton(actions, Tr("UI_TOP_INVENTORY"), ShowInventory, -1, 92);
         AddTopButton(actions, Tr("UI_TOP_BREED"), ShowBreeding, -1, 82);
         AddTopButton(actions, Tr("UI_TOP_RACE"), ShowRacePickerWithCourses, -1, 78);
+
+        // The premium glyphs stay (the Garden UI smoke gate requires them), but they no longer
+        // stretch: an expanding icon ate the button and shoved the label off to one side.
         var glyphs = new[] { new Vector2I(7, 6), new Vector2I(7, 7), new Vector2I(4, 4), new Vector2I(6, 0) };
         for (var i = 0; i < glyphs.Length; i++)
         {
-            actions.GetChild<Button>(i).Icon = UiFactory.CreateGardenIcon(glyphs[i].X, glyphs[i].Y);
-            actions.GetChild<Button>(i).ExpandIcon = true;
-            actions.GetChild<Button>(i).AddThemeConstantOverride("icon_max_width", 14);
+            var button = actions.GetChild<Button>(i);
+            button.Icon = UiFactory.CreateGardenIcon(glyphs[i].X, glyphs[i].Y);
+            button.ExpandIcon = false;
+            button.IconAlignment = HorizontalAlignment.Left;
+            button.AddThemeConstantOverride("icon_max_width", 14);
         }
+    }
+
+    /// <summary>
+    /// The island's name, edited in place. It is player-authored text, so it is never translated
+    /// and the localized default only stands in while the player has not named the garden.
+    /// </summary>
+    private LineEdit BuildGardenNameField()
+    {
+        var field = new LineEdit
+        {
+            Text = _session.State.GardenName,
+            PlaceholderText = Tr("UI_GARDEN_HOME"),
+            MaxLength = GameStateMigrationService.GardenNameMaxLength,
+            Alignment = HorizontalAlignment.Left,
+            ExpandToTextLength = false,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = Tr("UI_GARDEN_NAME_HINT")
+        };
+        UiFactory.ApplyPixelFont(field, 12);
+        field.AddThemeStyleboxOverride("normal", new StyleBoxEmpty());
+        field.AddThemeStyleboxOverride("focus", new StyleBoxEmpty());
+        field.AddThemeStyleboxOverride("read_only", new StyleBoxEmpty());
+        field.AddThemeColorOverride("font_color", Color.FromHtml("#3B5044"));
+        field.AddThemeColorOverride("font_placeholder_color", Color.FromHtml("#3B5044"));
+        field.AddThemeColorOverride("caret_color", Color.FromHtml("#3B5044"));
+        field.TextSubmitted += name =>
+        {
+            _session.SetGardenName(name);
+            field.ReleaseFocus();
+        };
+        field.FocusExited += () => _session.SetGardenName(field.Text);
+        return field;
     }
 
     private static void AddTopButton(HBoxContainer row, string text, Action action, int iconIndex, float width)
     {
         var button = UiFactory.CreateButton(text, iconIndex);
+        // The label sits in the middle of the button; the dock reads as four even tiles.
+        button.Alignment = HorizontalAlignment.Center;
         button.CustomMinimumSize = new Vector2(width, 24);
         UiFactory.ApplyPixelFont(button, 7);
         button.Pressed += action;
@@ -167,7 +212,7 @@ public partial class MainController : Node
     private void BuildToast()
     {
         _toastLabel = UiFactory.CreateLabel("", 9);
-        _toastLabel.Position = new Vector2(24, 200);
+        _toastLabel.Position = new Vector2(24, 164);
         _toastLabel.Size = new Vector2(352, 28);
         _toastLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _toastLabel.AddThemeColorOverride("font_color", Color.FromHtml("#F9F4D8"));
@@ -180,11 +225,12 @@ public partial class MainController : Node
 
     private void BuildGardenEventLog()
     {
+        // Wide and tall enough to read the last handful of entries without scrolling.
         _gardenEventLog = new GardenEventLog
         {
-            Position = new Vector2(12, 244),
-            Size = new Vector2(280, 50),
-            CustomMinimumSize = new Vector2(280, 50),
+            Position = new Vector2(12, 214),
+            Size = new Vector2(320, 82),
+            CustomMinimumSize = new Vector2(320, 82),
             ZIndex = 6
         };
         _uiRoot.AddChild(_gardenEventLog);
@@ -193,6 +239,8 @@ public partial class MainController : Node
     private void RefreshUi()
     {
         _coinsLabel.Text = string.Format(Tr("UI_TOP_SPROUTS"), _session.State.Coins);
+        if (!_gardenNameField.HasFocus() && !string.Equals(_gardenNameField.Text, _session.State.GardenName, StringComparison.Ordinal))
+            _gardenNameField.Text = _session.State.GardenName;
 
         if (_selectedId.Length > 0 && _session.FindVoidling(_selectedId) == null)
             _selectedId = "";

@@ -4,21 +4,19 @@ using System.Collections.Generic;
 namespace Voidling.Domain.Garden;
 
 /// <summary>
-/// Flat-top axial hex grid laid over the authored Garden island. Placement rules and rendering
-/// share this geometry so "does this tile fit" and "where is it drawn" can never disagree.
+/// Flat-top axial hex grid the whole island is built from. Placement rules and rendering share
+/// this geometry so "does this piece fit" and "where is it drawn" can never disagree.
 /// A tile is sized the way the art is authored: <paramref name="TopEdgeWidth"/> is the flat top
 /// edge, the tile is twice that wide, and <paramref name="Height"/> is its total height. Keeping
 /// height independent lets a squashed sprite tile drop in without changing the grid maths.
+/// There is no authored base island any more: the player's starting hex is a real placed tile and
+/// everything else must grow off land that is already down.
 /// </summary>
 public sealed record GardenHexLayout(
     float TopEdgeWidth,
     float Height,
     float OriginX,
-    float OriginY,
-    float IslandLeft,
-    float IslandTop,
-    float IslandRight,
-    float IslandBottom)
+    float OriginY)
 {
     /// <summary>Total tile width, corner to corner.</summary>
     public float Width => TopEdgeWidth * 2.0f;
@@ -44,13 +42,6 @@ public sealed record GardenHexLayout(
         return RoundAxial(px * 2.0f / 3.0f, (-px + MathF.Sqrt(3.0f) * py) / 3.0f);
     }
 
-    /// <summary>True when the tile sits on the island the Garden scene already authors.</summary>
-    public bool IsBaseIsland(int q, int r)
-    {
-        var (x, y) = CenterOf(q, r);
-        return x >= IslandLeft && x <= IslandRight && y >= IslandTop && y <= IslandBottom;
-    }
-
     public static IReadOnlyList<(int Q, int R)> NeighboursOf(int q, int r)
     {
         var neighbours = new (int Q, int R)[NeighbourOffsets.Length];
@@ -59,25 +50,37 @@ public sealed record GardenHexLayout(
         return neighbours;
     }
 
-    /// <summary>
-    /// Catan-style fit: a tile may not overlap one that is already down, and must either sit on
-    /// the authored island or touch land that is already there.
-    /// </summary>
-    public bool CanPlace(int q, int r, Func<int, int, bool> isOccupied)
-    {
-        ArgumentNullException.ThrowIfNull(isOccupied);
-        if (isOccupied(q, r))
-            return false;
-        if (IsBaseIsland(q, r))
-            return true;
+    /// <summary>Corner-to-corner edge count of a tile; the coastline is drawn per edge.</summary>
+    public static int EdgeCount => NeighbourOffsets.Length;
 
-        foreach (var (neighbourQ, neighbourR) in NeighboursOf(q, r))
+    /// <summary>
+    /// Catan-style fit for a whole piece: no cell may overlap land that is already down, and at
+    /// least one cell has to touch it, so the island always stays one connected landmass.
+    /// </summary>
+    public static bool CanPlaceShape(
+        IReadOnlyList<(int Q, int R)> cells,
+        int anchorQ,
+        int anchorR,
+        Func<int, int, bool> isOccupied)
+    {
+        ArgumentNullException.ThrowIfNull(cells);
+        ArgumentNullException.ThrowIfNull(isOccupied);
+        if (cells.Count == 0)
+            return false;
+
+        var touchesLand = false;
+        foreach (var (offsetQ, offsetR) in cells)
         {
-            if (isOccupied(neighbourQ, neighbourR) || IsBaseIsland(neighbourQ, neighbourR))
-                return true;
+            var q = anchorQ + offsetQ;
+            var r = anchorR + offsetR;
+            if (isOccupied(q, r))
+                return false;
+
+            foreach (var (neighbourQ, neighbourR) in NeighboursOf(q, r))
+                touchesLand |= isOccupied(neighbourQ, neighbourR);
         }
 
-        return false;
+        return touchesLand;
     }
 
     private static (int Q, int R) RoundAxial(float q, float r)

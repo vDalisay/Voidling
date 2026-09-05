@@ -50,23 +50,27 @@ public sealed record GardenModuleRules(
     IReadOnlyList<float> PointsPerMinuteByLevel)
 {
     /// <summary>
-    /// How many Voidlings one tile can train at once. Bigger tiles are expected to raise this.
+    /// How many Voidlings one hex can train at once. A three-hex piece is three tiles once it is
+    /// down, so it holds three trainees without touching this number.
     /// </summary>
     public int VoidlingsPerTile { get; init; } = 1;
 
+    /// <summary>Cost of one hex of plain ground; a piece costs this per hex it covers.</summary>
+    public int EmptyHexCost { get; init; } = 25;
+
     /// <summary>
-    /// Hex geometry the land tiles snap to. Sized in sprite proportions: a 5-wide flat top scales
-    /// to this tile at x7, so a 70x60 tile sprite drops straight in.
+    /// Hex geometry the land snaps to. Sized in sprite proportions: a 5-wide flat top scales to
+    /// this tile at x21, so the 16px premium ground tiles read at a comfortable size on a hex big
+    /// enough for a Voidling to live on.
     /// </summary>
     public GardenHexLayout Hex { get; init; } = new(
-        TopEdgeWidth: 35.0f,
-        Height: 60.0f,
+        TopEdgeWidth: 105.0f,
+        Height: 180.0f,
         OriginX: 416.0f,
-        OriginY: 256.0f,
-        IslandLeft: 64.0f,
-        IslandTop: 64.0f,
-        IslandRight: 768.0f,
-        IslandBottom: 448.0f);
+        OriginY: 240.0f);
+
+    /// <summary>Coins to turn one placed empty hex into training ground for a stat.</summary>
+    public int TrainingConversionCost => Math.Max(0, PurchaseCost);
 
     public int MaxLevel => Math.Max(1, Math.Min(PointsPerMinuteByLevel.Count, UpgradeCosts.Count + 1));
 

@@ -62,7 +62,8 @@ public partial class GardenController
                 actor.QueueFree();
 
                 actor = new VoidlingActor();
-                actor.Setup(data, _wanderBounds, position);
+                actor.Setup(data, _landBounds, position);
+                actor.LandClamp = ClampToLand;
                 actor.Clicked += OnActorPressed;
                 _actorsRoot.AddChild(actor);
                 _actors[data.Id] = actor;

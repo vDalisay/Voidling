@@ -1,3 +1,6 @@
+using System;
+using Voidling.Application.Persistence;
+
 namespace VoidlingGame;
 
 public partial class GameSession
@@ -46,5 +49,22 @@ public partial class GameSession
         var seed = NextSeed();
         Save();
         return seed;
+    }
+
+    /// <summary>
+    /// Renames the island. The name is the player's own text, so it is stored as typed and never
+    /// translated; only surrounding whitespace and length are normalized.
+    /// </summary>
+    public bool SetGardenName(string name)
+    {
+        var trimmed = (name ?? string.Empty).Trim();
+        if (trimmed.Length > GameStateMigrationService.GardenNameMaxLength)
+            trimmed = trimmed[..GameStateMigrationService.GardenNameMaxLength];
+        if (string.Equals(trimmed, State.GardenName, StringComparison.Ordinal))
+            return false;
+
+        State.GardenName = trimmed;
+        SaveAndNotify(trimmed.Length == 0 ? "Garden name cleared." : $"Garden renamed to {trimmed}.");
+        return true;
     }
 }

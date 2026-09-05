@@ -17,7 +17,6 @@ public partial class GardenController : Node2D
 
     private readonly Dictionary<string, VoidlingActor> _actors = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EggVisual> _eggVisuals = new(StringComparer.Ordinal);
-    private readonly Rect2 _wanderBounds = new(new Vector2(72, 76), new Vector2(688, 330));
 
     private GameSession _session = null!;
     private Node2D _actorsRoot = null!;
@@ -27,6 +26,7 @@ public partial class GardenController : Node2D
     private string _followId = "";
     private string _pendingGrabId = "";
     private string _draggedId = "";
+    private Vector2 _grabOrigin;
     private float _pendingGrabSeconds;
     private int _spawnIndex;
     private bool _cameraDragging;
@@ -53,6 +53,9 @@ public partial class GardenController : Node2D
 
         _session.StateChanged += Refresh;
         Refresh();
+        // The island is one hex at the start and grows from there, so the camera frames the land
+        // itself rather than a fixed point the old authored island used to sit on.
+        ResetCamera();
         _initialRefreshComplete = true;
     }
 
@@ -91,7 +94,7 @@ public partial class GardenController : Node2D
             }
 
             if (_actors.TryGetValue(_draggedId, out var dragged))
-                dragged.Position = ClampToGarden(_actorsRoot.ToLocal(GetGlobalMousePosition()));
+                dragged.Position = _actorsRoot.ToLocal(GetGlobalMousePosition());
             return;
         }
 
@@ -192,12 +195,32 @@ public partial class GardenController : Node2D
             }
         }
 
+        if (IsPlacingLand && inputEvent is InputEventKey { Pressed: true } key)
+        {
+            switch (key.Keycode)
+            {
+                case Key.R:
+                case Key.E:
+                    RotateLandPlacement(1);
+                    GetViewport().SetInputAsHandled();
+                    return;
+                case Key.Q:
+                    RotateLandPlacement(-1);
+                    GetViewport().SetInputAsHandled();
+                    return;
+                case Key.Escape:
+                    CancelLandPlacement();
+                    GetViewport().SetInputAsHandled();
+                    return;
+            }
+        }
+
         if (inputEvent is InputEventMouseMotion motion)
         {
             if (_draggedId.Length > 0)
             {
                 if (_actors.TryGetValue(_draggedId, out var dragged))
-                    dragged.Position = ClampToGarden(_actorsRoot.ToLocal(GetGlobalMousePosition()));
+                    dragged.Position = _actorsRoot.ToLocal(GetGlobalMousePosition());
                 GetViewport().SetInputAsHandled();
                 return;
             }
@@ -223,7 +246,7 @@ public partial class GardenController : Node2D
     public void ResetCamera()
     {
         StopFollowing();
-        _camera.Position = new Vector2(416, 240);
+        _camera.Position = _landBounds.GetCenter();
         _zoomTarget = 1.0f;
     }
 
@@ -353,6 +376,9 @@ public partial class GardenController : Node2D
 
     private void Refresh()
     {
+        // The island is rebuilt first: it decides where actors may roam and where the camera stops.
+        RefreshLand();
+
         var currentIds = _session.State.Voidlings
             .Select(v => v.Id)
             .ToHashSet(StringComparer.Ordinal);
@@ -380,7 +406,8 @@ public partial class GardenController : Node2D
                 : NextSpawnPosition();
 
             var actor = new VoidlingActor();
-            actor.Setup(data, _wanderBounds, start);
+            actor.Setup(data, _landBounds, start);
+            actor.LandClamp = ClampToLand;
             actor.Clicked += OnActorPressed;
             _actorsRoot.AddChild(actor);
             _actors[data.Id] = actor;
@@ -391,7 +418,6 @@ public partial class GardenController : Node2D
 
         Select(_selectedId);
         RefreshEggs();
-        RefreshLand();
         RefreshTileResidents();
     }
 
@@ -489,9 +515,11 @@ public partial class GardenController : Node2D
             return;
 
         _draggedId = creatureId;
+        // Where it was standing, so letting go over open water simply puts it back.
+        _grabOrigin = actor.Position;
         Input.SetDefaultCursorShape(Input.CursorShape.Drag);
         actor.SetPickedUp(true);
-        actor.Position = ClampToGarden(_actorsRoot.ToLocal(GetGlobalMousePosition()));
+        actor.Position = _actorsRoot.ToLocal(GetGlobalMousePosition());
     }
 
     private void DropGrabbedVoidling()
@@ -507,19 +535,29 @@ public partial class GardenController : Node2D
             return;
         }
 
-        // Dropping onto a tile with room settles the Voidling on that ground; anywhere else it is a
-        // normal release into the Garden, which is also the only way to take a trainee off its tile.
-        // A full tile refuses the drop and the session says why.
-        var tileAccepts = landModuleId.Length > 0 && _session.HasRoomOnLand(landModuleId, creatureId);
-        actor.Position = tileAccepts
-            ? TileCenterOf(landModuleId)
-            : ClampToGarden(actor.Position);
+        // Letting go over open water is not a move at all: the Voidling walks back to where it was
+        // picked up and whatever it was doing carries on.
+        if (landModuleId.Length == 0)
+        {
+            actor.Position = _grabOrigin;
+            actor.SetPickedUp(false);
+            SpawnDust(actor.Position + new Vector2(0, 4));
+            UpdateLandHover();
+            return;
+        }
+
+        // Dropping onto training ground with room settles the Voidling on that hex. The whole island
+        // is hexes now, so plain grass is a normal release into the Garden, and that is also how a
+        // trainee is taken off its ground. A full hex refuses the drop and the session says why.
+        var trainingHex = IsTrainingGround(landModuleId);
+        var tileAccepts = trainingHex && _session.HasRoomOnLand(landModuleId, creatureId);
+        actor.Position = tileAccepts ? TileCenterOf(landModuleId) : actor.Position;
         actor.SetPickedUp(false);
         SpawnDust(actor.Position + new Vector2(0, 4));
         _session.MoveVoidling(creatureId, actor.Position);
         UpdateLandHover();
 
-        if (landModuleId.Length > 0)
+        if (trainingHex)
             _session.SetPassiveTrainingLand(creatureId, landModuleId);
         else if (WasTrainingOnLand(creatureId))
             _session.StopPassiveTraining(creatureId);
@@ -600,29 +638,36 @@ public partial class GardenController : Node2D
         _pendingGrabSeconds = 0.0f;
     }
 
+    /// <summary>Nothing can be dropped into the sea, so everything lands on the island.</summary>
     private Vector2 ClampToGarden(Vector2 position)
-        => new(
-            Mathf.Clamp(position.X, _wanderBounds.Position.X, _wanderBounds.End.X),
-            Mathf.Clamp(position.Y, _wanderBounds.Position.Y, _wanderBounds.End.Y));
+        => ClampToLand(new Vector2(
+            Mathf.Clamp(position.X, _landBounds.Position.X, _landBounds.End.X),
+            Mathf.Clamp(position.Y, _landBounds.Position.Y, _landBounds.End.Y)));
 
+    /// <summary>Newcomers appear on the island, spread around the hexes that are already down.</summary>
     private Vector2 NextSpawnPosition()
     {
-        var preset = new[]
-        {
-            new Vector2(300, 185), new Vector2(420, 210), new Vector2(250, 250),
-            new Vector2(485, 160), new Vector2(360, 290), new Vector2(530, 250),
-            new Vector2(215, 180), new Vector2(590, 185)
-        };
+        var placed = _session.State.GardenModules.Where(module => module.Placed).ToList();
+        if (placed.Count == 0)
+            return _landBounds.GetCenter();
 
-        var position = preset[_spawnIndex % preset.Length];
+        var tile = placed[_spawnIndex % placed.Count];
+        var ring = _spawnIndex / placed.Count;
+        var angle = Mathf.Tau * ((_spawnIndex * 0.37f) % 1.0f);
         _spawnIndex++;
-        return position;
+
+        var (x, y) = GameRules.GardenModuleRules.Hex.CenterOf(tile.HexQ, tile.HexR);
+        var reach = GameRules.GardenModuleRules.Hex.InnerRadius * (ring == 0 ? 0.35f : 0.6f);
+        return new Vector2(x, y) + Vector2.Right.Rotated(angle) * reach;
     }
 
+    /// <summary>The camera stays over the island, however far it has grown.</summary>
     private void ClampCamera()
     {
+        var margin = new Vector2(70.0f, 60.0f);
+        var allowed = _landBounds.Grow(-1.0f).GrowIndividual(margin.X, margin.Y, margin.X, margin.Y);
         _camera.Position = new Vector2(
-            Mathf.Clamp(_camera.Position.X, 260.0f, 570.0f),
-            Mathf.Clamp(_camera.Position.Y, 150.0f, 330.0f));
+            Mathf.Clamp(_camera.Position.X, allowed.Position.X, allowed.End.X),
+            Mathf.Clamp(_camera.Position.Y, allowed.Position.Y, allowed.End.Y));
     }
 }
