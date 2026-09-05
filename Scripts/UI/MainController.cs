@@ -288,7 +288,7 @@ public partial class MainController : Node
         {
             Position = new Vector2(110, 270),
             Size = new Vector2(300, 80),
-            CustomMinimumSize = new Vector2(300, 80),
+            CustomMinimumSize = new Vector2(300, 45),
             ZIndex = 6
         };
         _gardenEventLog.ActivitiesRequested += ShowGardenActivities;

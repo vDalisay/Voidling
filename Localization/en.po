@@ -342,6 +342,12 @@ msgstr "Return to Garden"
 msgid "UI_GARDEN_LOG_TITLE"
 msgstr "Garden log"
 
+msgid "UI_GARDEN_LOG_COLLAPSE"
+msgstr "Show one log line"
+
+msgid "UI_GARDEN_LOG_EXPAND"
+msgstr "Show more log lines"
+
 msgid "UI_GARDEN_LOG_STARTED"
 msgstr "Garden session started."
 

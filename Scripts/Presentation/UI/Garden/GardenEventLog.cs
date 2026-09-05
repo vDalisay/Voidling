@@ -13,12 +13,17 @@ public partial class GardenEventLog : Control
 {
     public event Action? ActivitiesRequested;
     private const int MaxEntries = 300;
+    private const float ExpandedHeight = 80;
+    private const float CompactHeight = 45;
 
     private sealed record Entry(string Id, string Text, Action? Action);
 
     private readonly Queue<Entry> _entries = new();
     private RichTextLabel _history = null!;
+    private Button _heightToggle = null!;
+    private Tween? _heightTween;
     private int _nextActionId;
+    public bool IsCompact { get; private set; }
 
     public override void _Ready()
     {
@@ -26,6 +31,7 @@ public partial class GardenEventLog : Control
 
         var panel = UiFactory.CreatePanel(Vector2.Zero);
         var background = (StyleBoxTexture)panel.GetThemeStylebox("panel").Duplicate();
+        background.ModulateColor = new Color(1, 1, 1, 0.5f);
         background.ContentMarginTop = background.ContentMarginBottom = 6;
         background.ContentMarginLeft = background.ContentMarginRight = 9;
         panel.AddThemeStyleboxOverride("panel", background);
@@ -35,9 +41,14 @@ public partial class GardenEventLog : Control
         column.AddThemeConstantOverride("separation", 3);
         panel.AddChild(column);
         var heading = new HBoxContainer();
-        var title = UiFactory.CreateLabel(Tr("UI_GARDEN_LOG_TITLE"), 9);
-        title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        heading.AddChild(title);
+        _heightToggle = UiFactory.CreateButton("−");
+        _heightToggle.Name = "ToggleHeight";
+        _heightToggle.CustomMinimumSize = new Vector2(18, 18);
+        _heightToggle.TooltipText = Tr("UI_GARDEN_LOG_COLLAPSE");
+        _heightToggle.Pressed += ToggleHeight;
+        UiFactory.ApplyPixelFont(_heightToggle, 8);
+        heading.AddChild(_heightToggle);
+        heading.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
         var activities = UiFactory.CreateButton(Tr("UI_GARDEN_ACTIVITIES"));
         activities.Name = "Activities";
         activities.CustomMinimumSize = new Vector2(62, 18);
@@ -68,6 +79,19 @@ public partial class GardenEventLog : Control
         RefreshText();
     }
 
+    private void ToggleHeight()
+    {
+        IsCompact = !IsCompact;
+        _heightToggle.Text = IsCompact ? "+" : "−";
+        _heightToggle.TooltipText = Tr(IsCompact ? "UI_GARDEN_LOG_EXPAND" : "UI_GARDEN_LOG_COLLAPSE");
+        _heightToggle.GrabFocus();
+        _history.ScrollActive = !IsCompact;
+        RefreshText();
+        _heightTween?.Kill();
+        _heightTween = CreateTween().SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+        _heightTween.TweenProperty(this, "size:y", IsCompact ? CompactHeight : ExpandedHeight, 0.18);
+    }
+
     public void Append(string message)
         => Append(message, null);
 
@@ -94,7 +118,7 @@ public partial class GardenEventLog : Control
             return;
 
         _history.Clear();
-        foreach (var entry in _entries)
+        foreach (var entry in IsCompact ? _entries.TakeLast(1) : _entries)
         {
             if (entry.Action == null)
             {
