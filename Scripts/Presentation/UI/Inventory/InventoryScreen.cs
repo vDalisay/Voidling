@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
+using Voidling.Domain.Garden;
 using Voidling.Presentation.UI.Common;
 using VoidlingGame;
 
@@ -11,7 +13,8 @@ public readonly record struct FailedEggViewState(string EggId, string DisplayNam
 public readonly record struct EggShellViewState(string ShellId, string DisplayName, int SaleValue);
 public readonly record struct IncubatingEggViewState(string EggId, string DisplayName, int SecondsRemaining);
 public readonly record struct StoredEggViewState(string EggId, string DisplayName, Color TintColor);
-public readonly record struct StoredLandViewState(string ModuleId, string DisplayName, Color TintColor);
+/// <summary>A piece of ground waiting in the inventory, named and shaped by what was bought.</summary>
+public readonly record struct StoredLandViewState(string ModuleId, string DisplayName, string ShapeId);
 public sealed record InventoryScreenState(IReadOnlyList<InventoryItemViewState> Items, IReadOnlyList<FailedEggViewState> FailedEggs, IReadOnlyList<EggShellViewState> EggShells, int IncubationSkipCount, IReadOnlyList<IncubatingEggViewState> IncubatingEggs, IReadOnlyList<StoredEggViewState> StoredEggs, IReadOnlyList<StoredLandViewState> StoredLand);
 
 public partial class InventoryScreen : VBoxContainer
@@ -80,17 +83,27 @@ public partial class InventoryScreen : VBoxContainer
 
     private Control CreateStoredLandRow(StoredLandViewState land)
     {
-        var panel = CreateRowPanel(); var row = CreateRow(panel); row.AddChild(CreateHexIcon(land.TintColor)); var name = UiFactory.CreateLabel(land.DisplayName, 8); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.VerticalAlignment = VerticalAlignment.Center; row.AddChild(name); var place = UiFactory.CreateButton(Tr("UI_INVENTORY_PLACE")); place.CustomMinimumSize = new Vector2(76, 22); UiFactory.ApplyPixelFont(place, 7); place.Pressed += () => PlaceStoredLandRequested?.Invoke(land); row.AddChild(place); return panel;
+        var panel = CreateRowPanel(); var row = CreateRow(panel); row.AddChild(CreateShapeIcon(land.ShapeId)); var name = UiFactory.CreateLabel(land.DisplayName, 8); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.VerticalAlignment = VerticalAlignment.Center; row.AddChild(name); var place = UiFactory.CreateButton(Tr("UI_INVENTORY_PLACE")); place.CustomMinimumSize = new Vector2(76, 22); UiFactory.ApplyPixelFont(place, 7); place.Pressed += () => PlaceStoredLandRequested?.Invoke(land); row.AddChild(place); return panel;
     }
 
-    private static Control CreateHexIcon(Color color)
+    /// <summary>The footprint of the piece, so the row shows the shape that is about to go down.</summary>
+    private static Control CreateShapeIcon(string shapeId)
     {
-        var holder = new Control { CustomMinimumSize = new Vector2(22, 22), MouseFilter = Control.MouseFilterEnum.Ignore };
-        var center = new Vector2(11, 11);
-        var polygon = HexShape.Corners(10.0f, 17.0f); for (var i = 0; i < polygon.Length; i++) polygon[i] += center;
-        holder.AddChild(new Polygon2D { Polygon = polygon, Color = color });
+        var shape = GardenTileShape.Find(shapeId) ?? GardenTileShape.Single;
+        var holder = new Control { CustomMinimumSize = new Vector2(34, 22), MouseFilter = Control.MouseFilterEnum.Ignore };
+        const float topEdge = 5.0f;
+        const float height = 8.5f;
+        var centers = shape.Cells.Select(cell => new Vector2(topEdge * 1.5f * cell.Q, height * (cell.R + cell.Q * 0.5f))).ToArray();
+        var origin = new Vector2(17, 11) - new Vector2(centers.Average(c => c.X), centers.Average(c => c.Y));
+        foreach (var center in centers)
+        {
+            var polygon = HexShape.Corners(topEdge, height); for (var i = 0; i < polygon.Length; i++) polygon[i] += origin + center;
+            holder.AddChild(new Polygon2D { Polygon = polygon, Color = LandIconColor });
+        }
         return holder;
     }
+
+    private static readonly Color LandIconColor = Color.FromHtml("#8FC57E");
 
     private Control CreateIncubationSkipRow(IncubatingEggViewState egg)
     {

@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Godot;
+using Voidling.Domain.Garden;
 using Voidling.Application.Breeding;
 using Voidling.Domain.Shop;
 using Voidling.Presentation.UI.Breeding;
@@ -51,14 +52,14 @@ public partial class MainController : Node
                 GameRules.FullIncubationSkipPrice)
             : null;
 
-        var landTiles = GameRules.StatIds
-            .Select(statId => new ShopLandTileViewState(
-                StatId: statId,
-                DisplayName: StatPresentationCatalog.NameFor(statId),
-                IdentityColor: StatPresentationCatalog.ColorFor(statId),
+        var landPieces = GardenTileShape.Catalog
+            .Select(shape => new ShopLandPieceViewState(
+                ShapeId: shape.Id,
+                DisplayName: LandShapePresentation.NameFor(shape.Id),
+                Cells: shape.Cells,
                 Stored: state.GardenModules.Count(module =>
-                    !module.Placed && string.Equals(module.StatId, statId, StringComparison.Ordinal)),
-                Price: GameRules.GardenModuleRules.PurchaseCost))
+                    !module.Placed && string.Equals(module.ShapeId, shape.Id, StringComparison.Ordinal)),
+                Price: GameRules.GardenModuleRules.EmptyHexCost * shape.HexCount))
             .ToArray();
 
         var rotationRemaining = (int)Math.Ceiling(Math.Max(
@@ -78,7 +79,7 @@ public partial class MainController : Node
         box.AddChild(stall);
 
         var screen = new ShopScreen();
-        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rotationRemaining, rareOffer, landTiles));
+        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rotationRemaining, rareOffer, landPieces));
         screen.TrainingItemPurchaseRequested += statId =>
         {
             _session.BuyTrainingItem(statId);
@@ -106,9 +107,9 @@ public partial class MainController : Node
             _session.BuyRareShopOffer(itemId);
             RenderShop();
         };
-        screen.LandPurchaseRequested += statId =>
+        screen.LandPurchaseRequested += shapeId =>
         {
-            _session.BuyGardenModule(statId);
+            _session.BuyLandShape(shapeId);
             RenderShop();
         };
         stall.AddChild(screen);

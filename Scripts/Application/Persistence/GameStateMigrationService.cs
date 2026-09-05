@@ -4,6 +4,8 @@ using System.Linq;
 using Voidling.Application.Breeding;
 using Voidling.Application.Daily;
 using Voidling.Application.Garden;
+using Voidling.Application.Training;
+using Voidling.Domain.Garden;
 using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
@@ -23,7 +25,7 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 21;
+    public const int CurrentSaveVersion = 22;
 
     private readonly GameBalanceRules _rules;
     private readonly LineageArchiveService _lineage = new();
@@ -92,7 +94,7 @@ public sealed class GameStateMigrationService
             state.TrainingItems[statId] = Math.Max(0, state.TrainingItems[statId]);
         }
 
-        NormalizeGardenModules(state);
+        NormalizeGardenModules(state, previousVersion);
         foreach (var creature in state.Voidlings.Concat(state.DepartedVoidlings)) NormalizeCreature(state, creature);
 
         foreach (var egg in state.OwnedEggs.Concat(state.StoreEggs))
@@ -211,10 +213,7 @@ public sealed class GameStateMigrationService
         return appearance;
     }
 
-    /// <summary>Deterministic hexes the four pre-hex Garden slots become, in slot order.</summary>
-    private static readonly (int Q, int R)[] LegacySlotHexes = { (0, 0), (1, 0), (0, 1), (-1, 1) };
-
-    private void NormalizeGardenModules(GameStateData state)
+    private void NormalizeGardenModules(GameStateData state, int previousVersion)
     {
         var normalized = new List<GardenModuleData>();
         var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -222,26 +221,33 @@ public sealed class GameStateMigrationService
         var maxLevel = Math.Max(1, _rules.GardenModules.MaxLevel);
         foreach (var module in state.GardenModules)
         {
-            if (module == null || string.IsNullOrWhiteSpace(module.Id) || !_rules.Genetics.StatIds.Contains(module.StatId ?? string.Empty)) continue;
+            if (module == null || string.IsNullOrWhiteSpace(module.Id)) continue;
             module.Id = module.Id.Trim();
             if (!ids.Add(module.Id)) continue;
+            module.StatId ??= string.Empty;
+            // Blank is plain ground now; anything that is neither blank nor a real stat is junk.
+            if (module.StatId.Length > 0 && !_rules.Genetics.StatIds.Contains(module.StatId)) continue;
             module.Level = Math.Clamp(module.Level, 1, maxLevel);
+            module.SlotIndex = -1;
+            if (GardenTileShape.Find(module.ShapeId ?? string.Empty) == null)
+                module.ShapeId = GardenTileShape.Single.Id;
 
-            // Pre-hex saves stored an abstract slot index. Keep those tiles on the ground by
-            // mapping each slot to its own hex instead of dropping the player back to storage.
-            if (!module.Placed && module.SlotIndex >= 0 && module.SlotIndex < LegacySlotHexes.Length)
+            // The hex grid grew to a size a Voidling can live on, so tiles from an older save no
+            // longer sit where they used to. They stay owned, at their stat and level, and go back
+            // to the inventory for the player to re-place on the new island.
+            if (previousVersion < 22)
             {
-                (module.HexQ, module.HexR) = LegacySlotHexes[module.SlotIndex];
-                module.Placed = true;
+                module.Placed = false;
+                module.ShapeId = GardenTileShape.Single.Id;
             }
 
-            module.SlotIndex = -1;
-            // ponytail: overlap only, no connectivity re-check on load. Tiles can only be placed
+            // ponytail: overlap only, no connectivity re-check on load. Pieces can only be placed
             // connected, so a save can only lose connectivity if it was hand-edited.
             if (module.Placed && !occupied.Add((module.HexQ, module.HexR))) module.Placed = false;
             normalized.Add(module);
         }
         state.GardenModules = normalized;
+        TrainingUseCase.EnsureStarterHex(state);
     }
 
     private void NormalizePassiveModuleAssignment(GameStateData state, VoidlingData creature)
@@ -261,8 +267,17 @@ public sealed class GameStateMigrationService
             creature.PassiveTrainingPointRemainder = 0.0;
             return;
         }
+        if (!module.Placed || module.StatId.Length == 0)
+        {
+            // The ground it was training on is gone, back in the inventory, or plain grass now.
+            creature.PassiveTrainingStatId = string.Empty;
+            creature.PassiveTrainingModuleId = string.Empty;
+            creature.PassiveTrainingPointsPerMinute = 0.0f;
+            creature.PassiveTrainingPointRemainder = 0.0;
+            return;
+        }
         creature.PassiveTrainingStatId = module.StatId;
-        creature.PassiveTrainingPointsPerMinute = module.Placed ? _rules.GardenModules.PointsPerMinuteForLevel(module.Level) : 0.0f;
+        creature.PassiveTrainingPointsPerMinute = _rules.GardenModules.PointsPerMinuteForLevel(module.Level);
         if (creature.PassiveTrainingPointsPerMinute <= 0.0f) creature.PassiveTrainingPointRemainder = 0.0;
     }
 

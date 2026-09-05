@@ -319,12 +319,15 @@ public partial class MainController : Node
 
         var storedLand = state.GardenModules
             .Where(module => !module.Placed)
-            .OrderBy(module => module.StatId, StringComparer.Ordinal)
+            .OrderBy(module => module.ShapeId, StringComparer.Ordinal)
             .ThenBy(module => module.Id, StringComparer.Ordinal)
             .Select(module => new StoredLandViewState(
                 module.Id,
-                string.Format(Tr("UI_INVENTORY_LAND_TILE"), StatPresentationCatalog.NameFor(module.StatId)),
-                StatPresentationCatalog.ColorFor(module.StatId)))
+                string.Format(
+                    Tr("UI_INVENTORY_LAND_TILE"),
+                    LandShapePresentation.NameFor(module.ShapeId),
+                    LandShapePresentation.HexCountOf(module.ShapeId)),
+                module.ShapeId))
             .ToList();
 
         var failedEggs = state.OwnedEggs
@@ -351,7 +354,7 @@ public partial class MainController : Node
         screen.PlaceStoredLandRequested += land =>
         {
             CloseModal();
-            _garden.BeginLandPlacement(land.ModuleId, land.TintColor);
+            _garden.BeginLandPlacement(land.ModuleId, land.ShapeId);
         };
         screen.DiscardFailedEggRequested += eggId => { _session.DiscardFailedEgg(eggId); CallDeferred(nameof(ShowInventory)); };
         screen.SellEggShellRequested += shellId => { if (_session.SellEggShell(shellId)) CallDeferred(nameof(ShowInventory)); };

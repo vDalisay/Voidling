@@ -60,27 +60,40 @@ public sealed class GardenHexLayoutTests
         Assert.True(Layout.InnerRadius <= Layout.Height * 0.5f);
     }
 
+    /// <summary>A hex is big enough for a Voidling to live on: three of the old tiles wide.</summary>
     [Fact]
-    public void IslandTilesArePlaceableAndOccupiedTilesAreNot()
+    public void OneHexIsThreeTimesTheOriginalTileAcross()
     {
-        Assert.True(Layout.IsBaseIsland(0, 0));
-        Assert.True(Layout.CanPlace(0, 0, (_, _) => false));
-        Assert.False(Layout.CanPlace(0, 0, (q, r) => q == 0 && r == 0));
+        Assert.Equal(210.0f, Layout.Width, 3);
+        Assert.Equal(180.0f, Layout.Height, 3);
     }
 
     [Fact]
-    public void LandOverWaterOnlyFitsWhenItTouchesExistingLand()
+    public void LandOnlyFitsWhereItTouchesTheIslandAndNothingIsUnderIt()
     {
-        var farQ = FirstColumnOffIsland();
-        Assert.False(Layout.IsBaseIsland(farQ, 0));
+        var placed = new HashSet<(int Q, int R)> { (0, 0) };
+        bool Occupied(int q, int r) => placed.Contains((q, r));
 
-        // Nothing placed yet: the tile beyond the island edge still touches the island itself.
-        Assert.True(Layout.CanPlace(farQ, 0, (_, _) => false));
+        var single = GardenTileShape.Single.Cells;
+        Assert.False(GardenHexLayout.CanPlaceShape(single, 0, 0, Occupied));
+        Assert.True(GardenHexLayout.CanPlaceShape(single, 1, 0, Occupied));
 
-        // One further out is orphaned until its neighbour is filled in.
-        Assert.False(Layout.CanPlace(farQ + 1, 0, (_, _) => false));
-        var placed = new HashSet<(int Q, int R)> { (farQ, 0) };
-        Assert.True(Layout.CanPlace(farQ + 1, 0, (q, r) => placed.Contains((q, r))));
+        // Out at sea, with nothing to touch, is not a place the island can reach.
+        Assert.False(GardenHexLayout.CanPlaceShape(single, 9, 9, Occupied));
+    }
+
+    [Fact]
+    public void APieceFitsOnlyWhenEveryOneOfItsHexesDoes()
+    {
+        var placed = new HashSet<(int Q, int R)> { (0, 0), (2, 0) };
+        bool Occupied(int q, int r) => placed.Contains((q, r));
+
+        // The row of three would have to cover the hex that is already down at (2, 0).
+        Assert.False(GardenHexLayout.CanPlaceShape(GardenTileShape.Line.Cells, 0, 0, Occupied));
+        Assert.False(GardenHexLayout.CanPlaceShape(GardenTileShape.Line.Cells, 1, 0, Occupied));
+
+        // Turned a sixth of a turn it clears both and still touches the island.
+        Assert.True(GardenHexLayout.CanPlaceShape(GardenTileShape.Line.CellsRotated(1), 1, 0, Occupied));
     }
 
     [Fact]
@@ -90,13 +103,5 @@ public sealed class GardenHexLayoutTests
         Assert.Equal(6, neighbours.Distinct().Count());
         Assert.DoesNotContain((3, -2), neighbours);
         Assert.All(neighbours, neighbour => Assert.Contains((3, -2), GardenHexLayout.NeighboursOf(neighbour.Q, neighbour.R)));
-    }
-
-    private static int FirstColumnOffIsland()
-    {
-        var q = 0;
-        while (Layout.IsBaseIsland(q, 0))
-            q++;
-        return q;
     }
 }

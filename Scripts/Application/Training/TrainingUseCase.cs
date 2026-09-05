@@ -3,6 +3,7 @@ using System.Linq;
 using Voidling.Application.Garden;
 using Voidling.Domain.Care;
 using Voidling.Domain.Evolution;
+using Voidling.Domain.Garden;
 using Voidling.Domain.Preferences;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shared;
@@ -27,6 +28,7 @@ public enum PassiveTrainingFailure
     UnknownStat,
     CreatureNotFound,
     LandNotPlaced,
+    LandNotTrainingGround,
     LandFull
 }
 
@@ -34,9 +36,13 @@ public enum GardenModuleFailure
 {
     None,
     UnknownStat,
+    UnknownShape,
     DuplicateModuleId,
     ModuleNotFound,
     AlreadyPlaced,
+    NotPlaced,
+    NotTrainingGround,
+    AlreadyTrainingGround,
     DoesNotFit,
     NotEnoughCurrency,
     MaxLevel
@@ -152,15 +158,20 @@ public sealed class TrainingUseCase
             favoriteFoodDiscoveredNow);
     }
 
-    public GardenModuleMutationResult BuyGardenModule(GameStateData state, string moduleId, string statId)
+    /// <summary>
+    /// Buys a piece of plain ground from the shop. It waits in the inventory as one item and only
+    /// becomes hexes when the player puts it down, so an unplaced piece trains nobody.
+    /// </summary>
+    public GardenModuleMutationResult BuyLandShape(GameStateData state, string moduleId, string shapeId)
     {
         ArgumentNullException.ThrowIfNull(state);
-        if (!_rules.Genetics.StatIds.Contains(statId))
-            return new GardenModuleMutationResult(GardenModuleFailure.UnknownStat, false);
+        var shape = GardenTileShape.Find(shapeId);
+        if (shape == null)
+            return new GardenModuleMutationResult(GardenModuleFailure.UnknownShape, false);
         if (string.IsNullOrWhiteSpace(moduleId) || state.GardenModules.Any(module => module.Id == moduleId))
             return new GardenModuleMutationResult(GardenModuleFailure.DuplicateModuleId, false);
 
-        var cost = Math.Max(0, _rules.GardenModules.PurchaseCost);
+        var cost = PriceOf(shape);
         if (state.Coins < cost)
             return new GardenModuleMutationResult(GardenModuleFailure.NotEnoughCurrency, false);
 
@@ -168,15 +179,32 @@ public sealed class TrainingUseCase
         state.GardenModules.Add(new GardenModuleData
         {
             Id = moduleId,
-            StatId = statId,
+            ShapeId = shape.Id,
+            StatId = string.Empty,
             Level = 1,
             Placed = false
         });
         return new GardenModuleMutationResult(GardenModuleFailure.None, true, cost);
     }
 
-    /// <summary>Puts an owned land tile down at a hex, if the island can grow there.</summary>
-    public GardenModuleMutationResult PlaceGardenModule(GameStateData state, string moduleId, int hexQ, int hexR)
+    /// <summary>Shop price of a piece: plain ground, charged per hex it covers.</summary>
+    public int PriceOf(GardenTileShape shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        return Math.Max(0, _rules.GardenModules.EmptyHexCost) * shape.HexCount;
+    }
+
+    /// <summary>
+    /// Puts an owned piece down, anchored on one hex and turned <paramref name="rotationSteps"/>
+    /// sixths of a turn. Every hex it covers becomes its own tile, so a three-hex piece can end up
+    /// training three Voidlings.
+    /// </summary>
+    public GardenModuleMutationResult PlaceGardenModule(
+        GameStateData state,
+        string moduleId,
+        int hexQ,
+        int hexR,
+        int rotationSteps = 0)
     {
         ArgumentNullException.ThrowIfNull(state);
         var module = state.GardenModules.FirstOrDefault(candidate => candidate.Id == moduleId);
@@ -184,14 +212,92 @@ public sealed class TrainingUseCase
             return new GardenModuleMutationResult(GardenModuleFailure.ModuleNotFound, false);
         if (module.Placed)
             return new GardenModuleMutationResult(GardenModuleFailure.AlreadyPlaced, false);
-        if (!_rules.GardenModules.Hex.CanPlace(hexQ, hexR, (q, r) => IsHexOccupied(state, q, r)))
+
+        var shape = GardenTileShape.Find(module.ShapeId) ?? GardenTileShape.Single;
+        var cells = shape.CellsRotated(rotationSteps);
+        if (!GardenHexLayout.CanPlaceShape(cells, hexQ, hexR, (q, r) => IsHexOccupied(state, q, r)))
             return new GardenModuleMutationResult(GardenModuleFailure.DoesNotFit, false);
 
-        module.HexQ = hexQ;
-        module.HexR = hexR;
+        // The anchor cell keeps the bought item's ID so inventory, toasts and saves stay stable;
+        // the rest of the piece becomes sibling hexes derived from it.
+        module.HexQ = hexQ + cells[0].Q;
+        module.HexR = hexR + cells[0].R;
+        module.ShapeId = GardenTileShape.Single.Id;
         module.Placed = true;
+        for (var index = 1; index < cells.Count; index++)
+        {
+            state.GardenModules.Add(new GardenModuleData
+            {
+                Id = SiblingHexId(state, module.Id, index),
+                ShapeId = GardenTileShape.Single.Id,
+                StatId = string.Empty,
+                Level = 1,
+                Placed = true,
+                HexQ = hexQ + cells[index].Q,
+                HexR = hexR + cells[index].R
+            });
+        }
+
         RefreshAssignedCreatureRates(state, module);
         return new GardenModuleMutationResult(GardenModuleFailure.None, true);
+    }
+
+    /// <summary>Turns one placed empty hex into training ground for a stat, for coins.</summary>
+    public GardenModuleMutationResult ConvertHexToTrainingGround(GameStateData state, string moduleId, string statId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (!_rules.Genetics.StatIds.Contains(statId))
+            return new GardenModuleMutationResult(GardenModuleFailure.UnknownStat, false);
+
+        var module = state.GardenModules.FirstOrDefault(candidate => candidate.Id == moduleId);
+        if (module == null)
+            return new GardenModuleMutationResult(GardenModuleFailure.ModuleNotFound, false);
+        if (!module.Placed)
+            return new GardenModuleMutationResult(GardenModuleFailure.NotPlaced, false);
+        if (module.StatId.Length > 0)
+            return new GardenModuleMutationResult(GardenModuleFailure.AlreadyTrainingGround, false);
+
+        var cost = _rules.GardenModules.TrainingConversionCost;
+        if (state.Coins < cost)
+            return new GardenModuleMutationResult(GardenModuleFailure.NotEnoughCurrency, false);
+
+        state.Coins -= cost;
+        module.StatId = statId;
+        module.Level = 1;
+        return new GardenModuleMutationResult(GardenModuleFailure.None, true, cost);
+    }
+
+    /// <summary>
+    /// Every island starts as one free hex of plain ground, so there is always something for the
+    /// next piece to connect to and somewhere for the starter Voidlings to stand.
+    /// </summary>
+    public static void EnsureStarterHex(GameStateData state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (state.GardenModules.Any(module => module.Placed))
+            return;
+
+        state.GardenModules.Add(new GardenModuleData
+        {
+            Id = StarterHexId,
+            ShapeId = GardenTileShape.Single.Id,
+            StatId = string.Empty,
+            Level = 1,
+            Placed = true,
+            HexQ = 0,
+            HexR = 0
+        });
+    }
+
+    public const string StarterHexId = "starter-hex";
+
+    private static string SiblingHexId(GameStateData state, string anchorId, int index)
+    {
+        var candidate = $"{anchorId}-{index}";
+        var suffix = index;
+        while (state.GardenModules.Any(module => string.Equals(module.Id, candidate, StringComparison.Ordinal)))
+            candidate = $"{anchorId}-{++suffix}";
+        return candidate;
     }
 
     public static bool IsHexOccupied(GameStateData state, int hexQ, int hexR)
@@ -206,6 +312,8 @@ public sealed class TrainingUseCase
         var module = state.GardenModules.FirstOrDefault(candidate => candidate.Id == moduleId);
         if (module == null)
             return new GardenModuleMutationResult(GardenModuleFailure.ModuleNotFound, false);
+        if (module.StatId.Length == 0)
+            return new GardenModuleMutationResult(GardenModuleFailure.NotTrainingGround, false);
 
         var cost = _rules.GardenModules.UpgradeCostForLevel(module.Level);
         if (cost < 0)
@@ -234,6 +342,8 @@ public sealed class TrainingUseCase
             string.Equals(candidate.Id, moduleId, StringComparison.Ordinal));
         if (module == null || !module.Placed)
             return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.LandNotPlaced, string.Empty, false);
+        if (module.StatId.Length == 0)
+            return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.LandNotTrainingGround, string.Empty, false);
         if (!_rules.Genetics.StatIds.Contains(module.StatId))
             return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.UnknownStat, string.Empty, false);
         if (!HasRoomFor(state, module.Id, creatureId))
@@ -310,7 +420,7 @@ public sealed class TrainingUseCase
     }
 
     private float RateFor(GardenModuleData module)
-        => module.Placed
+        => module.Placed && module.StatId.Length > 0
             ? _rules.GardenModules.PointsPerMinuteForLevel(module.Level)
             : 0.0f;
 }

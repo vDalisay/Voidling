@@ -5,6 +5,8 @@ namespace VoidlingGame;
 public partial class GardenController
 {
     private Area2D? _groundPanArea;
+    private Vector2 _groundPressPosition;
+    private bool _groundPressWasPan;
 
     public override void _EnterTree()
     {
@@ -56,11 +58,19 @@ public partial class GardenController
                 return;
 
             _cameraDragging = true;
+            _groundPressWasPan = true;
+            _groundPressPosition = mouse.Position;
             StopFollowing();
         }
-        else if (_cameraDragging)
+        else if (_groundPressWasPan)
         {
             _cameraDragging = false;
+            _groundPressWasPan = false;
+
+            // A press that never travelled is a click on the ground, not a camera drag, so it
+            // belongs to the hex underneath: that is how the player opens a hex's menu.
+            if (!IsPlacingLand && !IsPlacingEgg && mouse.Position.DistanceTo(_groundPressPosition) <= 5.0f)
+                SelectLandHexUnderPointer();
         }
     }
 }
