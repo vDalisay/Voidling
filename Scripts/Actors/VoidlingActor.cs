@@ -358,20 +358,28 @@ public partial class VoidlingActor : Node2D
         _nextTargetSeconds = _rng.RandfRange(1.5f, 4.0f);
     }
 
+    /// <summary>
+    /// Any real sideways component decides which way a Voidling looks. The up and down animations
+    /// keep whatever horizontal facing came before them, so letting them win a mostly-vertical walk
+    /// leaves a creature drifting left while still facing right.
+    /// </summary>
+    private const float FacingDeadzone = 0.12f;
+
     private void PlayForDirection(Vector2 direction)
     {
         // A Voidling on a land tile wears the race frames, which only carry its activity loop.
         // Facing comes from a flip there instead of a per-direction animation.
         if (IsOnTile)
         {
-            _sprite.FlipH = direction.X < 0.0f;
+            if (Mathf.Abs(direction.X) > FacingDeadzone)
+                _sprite.FlipH = direction.X < 0.0f;
             if (_sprite.Animation != _tileAnimation)
                 _sprite.Play(_tileAnimation);
             return;
         }
 
         StringName animation;
-        if (Mathf.Abs(direction.X) > Mathf.Abs(direction.Y))
+        if (Mathf.Abs(direction.X) > FacingDeadzone)
             animation = direction.X < 0.0f ? "walk_left" : "walk_right";
         else
             animation = direction.Y < 0.0f ? "walk_up" : "walk_down";

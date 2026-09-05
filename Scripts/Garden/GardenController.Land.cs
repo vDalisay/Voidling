@@ -76,6 +76,7 @@ public partial class GardenController
     private static readonly Color CoastSand = Color.FromHtml("#E4C58C");
     private static readonly Color CoastShadow = Color.FromHtml("#8A6A46");
     private static readonly Color GrassEdge = Color.FromHtml("#5E9455");
+    private static readonly Color RefusedGround = Color.FromHtml("#9C514B");
 
     /// <summary>
     /// Hex edges paired with the neighbour they face. <see cref="HexShape.Corners"/> starts at the
@@ -88,6 +89,7 @@ public partial class GardenController
     private readonly List<Node2D> _ghostCells = new();
 
     private Node2D _landRoot = null!;
+    private Node2D? _coastRoot;
     private string _placingModuleId = "";
     private GardenTileShape _placingShape = GardenTileShape.Single;
     private int _placingRotation;
@@ -107,9 +109,12 @@ public partial class GardenController
     private sealed class LandVisual
     {
         public Node2D Holder { get; init; } = null!;
-        public Polygon2D Overlay { get; init; } = null!;
+
+        /// <summary>Grass and clutter only. Tinting this leaves the Voidlings standing on it alone.</summary>
+        public Node2D Ground { get; init; } = null!;
         public Line2D Highlight { get; init; } = null!;
         public Color BaseColor { get; init; }
+        public Color IdleTint { get; init; }
         public bool IsTrainingGround { get; init; }
     }
 
@@ -244,9 +249,10 @@ public partial class GardenController
         _landVisuals.Clear();
 
         var occupied = placed.Select(module => (module.HexQ, module.HexR)).ToHashSet();
+        BuildCoastline(placed, occupied);
         foreach (var module in placed)
         {
-            var visual = BuildHexVisual(module, occupied);
+            var visual = BuildHexVisual(module);
             _landVisuals[module.Id] = visual;
 
             if (_initialRefreshComplete && !known.Contains(module.Id))
@@ -263,25 +269,21 @@ public partial class GardenController
             BuildSnapGrid();
     }
 
-    private LandVisual BuildHexVisual(GardenModuleData module, IReadOnlySet<(int Q, int R)> occupied)
+    private LandVisual BuildHexVisual(GardenModuleData module)
     {
         var trainingGround = module.StatId.Length > 0;
         var identity = trainingGround ? StatPresentationCatalog.ColorFor(module.StatId) : GrassEdge;
         var (x, y) = Hex.CenterOf(module.HexQ, module.HexR);
         var holder = new Node2D { Position = new Vector2(x, y), ZIndex = -4 };
 
-        holder.AddChild(CreateGroundFill(new Vector2(x, y)));
-
-        // Training ground wears its stat as a wash over the grass so it reads at a glance.
-        var overlay = new Polygon2D
-        {
-            Polygon = HexShape.Corners(Hex.TopEdgeWidth, Hex.Height),
-            Color = identity with { A = trainingGround ? 0.22f : 0.0f }
-        };
-        holder.AddChild(overlay);
-
-        AddDecorations(holder, module, trainingGround);
-        AddCoastline(holder, module, occupied);
+        // Training ground wears its stat as a wash over the grass so it reads at a glance. The wash
+        // is a modulate on the ground itself, never a polygon over the hex: an overlay would also
+        // paint every Voidling standing on it.
+        var idleTint = trainingGround ? Colors.White.Lerp(identity, 0.30f) : Colors.White;
+        var ground = new Node2D { Modulate = idleTint };
+        ground.AddChild(CreateGroundFill(new Vector2(x, y)));
+        AddDecorations(ground, module, trainingGround);
+        holder.AddChild(ground);
 
         var highlight = CreateHexOutline(Colors.White, 3.0f);
         highlight.Visible = false;
@@ -294,12 +296,17 @@ public partial class GardenController
         return new LandVisual
         {
             Holder = holder,
-            Overlay = overlay,
+            Ground = ground,
             Highlight = highlight,
             BaseColor = identity,
+            IdleTint = idleTint,
             IsTrainingGround = trainingGround
         };
     }
+
+    /// <summary>The same polygon pushed out from its centre, so neighbouring hexes overlap.</summary>
+    private static Vector2[] Grown(Vector2[] polygon, float amount)
+        => polygon.Select(point => point + point.Normalized() * amount).ToArray();
 
     /// <summary>
     /// The premium 16px ground tile, repeated across the hex. Offsetting the texture by the hex's
@@ -308,44 +315,112 @@ public partial class GardenController
     private static Polygon2D CreateGroundFill(Vector2 worldPosition)
         => new()
         {
-            Polygon = HexShape.Corners(Hex.TopEdgeWidth, Hex.Height),
+            Polygon = Grown(HexShape.Corners(Hex.TopEdgeWidth, Hex.Height), 1.5f),
             Texture = GroundTexture,
             TextureOffset = -worldPosition,
             TextureRepeat = CanvasItem.TextureRepeatEnum.Enabled
         };
 
     /// <summary>
-    /// Only the edges facing open water get a coast, so a placed piece reads as one landmass
-    /// instead of a pile of separate tiles.
+    /// The shore is traced around the island as a whole, not per hex: every edge facing open water
+    /// is chained into closed loops and drawn as one line. Drawing it per hex leaves a notch at
+    /// every corner where two hexes meet, because each hex's line stops at its own corner.
     /// </summary>
-    private static void AddCoastline(Node2D holder, GardenModuleData module, IReadOnlySet<(int Q, int R)> occupied)
+    private void BuildCoastline(IReadOnlyList<GardenModuleData> placed, IReadOnlySet<(int Q, int R)> occupied)
     {
+        if (_coastRoot != null && GodotObject.IsInstanceValid(_coastRoot))
+            _coastRoot.QueueFree();
+        _coastRoot = new Node2D { ZIndex = -3 };
+        _landRoot.AddChild(_coastRoot);
+
         var corners = HexShape.Corners(Hex.TopEdgeWidth, Hex.Height);
-        for (var edge = 0; edge < EdgeNeighbours.Length; edge++)
+        var open = new Dictionary<(int X, int Y), List<CoastSegment>>();
+        foreach (var module in placed)
         {
-            var neighbour = (module.HexQ + EdgeNeighbours[edge].Q, module.HexR + EdgeNeighbours[edge].R);
-            if (occupied.Contains(neighbour))
-                continue;
-
-            var from = corners[edge];
-            var to = corners[(edge + 1) % corners.Length];
-            var inward = -((from + to) * 0.5f).Normalized();
-
-            holder.AddChild(new Line2D
+            var (centerX, centerY) = Hex.CenterOf(module.HexQ, module.HexR);
+            var center = new Vector2(centerX, centerY);
+            for (var edge = 0; edge < EdgeNeighbours.Length; edge++)
             {
-                Points = new[] { from, to },
-                DefaultColor = CoastShadow,
-                Width = 7.0f,
-                ZIndex = 1
-            });
-            holder.AddChild(new Line2D
-            {
-                Points = new[] { from + inward * 3.0f, to + inward * 3.0f },
-                DefaultColor = CoastSand,
-                Width = 5.0f,
-                ZIndex = 2
-            });
+                var neighbour = (module.HexQ + EdgeNeighbours[edge].Q, module.HexR + EdgeNeighbours[edge].R);
+                if (occupied.Contains(neighbour))
+                    continue;
+
+                // Corners run clockwise, so every hex hands its shore on in the same direction and
+                // the segments chain into one loop around the landmass.
+                var from = center + corners[edge];
+                var to = center + corners[(edge + 1) % corners.Length];
+                var segment = new CoastSegment(from, to, (center - (from + to) * 0.5f).Normalized());
+                if (!open.TryGetValue(PointKey(from), out var starting))
+                    open[PointKey(from)] = starting = new List<CoastSegment>();
+                starting.Add(segment);
+            }
         }
+
+        while (open.Count > 0)
+        {
+            var entry = open.First();
+            var loop = new List<Vector2>();
+            var inwards = new List<Vector2>();
+            var cursor = entry.Key;
+            while (open.TryGetValue(cursor, out var candidates) && candidates.Count > 0)
+            {
+                var segment = candidates[0];
+                candidates.RemoveAt(0);
+                if (candidates.Count == 0)
+                    open.Remove(cursor);
+
+                loop.Add(segment.From);
+                inwards.Add(segment.Inward);
+                cursor = PointKey(segment.To);
+                if (cursor == entry.Key)
+                    break;
+            }
+
+            if (loop.Count > 1)
+                AddCoastLoop(loop, inwards);
+        }
+    }
+
+    private readonly record struct CoastSegment(Vector2 From, Vector2 To, Vector2 Inward);
+
+    /// <summary>Corner keys are quantised so the same corner reached from two hexes matches.</summary>
+    private static (int X, int Y) PointKey(Vector2 point)
+        => ((int)MathF.Round(point.X * 4.0f), (int)MathF.Round(point.Y * 4.0f));
+
+    /// <summary>Dark shore around the loop with a sand line just inside it, both continuous.</summary>
+    private void AddCoastLoop(IReadOnlyList<Vector2> loop, IReadOnlyList<Vector2> inwards)
+    {
+        var ring = new Vector2[loop.Count + 1];
+        var sand = new Vector2[loop.Count + 1];
+        for (var i = 0; i < loop.Count; i++)
+        {
+            // A corner belongs to the segment that ends there and the one that starts there, so the
+            // sand line follows the average of both, which keeps it inside on convex and concave turns.
+            var previous = inwards[(i + inwards.Count - 1) % inwards.Count];
+            ring[i] = loop[i];
+            sand[i] = loop[i] + (previous + inwards[i]).Normalized() * 3.0f;
+        }
+
+        ring[^1] = ring[0];
+        sand[^1] = sand[0];
+
+        _coastRoot!.AddChild(new Line2D
+        {
+            Points = ring,
+            DefaultColor = CoastShadow,
+            Width = 7.0f,
+            JointMode = Line2D.LineJointMode.Round,
+            Closed = true
+        });
+        _coastRoot.AddChild(new Line2D
+        {
+            Points = sand,
+            DefaultColor = CoastSand,
+            Width = 5.0f,
+            JointMode = Line2D.LineJointMode.Round,
+            Closed = true,
+            ZIndex = 1
+        });
     }
 
     /// <summary>
@@ -513,15 +588,17 @@ public partial class GardenController
             if (moduleId != hovered)
             {
                 visual.Highlight.Visible = false;
-                visual.Overlay.Color = visual.BaseColor with { A = visual.IsTrainingGround ? 0.22f : 0.0f };
+                visual.Ground.Modulate = visual.IdleTint;
                 continue;
             }
 
             // Plain ground and a full hex both turn the drop away, and say so in the same colour.
             var welcome = visual.IsTrainingGround && TileHasRoomFor(moduleId, _draggedId);
             visual.Highlight.Visible = true;
-            visual.Highlight.DefaultColor = welcome ? Colors.White : Color.FromHtml("#9C514B");
-            visual.Overlay.Color = visual.BaseColor with { A = welcome ? 0.42f : 0.30f };
+            visual.Highlight.DefaultColor = welcome ? Colors.White : RefusedGround;
+            visual.Ground.Modulate = welcome
+                ? Colors.White.Lerp(visual.BaseColor, 0.55f)
+                : Colors.White.Lerp(RefusedGround, 0.40f);
         }
     }
 

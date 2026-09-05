@@ -116,13 +116,11 @@ public partial class MainController
         row.AddChild(controls);
 
         var label = UiFactory.CreateLabel(
-            string.Format(
-                Tr("UI_INVENTORY_LAND_TILE"),
-                LandShapePresentation.NameFor(module.ShapeId),
-                LandShapePresentation.HexCountOf(module.ShapeId)),
+            LandShapePresentation.DescribeStoredPiece(module.ShapeId, module.StatId, module.Level),
             7);
         label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         label.VerticalAlignment = VerticalAlignment.Center;
+        label.AddThemeColorOverride("font_color", LandShapePresentation.TintFor(module.StatId).Darkened(0.25f));
         controls.AddChild(label);
 
         var stored = UiFactory.CreateLabel(Tr("UI_LAND_STORED"), 6);

@@ -26,6 +26,7 @@ public partial class GardenController : Node2D
     private string _followId = "";
     private string _pendingGrabId = "";
     private string _draggedId = "";
+    private Vector2 _grabOrigin;
     private float _pendingGrabSeconds;
     private int _spawnIndex;
     private bool _cameraDragging;
@@ -93,7 +94,7 @@ public partial class GardenController : Node2D
             }
 
             if (_actors.TryGetValue(_draggedId, out var dragged))
-                dragged.Position = ClampToGarden(_actorsRoot.ToLocal(GetGlobalMousePosition()));
+                dragged.Position = _actorsRoot.ToLocal(GetGlobalMousePosition());
             return;
         }
 
@@ -219,7 +220,7 @@ public partial class GardenController : Node2D
             if (_draggedId.Length > 0)
             {
                 if (_actors.TryGetValue(_draggedId, out var dragged))
-                    dragged.Position = ClampToGarden(_actorsRoot.ToLocal(GetGlobalMousePosition()));
+                    dragged.Position = _actorsRoot.ToLocal(GetGlobalMousePosition());
                 GetViewport().SetInputAsHandled();
                 return;
             }
@@ -514,9 +515,11 @@ public partial class GardenController : Node2D
             return;
 
         _draggedId = creatureId;
+        // Where it was standing, so letting go over open water simply puts it back.
+        _grabOrigin = actor.Position;
         Input.SetDefaultCursorShape(Input.CursorShape.Drag);
         actor.SetPickedUp(true);
-        actor.Position = ClampToGarden(_actorsRoot.ToLocal(GetGlobalMousePosition()));
+        actor.Position = _actorsRoot.ToLocal(GetGlobalMousePosition());
     }
 
     private void DropGrabbedVoidling()
@@ -532,14 +535,23 @@ public partial class GardenController : Node2D
             return;
         }
 
+        // Letting go over open water is not a move at all: the Voidling walks back to where it was
+        // picked up and whatever it was doing carries on.
+        if (landModuleId.Length == 0)
+        {
+            actor.Position = _grabOrigin;
+            actor.SetPickedUp(false);
+            SpawnDust(actor.Position + new Vector2(0, 4));
+            UpdateLandHover();
+            return;
+        }
+
         // Dropping onto training ground with room settles the Voidling on that hex. The whole island
         // is hexes now, so plain grass is a normal release into the Garden, and that is also how a
         // trainee is taken off its ground. A full hex refuses the drop and the session says why.
-        var trainingHex = landModuleId.Length > 0 && IsTrainingGround(landModuleId);
+        var trainingHex = IsTrainingGround(landModuleId);
         var tileAccepts = trainingHex && _session.HasRoomOnLand(landModuleId, creatureId);
-        actor.Position = tileAccepts
-            ? TileCenterOf(landModuleId)
-            : ClampToGarden(actor.Position);
+        actor.Position = tileAccepts ? TileCenterOf(landModuleId) : actor.Position;
         actor.SetPickedUp(false);
         SpawnDust(actor.Position + new Vector2(0, 4));
         _session.MoveVoidling(creatureId, actor.Position);

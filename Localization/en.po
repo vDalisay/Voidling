@@ -750,6 +750,12 @@ msgstr "LAND TO PLACE"
 msgid "UI_INVENTORY_LAND_TILE"
 msgstr "{0} ({1} hex)"
 
+msgid "UI_INVENTORY_LAND_PLAIN"
+msgstr "Plain ground  \u2022  {0}"
+
+msgid "UI_INVENTORY_LAND_TRAINED"
+msgstr "{0} ground L{1}  \u2022  {2}"
+
 msgid "UI_INVENTORY_LAND_HINT"
 msgstr "Place a piece against the island. R rotates it. Then click a hex to build training ground on it."
 

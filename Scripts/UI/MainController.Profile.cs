@@ -319,15 +319,14 @@ public partial class MainController : Node
 
         var storedLand = state.GardenModules
             .Where(module => !module.Placed)
-            .OrderBy(module => module.ShapeId, StringComparer.Ordinal)
+            .OrderBy(module => module.StatId, StringComparer.Ordinal)
+            .ThenBy(module => module.ShapeId, StringComparer.Ordinal)
             .ThenBy(module => module.Id, StringComparer.Ordinal)
             .Select(module => new StoredLandViewState(
                 module.Id,
-                string.Format(
-                    Tr("UI_INVENTORY_LAND_TILE"),
-                    LandShapePresentation.NameFor(module.ShapeId),
-                    LandShapePresentation.HexCountOf(module.ShapeId)),
-                module.ShapeId))
+                LandShapePresentation.DescribeStoredPiece(module.ShapeId, module.StatId, module.Level),
+                module.ShapeId,
+                LandShapePresentation.TintFor(module.StatId)))
             .ToList();
 
         var failedEggs = state.OwnedEggs

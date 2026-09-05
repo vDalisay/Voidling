@@ -14,7 +14,7 @@ public readonly record struct EggShellViewState(string ShellId, string DisplayNa
 public readonly record struct IncubatingEggViewState(string EggId, string DisplayName, int SecondsRemaining);
 public readonly record struct StoredEggViewState(string EggId, string DisplayName, Color TintColor);
 /// <summary>A piece of ground waiting in the inventory, named and shaped by what was bought.</summary>
-public readonly record struct StoredLandViewState(string ModuleId, string DisplayName, string ShapeId);
+public readonly record struct StoredLandViewState(string ModuleId, string DisplayName, string ShapeId, Color Tint);
 public sealed record InventoryScreenState(IReadOnlyList<InventoryItemViewState> Items, IReadOnlyList<FailedEggViewState> FailedEggs, IReadOnlyList<EggShellViewState> EggShells, int IncubationSkipCount, IReadOnlyList<IncubatingEggViewState> IncubatingEggs, IReadOnlyList<StoredEggViewState> StoredEggs, IReadOnlyList<StoredLandViewState> StoredLand);
 
 public partial class InventoryScreen : VBoxContainer
@@ -83,27 +83,42 @@ public partial class InventoryScreen : VBoxContainer
 
     private Control CreateStoredLandRow(StoredLandViewState land)
     {
-        var panel = CreateRowPanel(); var row = CreateRow(panel); row.AddChild(CreateShapeIcon(land.ShapeId)); var name = UiFactory.CreateLabel(land.DisplayName, 8); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.VerticalAlignment = VerticalAlignment.Center; row.AddChild(name); var place = UiFactory.CreateButton(Tr("UI_INVENTORY_PLACE")); place.CustomMinimumSize = new Vector2(76, 22); UiFactory.ApplyPixelFont(place, 7); place.Pressed += () => PlaceStoredLandRequested?.Invoke(land); row.AddChild(place); return panel;
+        var panel = CreateRowPanel(); var row = CreateRow(panel); row.AddChild(CreateShapeIcon(land.ShapeId, land.Tint)); var name = UiFactory.CreateLabel(land.DisplayName, 8); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.VerticalAlignment = VerticalAlignment.Center; row.AddChild(name); var place = UiFactory.CreateButton(Tr("UI_INVENTORY_PLACE")); place.CustomMinimumSize = new Vector2(76, 22); UiFactory.ApplyPixelFont(place, 7); place.Pressed += () => PlaceStoredLandRequested?.Invoke(land); row.AddChild(place); return panel;
     }
 
-    /// <summary>The footprint of the piece, so the row shows the shape that is about to go down.</summary>
-    private static Control CreateShapeIcon(string shapeId)
+    /// <summary>
+    /// The footprint of the piece, scaled to fit and coloured by the ground it carries, so two
+    /// rows in the inventory are told apart at a glance instead of by their text alone.
+    /// </summary>
+    private static Control CreateShapeIcon(string shapeId, Color tint)
     {
         var shape = GardenTileShape.Find(shapeId) ?? GardenTileShape.Single;
-        var holder = new Control { CustomMinimumSize = new Vector2(34, 22), MouseFilter = Control.MouseFilterEnum.Ignore };
-        const float topEdge = 5.0f;
-        const float height = 8.5f;
-        var centers = shape.Cells.Select(cell => new Vector2(topEdge * 1.5f * cell.Q, height * (cell.R + cell.Q * 0.5f))).ToArray();
-        var origin = new Vector2(17, 11) - new Vector2(centers.Average(c => c.X), centers.Average(c => c.Y));
+        const float boxWidth = 40.0f;
+        const float boxHeight = 26.0f;
+        const float ratio = 1.7f;
+
+        var units = shape.Cells.Select(cell => new Vector2(1.5f * cell.Q, cell.R + cell.Q * 0.5f)).ToArray();
+        var spanX = units.Max(unit => unit.X) - units.Min(unit => unit.X) + 2.0f;
+        var spanY = units.Max(unit => unit.Y) - units.Min(unit => unit.Y) + 1.0f;
+        var topEdge = Mathf.Min(boxWidth / spanX, boxHeight / (ratio * spanY));
+        var height = topEdge * ratio;
+
+        var centers = units.Select(unit => new Vector2(unit.X * topEdge, unit.Y * height)).ToArray();
+        var middle = new Vector2(
+            (centers.Max(center => center.X) + centers.Min(center => center.X)) * 0.5f,
+            (centers.Max(center => center.Y) + centers.Min(center => center.Y)) * 0.5f);
+        var origin = new Vector2(boxWidth * 0.5f, boxHeight * 0.5f) - middle;
+
+        var holder = new Control { CustomMinimumSize = new Vector2(boxWidth, boxHeight), MouseFilter = Control.MouseFilterEnum.Ignore };
         foreach (var center in centers)
         {
             var polygon = HexShape.Corners(topEdge, height); for (var i = 0; i < polygon.Length; i++) polygon[i] += origin + center;
-            holder.AddChild(new Polygon2D { Polygon = polygon, Color = LandIconColor });
+            var outline = HexShape.Outline(topEdge, height); for (var i = 0; i < outline.Length; i++) outline[i] += origin + center;
+            holder.AddChild(new Polygon2D { Polygon = polygon, Color = tint });
+            holder.AddChild(new Line2D { Points = outline, DefaultColor = tint.Darkened(0.45f), Width = 1.0f, JointMode = Line2D.LineJointMode.Round });
         }
         return holder;
     }
-
-    private static readonly Color LandIconColor = Color.FromHtml("#8FC57E");
 
     private Control CreateIncubationSkipRow(IncubatingEggViewState egg)
     {
