@@ -11,7 +11,7 @@ namespace Voidling.Presentation.UI.Garden;
 /// </summary>
 public partial class GardenEventLog : Control
 {
-    private const int MaxEntries = 80;
+    private const int MaxEntries = 300;
 
     private sealed record Entry(string Id, string Text, Action? Action);
 
