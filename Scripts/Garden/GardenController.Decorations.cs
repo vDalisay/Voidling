@@ -129,10 +129,11 @@ public partial class GardenController
         GetViewport().SetInputAsHandled();
     }
 
-    private Vector2 ClampDecorationPosition(Vector2 position)
-        => new(
-            Mathf.Clamp(position.X, _wanderBounds.Position.X, _wanderBounds.End.X),
-            Mathf.Clamp(position.Y, _wanderBounds.Position.Y, _wanderBounds.End.Y));
+    /// <summary>
+    /// Decorations follow the same rule as everything else in the Garden: they belong on the
+    /// island. The Garden is a cluster of hexes now, so a rectangle would let a bush sit on water.
+    /// </summary>
+    private Vector2 ClampDecorationPosition(Vector2 position) => ClampToGarden(position);
 
     private void RefreshDecorations()
     {
