@@ -18,6 +18,7 @@ public sealed class GameStateData
     private Dictionary<string, int> _utilityItems = new(StringComparer.Ordinal);
     private string _shopRareOfferItemId = string.Empty;
     private List<GardenDecorationData> _gardenDecorations = new();
+    private List<string> _completedCupIds = new();
 
     public int SaveVersion { get; set; } = 20;
 
@@ -57,6 +58,16 @@ public sealed class GameStateData
     {
         get => _gardenDecorations;
         set => _gardenDecorations = value ?? new List<GardenDecorationData>();
+    }
+
+    /// <summary>
+    /// Stable authored Cup IDs already won by this save. Unlocks are derived from this collection;
+    /// the non-null setter makes older saves that predate Cups load as having no completed Cups.
+    /// </summary>
+    public List<string> CompletedCupIds
+    {
+        get => _completedCupIds;
+        set => _completedCupIds = value ?? new List<string>();
     }
 
     // Multiplayer transaction durability. These remain harmless empty collections for players who
