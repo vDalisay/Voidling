@@ -6,9 +6,9 @@ namespace VoidlingGame;
 
 /// <summary>
 /// Reconciles the useful Garden-roaming portion of the old implementation-plan branch with the
-/// current Garden/hex-training architecture. Effective Run changes free-roam speed and Stamina
-/// changes how long a free-roaming Voidling pauses between destinations. Training-tile activity
-/// loops remain continuous.
+/// current Garden/land architecture. Effective Run changes free-roam speed, Stamina changes pause
+/// duration, and Swim subtly biases free-roam destinations toward the island shoreline. Training
+/// activity loops remain continuous and none of this presentation state feeds race outcomes.
 /// </summary>
 public partial class GardenController
 {
@@ -53,8 +53,7 @@ public partial class GardenController
             if (!_actors.TryGetValue(data.Id, out var actor) || !GodotObject.IsInstanceValid(actor))
                 continue;
 
-            // The old branch also caught a real lifecycle presentation bug: an actor that matures
-            // must be rebuilt so adult scale, hitbox, movement baseline and current appearance apply.
+            // A stage change rebuilds the actor so its adult/child scale, hitbox and appearance refresh.
             if (actor.Stage != data.Stage)
             {
                 var position = actor.Position;
@@ -85,11 +84,13 @@ public partial class GardenController
                 string.Equals(stat.StatId, "run", StringComparison.Ordinal))?.EffectiveValue ?? 0;
             var stamina = profile.Stats.FirstOrDefault(stat =>
                 string.Equals(stat.StatId, "stamina", StringComparison.Ordinal))?.EffectiveValue ?? 0;
-            actor.ApplyAmbientStats(run, stamina);
+            var swim = profile.Stats.FirstOrDefault(stat =>
+                string.Equals(stat.StatId, "swim", StringComparison.Ordinal))?.EffectiveValue ?? 0;
+            actor.ApplyAmbientStats(run, stamina, swim);
         }
 
         // A rebuilt actor must immediately rejoin its authored training tile rather than waiting for
-        // the next unrelated state change. This preserves the current hex-land behavior.
+        // the next unrelated state change. This preserves the current land-training behavior.
         if (replacedStageActor)
             RefreshTileResidents();
     }
