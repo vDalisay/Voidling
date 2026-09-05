@@ -45,15 +45,19 @@ public partial class MainController
             await ClickGardenControl(_railToggle);
             await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
             RequireOnScreen(_railToggle);
-            if (rail.Visible || !_railToggle.HasFocus() || actions.GetChildren().OfType<Button>().Any(b => b.FocusMode != Control.FocusModeEnum.None))
-                throw new InvalidOperationException("Collapsed navigation is still visible or keyboard focus is lost.");
+            if (rail.Visible || _gardenStatus.Visible || _dayNightDial.Visible || _gardenEventLog.Visible ||
+                !_railToggle.HasFocus() || actions.GetChildren().OfType<Button>().Any(b => b.FocusMode != Control.FocusModeEnum.None))
+                throw new InvalidOperationException("Collapsed Garden HUD is still visible or keyboard focus is lost.");
+            if (Mathf.Abs(_railToggle.Position.Y - (ScreenHeight - _railToggle.Size.Y) / 2) > 1)
+                throw new InvalidOperationException("Navigation handle is not centered on the screen edge.");
             await CaptureGardenUi("garden-collapsed");
             await ClickGardenControl(_railToggle);
             ToggleGardenRail();
             ToggleGardenRail();
             await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
             RequireOnScreen(rail);
-            if (!rail.Visible || actions.GetChildren().OfType<Button>().Any(b => b.FocusMode != Control.FocusModeEnum.All))
+            if (!rail.Visible || !_gardenStatus.Visible || !_dayNightDial.Visible || !_gardenEventLog.Visible ||
+                actions.GetChildren().OfType<Button>().Any(b => b.FocusMode != Control.FocusModeEnum.All))
                 throw new InvalidOperationException("Navigation did not recover from interrupted animation.");
 
             var history = _gardenEventLog.FindChildren("*", "RichTextLabel", true, false).OfType<RichTextLabel>().Single();

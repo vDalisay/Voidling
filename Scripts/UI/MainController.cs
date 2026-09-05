@@ -27,6 +27,7 @@ public partial class MainController : Node
     private GardenEventLog _gardenEventLog = null!;
     private LineEdit _gardenNameField = null!;
     private readonly List<string> _pendingGardenMessages = new();
+    private PanelContainer _gardenStatus = null!;
     private GardenDayNightDial _dayNightDial = null!;
     private PanelContainer _gardenRail = null!;
     private Button _railToggle = null!;
@@ -128,18 +129,18 @@ public partial class MainController : Node
 
     private void BuildTopBar()
     {
-        var panel = UiFactory.CreatePanel(new Vector2(120, 50));
-        panel.Name = "GardenStatus";
-        panel.Position = new Vector2(110, 10);
-        panel.Size = new Vector2(120, 50);
-        _uiRoot.AddChild(panel);
+        _gardenStatus = UiFactory.CreatePanel(new Vector2(120, 50));
+        _gardenStatus.Name = "GardenStatus";
+        _gardenStatus.Position = new Vector2(110, 10);
+        _gardenStatus.Size = new Vector2(120, 50);
+        _uiRoot.AddChild(_gardenStatus);
 
         // Name over sprouts rather than side by side: the island is the player's to name, so the
         // name gets the top line and the wallet reads underneath it.
         var column = new VBoxContainer();
         column.AddThemeConstantOverride("separation", 1);
         column.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        panel.AddChild(column);
+        _gardenStatus.AddChild(column);
 
         _gardenNameField = BuildGardenNameField();
         column.AddChild(_gardenNameField);
@@ -202,8 +203,9 @@ public partial class MainController : Node
         }
         _railToggle = UiFactory.CreateButton("‹");
         _railToggle.Name = "GardenRailToggle";
-        _railToggle.Position = new Vector2(66, 12);
+        _railToggle.Position = new Vector2(84, (ScreenHeight - 24) / 2);
         _railToggle.CustomMinimumSize = new Vector2(24, 24);
+        _railToggle.ZIndex = 20;
         _railToggle.TooltipText = Tr("UI_GARDEN_HIDE_RAIL");
         _railToggle.Pressed += ToggleGardenRail;
         _uiRoot.AddChild(_railToggle);
@@ -215,6 +217,9 @@ public partial class MainController : Node
         _railTween?.Kill();
         _quickMenu.Close();
         _gardenRail.Visible = true;
+        _gardenStatus.Visible = true;
+        _dayNightDial.Visible = true;
+        _gardenEventLog.Visible = true;
         foreach (var node in _gardenRail.FindChildren("*", "Button", true, false))
             ((Button)node).FocusMode = _railCollapsed ? Control.FocusModeEnum.None : Control.FocusModeEnum.All;
         _railToggle.Text = _railCollapsed ? "›" : "‹";
@@ -222,9 +227,18 @@ public partial class MainController : Node
         _railToggle.GrabFocus();
         _railTween = CreateTween().SetParallel().SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
         _railTween.TweenProperty(_gardenRail, "position:x", _railCollapsed ? -96f : 0f, 0.22);
-        _railTween.TweenProperty(_railToggle, "position:x", _railCollapsed ? 8f : 66f, 0.22);
+        _railTween.TweenProperty(_railToggle, "position:x", _railCollapsed ? 4f : 84f, 0.22);
+        _railTween.TweenProperty(_gardenStatus, "position:x", _railCollapsed ? -120f : 110f, 0.22);
+        _railTween.TweenProperty(_dayNightDial, "position:x", _railCollapsed ? -78f : 110f, 0.22);
+        _railTween.TweenProperty(_gardenEventLog, "position:x", _railCollapsed ? -300f : 110f, 0.22);
         _railTween.TweenProperty(_saveStatusLabel, "position:x", _railCollapsed ? -84f : 12f, 0.22);
-        _railTween.Finished += () => _gardenRail.Visible = !_railCollapsed;
+        _railTween.Finished += () =>
+        {
+            _gardenRail.Visible = !_railCollapsed;
+            _gardenStatus.Visible = !_railCollapsed;
+            _dayNightDial.Visible = !_railCollapsed;
+            _gardenEventLog.Visible = !_railCollapsed && !_modalHost.IsOpen;
+        };
     }
 
     /// <summary>
@@ -299,7 +313,7 @@ public partial class MainController : Node
         RefreshQuickMenu();
 
         if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))
-            _gardenEventLog.Visible = !_modalHost.IsOpen;
+            _gardenEventLog.Visible = !_modalHost.IsOpen && !_railCollapsed;
 
         if (_modalHost.IsOpen)
             HideGardenHudPanels();
