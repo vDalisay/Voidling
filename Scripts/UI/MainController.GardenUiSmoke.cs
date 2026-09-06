@@ -3,7 +3,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using Voidling.Domain.Racing;
+using Voidling.Presentation.UI.Breeding;
+using Voidling.Presentation.UI.Inventory;
 using Voidling.Presentation.UI.Racing;
+using Voidling.Presentation.UI.Settings;
 
 namespace VoidlingGame;
 
@@ -241,6 +244,8 @@ public partial class MainController
                 RequireOnScreen(ModalPanel());
                 if (button.Name == "Shop") await VerifyShopUi(rail);
                 if (button.Name == "Races") await VerifyRaceEntryUi();
+                if (button.Name == "Inventory") await VerifyInventoryUi();
+                if (button.Name == "Breed") await VerifyBreedingUi();
                 await CaptureGardenUi($"menu-{button.Name}");
                 CloseModal();
                 await SettleGardenUi();
@@ -258,9 +263,7 @@ public partial class MainController
                 throw new InvalidOperationException("Escape did not cancel decoration placement before opening a menu.");
             ShowGardenBuild();
             await SettleGardenUi();
-            FindGardenButton(_modalHost, "Land").EmitSignal(BaseButton.SignalName.Pressed);
-            await SettleGardenUi();
-            RequireOnScreen(ModalPanel());
+            await VerifyBuildUi();
             CloseModal();
             ShowGardenActivities();
             await SettleGardenUi();
@@ -289,6 +292,7 @@ public partial class MainController
             FindGardenButton(_modalHost, "Settings").EmitSignal(BaseButton.SignalName.Pressed);
             await SettleGardenUi();
             RequireOnScreen(ModalPanel());
+            await VerifySettingsUi();
             await CaptureGardenUi("settings");
             await PressGardenEscape();
             FindGardenButton(_modalHost, "Resume");
@@ -505,6 +509,113 @@ public partial class MainController
         await SettleGardenUi();
         if (FindRaceEntry().Step != RaceEntryStep.Course)
             throw new InvalidOperationException("Back did not return to course select.");
+    }
+
+    /// <summary>
+    /// The satchel's three bands: a category column reflecting the save, a grid that keeps its
+    /// shape, and one detail card that follows whichever slot is picked.
+    /// </summary>
+    private async Task VerifyInventoryUi()
+    {
+        var satchel = _modalHost.FindChildren("Satchel", string.Empty, true, false)
+            .OfType<InventoryScreen>().Single(screen => !screen.IsQueuedForDeletion());
+        var categories = satchel.GetNode<VBoxContainer>("Categories");
+        var slots = satchel.GetNode<PanelContainer>("Slots");
+        var detail = satchel.GetNode<PanelContainer>("ItemDetail");
+        RequireSeparate(categories, slots);
+        RequireSeparate(slots, detail);
+        RequireOnScreen(detail);
+
+        var filled = slots.FindChildren("Slot_*", "Button", true, false)
+            .OfType<Button>().Where(button => !button.IsQueuedForDeletion()).ToArray();
+        if (filled.Length == 0) throw new InvalidOperationException("Inventory showed no owned item.");
+        // Occupied plus drawn-empty slots always fill the grid, whatever the save holds.
+        const int inventorySlotCount = 12;
+        if (slots.FindChildren("*", "PanelContainer", true, false).Count + filled.Length < inventorySlotCount)
+            throw new InvalidOperationException("Inventory grid did not keep its shape.");
+        if (filled.Count(button => button.ButtonPressed) != 1)
+            throw new InvalidOperationException("Inventory did not hold exactly one selection.");
+
+        // The detail card has to follow the slot, not stay on whatever opened first.
+        var before = ((Label)detail.FindChild("DetailName", true, false)).Text;
+        var other = filled.FirstOrDefault(button => !button.ButtonPressed);
+        if (other != null)
+        {
+            await ClickGardenControl(other);
+            await SettleGardenUi();
+            var after = (Label)satchel.GetNode<PanelContainer>("ItemDetail").FindChild("DetailName", true, false);
+            if (after.Text == before) throw new InvalidOperationException("Inventory detail did not follow the slot.");
+        }
+
+        foreach (var category in categories.GetChildren().OfType<Button>())
+        {
+            await ClickGardenControl(category);
+            await SettleGardenUi();
+            RequireOnScreen(satchel.GetNode<PanelContainer>("ItemDetail"));
+        }
+        await CaptureGardenUi("inventory");
+    }
+
+    /// <summary>Two parents, marked A and B, and one verdict that follows the pair.</summary>
+    private async Task VerifyBreedingUi()
+    {
+        var nest = _modalHost.FindChildren("Nesting", string.Empty, true, false)
+            .OfType<BreedingScreen>().SingleOrDefault(screen => !screen.IsQueuedForDeletion());
+        if (nest == null) return;
+        var roster = nest.GetNode<PanelContainer>("RosterPanel");
+        var pair = nest.GetNode<PanelContainer>("PairCard");
+        RequireSeparate(roster, pair);
+        RequireOnScreen(pair);
+
+        var picked = roster.FindChildren("Racer_*", "Button", true, false)
+            .OfType<Button>().Where(button => !button.IsQueuedForDeletion() && button.ButtonPressed).ToArray();
+        if (picked.Length != 2) throw new InvalidOperationException("Breeding did not start with two parents.");
+        FindGardenButton(pair, "BreedAction");
+        if (pair.FindChild("PairVerdict", true, false) == null)
+            throw new InvalidOperationException("Breeding showed no pairing verdict.");
+        await CaptureGardenUi("breed");
+    }
+
+    /// <summary>Build reaches both land and decorations, each as a grid beside its own card.</summary>
+    private async Task VerifyBuildUi()
+    {
+        FindGardenButton(_modalHost, "Land").EmitSignal(BaseButton.SignalName.Pressed);
+        await SettleGardenUi();
+        RequireOnScreen(ModalPanel());
+        var landSlots = (Control)_modalHost.FindChild("LandSlots", true, false);
+        var landDetail = (Control)_modalHost.FindChild("LandDetail", true, false);
+        RequireSeparate(landSlots, landDetail);
+        await CaptureGardenUi("build-land");
+        CloseModal();
+
+        ShowGardenDecorations();
+        await SettleGardenUi();
+        RequireOnScreen(ModalPanel());
+        var decorationSlots = (Control)_modalHost.FindChild("DecorationSlots", true, false);
+        var decorationDetail = (Control)_modalHost.FindChild("DecorationDetail", true, false);
+        RequireSeparate(decorationSlots, decorationDetail);
+        FindGardenButton(decorationDetail, "DecorationAction");
+        await CaptureGardenUi("build-decorate");
+    }
+
+    /// <summary>Each switch's mark has to change with the switch, not only its pressed state.</summary>
+    private async Task VerifySettingsUi()
+    {
+        var settings = _modalHost.FindChildren("Settings", string.Empty, true, false)
+            .OfType<SettingsScreen>().Single(screen => !screen.IsQueuedForDeletion());
+        var edgePan = FindGardenButton(settings, "EdgePan");
+        var mark = edgePan.GetNode<TextureRect>("Mark");
+        var before = mark.Texture;
+        var edgePanning = _session.State.EdgePanning;
+        await ClickGardenControl(edgePan);
+        await SettleGardenUi();
+        if (_session.State.EdgePanning == edgePanning)
+            throw new InvalidOperationException("Edge panning switch did not reach the session.");
+        if (mark.Texture == before) throw new InvalidOperationException("Switch mark did not follow the switch.");
+        await ClickGardenControl(edgePan);
+        await SettleGardenUi();
+        if (_session.State.EdgePanning != edgePanning)
+            throw new InvalidOperationException("Edge panning switch did not toggle back.");
     }
 
     private RaceEntryScreen FindRaceEntry()

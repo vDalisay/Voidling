@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
@@ -411,65 +412,29 @@ public partial class RaceEntryScreen : Control
         var row = new HBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkCenter };
         row.AddThemeConstantOverride("separation", 8);
 
-        var pages = Mathf.Max(1, (_state!.Voidlings.Count + RacersPerPage - 1) / RacersPerPage);
-        _racerPage = Mathf.Clamp(_racerPage, 0, pages - 1);
-
         var rosterPanel = PaperPanel(Vector2.Zero);
         rosterPanel.Name = "RosterPanel";
         var rosterBox = new VBoxContainer();
         rosterBox.AddThemeConstantOverride("separation", 3);
         rosterPanel.AddChild(rosterBox);
 
-        var gridRow = new HBoxContainer();
-        gridRow.AddThemeConstantOverride("separation", 4);
-        gridRow.AddChild(BuildPageArrow("RosterPrev", -1, pages));
-
-        var grid = new GridContainer { Name = "RosterGrid", Columns = RacerColumns };
-        grid.AddThemeConstantOverride("h_separation", 3);
-        grid.AddThemeConstantOverride("v_separation", 1);
-        var page = _state.Voidlings.Skip(_racerPage * RacersPerPage).Take(RacersPerPage).ToArray();
-        foreach (var creature in page)
-        {
-            var captured = creature;
-            var entry = UiFactory.CreateVoidlingCard(
-                creature.Name,
-                creature.Appearance,
-                creature.HasAngelMutation,
-                creature.OtherMutationCount,
-                pressed =>
-                {
-                    if (!pressed) return;
-                    _selectedId = captured.Id;
-                    RaiseSelectionChanged();
-                    RebuildStep();
-                },
-                out var card);
-            card.Name = "Racer_" + creature.Id;
-            card.SetPressedNoSignal(creature.Id == _selectedId);
-            // Three rows have to fit above the footer, so the card keeps only the height its
-            // portrait and name actually need.
-            entry.CustomMinimumSize = new Vector2(84, 72);
-            if (creature.Id == _selectedId)
+        var roster = _state!.Voidlings
+            .Select(racer => new RosterEntry(
+                racer.Id, racer.Name, racer.Appearance, racer.HasAngelMutation, racer.OtherMutationCount))
+            .ToArray();
+        rosterBox.AddChild(VoidlingRosterGrid.Build(
+            roster,
+            _racerPage,
+            entry => entry.Id == _selectedId ? "*" : string.Empty,
+            entry =>
             {
-                card.AddChild(new TextureRect
-                {
-                    Texture = new AtlasTexture { Atlas = WoodStars, Region = new Rect2(0, 0, 32, 32) },
-                    Position = new Vector2(60, 1),
-                    Size = new Vector2(17, 17),
-                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-                    MouseFilter = MouseFilterEnum.Ignore
-                });
-            }
-            grid.AddChild(entry);
-        }
-        // Empty slots stay drawn so the roster keeps a stable 3x3 shape however many Voidlings a
-        // player owns, instead of the grid collapsing around a short last page.
-        for (var filler = page.Length; filler < RacersPerPage; filler++)
-            grid.AddChild(BuildEmptySlot());
-        gridRow.AddChild(grid);
-        gridRow.AddChild(BuildPageArrow("RosterNext", 1, pages));
-        rosterBox.AddChild(gridRow);
+                _selectedId = entry.Id;
+                RaiseSelectionChanged();
+                RebuildStep();
+            },
+            page => { _racerPage = page; RebuildStep(); },
+            out var pages));
+        _racerPage = Mathf.Clamp(_racerPage, 0, pages - 1);
 
         if (pages > 1)
         {
@@ -481,44 +446,6 @@ public partial class RaceEntryScreen : Control
         row.AddChild(rosterPanel);
         row.AddChild(BuildStatPanel(SelectedRacer(), 246));
         return row;
-    }
-
-    private static Control BuildEmptySlot()
-    {
-        var slot = new PanelContainer { CustomMinimumSize = new Vector2(84, 70), MouseFilter = MouseFilterEnum.Ignore };
-        var style = new StyleBoxFlat
-        {
-            BgColor = new Color(0.72f, 0.66f, 0.52f, 0.30f),
-            BorderColor = new Color(0.62f, 0.55f, 0.42f, 0.45f)
-        };
-        style.SetBorderWidthAll(1);
-        style.SetCornerRadiusAll(3);
-        slot.AddThemeStyleboxOverride("panel", style);
-        return slot;
-    }
-
-    private Button BuildPageArrow(string name, int delta, int pages)
-    {
-        var button = UiFactory.CreateButton(string.Empty);
-        button.Name = name;
-        button.CustomMinimumSize = new Vector2(24, 36);
-        button.SizeFlagsVertical = SizeFlags.ShrinkCenter;
-        button.Disabled = pages <= 1;
-        button.AddChild(new TextureRect
-        {
-            Texture = UiFactory.CreateGardenIcon(13, 3),
-            FlipH = delta < 0,
-            CustomMinimumSize = new Vector2(24, 36),
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            MouseFilter = MouseFilterEnum.Ignore,
-            Modulate = new Color(1, 1, 1, pages <= 1 ? 0.35f : 1.0f)
-        });
-        button.Pressed += () =>
-        {
-            _racerPage = (_racerPage + delta + pages) % pages;
-            RebuildStep();
-        };
-        return button;
     }
 
     private Control BuildStatPanel(RacePickerVoidlingViewState racer, float width)
@@ -647,40 +574,11 @@ public partial class RaceEntryScreen : Control
     /// Difficulty as filled and empty wooden stars from the premium icon pack, so a level reads as
     /// a rating rather than only a number.
     /// </summary>
-    private static Control BuildStarRating(int level)
-    {
-        var row = new HBoxContainer { Name = "StarRating", Alignment = BoxContainer.AlignmentMode.Center, MouseFilter = MouseFilterEnum.Ignore };
-        row.AddThemeConstantOverride("separation", 1);
-        for (var star = MinLevel; star <= MaxLevel; star++)
-        {
-            row.AddChild(new TextureRect
-            {
-                Texture = new AtlasTexture { Atlas = WoodStars, Region = new Rect2(star <= level ? 0 : 32, 0, 32, 32) },
-                CustomMinimumSize = new Vector2(20, 20),
-                ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-                StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-                MouseFilter = MouseFilterEnum.Ignore
-            });
-        }
-        return row;
-    }
+    private static Control BuildStarRating(int level) => PaperCard.StarRating(level, MaxLevel, 20.0f);
 
-    /// <summary>The window's warm paper, one shade lighter, so a card reads as part of the same sheet.</summary>
-    private static PanelContainer PaperPanel(Vector2 minimumSize)
-    {
-        var panel = UiFactory.CreatePanel(minimumSize);
-        var style = (StyleBoxTexture)panel.GetThemeStylebox("panel").Duplicate();
-        style.ModulateColor = new Color(247f / 220f, 233f / 224f, 197f / 210f);
-        panel.AddThemeStyleboxOverride("panel", style);
-        return panel;
-    }
+    private static PanelContainer PaperPanel(Vector2 minimumSize) => PaperCard.Panel(minimumSize);
 
-    private static Label Header(string text, float width)
-    {
-        var label = UiFactory.CreateLabel(text, 7);
-        if (width > 0) label.CustomMinimumSize = new Vector2(width, 0);
-        return label;
-    }
+    private static Label Header(string text, float width) => PaperCard.Header(text, width);
 
     private RacePickerCourseViewState SelectedCourse()
         => _state!.Courses.First(course => CourseKey(course) == CourseKey(_selectedCourseId, _selectedCourseVersion));
@@ -698,22 +596,11 @@ public partial class RaceEntryScreen : Control
     private void RaiseSelectionChanged()
         => SelectionChanged?.Invoke(_selectedId, _selectedCourseId, _selectedCourseVersion, _level);
 
-    // Stat identity colours are authored for the dark Garden inspector; on the entry screen's paper
-    // the pale ones (swim yellow, stamina white) vanish, so darken by however much luminance is over.
-    private static Color PaperInk(Color color)
-        => color.Darkened(Mathf.Clamp(color.Luminance - 0.35f, 0.0f, 0.6f));
+    private static Color PaperInk(Color color) => PaperCard.Ink(color);
 
     private static string CourseKey(RacePickerCourseViewState course) => CourseKey(course.Id, course.Version);
 
     private static string CourseKey(string id, int version) => $"{id}@{version}";
 
-    private static void Clear(Node node)
-    {
-        foreach (var child in node.GetChildren())
-        {
-            if (child is CanvasItem canvasItem) canvasItem.Visible = false;
-            if (child is Control control) control.MouseFilter = MouseFilterEnum.Ignore;
-            child.QueueFree();
-        }
-    }
+    private static void Clear(Node node) => PaperCard.Clear(node);
 }

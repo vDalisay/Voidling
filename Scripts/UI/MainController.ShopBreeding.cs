@@ -161,7 +161,7 @@ public partial class MainController : Node
             ? CreateBreedingPreviewView(_session.GetBreedingPairInfo(parentViews[0].Id, parentViews[1].Id))
             : new BreedingPreviewViewState(Tr("UI_BREED_NEED_TWO_ADULTS"), false);
 
-        var box = OpenModal(Tr("UI_BREED_TITLE"), new Vector2(440, 270));
+        var box = OpenModal(Tr("UI_BREED_TITLE"), new Vector2(520, 282));
         var screen = new BreedingScreen();
         screen.Configure(new BreedingScreenState(parentViews, initialPreview));
         screen.PairChanged += (parentAId, parentBId) =>

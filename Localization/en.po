@@ -54,35 +54,14 @@ msgstr "SETTINGS"
 msgid "UI_SETTINGS_AUDIO"
 msgstr "Audio"
 
-msgid "UI_SETTINGS_CAMERA"
-msgstr "Camera"
-
-msgid "UI_SETTINGS_RACE"
-msgstr "Race"
-
 msgid "UI_SETTINGS_VOLUME"
-msgstr "Volume {0}%"
-
-msgid "UI_SETTINGS_AUTO_FINISH_ON"
-msgstr "Auto Finish: ON"
-
-msgid "UI_SETTINGS_AUTO_FINISH_OFF"
-msgstr "Auto Finish: OFF"
+msgstr "{0}%"
 
 msgid "UI_SETTINGS_AUTO_FINISH_TOOLTIP"
 msgstr "Finish once either you finish or every CPU has already finished."
 
-msgid "UI_SETTINGS_EDGE_PAN_ON"
-msgstr "Edge Pan: ON"
-
-msgid "UI_SETTINGS_EDGE_PAN_OFF"
-msgstr "Edge Pan: OFF"
-
 msgid "UI_SETTINGS_EDGE_PAN_TOOLTIP"
 msgstr "Move the cursor to an edge to pan the garden or family tree."
-
-msgid "UI_SETTINGS_HINT"
-msgstr "ESC opens/closes this menu from the garden."
 
 msgid "UI_SHOP_TITLE"
 msgstr "Sprout Market"
@@ -288,14 +267,8 @@ msgstr "GROWING THE RACE TRACK..."
 msgid "UI_RACE_COUNTDOWN_GO"
 msgstr "RACE!"
 
-msgid "UI_INVENTORY_STORED_EGGS"
-msgstr "EGGS TO PLACE"
-
 msgid "UI_INVENTORY_STORED_EGG"
 msgstr "Unplaced egg {0}"
-
-msgid "UI_INVENTORY_PLACE_HINT"
-msgstr "Place an egg in the garden to start its incubation timer."
 
 msgid "UI_INVENTORY_PLACE"
 msgstr "Place"
@@ -317,9 +290,6 @@ msgstr "No Voidling matches that search."
 
 msgid "UI_INVENTORY_TITLE"
 msgstr "INVENTORY"
-
-msgid "UI_INVENTORY_SUBTITLE"
-msgstr "Items you currently own"
 
 msgid "UI_INVENTORY_TREAT"
 msgstr "{0} Treat"
@@ -924,17 +894,8 @@ msgstr "Plain ground  \u2022  {0}"
 msgid "UI_INVENTORY_LAND_TRAINED"
 msgstr "{0} ground L{1}  \u2022  {2}"
 
-msgid "UI_INVENTORY_LAND_HINT"
-msgstr "Place a piece against the island. R rotates it. Then click a hex to build training ground on it."
-
 msgid "UI_LAND_TITLE"
 msgstr "Island land"
-
-msgid "UI_LAND_SUMMARY"
-msgstr "{0} hexes  •  {1} training  •  {2} in inventory  •  {3} sprouts"
-
-msgid "UI_LAND_HINT"
-msgstr "Buy land in the Shop and place it from the Inventory. Click a hex to build training ground on it, then drop a Voidling there."
 
 msgid "UI_LAND_PLAIN_GROUND"
 msgstr "Plain ground"
@@ -1132,3 +1093,99 @@ msgstr "Hide navigation"
 
 msgid "UI_GARDEN_SHOW_RAIL"
 msgstr "Show navigation"
+
+msgid "UI_INVENTORY_CATEGORY_TREATS"
+msgstr "Treats"
+
+msgid "UI_INVENTORY_CATEGORY_EGGS"
+msgstr "Eggs"
+
+msgid "UI_INVENTORY_CATEGORY_LAND"
+msgstr "Land"
+
+msgid "UI_INVENTORY_CATEGORY_SHELLS"
+msgstr "Shells"
+
+msgid "UI_INVENTORY_EMPTY"
+msgstr "Nothing here yet."
+
+msgid "UI_INVENTORY_UNPLACED"
+msgstr "Not placed"
+
+msgid "UI_INVENTORY_INCUBATING"
+msgstr "{0}s left"
+
+msgid "UI_INVENTORY_USE_SKIP"
+msgstr "Hatch now ({0})"
+
+msgid "UI_INVENTORY_SELL"
+msgstr "Sell {0}"
+
+msgid "UI_INVENTORY_SHELL_VALUE"
+msgstr "Worth {0}"
+
+msgid "UI_INVENTORY_SHELL"
+msgstr "Eggshell {0}"
+
+msgid "UI_INVENTORY_EGG"
+msgstr "Egg {0}"
+
+msgid "UI_BREED_PARENT_A"
+msgstr "First parent"
+
+msgid "UI_BREED_PARENT_B"
+msgstr "Second parent"
+
+msgid "UI_BREED_PICK_PARENTS"
+msgstr "Pick two adults"
+
+msgid "UI_SETTINGS_MASTER"
+msgstr "Master"
+
+msgid "UI_SETTINGS_SFX"
+msgstr "Effects"
+
+msgid "UI_SETTINGS_UI"
+msgstr "Interface"
+
+msgid "UI_GARDEN_BUILD_STORED"
+msgstr "Stored"
+
+msgid "UI_DECORATION_PLACE"
+msgstr "Place"
+
+msgid "UI_DECORATION_MOVE"
+msgstr "Move"
+
+msgid "UI_DECORATION_REMOVE"
+msgstr "Remove"
+
+msgid "UI_DECORATION_PLACED"
+msgstr "Placed"
+
+msgid "UI_DECORATION_CATALOGUE"
+msgstr "Catalogue"
+
+msgid "UI_LAND_RATE"
+msgstr "{0}/min"
+
+msgid "UI_LAND_TRAINING_COUNT"
+msgstr "{0} training"
+
+msgid "UI_SETTINGS_EDGE_PAN"
+msgstr "Edge panning"
+
+msgid "UI_SETTINGS_AUTO_FINISH"
+msgstr "Skip to results"
+
+msgid "UI_DECORATION_TREE"
+msgstr "Tree"
+
+msgid "UI_DECORATION_SMALL_TREE"
+msgstr "Small Tree"
+
+msgid "UI_DECORATION_LARGE_TREE"
+msgstr "Large Tree"
+
+msgid "UI_SETTINGS_PLAY"
+msgstr "Play"

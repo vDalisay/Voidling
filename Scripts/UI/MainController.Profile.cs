@@ -99,8 +99,6 @@ public partial class MainController : Node
                 state.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0,
                 18 + index))
             .ToList();
-        items.Add(new InventoryItemViewState(Tr("UI_INVENTORY_EGGS"), state.OwnedEggs.Count, -1, UsesEggIcon: true));
-
         var storedEggs = state.OwnedEggs
             .Where(egg => egg.State == EggState.Stored)
             .Select((egg, index) => new StoredEggViewState(
@@ -126,15 +124,15 @@ public partial class MainController : Node
             .Select((egg, index) => new FailedEggViewState(egg.Id, string.Format(Tr("UI_INVENTORY_FAILED_EGG"), index + 1)))
             .ToList();
         var eggShells = state.EggShells
-            .Select((shell, index) => new EggShellViewState(shell.Id, $"Eggshell {index + 1}", GameRules.EggShellSalePrice))
+            .Select((shell, index) => new EggShellViewState(shell.Id, string.Format(Tr("UI_INVENTORY_SHELL"), index + 1), GameRules.EggShellSalePrice))
             .ToList();
         var incubationSkipCount = state.UtilityItems.TryGetValue(ShopItemIds.FullIncubationSkip, out var ownedSkips) ? Math.Max(0, ownedSkips) : 0;
         var incubatingEggs = state.OwnedEggs
             .Where(egg => egg.State == EggState.Incubating && egg.IncubationSeconds < egg.RequiredIncubationSeconds)
-            .Select((egg, index) => new IncubatingEggViewState(egg.Id, $"Egg {index + 1}", Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds))))
+            .Select((egg, index) => new IncubatingEggViewState(egg.Id, string.Format(Tr("UI_INVENTORY_EGG"), index + 1), Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds))))
             .ToList();
 
-        var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(380, 292));
+        var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(520, 292));
         var screen = new InventoryScreen();
         screen.Configure(new InventoryScreenState(items, failedEggs, eggShells, incubationSkipCount, incubatingEggs, storedEggs, storedLand));
         screen.PlaceStoredEggRequested += egg =>
@@ -151,5 +149,6 @@ public partial class MainController : Node
         screen.SellEggShellRequested += shellId => { if (_session.SellEggShell(shellId)) CallDeferred(nameof(ShowInventory)); };
         screen.UseIncubationSkipRequested += eggId => { if (_session.UseFullIncubationSkip(eggId)) CallDeferred(nameof(ShowInventory)); };
         box.AddChild(screen);
+        screen.CallDeferred(InventoryScreen.MethodName.FocusSelection);
     }
 }

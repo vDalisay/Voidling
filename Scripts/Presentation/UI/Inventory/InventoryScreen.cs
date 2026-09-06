@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
-using Voidling.Domain.Garden;
 using Voidling.Presentation.UI.Common;
 using VoidlingGame;
 
@@ -17,15 +16,41 @@ public readonly record struct StoredEggViewState(string EggId, string DisplayNam
 public readonly record struct StoredLandViewState(string ModuleId, string DisplayName, string ShapeId, Color Tint);
 public sealed record InventoryScreenState(IReadOnlyList<InventoryItemViewState> Items, IReadOnlyList<FailedEggViewState> FailedEggs, IReadOnlyList<EggShellViewState> EggShells, int IncubationSkipCount, IReadOnlyList<IncubatingEggViewState> IncubatingEggs, IReadOnlyList<StoredEggViewState> StoredEggs, IReadOnlyList<StoredLandViewState> StoredLand);
 
-public partial class InventoryScreen : VBoxContainer
+/// <summary>
+/// The satchel: category column, a grid of drawn slots, and one detail card carrying the single
+/// action an item has. Follows the Shop's three bands, so an item is recognised by its own art
+/// rather than read out of a list.
+/// </summary>
+public partial class InventoryScreen : HBoxContainer
 {
+    public const string TreatsCategory = "Treats";
+    public const string EggsCategory = "Eggs";
+    public const string LandCategory = "Land";
+    public const string ShellsCategory = "Shells";
+
+    private const int SlotColumns = 4;
+    private const int SlotRows = 3;
+    private static readonly Vector2 SlotSize = new(52, 52);
+
     public event Action<string>? DiscardFailedEggRequested;
     public event Action<string>? SellEggShellRequested;
     public event Action<string>? UseIncubationSkipRequested;
     public event Action<StoredEggViewState>? PlaceStoredEggRequested;
     public event Action<StoredLandViewState>? PlaceStoredLandRequested;
+
     private static readonly Texture2D EggTexture = GD.Load<Texture2D>("res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
+    private static readonly Texture2D TreatTexture = GD.Load<Texture2D>(
+        "res://Assets/Sprout Lands - Sprites - premium pack/Objects/Items/fruit-n-berries-items.png");
+
+    /// <summary>One occupied slot: its art, how many, and the single thing the player can do with it.</summary>
+    private sealed record Slot(string Key, string Name, string Detail, int Count, Color Tint, Func<Control> Art, string? ActionText, Action? Action);
+
     private InventoryScreenState? _state;
+    private string _category = TreatsCategory;
+    private string _selection = string.Empty;
+    private VBoxContainer _categories = null!;
+    private GridContainer _grid = null!;
+    private VBoxContainer _detail = null!;
 
     public void Configure(InventoryScreenState state)
     {
@@ -36,110 +61,265 @@ public partial class InventoryScreen : VBoxContainer
     public override void _Ready()
     {
         if (_state == null) throw new InvalidOperationException("InventoryScreen must be configured before AddChild.");
-        AddThemeConstantOverride("separation", 7); SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; AddChild(UiFactory.CreateLabel(Tr("UI_INVENTORY_SUBTITLE"), 9));
-        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(340, 198), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ExpandFill }; AddChild(scroll);
-        UiFactory.StyleScroll(scroll);
-        var list = new VBoxContainer(); list.AddThemeConstantOverride("separation", 5); scroll.AddChild(list);
-        foreach (var item in _state.Items) list.AddChild(CreateInventoryRow(CreateItemIcon(item), item.DisplayName, item.Count));
-        if (_state.StoredEggs.Count > 0)
+        Name = "Satchel";
+        AddThemeConstantOverride("separation", 6);
+        SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        SizeFlagsVertical = SizeFlags.ExpandFill;
+
+        _categories = new VBoxContainer { Name = "Categories", CustomMinimumSize = new Vector2(82, 0) };
+        _categories.AddThemeConstantOverride("separation", 5);
+        AddChild(_categories);
+
+        var gridPanel = PaperCard.Panel(new Vector2(238, 0));
+        gridPanel.Name = "Slots";
+        gridPanel.SizeFlagsVertical = SizeFlags.ShrinkBegin;
+        AddChild(gridPanel);
+        _grid = new GridContainer { Columns = SlotColumns };
+        _grid.AddThemeConstantOverride("h_separation", 3);
+        _grid.AddThemeConstantOverride("v_separation", 3);
+        gridPanel.AddChild(_grid);
+
+        var detailPanel = PaperCard.Panel(new Vector2(145, 225));
+        detailPanel.Name = "ItemDetail";
+        AddChild(detailPanel);
+        _detail = new VBoxContainer();
+        _detail.AddThemeConstantOverride("separation", 5);
+        detailPanel.AddChild(_detail);
+
+        NormalizeCategory();
+        RebuildCategories();
+        RebuildSlots();
+    }
+
+    public void FocusSelection()
+        => (_grid.GetChildren().OfType<Button>().FirstOrDefault(button => button.ButtonPressed)
+            ?? _categories.GetChildren().OfType<Button>().FirstOrDefault())?.GrabFocus();
+
+    // ---- categories -----------------------------------------------------------------------
+
+    /// <summary>A category is offered only when the save holds something in it.</summary>
+    private IEnumerable<string> AvailableCategories()
+    {
+        if (_state!.Items.Any(item => !item.UsesEggIcon && item.Count > 0)) yield return TreatsCategory;
+        if (_state.StoredEggs.Count > 0 || _state.IncubatingEggs.Count > 0 ||
+            _state.FailedEggs.Count > 0 || _state.IncubationSkipCount > 0) yield return EggsCategory;
+        if (_state.StoredLand.Count > 0) yield return LandCategory;
+        if (_state.EggShells.Count > 0) yield return ShellsCategory;
+    }
+
+    private void NormalizeCategory()
+    {
+        var available = AvailableCategories().ToArray();
+        if (available.Length == 0) { _category = TreatsCategory; return; }
+        if (!available.Contains(_category)) _category = available[0];
+    }
+
+    private void RebuildCategories()
+    {
+        PaperCard.Clear(_categories);
+        foreach (var category in AvailableCategories())
         {
-            list.AddChild(UiFactory.CreateLabel(Tr("UI_INVENTORY_STORED_EGGS"), 8));
-            list.AddChild(UiFactory.CreateLabel(Tr("UI_INVENTORY_PLACE_HINT"), 6));
-            foreach (var egg in _state.StoredEggs) list.AddChild(CreateStoredEggRow(egg));
+            var button = UiFactory.CreateButton(Tr("UI_INVENTORY_CATEGORY_" + category.ToUpperInvariant()));
+            button.Name = "Category" + category;
+            button.ToggleMode = true;
+            button.ButtonPressed = category == _category;
+            button.CustomMinimumSize = new Vector2(82, 28);
+            button.Alignment = HorizontalAlignment.Left;
+            UiFactory.ApplyPixelFont(button, 6);
+            var captured = category;
+            button.Pressed += () =>
+            {
+                _category = captured;
+                _selection = string.Empty;
+                foreach (var other in _categories.GetChildren().OfType<Button>())
+                    other.ButtonPressed = other.Name == "Category" + _category;
+                RebuildSlots();
+                FocusSelection();
+            };
+            _categories.AddChild(button);
         }
-        if (_state.StoredLand.Count > 0)
+    }
+
+    // ---- slots ----------------------------------------------------------------------------
+
+    private void RebuildSlots()
+    {
+        PaperCard.Clear(_grid);
+        PaperCard.Clear(_detail);
+        var slots = Slots().ToArray();
+        if (slots.Length == 0)
         {
-            list.AddChild(UiFactory.CreateLabel(Tr("UI_INVENTORY_LAND"), 8));
-            list.AddChild(UiFactory.CreateLabel(Tr("UI_INVENTORY_LAND_HINT"), 6));
-            foreach (var land in _state.StoredLand) list.AddChild(CreateStoredLandRow(land));
+            for (var filler = 0; filler < SlotColumns * SlotRows; filler++) _grid.AddChild(PaperCard.EmptySlot(SlotSize));
+            _detail.AddChild(UiFactory.CreateLabel(Tr("UI_INVENTORY_EMPTY"), 7));
+            return;
         }
-        if (_state.IncubationSkipCount > 0)
+        if (slots.All(slot => slot.Key != _selection)) _selection = slots[0].Key;
+
+        foreach (var slot in slots) _grid.AddChild(BuildSlot(slot));
+        for (var filler = slots.Length; filler < SlotColumns * SlotRows; filler++)
+            _grid.AddChild(PaperCard.EmptySlot(SlotSize));
+
+        BuildDetail(slots.First(slot => slot.Key == _selection));
+    }
+
+    private Button BuildSlot(Slot slot)
+    {
+        var button = UiFactory.CreateButton(string.Empty);
+        button.Name = "Slot_" + slot.Key.Replace(':', '_');
+        button.ToggleMode = true;
+        button.ButtonPressed = slot.Key == _selection;
+        button.CustomMinimumSize = SlotSize;
+        button.TooltipText = slot.Name;
+        var art = slot.Art();
+        // Drawn land footprints carry their own size; sprites take the slot's default.
+        var artSize = art.CustomMinimumSize == Vector2.Zero ? new Vector2(30, 30) : art.CustomMinimumSize;
+        art.CustomMinimumSize = artSize;
+        art.Size = artSize;
+        art.Position = ((SlotSize - artSize) * 0.5f) - new Vector2(0, 4);
+        art.MouseFilter = MouseFilterEnum.Ignore;
+        button.AddChild(art);
+        if (slot.Count > 1)
         {
-            list.AddChild(UiFactory.CreateLabel($"INCUBATION SKIPS  x{_state.IncubationSkipCount}", 8));
-            if (_state.IncubatingEggs.Count == 0) list.AddChild(UiFactory.CreateLabel("No egg currently needs an incubation skip.", 6));
-            else foreach (var egg in _state.IncubatingEggs) list.AddChild(CreateIncubationSkipRow(egg));
+            var count = UiFactory.CreateLabel("x" + slot.Count, 6);
+            count.Position = new Vector2(2, 36);
+            count.Size = new Vector2(48, 12);
+            count.HorizontalAlignment = HorizontalAlignment.Right;
+            count.MouseFilter = MouseFilterEnum.Ignore;
+            button.AddChild(count);
         }
-        if (_state.EggShells.Count > 0)
+        if (slot.Key == _selection) button.AddChild(PaperCard.Star(new Vector2(34, 0), 14));
+        button.Pressed += () => { _selection = slot.Key; RebuildSlots(); FocusSelection(); };
+        return button;
+    }
+
+    private void BuildDetail(Slot slot)
+    {
+        var artPanel = new PanelContainer { CustomMinimumSize = new Vector2(0, 56) };
+        artPanel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
         {
-            list.AddChild(UiFactory.CreateLabel("EGGSHELLS", 8));
-            foreach (var shell in _state.EggShells) list.AddChild(CreateEggShellRow(shell));
-        }
-        if (_state.FailedEggs.Count <= 0) return;
-        var failedTitle = UiFactory.CreateLabel(Tr("UI_INVENTORY_FAILED_EGGS"), 8); failedTitle.AddThemeColorOverride("font_color", Color.FromHtml("#9C514B")); list.AddChild(failedTitle);
-        foreach (var failedEgg in _state.FailedEggs) list.AddChild(CreateFailedEggRow(failedEgg));
-    }
+            BgColor = Color.FromHtml("#F7E5BD"),
+            CornerRadiusTopLeft = 3, CornerRadiusTopRight = 3,
+            CornerRadiusBottomLeft = 3, CornerRadiusBottomRight = 3
+        });
+        var center = new CenterContainer();
+        var art = slot.Art();
+        if (art.CustomMinimumSize == Vector2.Zero) art.CustomMinimumSize = new Vector2(46, 46);
+        center.AddChild(art);
+        artPanel.AddChild(center);
+        _detail.AddChild(artPanel);
 
-    private static Texture2D CreateItemIcon(InventoryItemViewState item) => !item.UsesEggIcon ? UiFactory.CreateIcon(item.IconIndex) : CreateEggTexture();
-    private static AtlasTexture CreateEggTexture() => new() { Atlas = EggTexture, Region = new Rect2(0, 0, EggTexture.GetWidth(), EggTexture.GetHeight()) };
+        var name = UiFactory.CreateLabel(slot.Name, 9);
+        name.Name = "DetailName";
+        name.HorizontalAlignment = HorizontalAlignment.Center;
+        name.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        name.AddThemeColorOverride("font_color", PaperCard.Ink(slot.Tint));
+        _detail.AddChild(name);
 
-    private static Control CreateInventoryRow(Texture2D iconTexture, string itemName, int count)
-    {
-        var panel = CreateRowPanel(); var row = CreateRow(panel); row.AddChild(CreateRowIcon(iconTexture)); var name = UiFactory.CreateLabel(itemName, 8); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.VerticalAlignment = VerticalAlignment.Center; row.AddChild(name); var amount = UiFactory.CreateLabel($"x{count}", 9); amount.CustomMinimumSize = new Vector2(42, 20); amount.HorizontalAlignment = HorizontalAlignment.Right; amount.VerticalAlignment = VerticalAlignment.Center; row.AddChild(amount); return panel;
-    }
+        var detail = UiFactory.CreateLabel(slot.Detail, 7);
+        detail.HorizontalAlignment = HorizontalAlignment.Center;
+        _detail.AddChild(detail);
 
-    private Control CreateStoredEggRow(StoredEggViewState egg)
-    {
-        var panel = CreateRowPanel(); var row = CreateRow(panel); var icon = CreateRowIcon(CreateEggTexture()); icon.Modulate = egg.TintColor; row.AddChild(icon); var name = UiFactory.CreateLabel(egg.DisplayName, 8); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.VerticalAlignment = VerticalAlignment.Center; row.AddChild(name); var place = UiFactory.CreateButton(Tr("UI_INVENTORY_PLACE")); place.CustomMinimumSize = new Vector2(76, 22); UiFactory.ApplyPixelFont(place, 7); place.Pressed += () => PlaceStoredEggRequested?.Invoke(egg); row.AddChild(place); return panel;
-    }
-
-    private Control CreateStoredLandRow(StoredLandViewState land)
-    {
-        var panel = CreateRowPanel(); var row = CreateRow(panel); row.AddChild(CreateShapeIcon(land.ShapeId, land.Tint)); var name = UiFactory.CreateLabel(land.DisplayName, 8); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.VerticalAlignment = VerticalAlignment.Center; row.AddChild(name); var place = UiFactory.CreateButton(Tr("UI_INVENTORY_PLACE")); place.CustomMinimumSize = new Vector2(76, 22); UiFactory.ApplyPixelFont(place, 7); place.Pressed += () => PlaceStoredLandRequested?.Invoke(land); row.AddChild(place); return panel;
-    }
-
-    /// <summary>
-    /// The footprint of the piece, scaled to fit and coloured by the ground it carries, so two
-    /// rows in the inventory are told apart at a glance instead of by their text alone.
-    /// </summary>
-    private static Control CreateShapeIcon(string shapeId, Color tint)
-    {
-        var shape = GardenTileShape.Find(shapeId) ?? GardenTileShape.Single;
-        const float boxWidth = 40.0f;
-        const float boxHeight = 26.0f;
-        const float ratio = 1.7f;
-
-        var units = shape.Cells.Select(cell => new Vector2(1.5f * cell.Q, cell.R + cell.Q * 0.5f)).ToArray();
-        var spanX = units.Max(unit => unit.X) - units.Min(unit => unit.X) + 2.0f;
-        var spanY = units.Max(unit => unit.Y) - units.Min(unit => unit.Y) + 1.0f;
-        var topEdge = Mathf.Min(boxWidth / spanX, boxHeight / (ratio * spanY));
-        var height = topEdge * ratio;
-
-        var centers = units.Select(unit => new Vector2(unit.X * topEdge, unit.Y * height)).ToArray();
-        var middle = new Vector2(
-            (centers.Max(center => center.X) + centers.Min(center => center.X)) * 0.5f,
-            (centers.Max(center => center.Y) + centers.Min(center => center.Y)) * 0.5f);
-        var origin = new Vector2(boxWidth * 0.5f, boxHeight * 0.5f) - middle;
-
-        var holder = new Control { CustomMinimumSize = new Vector2(boxWidth, boxHeight), MouseFilter = Control.MouseFilterEnum.Ignore };
-        foreach (var center in centers)
+        _detail.AddChild(new ColorRect
         {
-            var polygon = HexShape.Corners(topEdge, height); for (var i = 0; i < polygon.Length; i++) polygon[i] += origin + center;
-            var outline = HexShape.Outline(topEdge, height); for (var i = 0; i < outline.Length; i++) outline[i] += origin + center;
-            holder.AddChild(new Polygon2D { Polygon = polygon, Color = tint });
-            holder.AddChild(new Line2D { Points = outline, DefaultColor = tint.Darkened(0.45f), Width = 1.0f, JointMode = Line2D.LineJointMode.Round });
+            Color = Color.FromHtml("#B7926F"),
+            CustomMinimumSize = new Vector2(1, 1),
+            MouseFilter = MouseFilterEnum.Ignore
+        });
+        _detail.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
+
+        if (slot.ActionText == null || slot.Action == null) return;
+        var action = UiFactory.CreateButton(slot.ActionText);
+        action.Name = "ItemAction";
+        action.CustomMinimumSize = new Vector2(125, 28);
+        UiFactory.ApplyPrimaryStyle(action);
+        action.Pressed += slot.Action;
+        _detail.AddChild(action);
+    }
+
+    // ---- what each category holds ---------------------------------------------------------
+
+    private IEnumerable<Slot> Slots()
+    {
+        if (_category == TreatsCategory)
+        {
+            var index = 0;
+            foreach (var item in _state!.Items.Where(candidate => !candidate.UsesEggIcon))
+            {
+                var iconIndex = index++;
+                if (item.Count <= 0) continue;
+                yield return new Slot("treat:" + iconIndex, item.DisplayName,
+                    string.Format(Tr("UI_SHOP_OWNED"), item.Count), item.Count, Color.FromHtml("#6B8F5E"),
+                    () => AtlasArt(TreatTexture, new Rect2(iconIndex % 4 * 16, iconIndex / 4 * 16, 16, 16)), null, null);
+            }
+            yield break;
         }
-        return holder;
+        if (_category == EggsCategory)
+        {
+            foreach (var egg in _state!.StoredEggs)
+            {
+                var captured = egg;
+                yield return new Slot("egg:" + egg.EggId, egg.DisplayName, Tr("UI_INVENTORY_UNPLACED"), 1, egg.TintColor,
+                    () => TintedEgg(captured.TintColor), Tr("UI_INVENTORY_PLACE"),
+                    () => PlaceStoredEggRequested?.Invoke(captured));
+            }
+            foreach (var egg in _state.IncubatingEggs)
+            {
+                var captured = egg;
+                var canSkip = _state.IncubationSkipCount > 0;
+                yield return new Slot("incubating:" + egg.EggId, egg.DisplayName,
+                    string.Format(Tr("UI_INVENTORY_INCUBATING"), egg.SecondsRemaining), 1, Color.FromHtml("#7C8F5E"),
+                    () => TintedEgg(new Color(1, 1, 1)),
+                    canSkip ? string.Format(Tr("UI_INVENTORY_USE_SKIP"), _state.IncubationSkipCount) : null,
+                    canSkip ? () => UseIncubationSkipRequested?.Invoke(captured.EggId) : null);
+            }
+            foreach (var failed in _state.FailedEggs)
+            {
+                var captured = failed;
+                yield return new Slot("failed:" + failed.EggId, failed.DisplayName, Tr("UI_INVENTORY_FAILED_EGGS"), 1,
+                    Color.FromHtml("#9C514B"), () => TintedEgg(Color.FromHtml("#9C514B")),
+                    Tr("UI_INVENTORY_DISCARD"), () => DiscardFailedEggRequested?.Invoke(captured.EggId));
+            }
+            yield break;
+        }
+        if (_category == LandCategory)
+        {
+            foreach (var land in _state!.StoredLand)
+            {
+                var captured = land;
+                yield return new Slot("land:" + land.ModuleId, land.DisplayName, Tr("UI_LAND_STORED"), 1, land.Tint,
+                    () => LandShapePresentation.CreateShapeArt(captured.ShapeId, captured.Tint), Tr("UI_INVENTORY_PLACE"),
+                    () => PlaceStoredLandRequested?.Invoke(captured));
+            }
+            yield break;
+        }
+        foreach (var shell in _state!.EggShells)
+        {
+            var captured = shell;
+            yield return new Slot("shell:" + shell.ShellId, shell.DisplayName,
+                string.Format(Tr("UI_INVENTORY_SHELL_VALUE"), shell.SaleValue), 1, Color.FromHtml("#8A7A5A"),
+                () => TintedEgg(new Color(0.78f, 0.74f, 0.66f)), string.Format(Tr("UI_INVENTORY_SELL"), shell.SaleValue),
+                () => SellEggShellRequested?.Invoke(captured.ShellId));
+        }
     }
 
-    private Control CreateIncubationSkipRow(IncubatingEggViewState egg)
+    // ---- art ------------------------------------------------------------------------------
+
+    private static TextureRect AtlasArt(Texture2D atlas, Rect2 region)
+        => Art(new AtlasTexture { Atlas = atlas, Region = region });
+
+    private static TextureRect TintedEgg(Color tint)
     {
-        var panel = CreateRowPanel(); var row = CreateRow(panel); row.AddChild(CreateRowIcon(CreateEggTexture())); var name = UiFactory.CreateLabel($"{egg.DisplayName} • {egg.SecondsRemaining}s", 7); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.VerticalAlignment = VerticalAlignment.Center; row.AddChild(name); var use = UiFactory.CreateButton("Use Skip"); use.CustomMinimumSize = new Vector2(76, 22); UiFactory.ApplyPixelFont(use, 7); use.Pressed += () => UseIncubationSkipRequested?.Invoke(egg.EggId); row.AddChild(use); return panel;
+        var art = Art(EggTexture);
+        art.SelfModulate = tint;
+        return art;
     }
 
-    private Control CreateEggShellRow(EggShellViewState shell)
+    private static TextureRect Art(Texture2D texture) => new()
     {
-        var panel = CreateRowPanel(); var row = CreateRow(panel); row.AddChild(CreateRowIcon(CreateEggTexture())); var name = UiFactory.CreateLabel(shell.DisplayName, 8); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.VerticalAlignment = VerticalAlignment.Center; row.AddChild(name); var sell = UiFactory.CreateButton($"Sell +{shell.SaleValue}"); sell.CustomMinimumSize = new Vector2(76, 22); UiFactory.ApplyPixelFont(sell, 7); sell.Pressed += () => SellEggShellRequested?.Invoke(shell.ShellId); row.AddChild(sell); return panel;
-    }
+        Texture = texture,
+        ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+        StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+        MouseFilter = MouseFilterEnum.Ignore
+    };
 
-    private Control CreateFailedEggRow(FailedEggViewState failedEgg)
-    {
-        var panel = CreateRowPanel(); var row = CreateRow(panel); row.AddChild(CreateRowIcon(CreateEggTexture())); var name = UiFactory.CreateLabel(failedEgg.DisplayName, 8); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.VerticalAlignment = VerticalAlignment.Center; name.AddThemeColorOverride("font_color", Color.FromHtml("#9C514B")); row.AddChild(name); var discard = UiFactory.CreateButton(Tr("UI_INVENTORY_DISCARD")); discard.CustomMinimumSize = new Vector2(66, 22); UiFactory.ApplyPixelFont(discard, 7); discard.Pressed += () => DiscardFailedEggRequested?.Invoke(failedEgg.EggId); row.AddChild(discard); return panel;
-    }
-
-    private static PanelContainer CreateRowPanel()
-    {
-        var panel = new PanelContainer { CustomMinimumSize = new Vector2(328, 32) }; var style = new StyleBoxFlat { BgColor = Color.FromHtml("#F0D9A8"), BorderColor = Color.FromHtml("#C59670") }; style.SetBorderWidthAll(1); style.ContentMarginLeft = style.ContentMarginRight = 7; style.ContentMarginTop = style.ContentMarginBottom = 4; panel.AddThemeStyleboxOverride("panel", style); return panel;
-    }
-    private static HBoxContainer CreateRow(PanelContainer panel) { var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 8); panel.AddChild(row); return row; }
-    private static TextureRect CreateRowIcon(Texture2D iconTexture) => new() { Texture = iconTexture, CustomMinimumSize = new Vector2(22, 22), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, MouseFilter = Control.MouseFilterEnum.Ignore };
 }
