@@ -71,5 +71,26 @@ public static class RaceCoursePresentationCatalog
         yield return "UI_RACE_PAUSED";
         yield return "UI_RACE_RESUME";
         yield return "UI_RACE_QUIT";
+
+        // The live HUD groups: banner, standings, course progress and the player's own card.
+        yield return "UI_RACE_HUD_LOCAL";
+        yield return "UI_RACE_HUD_ONLINE";
+        yield return "UI_RACE_HUD_MENU";
+        yield return "UI_RACE_HUD_STANDINGS";
+        yield return "UI_RACE_HUD_COURSE";
+        yield return "UI_RACE_HUD_START";
+        yield return "UI_RACE_HUD_FINISH";
+        yield return "UI_RACE_HUD_YOU";
+        yield return "UI_RACE_HUD_LEAD";
+        yield return "UI_RACE_HUD_PROGRESS";
+        yield return "UI_RACE_HUD_PLACE";
+        yield return "UI_RACE_CHEER";
+        yield return "UI_RACE_CHEERING";
+        yield return "UI_RACE_STAMINA";
+        yield return "UI_RACE_ORDINAL_1";
+        yield return "UI_RACE_ORDINAL_2";
+        yield return "UI_RACE_ORDINAL_3";
+        yield return "UI_RACE_ORDINAL_4";
+        yield return "UI_RACE_ORDINAL_N";
     }
 }

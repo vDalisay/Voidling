@@ -78,8 +78,6 @@ public partial class RaceScreen : Node2D
     private static readonly Color SubmergedWater = new(0.608f, 0.831f, 0.765f, 0.56f);
     private static readonly Color WakeRipple = new(1.0f, 1.0f, 1.0f, 0.42f);
 
-    private static readonly Color StaminaColor = Color.FromHtml("#F7F3E7");
-
     // Lanes spread across the full dirt band. The old 33px cluster stacked four racers on top of
     // each other on the start line and left most of the track empty.
     private readonly float[] _racerOffsets = { -30.0f, -10.0f, 10.0f, 30.0f };
@@ -107,12 +105,6 @@ public partial class RaceScreen : Node2D
     private float _zoomTarget = MinZoom;
     private Camera2D _camera = null!;
     private Polygon2D _playerMarker = null!;
-    private Button _cheerButton = null!;
-    private ProgressBar _staminaBar = null!;
-    private Label _staminaLabel = null!;
-    private Label _faultLabel = null!;
-    private ColorRect _faultPlaque = null!;
-    private RaceMiniMap _miniMap = null!;
 
     private sealed class RacerVisual
     {
@@ -994,83 +986,6 @@ public partial class RaceScreen : Node2D
         AddChild(_playerMarker);
     }
 
-    private void CreateHud()
-    {
-        var canvas = new CanvasLayer { Layer = 20 };
-        AddChild(canvas);
-
-        var title = UiFactory.CreateTitle("SPROUT RUN");
-        title.Position = new Vector2(255, 8);
-        title.Size = new Vector2(180, 24);
-        canvas.AddChild(title);
-
-        // The track no longer names its own sections. This strip only appears to report a fault the
-        // player has to know about, such as multiplayer losing sync.
-        _faultPlaque = new ColorRect
-        {
-            Color = new Color(0.16f, 0.20f, 0.17f, 0.72f),
-            Position = new Vector2(212, 35),
-            Size = new Vector2(216, 16),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-            Visible = false
-        };
-        canvas.AddChild(_faultPlaque);
-
-        _faultLabel = UiFactory.CreateLabel(string.Empty, 8);
-        _faultLabel.Position = new Vector2(212, 34);
-        _faultLabel.Size = new Vector2(216, 18);
-        _faultLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        _faultLabel.Visible = false;
-        canvas.AddChild(_faultLabel);
-
-        var cheerPanel = UiFactory.CreatePanel(new Vector2(228, 70));
-        cheerPanel.Position = new Vector2(14, 276);
-        cheerPanel.Size = new Vector2(228, 70);
-        canvas.AddChild(cheerPanel);
-
-        var cheerBox = new VBoxContainer();
-        cheerBox.AddThemeConstantOverride("separation", 3);
-        cheerPanel.AddChild(cheerBox);
-
-        var cheerRow = new HBoxContainer();
-        cheerRow.AddThemeConstantOverride("separation", 6);
-        _cheerButton = UiFactory.CreateButton("CHEER!");
-        _cheerButton.CustomMinimumSize = new Vector2(88, 27);
-        _cheerButton.Pressed += CheerPlayer;
-        cheerRow.AddChild(_cheerButton);
-        _staminaLabel = UiFactory.CreateLabel("STAMINA", 7);
-        _staminaLabel.VerticalAlignment = VerticalAlignment.Center;
-        cheerRow.AddChild(_staminaLabel);
-        cheerBox.AddChild(cheerRow);
-
-        _staminaBar = new ProgressBar
-        {
-            MinValue = 0,
-            MaxValue = 100,
-            Value = 100,
-            ShowPercentage = false,
-            CustomMinimumSize = new Vector2(196, 16)
-        };
-        UiFactory.ApplyPixelFont(_staminaBar, 7);
-        var background = new StyleBoxFlat { BgColor = Color.FromHtml("#66594C") };
-        background.CornerRadiusTopLeft = background.CornerRadiusTopRight = 2;
-        background.CornerRadiusBottomLeft = background.CornerRadiusBottomRight = 2;
-        var fill = new StyleBoxFlat { BgColor = StaminaColor };
-        fill.CornerRadiusTopLeft = fill.CornerRadiusTopRight = 2;
-        fill.CornerRadiusBottomLeft = fill.CornerRadiusBottomRight = 2;
-        _staminaBar.AddThemeStyleboxOverride("background", background);
-        _staminaBar.AddThemeStyleboxOverride("fill", fill);
-        cheerBox.AddChild(_staminaBar);
-
-        var mapPanel = UiFactory.CreatePanel(new Vector2(205, 64));
-        mapPanel.Position = new Vector2(421, 282);
-        mapPanel.Size = new Vector2(205, 64);
-        canvas.AddChild(mapPanel);
-
-        _miniMap = new RaceMiniMap { CustomMinimumSize = new Vector2(181, 40) };
-        mapPanel.AddChild(_miniMap);
-    }
-
     private void CheerPlayer()
     {
         if (!_running)
@@ -1150,31 +1065,6 @@ public partial class RaceScreen : Node2D
         tween.Finished += streak.QueueFree;
     }
 
-    private void UpdateHud()
-    {
-        if (_entry == null || _miniMap == null || !TryGetPlayerState(out var player))
-            return;
-
-        _staminaBar.MaxValue = player.MaxStamina;
-        _staminaBar.Value = player.CurrentStamina;
-        _staminaLabel.Text = $"STAMINA {Mathf.CeilToInt(player.CurrentStamina)} / {Mathf.CeilToInt(player.MaxStamina)}";
-        _cheerButton.Disabled = !_running || player.Finished || player.CheerSeconds > 0.0f || player.CurrentStamina < _entry.Rules.CheerCost;
-        _cheerButton.Text = player.CheerSeconds > 0.0f ? "CHEERING!" : "CHEER!";
-
-        var points = _entry.Entrants.Select(entrant =>
-        {
-            var state = GetParticipantState(entrant);
-            return new RaceMiniMapPoint
-            {
-                Id = entrant.Participant.CreatureId,
-                Color = ParseTint(entrant.Participant.TintHex),
-                Progress = Mathf.Clamp((state.X - Course.StartX) / (Course.EndX - Course.StartX), 0.0f, 1.0f),
-                IsPlayer = entrant.Participant.CreatureId == _playerId
-            };
-        }).ToList();
-        _miniMap.SetPoints(points);
-    }
-
     private RaceParticipantStateSnapshot GetParticipantState(RaceEntrant entrant)
     {
         if (_simulation != null)
@@ -1208,14 +1098,6 @@ public partial class RaceScreen : Node2D
             return false;
         state = GetParticipantState(entrant);
         return true;
-    }
-
-    private void ShowFault(string text)
-    {
-        _faultLabel.Text = text;
-        _faultLabel.AddThemeColorOverride("font_color", Color.FromHtml("#F2B6AF"));
-        _faultLabel.Visible = true;
-        _faultPlaque.Visible = true;
     }
 
     /// <summary>Wheel zoom. Steps multiply, so each notch feels the same at any distance.</summary>

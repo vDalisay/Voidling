@@ -15,6 +15,10 @@ namespace Voidling.Presentation.Racing;
 ///
 /// Guards the freeze where the simulation completed but the podium never rendered, leaving the
 /// player stuck on a motionless track with no way back to the Garden.
+///
+/// It also holds the live HUD to the "creature first" layout: the four groups exist, stay inside the
+/// viewport, never overlap each other, the player's portrait, place, stamina and Cheer stay together
+/// in one group, and the standings actually rank the field with the player's own row marked.
 /// </summary>
 public partial class RaceCompletionSmokeProbe : Node
 {
@@ -45,6 +49,10 @@ public partial class RaceCompletionSmokeProbe : Node
             race.RaceCompleted += placement => completedPlacement = placement;
             race.ReturnRequested += () => returnRequested = true;
             AddChild(race);
+            // Containers only resolve their rects once layout has run, so settle before measuring.
+            for (var frame = 0; frame < 6; frame++)
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            ValidateHudLayout(race);
 
             Engine.TimeScale = TimeScale;
             var startedMsec = Time.GetTicksMsec();
@@ -66,6 +74,8 @@ public partial class RaceCompletionSmokeProbe : Node
             if (!returnRequested)
                 throw new InvalidOperationException("The results return control did not ask its owner to leave the race.");
 
+            ValidateHudReadouts(race);
+
             GD.Print($"[race-completion-smoke] RACE_COMPLETION_SMOKE_SUCCESS placement={completedPlacement}");
             GetTree().Quit(0);
         }
@@ -73,6 +83,113 @@ public partial class RaceCompletionSmokeProbe : Node
         {
             GD.PrintErr($"[race-completion-smoke] RACE_COMPLETION_SMOKE_FAILED: {exception}");
             GetTree().Quit(8);
+        }
+    }
+
+    private static CanvasLayer Hud(Node race)
+        => race.GetChildren().OfType<CanvasLayer>()
+               .FirstOrDefault(layer => layer.Layer == RaceScreen.HudCanvasLayer)
+           ?? throw new InvalidOperationException("The race has no HUD layer.");
+
+    /// <summary>
+    /// The layout contract: each named group is present, inside the viewport, and clear of every
+    /// other group, and the player's own group carries the portrait, stamina and Cheer together.
+    /// </summary>
+    private void ValidateHudLayout(RaceScreen race)
+    {
+        var hud = Hud(race);
+        var viewport = race.GetViewport().GetVisibleRect().Size;
+        var groups = RaceScreen.HudGroupNames
+            .Select(name => hud.GetNodeOrNull<Control>(name)
+                ?? throw new InvalidOperationException($"Race HUD group '{name}' is missing."))
+            .ToList();
+
+        foreach (var group in groups)
+        {
+            var rect = group.GetGlobalRect();
+            if (rect.Size.X < 40.0f || rect.Size.Y < 16.0f)
+                throw new InvalidOperationException($"Race HUD group '{group.Name}' has no usable size: {rect}.");
+            if (rect.Position.X < -1 || rect.Position.Y < -1 ||
+                rect.End.X > viewport.X + 1 || rect.End.Y > viewport.Y + 1)
+            {
+                throw new InvalidOperationException($"Race HUD group '{group.Name}' leaves the viewport: {rect}.");
+            }
+        }
+
+        for (var first = 0; first < groups.Count; first++)
+        {
+            for (var second = first + 1; second < groups.Count; second++)
+            {
+                if (groups[first].GetGlobalRect().Intersects(groups[second].GetGlobalRect()))
+                {
+                    throw new InvalidOperationException(
+                        $"Race HUD groups '{groups[first].Name}' and '{groups[second].Name}' overlap.");
+                }
+            }
+        }
+
+        var player = hud.GetNode<Control>("RaceHudPlayer");
+        foreach (var part in new[] { "PlayerPortrait", "PlayerName", "PlayerPlace", "StaminaDial", "StaminaBar", "CheerButton" })
+        {
+            if (player.FindChild(part, recursive: true, owned: false) == null)
+                throw new InvalidOperationException($"The player's race HUD group is missing '{part}'.");
+        }
+
+        if (player.FindChild("CheerButton", recursive: true, owned: false) is not Button cheer ||
+            cheer.FocusMode != Control.FocusModeEnum.All)
+        {
+            throw new InvalidOperationException("The Cheer action is not keyboard accessible.");
+        }
+
+        if (hud.GetNode<Control>("RaceHudCourse").FindChild("CourseStrip", recursive: true, owned: false) == null)
+            throw new InvalidOperationException("Course progress is missing its course strip.");
+    }
+
+    /// <summary>
+    /// The readouts the groups exist to carry: every standings row names a racer, exactly one row is
+    /// the player's, and the player's group states a place. All are filled by the live HUD update,
+    /// so an empty one means the HUD stopped following the race.
+    /// </summary>
+    private void ValidateHudReadouts(RaceScreen race)
+    {
+        var hud = Hud(race);
+        var standings = hud.GetNode<Control>("RaceHudStandings");
+        var rows = standings.FindChildren("Standing*", "PanelContainer", recursive: true, owned: false)
+            .OfType<PanelContainer>()
+            .ToList();
+        if (rows.Count == 0)
+            throw new InvalidOperationException("Opponent standings have no rows.");
+
+        var you = Tr("UI_RACE_HUD_YOU");
+        var playerRows = 0;
+        foreach (var row in rows)
+        {
+            if (row.FindChild("Racer", recursive: true, owned: false) is not Label name ||
+                string.IsNullOrWhiteSpace(name.Text))
+            {
+                throw new InvalidOperationException("A standings row never received a racer name.");
+            }
+
+            if (row.FindChild("Status", recursive: true, owned: false) is Label status &&
+                string.Equals(status.Text, you, StringComparison.Ordinal))
+            {
+                playerRows++;
+            }
+        }
+
+        if (playerRows != 1)
+            throw new InvalidOperationException($"Standings marked {playerRows} rows as the player instead of one.");
+
+        if (hud.GetNode<Control>("RaceHudPlayer").FindChild("PlayerPlace", recursive: true, owned: false)
+                is not Label place || string.IsNullOrWhiteSpace(place.Text))
+        {
+            throw new InvalidOperationException("The player's HUD group never reported a place.");
+        }
+
+        if (hud.GetNode<Control>("RaceHudCourse").FindChild("CourseProgress", recursive: true, owned: false)
+                is not Label progress || string.IsNullOrWhiteSpace(progress.Text))
+        {
+            throw new InvalidOperationException("Course progress never reported a position on the course.");
         }
     }
 

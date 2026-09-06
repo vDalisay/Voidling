@@ -21,6 +21,10 @@ public partial class CourseMinimap : Control
         ["Glide"] = Color.FromHtml("#C9B4E6")
     };
 
+    /// <summary>One colour per segment kind, shared with the live in-race course strip.</summary>
+    public static Color ColorForKind(string kind)
+        => KindColors.TryGetValue(kind, out var color) ? color : KindColors["Ground"];
+
     private IReadOnlyList<CourseMinimapSegment> _segments = Array.Empty<CourseMinimapSegment>();
     private IReadOnlyList<float> _obstacles = Array.Empty<float>();
     private float _startX;
@@ -58,7 +62,7 @@ public partial class CourseMinimap : Control
         {
             var left = Fraction(segment.StartX) * width;
             var right = Fraction(segment.EndX) * width;
-            var color = KindColors.TryGetValue(segment.Kind, out var kindColor) ? kindColor : KindColors["Ground"];
+            var color = ColorForKind(segment.Kind);
             DrawRect(new Rect2(left, trackTop, Mathf.Max(1.0f, right - left), trackHeight), color);
         }
 

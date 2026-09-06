@@ -1,6 +1,6 @@
 # Selected UI overhaul — staged implementation
 
-Status: **Stages 1–3 implemented and verified; waiting for race-entry player testing.** Each subsequent screen waits for the previous screen's player test.
+Status: **Stages 1–4 implemented and verified; waiting for race-entry and live-race player testing.** Each subsequent screen waits for the previous screen's player test.
 
 Branch: `codex/ui-overhaul-managers-rail`  
 Workspace: `C:/Users/Home/Documents/Voidling-ui-overhaul`  
@@ -273,3 +273,100 @@ Verified with Debug and Release builds, 241 tests (four new ones cover the diffi
 record keeping), architecture/localization checks, `git diff --check`, Godot import and main-scene
 runtime, and the Garden UI, Voidling visual, race presentation, race completion, family tree and
 persistence recovery probes.
+
+## Stage 4 handoff
+
+Implemented the option 05 "creature first" live-race HUD. The race world keeps the screen; the chrome
+is now four named premium panels around it:
+
+- **Bottom centre — the player.** One group holding the portrait, the name, the live place
+  (`3rd of 4`), the premium stamina dial and bar with its numbers, and a large green Cheer action.
+  Everything the player acts on is in one place instead of split between a bottom-left box and a
+  bottom-right strip.
+- **Right — opponent standings.** A positional `POSITIONS` list: finishers keep the order they
+  actually finished in, everyone still racing is ranked by distance along the course, and the
+  player's own row is highlighted and marked `YOU` rather than repeating an ordinal.
+- **Bottom left — course progress.** The course strip now draws the authored segments in their own
+  colours (the same colours the race-entry `CourseMinimap` uses) with every racer's dot on it, under
+  a `34% · SWIM` readout and between Start and Finish posts.
+- **Top left — the race banner.** `LOCAL RACE` / `ONLINE RACE`, the course's own name, and the
+  section being raced. The old centred `SPROUT RUN` title is gone, and a small non-interactive
+  `ESC · Menu` reminder sits top right.
+
+The premium art carries it rather than flat rectangles: `UiFactory.CreatePanel` chrome with tighter
+content margins for the small viewport, `UiFactory.ApplyPrimaryStyle` on Cheer, and the premium
+`Stamina circle with black outline` sheet as a 37-frame radial dial that fills and changes colour
+with the racer's stamina.
+
+### Deliberately unchanged
+
+The race simulation, fixed-step determinism, seeds, rewards, telemetry, results podium, completion
+callback and the local and online exit/pause semantics are untouched — Escape still opens the pause
+menu on its own layer, quitting still raises `ReturnRequested`, and the multiplayer lockstep bridge,
+cheer request and sync-fault strip behave exactly as before. No save schema, economy, genetics or
+balance change. The HUD only reads the snapshots the screen already had.
+
+Two presentation-only judgement calls worth a look during the playtest:
+
+- **The `ESC · Menu` chip is a label, not a button.** Garden feedback removed the visible Escape
+  button, and a clickable control in that corner would sit under the pointer during the skippable
+  opening flyover. Say the word if it should be pressable.
+- **Standings show `Lead` for first place and `YOU` for the player's row**, following the mockup, so
+  the player's own row never states its ordinal twice. The ordinal is in the bottom-centre group.
+
+Review captures: [running section](ui-overhaul/live-race.png), [swim section](ui-overhaul/live-race-swim.png).
+
+### Launch the live-race playtest
+
+From this workspace in PowerShell:
+
+```powershell
+.\playgame.bat --no-build --voidling-dev-profile=ui_overhaul_live_race_playtest
+```
+
+Open **Races** from the left rail, pick a course and racer, and start the race.
+
+## Live race player checklist
+
+- Watch the bottom-centre group through a whole race: name, place, stamina numbers and the dial
+  should all follow the same creature, and Cheer should grey out while cheering and when stamina is
+  below the cheer cost.
+- Cheer at least twice and confirm the dial and bar drop together and recover together.
+- Watch the standings reorder as racers pass each other; your row should stay highlighted and marked
+  `YOU` wherever it sits, and finishers should hold their finishing order.
+- Watch the banner's section line and the bottom-left percentage change as you cross into the swim,
+  climb and glide stretches.
+- Press Escape mid-race: the pause menu should open over the HUD, Resume should return to the same
+  race, and Quit should return to the Garden.
+- Finish a race: the podium should cover the HUD and Return to Garden should still work.
+- Run an online race and confirm the banner reads ONLINE RACE and the standings follow both peers.
+- Verify the HUD stays readable at 1280×720 and a larger desktop window, and that the world is never
+  hidden behind a group.
+
+### Verification completed
+
+Local environment: Windows, .NET 8, Godot 4.6.1 Mono (CI uses Linux/Godot 4.6.0).
+
+| Check | Result |
+|---|---|
+| Restore; Debug and Release builds | Pass; the two pre-existing `TradeNegotiationCoordinator` warnings remain |
+| `dotnet test Tests/Voidling.Tests.csproj -c Release` | 241 passed, zero failures |
+| Architecture and canonical creature-art greps from `ci.yml` | Pass |
+| Localization source; every new HUD key resolves | Pass |
+| `godot --headless --path . --import` | Pass |
+| `godot --headless --path . --quit-after 30` | Pass; no ERROR/SCRIPT ERROR lines |
+| Garden UI smoke (`ci_garden_ui` profile) | Pass |
+| Race presentation smoke | Pass; now also asserts the HUD's own strings are authored |
+| Race completion smoke | Pass; now also asserts the HUD layout and readouts |
+| Rendered live-race review at 1280×720 | Pass |
+| `git diff --check` | Pass |
+
+The race completion probe was extended the way `MainController.GardenUiSmoke.cs` covers the Garden
+and Shop. It now requires each named HUD group (`RaceHudBanner`, `RaceHudMenuHint`,
+`RaceHudStandings`, `RaceHudCourse`, `RaceHudPlayer`) to exist with a usable size, stay inside the
+viewport and never intersect another group; requires the player's group to hold the portrait, name,
+place, stamina dial, stamina bar and a keyboard-accessible Cheer together; and, after the race has
+run, requires every standings row to name a racer with exactly one row marked as the player, plus a
+filled place and course-progress readout. The presentation probe covers the new localization keys
+through `RaceCoursePresentationCatalog.AllKeys()`, so a missing HUD string fails CI rather than
+showing a raw key.
