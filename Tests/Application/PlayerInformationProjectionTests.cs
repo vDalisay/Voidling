@@ -55,6 +55,8 @@ public sealed class PlayerInformationProjectionTests
         var creature = CreateCreature("training");
         creature.TrainingPoints["run"] = 5;
         creature.PassiveTrainingStatId = "run";
+        creature.PassiveTrainingPointsPerMinute = 3;
+        creature.PassiveTrainingModuleId = "run-ground";
         creature.PassiveTrainingPointRemainder = 0.5;
         state.Voidlings.Add(creature);
 
@@ -62,6 +64,7 @@ public sealed class PlayerInformationProjectionTests
             .Single(stat => stat.StatId == "run");
 
         Assert.InRange(run.TrainingProgress, 5.49 / 12.0, 5.51 / 12.0);
+        Assert.Equal(0.05, run.TrainingPointsPerSecond, 3);
     }
 
     [Theory]

@@ -139,7 +139,12 @@ public partial class MainController
             {
                 Name = "MMMMMMMMMMMMMMMMMM",
                 DiscoveredFavoriteFoodId = GameRules.StatIds[0],
-                CareDemeanor = Voidling.Application.Roster.CreatureCareDemeanor.NeedsCare
+                CareDemeanor = Voidling.Application.Roster.CreatureCareDemeanor.NeedsCare,
+                Stats = _session.CreateCreatureProfileProjection(inspector.CreatureId)!.Stats
+                    .Select((stat, index) => index == 0
+                        ? stat with { TrainingProgress = 0.42, TrainingPointsPerSecond = 0.05 }
+                        : stat)
+                    .ToArray()
             };
             inspector.Render(expandedProfile, GameRules.StatIds[0], true);
             await SettleGardenUi();
@@ -153,6 +158,9 @@ public partial class MainController
             }
             if (inspector.FindChild("StopTraining", true, false) != null)
                 throw new InvalidOperationException("Inspector still renders the redundant passive-training row.");
+            var activeRate = inspector.FindChild("Rate_" + GameRules.StatIds[0], true, false) as Label;
+            if (activeRate is not { Visible: true } || !activeRate.Text.Contains("EXP/s", StringComparison.Ordinal))
+                throw new InvalidOperationException("Inspector did not show the active training rate.");
             await CaptureGardenUi("companion-expanded");
             RefreshUi();
             await SettleGardenUi();

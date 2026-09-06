@@ -978,6 +978,9 @@ msgstr "Level"
 msgid "UI_PROFILE_LEVEL_VALUE"
 msgstr "Lv {0}"
 
+msgid "UI_PROFILE_EXP_PER_SECOND"
+msgstr "+{0:0.##} EXP/s"
+
 msgid "UI_PROFILE_ADULT_PERSONALITY"
 msgstr "Adult · {0}"
 

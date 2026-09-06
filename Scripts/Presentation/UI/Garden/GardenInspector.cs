@@ -27,7 +27,7 @@ public partial class GardenInspector : PanelContainer
     private Button _treat = null!;
     private TextureRect _portrait = null!;
     private CreatureProfileProjection _visualProfile = null!;
-    private readonly Dictionary<string, (Label rank, Label level, ProgressBar progress)> _stats = new();
+    private readonly Dictionary<string, (Label rank, Label level, Label rate, ProgressBar progress, StyleBoxFlat background)> _stats = new();
     private string _trainingStat = string.Empty;
     public string CreatureId { get; private set; } = string.Empty;
 
@@ -93,19 +93,25 @@ public partial class GardenInspector : PanelContainer
         foreach (var stat in profile.Stats)
         {
             var label = UiFactory.CreateLabel(StatPresentationCatalog.NameFor(stat.StatId), 8);
-            label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             label.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(stat.StatId));
             label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
             label.AddThemeConstantOverride("outline_size", 1);
+            var statName = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+            statName.AddThemeConstantOverride("separation", 3);
+            statName.AddChild(label);
+            var rate = UiFactory.CreateLabel(string.Empty, 6);
+            rate.Name = "Rate_" + stat.StatId;
+            rate.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            statName.AddChild(rate);
             var rank = UiFactory.CreateLabel(string.Empty, 8);
             var level = UiFactory.CreateLabel(string.Empty, 8);
             var block = new VBoxContainer();
             block.AddThemeConstantOverride("separation", 1);
-            block.AddChild(CreateStatRow(label, rank, level));
-            var progress = CreateProgressBar(stat.StatId);
+            block.AddChild(CreateStatRow(statName, rank, level));
+            var (progress, background) = CreateProgressBar(stat.StatId);
             block.AddChild(progress);
             table.AddChild(block);
-            _stats.Add(stat.StatId, (rank, level, progress));
+            _stats.Add(stat.StatId, (rank, level, rate, progress, background));
         }
         box.AddChild(table);
         var actions = new GridContainer { Columns = 2 };
@@ -132,10 +138,15 @@ public partial class GardenInspector : PanelContainer
 
     public override void _Process(double delta)
     {
-        var pulse = 0.88f + (Mathf.Sin((float)Time.GetTicksMsec() / 240.0f) + 1.0f) * 0.06f;
+        var pulse = (Mathf.Sin((float)Time.GetTicksMsec() / 240.0f) + 1.0f) * 0.5f;
         foreach (var (statId, view) in _stats)
-            view.progress.Modulate = new Color(1, 1, 1,
-                string.Equals(statId, _trainingStat, StringComparison.Ordinal) ? pulse : 1.0f);
+        {
+            var active = string.Equals(statId, _trainingStat, StringComparison.Ordinal);
+            view.background.SetBorderWidthAll(active ? 1 : 0);
+            var border = StatPresentationCatalog.ColorFor(statId);
+            border.A = 0.45f + pulse * 0.45f;
+            view.background.BorderColor = border;
+        }
     }
 
     public void FocusCare() => _treat.GrabFocus();
@@ -168,6 +179,10 @@ public partial class GardenInspector : PanelContainer
             _stats[stat.StatId].rank.Text = stat.InheritedRank;
             _stats[stat.StatId].level.Text = string.Format(Tr("UI_PROFILE_LEVEL_VALUE"), stat.TrainingLevel);
             _stats[stat.StatId].progress.Value = stat.TrainingProgress;
+            _stats[stat.StatId].rate.Visible = stat.TrainingPointsPerSecond > 0;
+            _stats[stat.StatId].rate.Text = stat.TrainingPointsPerSecond > 0
+                ? string.Format(Tr("UI_PROFILE_EXP_PER_SECOND"), stat.TrainingPointsPerSecond)
+                : string.Empty;
         }
         _follow.SetPressedNoSignal(following);
         _trainingStat = trainingStat;
@@ -186,7 +201,7 @@ public partial class GardenInspector : PanelContainer
         return row;
     }
 
-    private static ProgressBar CreateProgressBar(string statId)
+    private static (ProgressBar bar, StyleBoxFlat background) CreateProgressBar(string statId)
     {
         var bar = new ProgressBar
         {
@@ -202,7 +217,7 @@ public partial class GardenInspector : PanelContainer
         fill.SetCornerRadiusAll(1);
         bar.AddThemeStyleboxOverride("background", background);
         bar.AddThemeStyleboxOverride("fill", fill);
-        return bar;
+        return (bar, background);
     }
 
     private static TextureRect CreatePortrait(CreatureProfileProjection profile)
