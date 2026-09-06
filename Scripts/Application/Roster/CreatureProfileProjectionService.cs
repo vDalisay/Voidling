@@ -96,12 +96,19 @@ public sealed class CreatureProfileProjectionService
         var stats = _statIds.Select(statId =>
         {
             var gene = StatCalculator.GetGene(creature, statId);
+            var progress = _stats.GetLevelProgress(creature, statId);
+            if (string.Equals(creature.PassiveTrainingStatId, statId, StringComparison.Ordinal) &&
+                _stats.GetLevel(creature, statId) < _rules.Stats.MaxLevel)
+            {
+                progress = (float)Math.Min(1.0, progress + creature.PassiveTrainingPointRemainder /
+                    _rules.Stats.TrainingPointsPerLevel);
+            }
             return new CreatureProfileStatProjection(
                 statId,
                 GradeName(gene.ExpressedValue),
                 _stats.GetLevel(creature, statId),
                 Math.Clamp((int)MathF.Round(_stats.GetEffectiveStat(creature, statId)), 0, 100),
-                _stats.GetLevelProgress(creature, statId),
+                progress,
                 GradeName(gene.AlleleA),
                 GradeName(gene.AlleleB))
             {

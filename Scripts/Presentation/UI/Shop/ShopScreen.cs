@@ -11,7 +11,7 @@ public readonly record struct ShopTrainingItemViewState(string StatId, string Di
 public readonly record struct ShopEggViewState(string EggId, Color TintColor, int Number, int Price);
 public readonly record struct ShopRareOfferViewState(string ItemId, string DisplayName, string Tooltip, int Price);
 public readonly record struct ShopLandPieceViewState(string ShapeId, string DisplayName, IReadOnlyList<(int Q, int R)> Cells, int Stored, int Price);
-public sealed record ShopScreenState(int Coins, IReadOnlyList<ShopTrainingItemViewState> TrainingItems, IReadOnlyList<ShopEggViewState> Eggs, int EggRotationSecondsRemaining, ShopRareOfferViewState? RareOffer, IReadOnlyList<ShopLandPieceViewState> LandPieces);
+public sealed record ShopScreenState(int Coins, IReadOnlyList<ShopTrainingItemViewState> TrainingItems, IReadOnlyList<ShopEggViewState> Eggs, ShopRareOfferViewState? RareOffer, IReadOnlyList<ShopLandPieceViewState> LandPieces);
 
 /// <summary>Keeper's ledger: categories, readable catalogue rows, and one stable purchase receipt.</summary>
 public partial class ShopScreen : VBoxContainer
@@ -33,7 +33,7 @@ public partial class ShopScreen : VBoxContainer
     public event Action? InventoryRequested;
     public event Action<string, string>? SelectionChanged;
 
-    private sealed record Product(string Key, string Name, string Description, string Status, int Price, Func<Control> Icon, Action Buy);
+    private sealed record Product(string Key, string Name, string Status, int Price, Func<Control> Icon, Action Buy);
 
     private ShopScreenState? _state;
     private string _category = TreatsCategory;
@@ -41,8 +41,6 @@ public partial class ShopScreen : VBoxContainer
     private VBoxContainer _categories = null!;
     private VBoxContainer _catalogue = null!;
     private VBoxContainer _receipt = null!;
-    private Label _prompt = null!;
-    private Label _itemCount = null!;
     private Button? _selectedButton;
 
     public void Configure(ShopScreenState state, string category, string selection)
@@ -73,11 +71,14 @@ public partial class ShopScreen : VBoxContainer
         catalogueColumn.AddThemeConstantOverride("separation", 4);
         body.AddChild(catalogueColumn);
         var context = new HBoxContainer();
-        _prompt = UiFactory.CreateLabel(CategoryPrompt(), 7);
-        _prompt.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        context.AddChild(_prompt);
-        _itemCount = UiFactory.CreateLabel(string.Empty, 7);
-        context.AddChild(_itemCount);
+        context.AddChild(new Control { CustomMinimumSize = new Vector2(32, 0) });
+        var typeHeader = UiFactory.CreateLabel(Tr("UI_SHOP_TYPE"), 7);
+        typeHeader.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        context.AddChild(typeHeader);
+        var priceHeader = UiFactory.CreateLabel(Tr("UI_SHOP_PRICE_HEADER"), 7);
+        priceHeader.CustomMinimumSize = new Vector2(38, 0);
+        priceHeader.HorizontalAlignment = HorizontalAlignment.Right;
+        context.AddChild(priceHeader);
         catalogueColumn.AddChild(context);
         var scroll = new ScrollContainer
         {
@@ -119,10 +120,14 @@ public partial class ShopScreen : VBoxContainer
         var walletStyle = (StyleBoxTexture)wallet.GetThemeStylebox("panel").Duplicate();
         walletStyle.ModulateColor = new Color(232f / 220f, 207f / 224f, 166f / 210f);
         wallet.AddThemeStyleboxOverride("panel", walletStyle);
-        var walletLabel = UiFactory.CreateLabel(string.Format(Tr("UI_SHOP_WALLET"), _state!.Coins), 8);
+        var walletRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        walletRow.AddThemeConstantOverride("separation", 3);
+        walletRow.AddChild(SproutIcon(12));
+        var walletLabel = UiFactory.CreateLabel(_state!.Coins.ToString(), 8);
         walletLabel.HorizontalAlignment = HorizontalAlignment.Center;
         walletLabel.VerticalAlignment = VerticalAlignment.Center;
-        wallet.AddChild(walletLabel);
+        walletRow.AddChild(walletLabel);
+        wallet.AddChild(walletRow);
         row.AddChild(wallet);
         return row;
     }
@@ -193,8 +198,6 @@ public partial class ShopScreen : VBoxContainer
     private void NormalizeSelection()
     {
         var products = Products().ToArray();
-        _prompt.Text = CategoryPrompt();
-        _itemCount.Text = string.Format(Tr("UI_SHOP_ITEM_COUNT"), products.Length);
         if (products.Length == 0) { _selection = string.Empty; return; }
         if (products.All(product => product.Key != _selection)) _selection = products[0].Key;
     }
@@ -239,10 +242,12 @@ public partial class ShopScreen : VBoxContainer
         copy.AddChild(UiFactory.CreateLabel(product.Name, 7));
         copy.AddChild(UiFactory.CreateLabel(product.Status, 5));
         row.AddChild(copy);
-        var price = UiFactory.CreateLabel(product.Price.ToString(), 8);
-        price.CustomMinimumSize = new Vector2(28, 26);
-        price.HorizontalAlignment = HorizontalAlignment.Right;
-        price.VerticalAlignment = VerticalAlignment.Center;
+        var price = new HBoxContainer { CustomMinimumSize = new Vector2(38, 26), Alignment = BoxContainer.AlignmentMode.End };
+        price.AddThemeConstantOverride("separation", 2);
+        price.AddChild(SproutIcon(10));
+        var priceValue = UiFactory.CreateLabel(product.Price.ToString(), 8);
+        priceValue.VerticalAlignment = VerticalAlignment.Center;
+        price.AddChild(priceValue);
         row.AddChild(price);
         button.AddChild(row);
         return button;
@@ -267,31 +272,23 @@ public partial class ShopScreen : VBoxContainer
         name.HorizontalAlignment = HorizontalAlignment.Center;
         name.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _receipt.AddChild(name);
-        var description = UiFactory.CreateLabel(product.Description, 6);
-        description.CustomMinimumSize = new Vector2(0, 55);
-        description.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        _receipt.AddChild(description);
         _receipt.AddChild(UiFactory.CreateLabel(product.Status, 6));
         _receipt.AddChild(new ColorRect { Color = Color.FromHtml("#B7926F"), CustomMinimumSize = new Vector2(1, 1), MouseFilter = MouseFilterEnum.Ignore });
-        var price = UiFactory.CreateLabel(string.Format(Tr("UI_SHOP_PRICE"), product.Price), 8);
-        price.HorizontalAlignment = HorizontalAlignment.Center;
+        var price = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        price.AddThemeConstantOverride("separation", 3);
+        price.AddChild(UiFactory.CreateLabel(Tr("UI_SHOP_PRICE_HEADER").ToUpperInvariant(), 8));
+        price.AddChild(SproutIcon(11));
+        price.AddChild(UiFactory.CreateLabel(product.Price.ToString(), 8));
         _receipt.AddChild(price);
         var buy = UiFactory.CreateButton(string.Format(Tr("UI_SHOP_BUY"), product.Price));
+        buy.Icon = UiFactory.CreateSproutIcon();
+        buy.AddThemeConstantOverride("icon_max_width", 12);
         buy.Name = "BuySelected";
         buy.CustomMinimumSize = new Vector2(125, 28);
         ApplyBuyStyle(buy);
         buy.Pressed += product.Buy;
         _receipt.AddChild(buy);
-        _receipt.AddChild(UiFactory.CreateLabel(Tr("UI_SHOP_INVENTORY_NOTE"), 6));
     }
-
-    private string CategoryPrompt() => _category switch
-    {
-        TreatsCategory => Tr("UI_SHOP_CHOOSE_TREAT"),
-        EggsCategory => $"{Tr("UI_SHOP_CHOOSE_EGG")}  ·  {string.Format(Tr("UI_SHOP_ROTATION"), FormatRotation(_state!.EggRotationSecondsRemaining))}",
-        LandCategory => Tr("UI_SHOP_CHOOSE_LAND"),
-        _ => Tr("UI_SHOP_CHOOSE_RARE")
-    };
 
     private static void ApplyBuyStyle(Button button)
     {
@@ -321,7 +318,7 @@ public partial class ShopScreen : VBoxContainer
             {
                 var iconIndex = index++;
                 yield return new Product("treat:" + item.StatId, item.DisplayName + " treat",
-                    TrainingItemEffectPresentation.Tooltip(item.DisplayName), string.Format(Tr("UI_SHOP_OWNED"), item.Owned), item.Price,
+                    string.Format(Tr("UI_SHOP_OWNED"), item.Owned), item.Price,
                     () => AtlasIcon(TreatTexture, new Rect2(iconIndex % 4 * 16, iconIndex / 4 * 16, 16, 16)),
                     () => TrainingItemPurchaseRequested?.Invoke(item.StatId));
             }
@@ -331,31 +328,32 @@ public partial class ShopScreen : VBoxContainer
         {
             foreach (var egg in _state!.Eggs)
                 yield return new Product("egg:" + egg.EggId, string.Format(Tr("UI_SHOP_MYSTERY_EGG"), egg.Number),
-                    Tr("UI_SHOP_HIDDEN_DNA"), Tr("UI_SHOP_IN_STOCK"), egg.Price,
+                    Tr("UI_SHOP_IN_STOCK"), egg.Price,
                     () => EggIcon(egg.TintColor), () => EggPurchaseRequested?.Invoke(egg.EggId));
             yield break;
         }
         if (_category == LandCategory)
         {
             foreach (var piece in _state!.LandPieces)
-                yield return new Product("land:" + piece.ShapeId, piece.DisplayName, Tr("UI_SHOP_LAND_SUBTITLE"),
+                yield return new Product("land:" + piece.ShapeId, piece.DisplayName,
                     string.Format(Tr("UI_SHOP_OWNED"), piece.Stored), piece.Price,
                     () => BuildShapeSwatch(piece.Cells), () => LandPurchaseRequested?.Invoke(piece.ShapeId));
             yield break;
         }
         if (_state!.RareOffer is { } offer)
-            yield return new Product("special:" + offer.ItemId, offer.DisplayName, offer.Tooltip, Tr("UI_SHOP_IN_STOCK"), offer.Price,
+            yield return new Product("special:" + offer.ItemId, offer.DisplayName, Tr("UI_SHOP_IN_STOCK"), offer.Price,
                 () => Icon(UiFactory.CreateIcon(19)), () => RareOfferPurchaseRequested?.Invoke(offer.ItemId));
-    }
-
-    private static string FormatRotation(int seconds)
-    {
-        var time = TimeSpan.FromSeconds(Math.Max(0, seconds));
-        return time.TotalHours >= 1 ? $"{(int)time.TotalHours}:{time.Minutes:00}:{time.Seconds:00}" : $"{time.Minutes}:{time.Seconds:00}";
     }
 
     private static TextureRect AtlasIcon(Texture2D atlas, Rect2 region)
         => Icon(new AtlasTexture { Atlas = atlas, Region = region });
+
+    private static TextureRect SproutIcon(float size)
+    {
+        var icon = Icon(UiFactory.CreateSproutIcon());
+        icon.CustomMinimumSize = new Vector2(size, size);
+        return icon;
+    }
 
     private static AtlasTexture AtlasIconTexture(Texture2D atlas, Rect2 region)
         => new() { Atlas = atlas, Region = region };

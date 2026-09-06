@@ -99,6 +99,12 @@ msgstr "PURCHASE RECEIPT"
 msgid "UI_SHOP_PRICE"
 msgstr "PRICE  {0} SPROUTS"
 
+msgid "UI_SHOP_TYPE"
+msgstr "Type"
+
+msgid "UI_SHOP_PRICE_HEADER"
+msgstr "Price"
+
 msgid "UI_SHOP_IN_STOCK"
 msgstr "IN STOCK  1"
 
@@ -130,7 +136,7 @@ msgid "UI_SHOP_OWNED"
 msgstr "OWNED {0}"
 
 msgid "UI_SHOP_BUY"
-msgstr "Buy · {0} sprouts"
+msgstr "Buy {0}"
 
 msgid "UI_SHOP_CATEGORY_TREATS"
 msgstr "Treats"

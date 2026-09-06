@@ -164,7 +164,7 @@ public partial class MainController : Node
         wallet.AddThemeConstantOverride("separation", 3);
         wallet.AddChild(new TextureRect
         {
-            Texture = UiFactory.CreateSettingsIcon(0, 12),
+            Texture = UiFactory.CreateSproutIcon(),
             CustomMinimumSize = new Vector2(14, 14),
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,

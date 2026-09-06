@@ -145,6 +145,14 @@ public partial class MainController
             await SettleGardenUi();
             RequireOnScreen(inspector);
             RequireSeparate(inspector, _saveStatusLabel);
+            foreach (var stat in expandedProfile.Stats)
+            {
+                var progress = inspector.FindChild("Progress_" + stat.StatId, true, false) as ProgressBar;
+                if (progress == null || Math.Abs(progress.Value - stat.TrainingProgress) > 0.001)
+                    throw new InvalidOperationException($"Inspector did not render {stat.StatId} training progress.");
+            }
+            if (inspector.FindChild("StopTraining", true, false) != null)
+                throw new InvalidOperationException("Inspector still renders the redundant passive-training row.");
             await CaptureGardenUi("companion-expanded");
             RefreshUi();
             await SettleGardenUi();

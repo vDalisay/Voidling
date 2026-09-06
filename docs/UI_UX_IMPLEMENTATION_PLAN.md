@@ -117,7 +117,7 @@ Add `--voidling-garden-ui-shots` with a graphical renderer to capture the review
 - Removed the redundant “Garden log” heading, reduced the log panel artwork to 50% opacity, and added a keyboard-accessible top-left toggle that animates between the full history and a one-line view while preserving the same bottom margin in both states.
 - Extended the Garden smoke check with clock boundaries, collapse/expand and interrupted animation, keyboard access, and notification deduplication. All 236 tests and the CI-equivalent local checks passed; graphical review passed at 1280×720.
 
-Review captures: [expanded](ui-overhaul/garden-refined.png), [collapsed navigation](ui-overhaul/garden-collapsed.png), [one-line log](ui-overhaul/garden-log-compact.png), [land inspector](ui-overhaul/land-inspector.png).
+Review captures: [expanded](ui-overhaul/garden-refined.png), [companion stats](ui-overhaul/companion-stats.png), [collapsed navigation](ui-overhaul/garden-collapsed.png), [one-line log](ui-overhaul/garden-log-compact.png), [land inspector](ui-overhaul/land-inspector.png).
 
 ## Stage 2 handoff
 
@@ -145,3 +145,5 @@ Stage 2 passed Debug and Release builds, all 236 tests, architecture/localizatio
 - Clicking the shaded area outside any modal now closes it through `ModalHost`, covering Settings and every rail submenu that uses the shared host.
 - Moved the Garden name and numeric sprout balance to the upper right with the premium sprout icon, moved the day/night dial into the former garden-card position, and removed Center.
 - Added faint pointer hover outlines for Voidlings and hexes, with the Voidling taking priority when both overlap. Clicking a placed hex now opens its conversion, occupancy and upgrade controls in the right-side Garden inspector without blocking the world.
+- Restored per-stat training progress bars in the compact companion inspector. Stat names and fills use their stat colors, active passive training pulses and includes fractional live progress, and the redundant passive/stop row is removed.
+- Simplified the Shop catalogue to Type and Price columns, replaced currency wording with the premium farming sprout, and removed receipt description and inventory-note copy.
