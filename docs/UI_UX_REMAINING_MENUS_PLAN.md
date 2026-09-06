@@ -322,3 +322,49 @@ hex, a point out at 90% of the inner radius must not come back inside the old 60
 off the island must still land on placed ground, and a real free-roaming Voidling must reach past
 that disc within ten seconds. Reverting the one-line clamp change fails the first of those, so the
 check is known to catch the regression rather than merely passing beside it.
+
+## Garden roaming, tree occlusion and failed-egg clicking
+
+Three player reports, and the first turned out to be three separate causes stacked on each other.
+
+**A Voidling on plain ground would not leave its tile.** The land-clamp fix above was necessary but
+not sufficient; measuring the actual behaviour found two more:
+
+- `PickNewTarget` gave every walk a flat 1.5-4s before giving up. At roughly 21px/s that is 30-85px
+  of travel, while a hex is over 200px across, so a Voidling abandoned every destination that was
+  not already beside it. The budget is now the distance to the target divided by its own speed, plus
+  slack, making the timer a give-up guard instead of a leash.
+- Destinations were drawn uniformly from the island's *bounding rectangle*, which on a small or
+  oddly shaped island is mostly water, and water points were then clamped back toward the nearest
+  hex — usually the one the Voidling was already standing on. It now asks the Garden for a point on
+  a randomly chosen placed hex, so every leg is a real destination somewhere on the island.
+- `ApplyAmbientStats` rolled the swim shoreline pull on *every* `StateChanged` — every autosave and
+  income tick — overwriting the target of a Voidling already walking somewhere and resetting its
+  patience to the old flat timer. The roll moved to `PickNewTarget`, where a destination is actually
+  being chosen; the flavour is unchanged, it simply no longer interrupts a walk in progress.
+
+Measured across five runs on the two-hex starter island, a Voidling dropped on plain ground now
+walks off that hex in 5-15 seconds.
+
+**Wings and crowns drew over trees.** Island trees are actor-layer props so they y-sort against
+Voidling bodies, but `MutationAdornment2D` sat eight layers above the body, and z_index is compared
+before the y-sort — so mutations always won. They now share the body's layer, and being a later
+sibling still keeps them drawn over the Voidling itself.
+
+**A failed egg was hard to click.** Its hitbox was 16x18 against a sprite drawn at 1.45x, so most of
+the egg was not clickable and the press fell through to the hex underneath. The box is now sized off
+the drawn egg with room around it, the handler marks the input handled so the ground does not also
+open its hex menu in the same press, and the egg takes the same pointer lift a Voidling and a hex
+get. The incubation pulse no longer fights that lift, because a failed egg has no pulse to run.
+
+### Verification
+
+Debug and Release builds; 249 tests; architecture greps; Godot import; four consecutive Garden UI
+smoke runs; the visual, race-presentation, race-completion, family-tree and persistence-recovery
+probes; `git diff --check`.
+
+The Garden smoke now checks the land clamp directly for every placed hex, that a Voidling dropped on
+plain ground is neither tile-bound nor assigned to training, that it walks off that hex within a
+generous budget, and that mutations share the body's draw layer. The clamp and layer checks are
+deterministic; the walk-off check was given its budget from the measurement above rather than a
+guess, after earlier tighter versions proved to be timing lotteries rather than real assertions.

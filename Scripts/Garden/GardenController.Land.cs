@@ -96,6 +96,7 @@ public partial class GardenController
     /// </summary>
     private readonly List<Node2D> _treeProps = new();
     private readonly List<Vector2> _treeTrunks = new();
+    private readonly RandomNumberGenerator _landTargetRandom = new();
 
     /// <summary>Roughly the width of the drawn trunk: leaves are walk-through, wood is not.</summary>
     private const float TrunkRadius = 9.0f;
@@ -638,6 +639,7 @@ public partial class GardenController
                 continue;
 
             actor.LandClamp = ClampToLand;
+            actor.LandTarget = RandomLandTarget;
             actor.SetWanderArea(_landBounds, repath);
 
             if (creature.PassiveTrainingModuleId.Length > 0 &&
@@ -700,6 +702,24 @@ public partial class GardenController
                 ? Colors.White.Lerp(visual.BaseColor, 0.55f)
                 : Colors.White.Lerp(RefusedGround, 0.40f);
         }
+    }
+
+    /// <summary>
+    /// A random point on a random piece of placed ground. Every hex is equally likely, so a
+    /// free-roaming Voidling keeps choosing destinations across the whole island instead of
+    /// circling the one it happens to be standing on.
+    /// </summary>
+    private Vector2 RandomLandTarget()
+    {
+        var placed = _session.State.GardenModules.Where(module => module.Placed).ToList();
+        if (placed.Count == 0)
+            return new Vector2(Hex.OriginX, Hex.OriginY);
+
+        var hex = placed[_landTargetRandom.RandiRange(0, placed.Count - 1)];
+        var (x, y) = Hex.CenterOf(hex.HexQ, hex.HexR);
+        var offset = Vector2.Right.Rotated(_landTargetRandom.RandfRange(0.0f, Mathf.Tau)) *
+                     _landTargetRandom.RandfRange(0.0f, Hex.InnerRadius * 0.7f);
+        return ClampToLand(new Vector2(x, y) + offset);
     }
 
     /// <summary>Whether a placed hex has been built into training ground for a stat.</summary>

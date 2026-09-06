@@ -315,6 +315,36 @@ public partial class GardenController
 
     internal Vector2 ClampToLandForProbe(Vector2 position) => ClampToLand(position);
 
+    /// <summary>Drops a Voidling on a hex through the same handler the pointer drives.</summary>
+    internal void DropOnHexForProbe(string creatureId, string moduleId, Vector2 position)
+    {
+        if (!_actors.TryGetValue(creatureId, out var actor) || !GodotObject.IsInstanceValid(actor))
+            return;
+        _draggedId = creatureId;
+        _grabOrigin = actor.Position;
+        actor.SetPickedUp(true);
+        actor.Position = position;
+        _hoveredModuleId = moduleId;
+        DropGrabbedVoidling();
+    }
+
+    /// <summary>
+    /// Body sprite layer and mutation layer for one Voidling. Island trees are actor-layer props
+    /// that y-sort against the body, and z_index is compared before that sort, so wings and crowns
+    /// have to sit on the body's layer or they draw over every tree.
+    /// </summary>
+    internal (int Body, int Mutations) MutationLayersForProbe(string creatureId)
+    {
+        if (!_actors.TryGetValue(creatureId, out var actor) || !GodotObject.IsInstanceValid(actor))
+            return (0, 0);
+        var body = actor.FindChildren("*", "AnimatedSprite2D", true, false).OfType<AnimatedSprite2D>().First();
+        var adornment = actor.FindChildren("*", "Node2D", true, false).OfType<MutationAdornment2D>().First();
+        return (body.ZIndex, adornment.ZIndex);
+    }
+
+    internal bool IsOnTileForProbe(string creatureId)
+        => _actors.TryGetValue(creatureId, out var actor) && GodotObject.IsInstanceValid(actor) && actor.IsOnTile;
+
     internal bool AnyVoidlingEatingForProbe()
         => _actors.Values.Any(actor => GodotObject.IsInstanceValid(actor) && actor.IsEating);
 

@@ -12,6 +12,9 @@ public partial class GardenController : Node2D
     private const float HoldToPickUpSeconds = 0.16f;
     private const float EggBaseScale = 1.45f;
 
+    /// <summary>Click target for a failed egg, generous enough to beat the ground beneath it.</summary>
+    private static readonly Vector2 EggHitboxSize = new(44, 48);
+
     private static readonly Texture2D EggTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
 
@@ -432,6 +435,7 @@ public partial class GardenController : Node2D
             var actor = new VoidlingActor();
             actor.Setup(data, _landBounds, start);
             actor.LandClamp = ClampToLand;
+            actor.LandTarget = RandomLandTarget;
             actor.Clicked += OnActorPressed;
             actor.RunningStride += OnRunningStride;
             _actorsRoot.AddChild(actor);
@@ -483,14 +487,29 @@ public partial class GardenController : Node2D
                 holder.AddChild(label);
 
                 // Only a failed egg is ever interactive; a healthy one is a timer, not a decision.
+                // The box is sized off the drawn egg rather than the atlas cell, with room around
+                // it, so the egg is as easy to hit as a Voidling instead of losing the click to
+                // the ground underneath.
                 var hitbox = new Area2D { InputPickable = false, Monitoring = false, Monitorable = false };
-                hitbox.AddChild(new CollisionShape2D { Shape = new RectangleShape2D { Size = new Vector2(16, 18) } });
+                hitbox.AddChild(new CollisionShape2D
+                {
+                    Shape = new RectangleShape2D { Size = EggHitboxSize },
+                    Position = new Vector2(0, -EggHitboxSize.Y * 0.18f)
+                });
                 var capturedEggId = egg.Id;
+                var capturedSprite = sprite;
                 hitbox.InputEvent += (_, inputEvent, _) =>
                 {
-                    if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
-                        FailedEggSelected?.Invoke(capturedEggId);
+                    if (inputEvent is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+                        return;
+                    // The egg owns the click; without this the ground underneath opens its hex menu
+                    // in the same press.
+                    GetViewport().SetInputAsHandled();
+                    FailedEggSelected?.Invoke(capturedEggId);
                 };
+                // The same faint lift a Voidling and a hex get, so a failed egg reads as clickable.
+                hitbox.MouseEntered += () => SetFailedEggHovered(capturedSprite, true);
+                hitbox.MouseExited += () => SetFailedEggHovered(capturedSprite, false);
                 holder.AddChild(hitbox);
 
                 _eggsRoot.AddChild(holder);
@@ -516,6 +535,15 @@ public partial class GardenController : Node2D
         }
     }
 
+    /// <summary>The pointer lift for a failed egg: brighter, and a touch larger.</summary>
+    private static void SetFailedEggHovered(Sprite2D sprite, bool hovered)
+    {
+        if (!GodotObject.IsInstanceValid(sprite))
+            return;
+        sprite.SelfModulate = hovered ? new Color(1.35f, 1.35f, 1.35f) : Colors.White;
+        sprite.Scale = Vector2.One * EggBaseScale * (hovered ? 1.10f : 1.0f);
+    }
+
     private void UpdateEggPulse()
     {
         var time = (float)Time.GetTicksMsec() / 1000.0f;
@@ -524,7 +552,10 @@ public partial class GardenController : Node2D
             if (!_eggVisuals.TryGetValue(egg.Id, out var visual))
                 continue;
 
-            if (egg.State == EggState.Failed || egg.RequiredIncubationSeconds <= 0.01f)
+            // A failed egg's scale belongs to its hover, not to the incubation pulse it no longer has.
+            if (egg.State == EggState.Failed)
+                continue;
+            if (egg.RequiredIncubationSeconds <= 0.01f)
             {
                 visual.Sprite.Scale = Vector2.One * EggBaseScale;
                 continue;

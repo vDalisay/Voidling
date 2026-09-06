@@ -234,6 +234,14 @@ public partial class VoidlingActor : Node2D
     /// </summary>
     public Func<Vector2, Vector2>? LandClamp { get; set; }
 
+    /// <summary>
+    /// Somewhere on the island worth walking to. The wander box is the island's bounding
+    /// rectangle, which on a small or oddly shaped island is mostly water; drawing from it and
+    /// clamping afterwards kept pulling destinations back to whichever hex the Voidling already
+    /// stood on. Asking for real ground instead is what lets it cross the island.
+    /// </summary>
+    public Func<Vector2>? LandTarget { get; set; }
+
     /// <summary>Widens the roaming area as the island grows.</summary>
     public void SetWanderArea(Rect2 bounds, bool repath = false)
     {
@@ -398,10 +406,19 @@ public partial class VoidlingActor : Node2D
         _target = IsOnTile
             ? _tileCenter + Vector2.Right.Rotated(_rng.RandfRange(0.0f, Mathf.Tau)) *
               _rng.RandfRange(0.0f, _tileRadius)
-            : ClampToWanderArea(new Vector2(
-                _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
-                _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y)));
-        _nextTargetSeconds = _rng.RandfRange(1.5f, 4.0f);
+            : ClampToWanderArea(
+                TryPickShorelineTarget() ??
+                LandTarget?.Invoke() ??
+                new Vector2(
+                    _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
+                    _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y)));
+
+        // Long enough to actually arrive, plus some slack. A flat timer was shorter than the walk
+        // across a single hex, so a Voidling gave up on every destination that was not already
+        // next to it and never left the ground it stood on. This stays a give-up guard: arriving
+        // early simply starts a rest, and hitting the island edge repaths at once.
+        _nextTargetSeconds = Position.DistanceTo(_target) / Mathf.Max(1.0f, _walkSpeed) +
+                             _rng.RandfRange(1.0f, 3.0f);
     }
 
     /// <summary>

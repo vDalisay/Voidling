@@ -740,15 +740,14 @@ public partial class MainController
     }
 
     /// <summary>
-    /// A Voidling on plain ground owns the whole island. It used to be pinned inside a disc at the
-    /// middle of whichever hex it stood on, so the land clamp is checked directly — a point out at
-    /// the rim of placed ground has to survive it — and then a real Voidling is watched reaching
-    /// ground that disc never let it touch.
+    /// A Voidling on plain ground owns the whole island. Plain ground has held one still in three
+    /// different ways, so this checks the clamp directly, then puts a Voidling down on plain ground
+    /// and requires it to walk off that hex by itself.
     /// </summary>
     private async Task VerifyFreeRoaming()
     {
         var innerRadius = _garden.HexInnerRadiusForProbe();
-        // The radius the old clamp held every free-roaming Voidling inside.
+        // The radius an earlier land clamp held every free-roaming Voidling inside.
         var oldLimit = innerRadius * 0.6f;
 
         foreach (var module in _session.State.GardenModules.Where(module => module.Placed))
@@ -773,21 +772,37 @@ public partial class MainController
                 module.Placed && _garden.HexUnderForProbe(faraway) == (module.HexQ, module.HexR)))
             throw new InvalidOperationException("The land clamp let a position stay off the island.");
 
-        var creature = _session.State.Voidlings.First(candidate => candidate.PassiveTrainingModuleId.Length == 0);
-        var startCenter = _garden.HexCenterForProbe(
-            _garden.HexUnderForProbe(_garden.ActorPositionForProbe(creature.Id)));
-        var reached = 0.0f;
-        var deadline = Time.GetTicksMsec() + 10000;
-        while (Time.GetTicksMsec() < deadline && reached <= oldLimit)
+        // Wings and crowns must share the body's layer, or trees stop hiding them.
+        foreach (var voidling in _session.State.Voidlings)
         {
-            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-            reached = Mathf.Max(reached, startCenter.DistanceTo(_garden.ActorPositionForProbe(creature.Id)));
+            var (body, mutations) = _garden.MutationLayersForProbe(voidling.Id);
+            if (body != mutations)
+                throw new InvalidOperationException(
+                    $"Mutations draw on layer {mutations} and the body on {body}; trees cannot hide them.");
         }
 
-        if (reached <= oldLimit)
+        // The case the player reports: pick a Voidling up, put it down on plain ground, and watch.
+        var creature = _session.State.Voidlings.First(candidate => candidate.PassiveTrainingModuleId.Length == 0);
+        var plain = _session.State.GardenModules.First(module => module.Placed && module.StatId.Length == 0);
+        _garden.DropOnHexForProbe(creature.Id, plain.Id, _garden.HexCenterForProbe((plain.HexQ, plain.HexR)));
+        await SettleGardenUi();
+        if (_garden.IsOnTileForProbe(creature.Id) ||
+            _session.FindVoidling(creature.Id)!.PassiveTrainingModuleId.Length > 0)
+            throw new InvalidOperationException("Plain ground bound the Voidling that was dropped on it.");
+
+        // Measured at 5-15s across runs on the two-hex starter island; the budget is generous
+        // because roaming is deliberately leisurely, not because the outcome is in doubt.
+        var droppedHex = _garden.HexUnderForProbe(_garden.ActorPositionForProbe(creature.Id));
+        var deadline = Time.GetTicksMsec() + 45000;
+        while (Time.GetTicksMsec() < deadline &&
+               _garden.HexUnderForProbe(_garden.ActorPositionForProbe(creature.Id)) == droppedHex)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+
+        if (_garden.HexUnderForProbe(_garden.ActorPositionForProbe(creature.Id)) == droppedHex)
             throw new InvalidOperationException(
-                $"A Voidling on plain ground stayed inside its hex's centre disc: reached {reached:0.#}px " +
-                $"of the {oldLimit:0.#}px the old clamp allowed.");
+                $"A Voidling dropped on plain ground never walked off hex {droppedHex}.");
     }
 
     private RaceEntryScreen FindRaceEntry()
