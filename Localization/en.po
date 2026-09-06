@@ -414,6 +414,54 @@ msgstr "CHEERING!"
 msgid "UI_RACE_STAMINA"
 msgstr "STAMINA {0} / {1}"
 
+msgid "UI_RACE_HUD_LOCAL"
+msgstr "LOCAL RACE"
+
+msgid "UI_RACE_HUD_ONLINE"
+msgstr "ONLINE RACE"
+
+msgid "UI_RACE_HUD_MENU"
+msgstr "ESC · Menu"
+
+msgid "UI_RACE_HUD_STANDINGS"
+msgstr "POSITIONS"
+
+msgid "UI_RACE_HUD_COURSE"
+msgstr "COURSE"
+
+msgid "UI_RACE_HUD_START"
+msgstr "Start"
+
+msgid "UI_RACE_HUD_FINISH"
+msgstr "Finish"
+
+msgid "UI_RACE_HUD_YOU"
+msgstr "YOU"
+
+msgid "UI_RACE_HUD_LEAD"
+msgstr "Lead"
+
+msgid "UI_RACE_HUD_PROGRESS"
+msgstr "{0}% · {1}"
+
+msgid "UI_RACE_HUD_PLACE"
+msgstr "{0} of {1}"
+
+msgid "UI_RACE_ORDINAL_1"
+msgstr "1st"
+
+msgid "UI_RACE_ORDINAL_2"
+msgstr "2nd"
+
+msgid "UI_RACE_ORDINAL_3"
+msgstr "3rd"
+
+msgid "UI_RACE_ORDINAL_4"
+msgstr "4th"
+
+msgid "UI_RACE_ORDINAL_N"
+msgstr "#{0}"
+
 msgid "UI_RACE_RESULT_WIN"
 msgstr "Congratulations!"
 
@@ -425,6 +473,15 @@ msgstr "Race complete!"
 
 msgid "UI_RACE_RESULT_PLACE"
 msgstr "You placed #{0}"
+
+msgid "UI_RACE_RESULT_EYEBROW"
+msgstr "{0} · RESULTS"
+
+msgid "UI_RACE_RESULT_REWARD"
+msgstr "+{0} sprouts"
+
+msgid "UI_RACE_RESULT_NEW_RECORD"
+msgstr "New course record!"
 
 msgid "UI_RACE_PAUSED"
 msgstr "RACE PAUSED"
@@ -845,6 +902,9 @@ msgstr "Trade complete — sent {0}, received {1}."
 
 msgid "UI_GARDEN_PLACE_LAND_HINT"
 msgstr "Click where the island should grow. R rotates the piece, right-click cancels."
+
+msgid "UI_GARDEN_PUT_IN_INVENTORY"
+msgstr "Put in inventory"
 
 msgid "UI_SHOP_LAND_TITLE"
 msgstr "LAND"

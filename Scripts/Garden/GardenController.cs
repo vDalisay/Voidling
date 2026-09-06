@@ -284,6 +284,12 @@ public partial class GardenController : Node2D
             CancelEggPlacement();
             CancelLandPlacement();
         }
+        else
+        {
+            // Rebuild every actor's target when the Garden becomes visible again. A target selected
+            // before a race/trade screen could otherwise keep walking into an old edge.
+            RefreshTileResidents(repath: true);
+        }
 
         Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
         _camera.Enabled = active;
@@ -377,7 +383,7 @@ public partial class GardenController : Node2D
     private void Refresh()
     {
         // The island is rebuilt first: it decides where actors may roam and where the camera stops.
-        RefreshLand();
+        var landChanged = RefreshLand();
 
         var currentIds = _session.State.Voidlings
             .Select(v => v.Id)
@@ -418,7 +424,7 @@ public partial class GardenController : Node2D
 
         Select(_selectedId);
         RefreshEggs();
-        RefreshTileResidents();
+        RefreshTileResidents(landChanged);
     }
 
     private void RefreshEggs()

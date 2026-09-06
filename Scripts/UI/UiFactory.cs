@@ -37,6 +37,14 @@ public static class UiFactory
         return panel;
     }
 
+    /// <summary>The premium panel chrome on its own, tinted, for surfaces that are not containers.</summary>
+    public static StyleBoxTexture CreatePanelStylebox(Color modulate)
+    {
+        var style = CreatePanelStyle();
+        style.ModulateColor = modulate;
+        return style;
+    }
+
     public static Button CreateButton(string text, int iconIndex = -1)
     {
         var useEyeIcon = text == "◉";

@@ -1,9 +1,9 @@
 # Selected UI overhaul — staged implementation
 
-Status: **Stages 1–3 implemented and verified; waiting for race-entry player testing.** Each subsequent screen waits for the previous screen's player test.
+Status: **Stages 1–5 implemented and verified; waiting for live-race and results player testing.** Each subsequent screen waits for the previous screen's player test.
 
-Branch: `codex/ui-overhaul-managers-rail`  
-Workspace: `C:/Users/Home/Documents/Voidling-ui-overhaul`  
+Branch: `codex/ui-stage4-live-race`
+Workspace: `C:/Users/Home/Documents/Voidling-ui-live-race`
 Baseline: `e03691b` from main. No save schema, economy, genetics or race simulation changes.
 
 ## Approved visual combination
@@ -292,3 +292,79 @@ premium packs:
   course instead of a row of coloured blocks.
 
 Nothing about course identity, difficulty tiers, records or the race itself changed in this pass.
+
+## Stage 5 handoff
+
+Implemented the option 01 Classic dock results card over the finished race. The podium is now built
+from premium art rather than flat rectangles: gold, silver and bronze blocks use the Sprout Lands
+panel chrome, the winner's block carries a gold star from `Icons/special icons/stars.png`, the
+headline sits on an amber plaque flanked by stars on a win, the reward line uses the farming sprout
+icon, and a new course record shows the wood-framed star from `stars in wood.png`. Portraits still
+stand on their blocks through the shared portrait pivot, so new creature art cannot leave a finisher
+floating or sunk.
+
+The card now reads: course eyebrow, outcome headline, podium, `You placed #N · time`, the reward that
+was granted, the new-record badge when one was set, and one green **Return to Garden** action that
+takes focus. Every part is a named node (`ResultsCard`, `ResultsHeadline`, `ResultsPodium`,
+`ResultsPlacement`, `ResultsReward`, `ResultsRecord`, `ResultsReturn`) so the CI probe can assert the
+layout instead of matching English text.
+
+Three things beyond the layout were needed:
+
+- `RaceScreen.PresentOutcome(reward, newCourseRecord)` lets the owner report what it already applied.
+  `MainController.OnRaceCompleted` keeps its single reward/record call and passes the results back;
+  the card never awards anything itself. `RecordCourseFinish` now returns whether the run became the
+  record — the persistence added in stage 3 is read, not extended.
+- `RaceScreen.Polish.cs` used to find the results title and return button by their English text and
+  rewrite them after the fact. That is deleted: the card builds its own localized text and Polish
+  only animates the named card and throws the confetti or the sweat drop.
+- Race times had two copies of the same formatter. `RaceScreen.FormatMilliseconds` is now the single
+  one, so the time on the results card and the time filed as a course record cannot disagree.
+
+Deliberately unchanged: **Race again** is not added — it is illustrative in the mockup and not
+approved. The in-race HUD is untouched, so stage 4 merges cleanly. Rewards, the one-time
+`_completionReported` guard, daily-race leaderboard handling, multiplayer results and both local and
+online return paths are exactly as they were; a multiplayer or daily race simply shows no reward line
+because none is granted. No save schema, economy, genetics or race-simulation change.
+
+Review captures: [results, last place with reward and record](ui-overhaul/race-results.png),
+[results, win headline](ui-overhaul/race-results-win.png). The win capture was produced by forcing
+the placement for review only; that change is not in the branch.
+
+### Launch the results playtest
+
+From this workspace in PowerShell:
+
+```powershell
+.\playgame.bat --no-build --voidling-dev-profile=ui_overhaul_results_playtest
+```
+
+Race from **Races** on the left rail and finish a course. Check that the placement, the sprouts you
+were actually given and the return action are all obvious, that a faster run shows the new-record
+badge and a slower one does not, that the sprout balance moves exactly once, and that Return to
+Garden works from a local race and from an online one.
+
+### Verification completed
+
+Local environment: Windows, .NET 8, Godot 4.6.1 Mono (CI uses Linux/Godot 4.6.0).
+
+| Check | Result |
+|---|---|
+| Debug and Release builds | Pass; the two existing `TradeNegotiationCoordinator` warnings only |
+| `dotnet test` (Release) | 241 passed, zero failures |
+| Architecture, canonical creature-art and localization greps | Pass |
+| Godot import and main-scene runtime | Pass; no ERROR/SCRIPT ERROR lines |
+| Garden UI smoke | Pass |
+| Race completion smoke, extended | Pass — named nodes, on-screen bounds, reward text, record badge, return action, and one single completion callback after 90 further frames |
+| Race presentation, Voidling visual, family tree, persistence recovery smoke | Pass |
+| Rendered results review at 1280×720 | Pass for last place and for a win |
+| `git diff --check` | Pass |
+
+The reusable results check is:
+
+```text
+godot --headless --path . -- --voidling-race-completion-smoke
+```
+
+Add `--voidling-race-results-shot` with a graphical renderer to write the review capture to
+`.godot/ui-checks/race-results.png`.

@@ -194,6 +194,25 @@ public sealed class TrainingUseCase
         return Math.Max(0, _rules.GardenModules.EmptyHexCost) * shape.HexCount;
     }
 
+    /// <summary>Reverses a just-bought piece while it is still waiting to be placed.</summary>
+    public GardenModuleMutationResult CancelLandPurchase(GameStateData state, string moduleId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var module = state.GardenModules.FirstOrDefault(candidate => candidate.Id == moduleId);
+        if (module == null)
+            return new GardenModuleMutationResult(GardenModuleFailure.ModuleNotFound, false);
+        if (module.Placed)
+            return new GardenModuleMutationResult(GardenModuleFailure.AlreadyPlaced, false);
+
+        var shape = GardenTileShape.Find(module.ShapeId);
+        if (shape == null)
+            return new GardenModuleMutationResult(GardenModuleFailure.UnknownShape, false);
+
+        state.GardenModules.Remove(module);
+        state.Coins += PriceOf(shape);
+        return new GardenModuleMutationResult(GardenModuleFailure.None, true);
+    }
+
     /// <summary>
     /// Puts an owned piece down, anchored on one hex and turned <paramref name="rotationSteps"/>
     /// sixths of a turn. Every hex it covers becomes its own tile, so a three-hex piece can end up

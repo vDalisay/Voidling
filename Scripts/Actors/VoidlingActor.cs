@@ -150,8 +150,12 @@ public partial class VoidlingActor : Node2D
         if (toTarget.LengthSquared() > 1.0f)
         {
             var direction = toTarget.Normalized();
-            Position += direction * _walkSpeed * step;
-            Position = ClampToWanderArea(Position);
+            var nextPosition = Position + direction * _walkSpeed * step;
+            var clampedPosition = ClampToWanderArea(nextPosition);
+            var hitBoundary = clampedPosition.DistanceSquaredTo(nextPosition) > 0.01f;
+            Position = clampedPosition;
+            if (hitBoundary && !IsOnTile)
+                PickNewTarget();
             PlayForDirection(direction);
         }
     }
@@ -201,13 +205,15 @@ public partial class VoidlingActor : Node2D
     public Func<Vector2, Vector2>? LandClamp { get; set; }
 
     /// <summary>Widens the roaming area as the island grows.</summary>
-    public void SetWanderArea(Rect2 bounds)
+    public void SetWanderArea(Rect2 bounds, bool repath = false)
     {
-        if (_wanderBounds == bounds)
+        if (_wanderBounds == bounds && !repath)
             return;
 
         _wanderBounds = bounds;
         Position = ClampToWanderArea(Position);
+        if (repath)
+            PickNewTarget();
     }
 
     private Vector2 ClampToWanderArea(Vector2 position)

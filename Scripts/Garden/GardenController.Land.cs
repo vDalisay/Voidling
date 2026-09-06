@@ -11,6 +11,8 @@ namespace VoidlingGame;
 
 public partial class GardenController
 {
+    public const double LandPlacementCameraSeconds = 1.0;
+    public const double LandPlacementAnimationSeconds = 0.4;
     /// <summary>Raised when land placement is armed or cleared so the HUD can show its own hint.</summary>
     public event Action<bool>? LandPlacementModeChanged;
 
@@ -108,6 +110,8 @@ public partial class GardenController
     private int _placingRotation;
     private Node2D? _landGhost;
     private Node2D? _snapGrid;
+    private Tween? _landPlacementCameraTween;
+    private bool _landPlacementCommitting;
     private string _hoveredModuleId = "";
     private string _landSignature = "";
     private Rect2 _landBounds = new(new Vector2(311, 150), new Vector2(210, 180));
@@ -152,7 +156,7 @@ public partial class GardenController
     /// <summary>Turns the piece under the cursor by a sixth of a turn while it is being placed.</summary>
     public void RotateLandPlacement(int steps)
     {
-        if (!IsPlacingLand || _placingShape.RotationCount <= 1)
+        if (!IsPlacingLand || _landPlacementCommitting || _placingShape.RotationCount <= 1)
             return;
 
         _placingRotation = ((_placingRotation + steps) % 6 + 6) % 6;
@@ -162,6 +166,9 @@ public partial class GardenController
 
     public void CancelLandPlacement()
     {
+        _landPlacementCameraTween?.Kill();
+        _landPlacementCameraTween = null;
+        _landPlacementCommitting = false;
         ClearSnapGrid();
         if (_landGhost != null && GodotObject.IsInstanceValid(_landGhost))
             _landGhost.QueueFree();
@@ -205,7 +212,7 @@ public partial class GardenController
 
     private void UpdateLandGhost()
     {
-        if (_landGhost == null || !GodotObject.IsInstanceValid(_landGhost))
+        if (_landPlacementCommitting || _landGhost == null || !GodotObject.IsInstanceValid(_landGhost))
             return;
 
         var pointer = _landRoot.ToLocal(GetGlobalMousePosition());
@@ -231,19 +238,39 @@ public partial class GardenController
     // pointer position last settled, so the drop point always matches what the player aimed at.
     private void TryCompleteLandPlacement(Vector2 viewportPosition)
     {
-        if (_placingModuleId.Length == 0)
+        if (_placingModuleId.Length == 0 || _landPlacementCommitting)
             return;
 
         var moduleId = _placingModuleId;
         var rotation = _placingRotation;
         var world = _landRoot.ToLocal(GetCanvasTransform().AffineInverse() * viewportPosition);
         var (q, r) = Hex.At(world.X, world.Y);
-        // A miss keeps placement armed and lets the session explain why the piece does not fit.
-        if (_session.PlaceGardenModule(moduleId, q, r, rotation))
-            CancelLandPlacement();
+        if (!CanPlaceShapeAt(q, r))
+            return;
+
+        var (x, y) = Hex.CenterOf(q, r);
+        _landPlacementCommitting = true;
+        _cameraDragging = false;
+        StopFollowing();
+        _landPlacementCameraTween = CreateTween();
+        _landPlacementCameraTween.TweenProperty(
+                _camera,
+                "position",
+                new Vector2(x, y),
+                LandPlacementCameraSeconds)
+            .SetTrans(Tween.TransitionType.Back)
+            .SetEase(Tween.EaseType.InOut);
+        _landPlacementCameraTween.TweenCallback(Callable.From(() =>
+        {
+            _landPlacementCameraTween = null;
+            _landPlacementCommitting = false;
+            _camera.ResetSmoothing();
+            if (_placingModuleId == moduleId && _session.PlaceGardenModule(moduleId, q, r, rotation))
+                CancelLandPlacement();
+        }));
     }
 
-    private void RefreshLand()
+    private bool RefreshLand()
     {
         var placed = _session.State.GardenModules.Where(module => module.Placed).ToList();
         var signature = string.Join(
@@ -251,7 +278,7 @@ public partial class GardenController
             placed.OrderBy(module => module.Id, StringComparer.Ordinal)
                 .Select(module => $"{module.Id}:{module.HexQ},{module.HexR}:{module.StatId}:{module.Level}"));
         if (signature == _landSignature && _landVisuals.Count > 0)
-            return;
+            return false;
 
         // A hex's coastline depends on its neighbours, so the island is rebuilt as a whole whenever
         // it changes. It is a handful of hexes, not a tilemap.
@@ -279,7 +306,7 @@ public partial class GardenController
             if (_initialRefreshComplete && !known.Contains(module.Id))
             {
                 visual.Holder.Scale = Vector2.Zero;
-                CreateTween().TweenProperty(visual.Holder, "scale", Vector2.One, 0.4)
+                CreateTween().TweenProperty(visual.Holder, "scale", Vector2.One, LandPlacementAnimationSeconds)
                     .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
             }
         }
@@ -288,6 +315,7 @@ public partial class GardenController
         _hoveredModuleId = "";
         if (IsPlacingLand)
             BuildSnapGrid();
+        return true;
     }
 
     private LandVisual BuildHexVisual(GardenModuleData module)
@@ -544,9 +572,12 @@ public partial class GardenController
     private Vector2 ClampToLand(Vector2 position)
     {
         var (q, r) = Hex.At(position.X, position.Y);
-        return TrainingUseCase.IsHexOccupied(_session.State, q, r)
-            ? PushOutOfTrunks(position)
-            : PushOutOfTrunks(NearestLandPoint(position));
+        if (!TrainingUseCase.IsHexOccupied(_session.State, q, r))
+            return PushOutOfTrunks(NearestLandPoint(position));
+
+        var (centerX, centerY) = Hex.CenterOf(q, r);
+        var center = new Vector2(centerX, centerY);
+        return PushOutOfTrunks(center + (position - center).LimitLength(Hex.InnerRadius * 0.6f));
     }
 
     private Vector2 PushOutOfTrunks(Vector2 position)
@@ -591,7 +622,7 @@ public partial class GardenController
     /// A Voidling training on a hex lives on that hex: it roams inside it playing the activity its
     /// ground trains, and only leaves when the player carries it off.
     /// </summary>
-    private void RefreshTileResidents()
+    private void RefreshTileResidents(bool repath = false)
     {
         var placedById = _session.State.GardenModules
             .Where(module => module.Placed)
@@ -603,7 +634,7 @@ public partial class GardenController
                 continue;
 
             actor.LandClamp = ClampToLand;
-            actor.SetWanderArea(_landBounds);
+            actor.SetWanderArea(_landBounds, repath);
 
             if (creature.PassiveTrainingModuleId.Length > 0 &&
                 placedById.TryGetValue(creature.PassiveTrainingModuleId, out var tile) &&
