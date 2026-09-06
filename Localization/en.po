@@ -294,12 +294,6 @@ msgstr "INVENTORY"
 msgid "UI_INVENTORY_TREAT"
 msgstr "{0} Treat"
 
-msgid "UI_INVENTORY_EGGS"
-msgstr "Eggs on Island"
-
-msgid "UI_INVENTORY_FAILED_EGGS"
-msgstr "FAILED EGGS"
-
 msgid "UI_INVENTORY_FAILED_EGG"
 msgstr "Failed Egg {0}"
 
@@ -882,17 +876,14 @@ msgstr "LAND"
 msgid "UI_SHOP_LAND_SUBTITLE"
 msgstr "Pieces of ground that extend the island. Each hex can become training ground for one Voidling."
 
-msgid "UI_INVENTORY_LAND"
-msgstr "LAND TO PLACE"
-
 msgid "UI_INVENTORY_LAND_TILE"
 msgstr "{0} ({1} hex)"
 
 msgid "UI_INVENTORY_LAND_PLAIN"
-msgstr "Plain ground  \u2022  {0}"
+msgstr "Plain ground · {0}"
 
 msgid "UI_INVENTORY_LAND_TRAINED"
-msgstr "{0} ground L{1}  \u2022  {2}"
+msgstr "{0} ground L{1} · {2}"
 
 msgid "UI_LAND_TITLE"
 msgstr "Island land"
@@ -1109,9 +1100,6 @@ msgstr "Shells"
 msgid "UI_INVENTORY_EMPTY"
 msgstr "Nothing here yet."
 
-msgid "UI_INVENTORY_UNPLACED"
-msgstr "Not placed"
-
 msgid "UI_INVENTORY_INCUBATING"
 msgstr "{0}s left"
 
@@ -1121,20 +1109,11 @@ msgstr "Hatch now ({0})"
 msgid "UI_INVENTORY_SELL"
 msgstr "Sell {0}"
 
-msgid "UI_INVENTORY_SHELL_VALUE"
-msgstr "Worth {0}"
-
 msgid "UI_INVENTORY_SHELL"
 msgstr "Eggshell {0}"
 
 msgid "UI_INVENTORY_EGG"
 msgstr "Egg {0}"
-
-msgid "UI_BREED_PARENT_A"
-msgstr "First parent"
-
-msgid "UI_BREED_PARENT_B"
-msgstr "Second parent"
 
 msgid "UI_BREED_PICK_PARENTS"
 msgstr "Pick two adults"
@@ -1169,9 +1148,6 @@ msgstr "Catalogue"
 msgid "UI_LAND_RATE"
 msgstr "{0}/min"
 
-msgid "UI_LAND_TRAINING_COUNT"
-msgstr "{0} training"
-
 msgid "UI_SETTINGS_EDGE_PAN"
 msgstr "Edge panning"
 
@@ -1189,3 +1165,30 @@ msgstr "Large Tree"
 
 msgid "UI_SETTINGS_PLAY"
 msgstr "Play"
+
+msgid "UI_INVENTORY_TREAT_EFFECT"
+msgstr "Raises {0} training by {1}-{2}."
+
+msgid "UI_INVENTORY_EGG_COMMON"
+msgstr "A common egg."
+
+msgid "UI_INVENTORY_EGG_BRED"
+msgstr "Bred in your garden."
+
+msgid "UI_INVENTORY_EGG_FAILED"
+msgstr "Never hatched. Worth nothing."
+
+msgid "UI_INVENTORY_SHELL_EFFECT"
+msgstr "A leftover shell. Sells for {0}."
+
+msgid "UI_INVENTORY_LAND_EFFECT"
+msgstr "Covers {0} hexes of the island."
+
+msgid "UI_INVENTORY_GIVE"
+msgstr "Put down"
+
+msgid "UI_INVENTORY_RETURN"
+msgstr "Take back"
+
+msgid "UI_GARDEN_EGG_FAILED_TITLE"
+msgstr "FAILED EGG"

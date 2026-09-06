@@ -7,11 +7,12 @@ using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Inventory;
 
-public readonly record struct InventoryItemViewState(string DisplayName, int Count, int IconIndex, bool UsesEggIcon = false);
+/// <summary>A treat: what it is, how many, and the one line saying what it does.</summary>
+public readonly record struct InventoryItemViewState(string DisplayName, string Description, string StatId, int Count, int IconIndex, bool UsesEggIcon = false);
 public readonly record struct FailedEggViewState(string EggId, string DisplayName);
 public readonly record struct EggShellViewState(string ShellId, string DisplayName, int SaleValue);
 public readonly record struct IncubatingEggViewState(string EggId, string DisplayName, int SecondsRemaining);
-public readonly record struct StoredEggViewState(string EggId, string DisplayName, Color TintColor);
+public readonly record struct StoredEggViewState(string EggId, string DisplayName, string Description, Color TintColor);
 /// <summary>A piece of ground waiting in the inventory, named and shaped by what was bought.</summary>
 public readonly record struct StoredLandViewState(string ModuleId, string DisplayName, string ShapeId, Color Tint);
 public sealed record InventoryScreenState(IReadOnlyList<InventoryItemViewState> Items, IReadOnlyList<FailedEggViewState> FailedEggs, IReadOnlyList<EggShellViewState> EggShells, int IncubationSkipCount, IReadOnlyList<IncubatingEggViewState> IncubatingEggs, IReadOnlyList<StoredEggViewState> StoredEggs, IReadOnlyList<StoredLandViewState> StoredLand);
@@ -37,6 +38,8 @@ public partial class InventoryScreen : HBoxContainer
     public event Action<string>? UseIncubationSkipRequested;
     public event Action<StoredEggViewState>? PlaceStoredEggRequested;
     public event Action<StoredLandViewState>? PlaceStoredLandRequested;
+    /// <summary>Put a treat on the ground for whichever Voidling reaches it first.</summary>
+    public event Action<string>? PlaceTreatRequested;
 
     private static readonly Texture2D EggTexture = GD.Load<Texture2D>("res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
     private static readonly Texture2D TreatTexture = GD.Load<Texture2D>(
@@ -187,7 +190,6 @@ public partial class InventoryScreen : HBoxContainer
             count.MouseFilter = MouseFilterEnum.Ignore;
             button.AddChild(count);
         }
-        if (slot.Key == _selection) button.AddChild(PaperCard.Star(new Vector2(34, 0), 14));
         button.Pressed += () => { _selection = slot.Key; RebuildSlots(); FocusSelection(); };
         return button;
     }
@@ -215,8 +217,10 @@ public partial class InventoryScreen : HBoxContainer
         name.AddThemeColorOverride("font_color", PaperCard.Ink(slot.Tint));
         _detail.AddChild(name);
 
-        var detail = UiFactory.CreateLabel(slot.Detail, 7);
+        var detail = UiFactory.CreateLabel(slot.Detail, 6);
+        detail.Name = "DetailDescription";
         detail.HorizontalAlignment = HorizontalAlignment.Center;
+        detail.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _detail.AddChild(detail);
 
         _detail.AddChild(new ColorRect
@@ -247,9 +251,11 @@ public partial class InventoryScreen : HBoxContainer
             {
                 var iconIndex = index++;
                 if (item.Count <= 0) continue;
+                var statId = item.StatId;
                 yield return new Slot("treat:" + iconIndex, item.DisplayName,
-                    string.Format(Tr("UI_SHOP_OWNED"), item.Count), item.Count, Color.FromHtml("#6B8F5E"),
-                    () => AtlasArt(TreatTexture, new Rect2(iconIndex % 4 * 16, iconIndex / 4 * 16, 16, 16)), null, null);
+                    item.Description, item.Count, Color.FromHtml("#6B8F5E"),
+                    () => AtlasArt(TreatTexture, new Rect2(iconIndex % 4 * 16, iconIndex / 4 * 16, 16, 16)),
+                    Tr("UI_INVENTORY_GIVE"), () => PlaceTreatRequested?.Invoke(statId));
             }
             yield break;
         }
@@ -258,7 +264,7 @@ public partial class InventoryScreen : HBoxContainer
             foreach (var egg in _state!.StoredEggs)
             {
                 var captured = egg;
-                yield return new Slot("egg:" + egg.EggId, egg.DisplayName, Tr("UI_INVENTORY_UNPLACED"), 1, egg.TintColor,
+                yield return new Slot("egg:" + egg.EggId, egg.DisplayName, egg.Description, 1, egg.TintColor,
                     () => TintedEgg(captured.TintColor), Tr("UI_INVENTORY_PLACE"),
                     () => PlaceStoredEggRequested?.Invoke(captured));
             }
@@ -275,7 +281,7 @@ public partial class InventoryScreen : HBoxContainer
             foreach (var failed in _state.FailedEggs)
             {
                 var captured = failed;
-                yield return new Slot("failed:" + failed.EggId, failed.DisplayName, Tr("UI_INVENTORY_FAILED_EGGS"), 1,
+                yield return new Slot("failed:" + failed.EggId, failed.DisplayName, Tr("UI_INVENTORY_EGG_FAILED"), 1,
                     Color.FromHtml("#9C514B"), () => TintedEgg(Color.FromHtml("#9C514B")),
                     Tr("UI_INVENTORY_DISCARD"), () => DiscardFailedEggRequested?.Invoke(captured.EggId));
             }
@@ -286,7 +292,8 @@ public partial class InventoryScreen : HBoxContainer
             foreach (var land in _state!.StoredLand)
             {
                 var captured = land;
-                yield return new Slot("land:" + land.ModuleId, land.DisplayName, Tr("UI_LAND_STORED"), 1, land.Tint,
+                yield return new Slot("land:" + land.ModuleId, land.DisplayName,
+                    string.Format(Tr("UI_INVENTORY_LAND_EFFECT"), LandShapePresentation.HexCountOf(land.ShapeId)), 1, land.Tint,
                     () => LandShapePresentation.CreateShapeArt(captured.ShapeId, captured.Tint), Tr("UI_INVENTORY_PLACE"),
                     () => PlaceStoredLandRequested?.Invoke(captured));
             }
@@ -296,7 +303,7 @@ public partial class InventoryScreen : HBoxContainer
         {
             var captured = shell;
             yield return new Slot("shell:" + shell.ShellId, shell.DisplayName,
-                string.Format(Tr("UI_INVENTORY_SHELL_VALUE"), shell.SaleValue), 1, Color.FromHtml("#8A7A5A"),
+                string.Format(Tr("UI_INVENTORY_SHELL_EFFECT"), shell.SaleValue), 1, Color.FromHtml("#8A7A5A"),
                 () => TintedEgg(new Color(0.78f, 0.74f, 0.66f)), string.Format(Tr("UI_INVENTORY_SELL"), shell.SaleValue),
                 () => SellEggShellRequested?.Invoke(captured.ShellId));
         }

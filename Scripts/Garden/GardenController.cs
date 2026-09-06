@@ -39,7 +39,11 @@ public partial class GardenController : Node2D
         public Node2D Holder { get; init; } = null!;
         public Sprite2D Sprite { get; init; } = null!;
         public Label Label { get; init; } = null!;
+        public Area2D Hitbox { get; init; } = null!;
     }
+
+    /// <summary>Raised when a failed egg in the Garden is clicked, so the host can offer its actions.</summary>
+    public event Action<string>? FailedEggSelected;
 
     public override void _Ready()
     {
@@ -70,6 +74,8 @@ public partial class GardenController : Node2D
     {
         UpdateEggPulse();
         UpdatePlacementGhost();
+        UpdateTreatGhost();
+        UpdateTreatDrops();
         UpdateLandGhost();
         UpdateLandHover();
 
@@ -129,6 +135,17 @@ public partial class GardenController : Node2D
                     TryCompleteEggPlacement(mouse.Position);
                 else
                     CancelEggPlacement();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            if (IsPlacingTreat && mouse.Pressed &&
+                mouse.ButtonIndex is MouseButton.Left or MouseButton.Right)
+            {
+                if (mouse.ButtonIndex == MouseButton.Left)
+                    TryCompleteTreatPlacement(mouse.Position);
+                else
+                    CancelTreatPlacement();
                 GetViewport().SetInputAsHandled();
                 return;
             }
@@ -282,6 +299,7 @@ public partial class GardenController : Node2D
         {
             StopFollowing();
             CancelEggPlacement();
+            CancelTreatPlacement();
             CancelLandPlacement();
         }
         else
@@ -415,6 +433,7 @@ public partial class GardenController : Node2D
             actor.Setup(data, _landBounds, start);
             actor.LandClamp = ClampToLand;
             actor.Clicked += OnActorPressed;
+            actor.RunningStride += OnRunningStride;
             _actorsRoot.AddChild(actor);
             _actors[data.Id] = actor;
 
@@ -429,7 +448,9 @@ public partial class GardenController : Node2D
 
     private void RefreshEggs()
     {
-        var placed = _session.State.OwnedEggs.Where(egg => egg.State != EggState.Stored).ToList();
+        var placed = _session.State.OwnedEggs
+            .Where(egg => egg.State != EggState.Stored && !egg.Stowed)
+            .ToList();
         var eggsById = placed.ToDictionary(e => e.Id, StringComparer.Ordinal);
 
         foreach (var staleId in _eggVisuals.Keys.Where(id => !eggsById.ContainsKey(id)).ToArray())
@@ -460,8 +481,19 @@ public partial class GardenController : Node2D
                 label.AddThemeColorOverride("font_color", Color.FromHtml("#4F5948"));
                 holder.AddChild(label);
 
+                // Only a failed egg is ever interactive; a healthy one is a timer, not a decision.
+                var hitbox = new Area2D { InputPickable = false, Monitoring = false, Monitorable = false };
+                hitbox.AddChild(new CollisionShape2D { Shape = new RectangleShape2D { Size = new Vector2(16, 18) } });
+                var capturedEggId = egg.Id;
+                hitbox.InputEvent += (_, inputEvent, _) =>
+                {
+                    if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+                        FailedEggSelected?.Invoke(capturedEggId);
+                };
+                holder.AddChild(hitbox);
+
                 _eggsRoot.AddChild(holder);
-                visual = new EggVisual { Holder = holder, Sprite = sprite, Label = label };
+                visual = new EggVisual { Holder = holder, Sprite = sprite, Label = label, Hitbox = hitbox };
                 _eggVisuals[egg.Id] = visual;
 
                 if (_initialRefreshComplete)
@@ -479,6 +511,7 @@ public partial class GardenController : Node2D
                 : GameRules.TintColor(egg.TintHex);
             var remaining = Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds));
             visual.Label.Text = egg.State == EggState.Failed ? "X" : $"{remaining}s";
+            visual.Hitbox.InputPickable = egg.State == EggState.Failed;
         }
     }
 

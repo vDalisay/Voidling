@@ -65,6 +65,7 @@ public partial class GardenController
                 actor.Setup(data, _landBounds, position);
                 actor.LandClamp = ClampToLand;
                 actor.Clicked += OnActorPressed;
+                actor.RunningStride += OnRunningStride;
                 _actorsRoot.AddChild(actor);
                 _actors[data.Id] = actor;
 

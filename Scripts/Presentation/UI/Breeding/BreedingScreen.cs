@@ -123,6 +123,7 @@ public partial class BreedingScreen : HBoxContainer
         _rosterBox.AddChild(VoidlingRosterGrid.Build(
             roster,
             _page,
+            entry => entry.Id == _parentAId || entry.Id == _parentBId,
             entry => entry.Id == _parentAId ? "A" : entry.Id == _parentBId ? "B" : string.Empty,
             Pick,
             page => { _page = page; RebuildRoster(); },

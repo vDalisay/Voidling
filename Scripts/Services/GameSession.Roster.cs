@@ -24,6 +24,15 @@ public partial class GameSession
     public CreatureProfileProjection? CreateCreatureProfileProjection(string creatureId)
         => _lineageTreeProjection!.CreateCreatureProfile(State, creatureId);
 
+    /// <summary>Takes a failed egg off the island; it stays in the satchel until discarded.</summary>
+    public bool StowFailedEgg(string eggId)
+    {
+        if (!_roster!.StowFailedEgg(State, eggId))
+            return false;
+        SaveAndNotify("Picked up a failed egg.");
+        return true;
+    }
+
     public void DiscardFailedEgg(string eggId)
     {
         if (!_roster!.DiscardFailedEgg(State, eggId))

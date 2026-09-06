@@ -63,6 +63,8 @@ public partial class MainController : Node
             "/root/GameBootstrap/FriendsLeaderboardPresentationBridge");
         _garden = GetNode<GardenController>("Garden");
         _garden.VoidlingSelected += OnVoidlingSelected;
+        _garden.TreatEaten += _session.UseTrainingItem;
+        _garden.FailedEggSelected += ShowFailedEggMenu;
         _connectedZoneBridge.StateChanged += OnConnectedZoneStateChanged;
         ComposeConnectedZoneGardenPresentation();
 
@@ -128,6 +130,8 @@ public partial class MainController : Node
         }
         else if (_garden.IsPlacingEgg)
             _garden.CancelEggPlacement();
+        else if (_garden.IsPlacingTreat)
+            _garden.CancelTreatPlacement();
         else if (_garden.IsPlacingLand)
             _garden.CancelLandPlacement();
         else if (_garden.IsPlacingDecoration)

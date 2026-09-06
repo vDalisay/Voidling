@@ -141,7 +141,9 @@ public sealed class TrainingUseCase
 
         state.TrainingItems[statId]--;
 
-        var rolledGain = StableRandom.Create(seed, $"training:{creatureId}:{statId}").Next(5, 10);
+        var gainRules = _rules.TrainingItems;
+        var rolledGain = StableRandom.Create(seed, $"training:{creatureId}:{statId}")
+            .Next(gainRules.MinGain, gainRules.MaxGain + 1);
         var favoriteBonus = wasFavoriteFood ? Math.Max(0, _rules.FavoriteFood.BonusTrainingPoints) : 0;
         var current = _stats.GetTrainingPoints(creature, statId);
         var cap = _stats.GetTrainingPointCap(creature, statId);

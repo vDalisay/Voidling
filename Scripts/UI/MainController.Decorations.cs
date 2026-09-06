@@ -88,7 +88,6 @@ public partial class MainController
         // A kind you can still place reads lighter than one already standing in the garden.
         art.Modulate = new Color(1, 1, 1, slot.InstanceId == null ? 0.6f : 1.0f);
         button.AddChild(art);
-        if (slot.Key == _selectedDecoration) button.AddChild(PaperCard.Star(new Vector2(42, 1), 14));
 
         var capturedKey = slot.Key;
         button.Pressed += () => { _selectedDecoration = capturedKey; CallDeferred(nameof(ShowGardenDecorations)); };

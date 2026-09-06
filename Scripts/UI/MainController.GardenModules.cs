@@ -104,7 +104,6 @@ public partial class MainController
             level.AddThemeColorOverride("font_color", PaperCard.Ink(StatPresentationCatalog.ColorFor(module.StatId)));
             button.AddChild(level);
         }
-        if (module.Id == _selectedModuleId) button.AddChild(PaperCard.Star(new Vector2(42, 1), 14));
 
         var capturedId = module.Id;
         button.Pressed += () => { _selectedModuleId = capturedId; CallDeferred(nameof(ShowGardenModules)); };
@@ -319,6 +318,68 @@ public partial class MainController
             };
             box.AddChild(upgrade);
         }
+
+        _landInspector = inspector;
+        _uiRoot.AddChild(inspector);
+    }
+
+    /// <summary>
+    /// A failed egg lying on the island, in the same non-blocking right inspector a hex uses. It is
+    /// worth nothing either way, so the only choice is whether to keep looking at it.
+    /// </summary>
+    private void ShowFailedEggMenu(string eggId)
+    {
+        var egg = _session.State.OwnedEggs.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, eggId, StringComparison.Ordinal) && candidate.State == EggState.Failed);
+        if (egg == null)
+            return;
+
+        CloseLandInspector();
+        _selectedId = string.Empty;
+        _garden.ClearSelection();
+        _garden.StopFollowing();
+        RebuildDetailsPanel();
+
+        var inspector = UiFactory.CreatePanel(new Vector2(162, 150));
+        inspector.Name = "FailedEggInspector";
+        inspector.Position = new Vector2(468, 82);
+        inspector.Size = new Vector2(162, 150);
+        inspector.ZIndex = 18;
+        var box = new VBoxContainer();
+        box.AddThemeConstantOverride("separation", 5);
+        inspector.AddChild(box);
+
+        var heading = new HBoxContainer();
+        var title = UiFactory.CreateLabel(Tr("UI_GARDEN_EGG_FAILED_TITLE"), 9);
+        title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        title.AddThemeColorOverride("font_color", Color.FromHtml("#9C514B"));
+        heading.AddChild(title);
+        var close = UiFactory.CreateButton("×");
+        close.Name = "CloseLandInspector";
+        close.CustomMinimumSize = new Vector2(20, 20);
+        close.Pressed += CloseLandInspector;
+        heading.AddChild(close);
+        box.AddChild(heading);
+
+        var detail = UiFactory.CreateLabel(Tr("UI_INVENTORY_EGG_FAILED"), 7);
+        detail.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        detail.CustomMinimumSize = new Vector2(138, 34);
+        box.AddChild(detail);
+
+        var stow = UiFactory.CreateButton(Tr("UI_INVENTORY_RETURN"));
+        stow.Name = "StowFailedEgg";
+        stow.CustomMinimumSize = new Vector2(138, 26);
+        UiFactory.ApplyPixelFont(stow, 7);
+        stow.Pressed += () => { if (_session.StowFailedEgg(eggId)) CloseLandInspector(); };
+        box.AddChild(stow);
+
+        var discard = UiFactory.CreateButton(Tr("UI_INVENTORY_DISCARD"));
+        discard.Name = "DiscardFailedEgg";
+        discard.CustomMinimumSize = new Vector2(138, 24);
+        UiFactory.ApplyPixelFont(discard, 7);
+        discard.AddThemeColorOverride("font_color", Color.FromHtml("#914E42"));
+        discard.Pressed += () => { _session.DiscardFailedEgg(eggId); CloseLandInspector(); };
+        box.AddChild(discard);
 
         _landInspector = inspector;
         _uiRoot.AddChild(inspector);

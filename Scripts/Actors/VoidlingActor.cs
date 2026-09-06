@@ -95,6 +95,31 @@ public partial class VoidlingActor : Node2D
     /// Applies presentation-only roaming flavor from the Voidling's current effective stats.
     /// This never feeds back into authoritative training, persistence, or race simulation.
     /// </summary>
+    /// <summary>
+    /// Raised while training on running ground, so the Garden can kick up its dust at the feet.
+    /// Presentation only: the tile's training rate is unaffected by how often this fires.
+    /// </summary>
+    public event Action<VoidlingActor>? RunningStride;
+
+    private float _tileDustSeconds;
+
+    /// <summary>
+    /// A Voidling on running ground breaks into a visible stride now and then rather than looping
+    /// in place, so the ground reads as being used. Swim ground stays quiet.
+    /// </summary>
+    private void TickTileDust(float step)
+    {
+        if (!IsOnTile || _tileAnimation != "run" || _eating || _pickedUp || _interactionLocked)
+            return;
+
+        _tileDustSeconds -= step;
+        if (_tileDustSeconds > 0.0f)
+            return;
+
+        _tileDustSeconds = _rng.RandfRange(0.9f, 2.4f);
+        RunningStride?.Invoke(this);
+    }
+
     public void ApplyAmbientStats(float run, float stamina)
     {
         var behavior = VoidlingAmbientBehaviorResolver.Resolve(run, stamina);
@@ -113,6 +138,11 @@ public partial class VoidlingActor : Node2D
             return;
 
         var step = (float)delta;
+        // Food on the ground outranks both roaming and tile confinement.
+        if (ProcessTreatChase(step))
+            return;
+
+        TickTileDust(step);
         if (!IsOnTile && _restSeconds > 0.0f)
         {
             _restSeconds = Math.Max(0.0f, _restSeconds - step);

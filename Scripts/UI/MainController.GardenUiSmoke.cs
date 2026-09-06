@@ -201,15 +201,27 @@ public partial class MainController
                     throw new InvalidOperationException("Simulation refresh replaced inspector or lost keyboard focus.");
             }
             _session.BuyTrainingItem(GameRules.StatIds[0]);
+            _session.BuyTrainingItem(GameRules.StatIds[0]);
             var stock = _session.State.TrainingItems[GameRules.StatIds[0]];
             giveTreat.EmitSignal(BaseButton.SignalName.Pressed);
             await SettleGardenUi();
             RequireOnScreen(ModalPanel());
             await CaptureGardenUi("treats");
-            FindGardenButton(_modalHost, "Give_" + GameRules.StatIds[0]).EmitSignal(BaseButton.SignalName.Pressed);
+            // The chooser stays open so the player can spam it; each press spends exactly one treat
+            // and restarts the eating beat rather than queueing a second one.
+            var give = FindGardenButton(_modalHost, "Give_" + GameRules.StatIds[0]);
+            give.EmitSignal(BaseButton.SignalName.Pressed);
             await SettleGardenUi();
-            if (_session.State.TrainingItems[GameRules.StatIds[0]] != stock - 1 || _modalHost.IsOpen)
-                throw new InvalidOperationException("Treat chooser did not consume one owned treat and return.");
+            if (_session.State.TrainingItems[GameRules.StatIds[0]] != stock - 1 || !_modalHost.IsOpen)
+                throw new InvalidOperationException("Treat chooser did not consume one owned treat and stay open.");
+            give.EmitSignal(BaseButton.SignalName.Pressed);
+            await SettleGardenUi();
+            var remaining = _session.State.TrainingItems[GameRules.StatIds[0]];
+            if (remaining != stock - 2 || give.Disabled != (remaining <= 0))
+                throw new InvalidOperationException("Spamming the treat chooser did not spend and track its stock.");
+            CloseModal();
+            await SettleGardenUi();
+            giveTreat.GrabFocus();
             if (!giveTreat.HasFocus()) throw new InvalidOperationException("Treat action lost focus on return.");
             ShowDetails();
             await SettleGardenUi();
@@ -284,6 +296,7 @@ public partial class MainController
                     !modalControls.Contains(control.GetNode<Control>(control.FocusPrevious)))
                     throw new InvalidOperationException("Tab navigation escapes the modal.");
             }
+            await VerifyTreatDrop();
             await CaptureGardenUi("garden-menu");
             var age = _session.State.Voidlings.First().AdultAgeSeconds;
             await ToSignal(GetTree().CreateTimer(1.1), SceneTreeTimer.SignalName.Timeout);
@@ -616,6 +629,48 @@ public partial class MainController
         await SettleGardenUi();
         if (_session.State.EdgePanning != edgePanning)
             throw new InvalidOperationException("Edge panning switch did not toggle back.");
+    }
+
+    /// <summary>
+    /// Food on the ground: the nearest Voidling has to run for it, reach it, eat exactly one treat
+    /// from the satchel, and be roaming again afterwards.
+    /// </summary>
+    private async Task VerifyTreatDrop()
+    {
+        var statId = GameRules.StatIds[0];
+        _session.BuyTrainingItem(statId);
+        var stock = _session.State.TrainingItems[statId];
+        var creature = _session.State.Voidlings.First();
+
+        _garden.BeginTreatPlacement(statId);
+        if (!_garden.IsPlacingTreat) throw new InvalidOperationException("Treat placement did not arm.");
+        _garden.CancelTreatPlacement();
+        if (_garden.IsPlacingTreat || _session.State.TrainingItems[statId] != stock)
+            throw new InvalidOperationException("Cancelling treat placement still spent a treat.");
+
+        // Drop it right where a Voidling already stands, so the chase resolves in a few frames
+        // rather than depending on how far it happened to wander.
+        _garden.DropTreatForProbe(statId, _garden.ActorPositionForProbe(creature.Id));
+        if (_garden.DroppedTreatCount(statId) != 1)
+            throw new InvalidOperationException("The treat did not land in the Garden.");
+
+        // Wall-clock, not frames: headless runs the idle loop uncapped, so a frame budget says
+        // nothing about whether the three-second eating beat has finished.
+        var deadline = Time.GetTicksMsec() + (ulong)((GardenController.TreatEatingSeconds + 4.0f) * 1000.0f);
+        while (Time.GetTicksMsec() < deadline && _session.State.TrainingItems[statId] != stock - 1)
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+        if (_session.State.TrainingItems[statId] != stock - 1)
+            throw new InvalidOperationException(
+                $"Nobody ate the treat. dropped={_garden.DroppedTreatCount(statId)} " +
+                $"chasing={_garden.ChasingCountForProbe()} eating={_garden.AnyVoidlingEatingForProbe()} " +
+                $"stock={_session.State.TrainingItems[statId]} expected={stock - 1}");
+        if (_garden.DroppedTreatCount(statId) != 0)
+            throw new InvalidOperationException("The eaten treat stayed on the ground.");
+
+        await ToSignal(GetTree().CreateTimer(1.0), SceneTreeTimer.SignalName.Timeout);
+        if (_garden.AnyVoidlingEatingForProbe())
+            throw new InvalidOperationException("A Voidling never finished eating.");
     }
 
     private RaceEntryScreen FindRaceEntry()

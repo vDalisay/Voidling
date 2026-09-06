@@ -293,16 +293,6 @@ public partial class RaceEntryScreen : Control
 
         // A gold star marks the picked course, so the row the record card is describing is obvious
         // without having to read the button states.
-        row.AddChild(new TextureRect
-        {
-            Texture = new AtlasTexture { Atlas = WoodStars, Region = new Rect2(0, 0, 32, 32) },
-            CustomMinimumSize = new Vector2(16, 16),
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            SizeFlagsVertical = SizeFlags.ShrinkCenter,
-            Modulate = selected ? Colors.White : new Color(1, 1, 1, 0),
-            MouseFilter = MouseFilterEnum.Ignore
-        });
 
         var name = UiFactory.CreateButton(course.Name);
         name.Name = "Course_" + course.Id;
@@ -425,7 +415,8 @@ public partial class RaceEntryScreen : Control
         rosterBox.AddChild(VoidlingRosterGrid.Build(
             roster,
             _racerPage,
-            entry => entry.Id == _selectedId ? "*" : string.Empty,
+            entry => entry.Id == _selectedId,
+            _ => string.Empty,
             entry =>
             {
                 _selectedId = entry.Id;

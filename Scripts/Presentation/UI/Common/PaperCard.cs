@@ -12,6 +12,8 @@ public static class PaperCard
 {
     private static readonly Texture2D WoodStars = GD.Load<Texture2D>(
         UiFactory.UiRoot + "Icons/special icons/stars in wood.png");
+    private static readonly Texture2D WoodHearts = GD.Load<Texture2D>(
+        UiFactory.UiRoot + "Icons/special icons/Hearts in wood.png");
 
     /// <summary>The window's warm paper, one shade lighter, so a card reads as part of the same sheet.</summary>
     public static PanelContainer Panel(Vector2 minimumSize)
@@ -49,7 +51,22 @@ public static class PaperCard
         return slot;
     }
 
-    /// <summary>The premium wooden star that marks whichever slot is picked.</summary>
+    /// <summary>The premium wooden heart, breeding's marker for a chosen parent.</summary>
+    public static TextureRect Heart(Vector2 position, float size = 19.0f) => new()
+    {
+        Texture = new AtlasTexture { Atlas = WoodHearts, Region = new Rect2(0, 0, 32, 32) },
+        Position = position,
+        Size = new Vector2(size, size),
+        CustomMinimumSize = new Vector2(size, size),
+        ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+        StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+        MouseFilter = Control.MouseFilterEnum.Ignore
+    };
+
+    /// <summary>
+    /// A wooden star. Only the filled/empty level rating uses these now; a picked slot is shown by
+    /// its own pressed chrome rather than by a badge sitting on top of the art.
+    /// </summary>
     public static TextureRect Star(Vector2 position, float size = 17.0f, bool filled = true) => new()
     {
         Texture = new AtlasTexture { Atlas = WoodStars, Region = new Rect2(filled ? 0 : 32, 0, 32, 32) },

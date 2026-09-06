@@ -208,3 +208,66 @@ switch reaches the session and changes its own mark. The reusable check is uncha
 ```text
 godot --headless --path . -- --voidling-garden-ui-smoke --voidling-dev-profile=ui_menus_check
 ```
+
+## Stage 6 feedback pass
+
+Player feedback after the first stage 6 build. Six changes:
+
+**The bullet was printing as text.** `UI_INVENTORY_LAND_PLAIN` and `UI_INVENTORY_LAND_TRAINED` held a
+literal `\u2022`; gettext has no such escape, so the name read `Plain ground \u2022 Double (2 hex)`.
+Both now carry a real separator, like every other string in the file.
+
+**One line per item, saying what it is.** The detail card's status line became a description. A treat
+says what it raises and by how much; the 5-9 range moved out of `TrainingUseCase` into
+`TrainingItemRules`, so the number shown is the number rolled rather than a copy of it. An egg says
+where it came from — a common egg, or one bred in your garden — instead of "Not placed"; its genome
+stays hidden until it hatches, so nothing here spoils a breeding outcome. Land says how many hexes it
+covers, a shell what it sells for, and a failed egg that it is worth nothing.
+
+**Selection stars are gone.** A picked slot was marked with a wooden star on top of its own art, in
+the inventory, the land and decoration grids, and both race-entry steps. The pressed button chrome
+already says which slot is picked, so the star was noise; it now survives only as the filled/empty
+level rating. Breeding keeps a badge because pressed chrome alone cannot say which of two picked
+slots is which, and it is now the premium wooden heart lettered A and B.
+
+**Food on the ground.** `GardenController.Treats` puts a treat down where you click. Every Voidling
+within 150px smells it and runs for it at 2.6x its own roaming speed — which already scales with Run,
+so a fast one genuinely arrives first — and the first to come within 9px eats it. The treat is only
+spent when it is eaten, so `UseTrainingItem` stays the one place that validates, decrements, applies
+the gain and writes the log line. The satchel refuses to put down more of one treat than it holds.
+
+The eating beat is three seconds: the Voidling squashes and stretches on the spot while the food
+shrinks 30% per bite and fades out. The inspector's Give treat plays the same beat with a treat
+spawned at the Voidling's feet, and the chooser no longer closes, so pressing it again spends another
+treat and restarts the animation instead of queueing a second one.
+
+**Failed eggs are reachable.** A failed egg in the Garden had no hitbox at all, so it could not be
+touched. It now takes a click and opens the same right-side inspector a hex uses, offering Take back
+or Discard. `EggData.Stowed` is additive — saves written before it load with every failed egg exactly
+where it lay — and a stowed egg leaves the island while staying in the satchel, still discardable.
+It is worth nothing either way, which is what the card says.
+
+**Running ground looks used.** A Voidling training on run ground now breaks into a stride at random
+intervals, 0.9 to 2.4 seconds apart, kicking up the Garden's own dust at its feet. Swim ground stays
+quiet. Presentation only: how often it fires has no effect on the tile's training rate.
+
+### Verification
+
+Debug and Release builds; 246 tests (four new ones cover stowing a failed egg, refusing a healthy
+one, staying discardable afterwards, and older saves loading unstowed); architecture greps; every
+`UI_*` key referenced by `Scripts/` resolves and the keys this pass orphaned are removed; Godot
+import; the Garden UI smoke, extended to drop a treat, watch a Voidling run to it and eat it, and
+confirm the chooser spends one treat per press while staying open; the visual, race-presentation,
+race-completion, family-tree and persistence-recovery probes; `git diff --check`.
+
+The treat probe waits on wall-clock rather than a frame budget, because headless Godot runs the idle
+loop uncapped and a frame count says nothing about whether a three-second beat has finished.
+
+### Known, not addressed
+
+`MainController.ShopBreeding` builds three of the breeding preview lines from interpolated English
+rather than localization keys, leaving `UI_BREED_RELATED`, `UI_BREED_CLEAN_OUTCROSS` and
+`UI_BREED_UNRELATED_BURDEN` orphaned in `en.po`. It predates this branch and is left alone here.
+
+A treat left on the ground when the game closes is lost, because a drop is presentation state and is
+not persisted. The treat is not spent either, so nothing the player owns disappears with it.

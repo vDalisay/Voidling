@@ -30,11 +30,13 @@ public sealed class VoidlingRosterGrid
 
     /// <summary>
     /// Builds the arrows/grid row for one page. <paramref name="mark"/> returns the badge text for
-    /// a slot — empty for unpicked, "*" for a plain star, or "A"/"B" for breeding's two parents.
+    /// a slot: empty for a plain pick, whose pressed chrome already shows it, or "A"/"B" for
+    /// breeding's two parents, which the chrome alone cannot tell apart.
     /// </summary>
     public static Control Build(
         IReadOnlyList<RosterEntry> roster,
         int page,
+        Func<RosterEntry, bool> picks,
         Func<RosterEntry, string> mark,
         Action<RosterEntry> picked,
         Action<int> pageChanged,
@@ -65,7 +67,7 @@ public sealed class VoidlingRosterGrid
                 out var card);
             card.Name = "Racer_" + creature.Id;
             var badge = mark(creature);
-            card.SetPressedNoSignal(badge.Length > 0);
+            card.SetPressedNoSignal(picks(creature));
             entry.CustomMinimumSize = new Vector2(84, 72);
             if (badge.Length > 0) card.AddChild(SlotBadge(badge));
             grid.AddChild(entry);
@@ -79,21 +81,20 @@ public sealed class VoidlingRosterGrid
     }
 
     /// <summary>
-    /// The wooden star for a single pick; breeding's A/B ride on the same star so two parents are
-    /// told apart without a second piece of art.
+    /// Breeding's two parents ride on the premium wooden heart, lettered A and B, because pressed
+    /// chrome alone cannot say which of two picked slots is which.
     /// </summary>
     private static Control SlotBadge(string badge)
     {
-        var star = PaperCard.Star(new Vector2(60, 1));
-        if (badge == "*") return star;
+        var heart = PaperCard.Heart(new Vector2(58, 0), 19.0f);
         var label = UiFactory.CreateLabel(badge, 7);
         label.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         label.HorizontalAlignment = HorizontalAlignment.Center;
         label.VerticalAlignment = VerticalAlignment.Center;
         label.AddThemeColorOverride("font_color", Color.FromHtml("#5A3A18"));
         label.MouseFilter = Control.MouseFilterEnum.Ignore;
-        star.AddChild(label);
-        return star;
+        heart.AddChild(label);
+        return heart;
     }
 
     private static Button PageArrow(string name, int delta, int page, int pages, Action<int> pageChanged)

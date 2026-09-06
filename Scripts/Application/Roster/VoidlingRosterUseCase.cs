@@ -96,6 +96,23 @@ public sealed class VoidlingRosterUseCase
         return egg != null && state.OwnedEggs.Remove(egg);
     }
 
+    /// <summary>
+    /// Picks a failed egg up off the island. It is worthless either way, so this only decides
+    /// whether the player has to keep looking at it.
+    /// </summary>
+    public bool StowFailedEgg(GameStateData state, string eggId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var egg = state.OwnedEggs.FirstOrDefault(e => e.Id == eggId && e.State == EggState.Failed);
+        if (egg == null || egg.Stowed)
+            return false;
+
+        egg.Stowed = true;
+        egg.WorldX = 0.0f;
+        egg.WorldY = 0.0f;
+        return true;
+    }
+
     public GoodbyeResult SayGoodbye(GameStateData state, string creatureId)
     {
         ArgumentNullException.ThrowIfNull(state);
