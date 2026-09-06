@@ -36,8 +36,8 @@ public partial class GardenDayNightDial : Control
         arrow.Name = "DayNightArrow";
         art.AddChild(arrow);
         _period = UiFactory.CreateLabel(string.Empty, 11);
-        _period.Position = new Vector2(8, 60);
-        _period.Size = new Vector2(76, 20);
+        _period.Position = new Vector2(0, 60);
+        _period.Size = new Vector2(104, 20);
         _period.HorizontalAlignment = HorizontalAlignment.Center;
         _period.VerticalAlignment = VerticalAlignment.Center;
         _period.MouseFilter = MouseFilterEnum.Ignore;

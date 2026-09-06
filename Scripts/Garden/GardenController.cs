@@ -377,7 +377,7 @@ public partial class GardenController : Node2D
     private void Refresh()
     {
         // The island is rebuilt first: it decides where actors may roam and where the camera stops.
-        RefreshLand();
+        var landChanged = RefreshLand();
 
         var currentIds = _session.State.Voidlings
             .Select(v => v.Id)
@@ -418,7 +418,7 @@ public partial class GardenController : Node2D
 
         Select(_selectedId);
         RefreshEggs();
-        RefreshTileResidents();
+        RefreshTileResidents(landChanged);
     }
 
     private void RefreshEggs()

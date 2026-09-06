@@ -201,13 +201,15 @@ public partial class VoidlingActor : Node2D
     public Func<Vector2, Vector2>? LandClamp { get; set; }
 
     /// <summary>Widens the roaming area as the island grows.</summary>
-    public void SetWanderArea(Rect2 bounds)
+    public void SetWanderArea(Rect2 bounds, bool repath = false)
     {
-        if (_wanderBounds == bounds)
+        if (_wanderBounds == bounds && !repath)
             return;
 
         _wanderBounds = bounds;
         Position = ClampToWanderArea(Position);
+        if (repath && !IsOnTile)
+            PickNewTarget();
     }
 
     private Vector2 ClampToWanderArea(Vector2 position)

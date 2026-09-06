@@ -57,13 +57,16 @@ public partial class MainController
 
             RequireOnScreen(_dayNightDial);
             RequireSeparate(_dayNightDial, _uiRoot.GetNode<Control>("GardenStatus"));
+            var clockLabel = _dayNightDial.FindChildren("*", "Label", true, false).OfType<Label>().Single();
+            if (Mathf.Abs(clockLabel.GetGlobalRect().GetCenter().X - _dayNightDial.GetGlobalRect().GetCenter().X) > 1)
+                throw new InvalidOperationException("Garden clock time is not centered in its dial.");
             var arrow = (TextureRect)(_dayNightDial.FindChild("DayNightArrow", true, false)
                 ?? throw new InvalidOperationException("Garden clock is missing its day/night arrow."));
             foreach (var hour in new[] { 0, 5, 9, 18, 22 })
             {
                 var time = DateTime.Today.AddHours(hour);
                 _dayNightDial.ShowTime(time);
-                if (_dayNightDial.FindChildren("*", "Label", true, false).OfType<Label>().Single().Text != time.ToShortTimeString())
+                if (clockLabel.Text != time.ToShortTimeString())
                     throw new InvalidOperationException("Garden clock does not show the user's local time.");
                 await CaptureGardenUi("garden-" + hour);
             }
@@ -382,9 +385,22 @@ public partial class MainController
                 (Q: module.HexQ + direction.Q, R: module.HexR + direction.R)))
             .First(candidate => !_session.State.GardenModules.Any(module =>
                 module.Placed && module.HexQ == candidate.Q && module.HexR == candidate.R));
-        if (!_session.PlaceGardenModule(_shopLandPurchaseId, target.Q, target.R))
-            throw new InvalidOperationException("Placement-delay probe could not place its land.");
-        _garden.CancelLandPlacement();
+        var (targetX, targetY) = GameRules.GardenModuleRules.Hex.CenterOf(target.Q, target.R);
+        var landRoot = _garden.GetNode<Node2D>("Land");
+        var targetPosition = landRoot.GetGlobalTransformWithCanvas() * new Vector2(targetX, targetY);
+        GetViewport().PushInput(new InputEventMouseMotion { Position = targetPosition, GlobalPosition = targetPosition }, true);
+        GetViewport().PushInput(new InputEventMouseButton
+            { Position = targetPosition, GlobalPosition = targetPosition, ButtonIndex = MouseButton.Left, Pressed = true }, true);
+        GetViewport().PushInput(new InputEventMouseButton
+            { Position = targetPosition, GlobalPosition = targetPosition, ButtonIndex = MouseButton.Left, Pressed = false }, true);
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (!_garden.IsPlacingLand || _session.State.GardenModules.Any(module =>
+                module.Id == _shopLandPurchaseId && module.Placed))
+            throw new InvalidOperationException("Land was placed before the one-second camera move finished.");
+        await ToSignal(GetTree().CreateTimer(GardenController.LandPlacementCameraSeconds + 0.1), SceneTreeTimer.SignalName.Timeout);
+        if (_garden.IsPlacingLand || !_session.State.GardenModules.Any(module =>
+                module.HexQ == target.Q && module.HexR == target.R && module.Placed))
+            throw new InvalidOperationException("Land was not placed after the camera centered it.");
         if (_modalHost.IsOpen)
             throw new InvalidOperationException("Shop reopened before the land placement animation.");
         await ToSignal(GetTree().CreateTimer(GardenController.LandPlacementAnimationSeconds + 0.1), SceneTreeTimer.SignalName.Timeout);
