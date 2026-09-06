@@ -10,155 +10,378 @@ namespace Voidling.Presentation.UI.Shop;
 public readonly record struct ShopTrainingItemViewState(string StatId, string DisplayName, Color IdentityColor, int Owned, int Price);
 public readonly record struct ShopEggViewState(string EggId, Color TintColor, int Number, int Price);
 public readonly record struct ShopRareOfferViewState(string ItemId, string DisplayName, string Tooltip, int Price);
-/// <summary>A buyable piece of ground: its footprint in axial cells, what it costs and how many are owned.</summary>
 public readonly record struct ShopLandPieceViewState(string ShapeId, string DisplayName, IReadOnlyList<(int Q, int R)> Cells, int Stored, int Price);
-public sealed record ShopScreenState(int Coins, IReadOnlyList<ShopTrainingItemViewState> TrainingItems, IReadOnlyList<ShopEggViewState> Eggs, int EggRotationSecondsRemaining, ShopRareOfferViewState? RareOffer, IReadOnlyList<ShopLandPieceViewState> LandPieces);
+public sealed record ShopScreenState(int Coins, IReadOnlyList<ShopTrainingItemViewState> TrainingItems, IReadOnlyList<ShopEggViewState> Eggs, ShopRareOfferViewState? RareOffer, IReadOnlyList<ShopLandPieceViewState> LandPieces);
 
+/// <summary>Keeper's ledger: categories, readable catalogue rows, and one stable purchase receipt.</summary>
 public partial class ShopScreen : VBoxContainer
 {
-    private static readonly Texture2D EggTexture = GD.Load<Texture2D>("res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
+    public const string TreatsCategory = "Treats";
+    public const string EggsCategory = "Eggs";
+    public const string LandCategory = "Land";
+    public const string SpecialCategory = "Special";
+
+    private static readonly Texture2D TreatTexture = GD.Load<Texture2D>(
+        "res://Assets/Sprout Lands - Sprites - premium pack/Objects/Items/fruit-n-berries-items.png");
+    private static readonly Texture2D EggTexture = GD.Load<Texture2D>(
+        "res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
+
     public event Action<string>? TrainingItemPurchaseRequested;
     public event Action<string>? EggPurchaseRequested;
     public event Action<string>? RareOfferPurchaseRequested;
     public event Action<string>? LandPurchaseRequested;
-    private const float SwatchTopEdgeWidth = 11.0f;
-    private const float SwatchHeight = 19.0f;
-    private ShopScreenState? _state;
+    public event Action? InventoryRequested;
+    public event Action<string, string>? SelectionChanged;
 
-    public void Configure(ShopScreenState state)
+    private sealed record Product(string Key, string Name, string Status, int Price, Func<Control> Icon, Action Buy);
+
+    private ShopScreenState? _state;
+    private string _category = TreatsCategory;
+    private string _selection = string.Empty;
+    private VBoxContainer _categories = null!;
+    private VBoxContainer _catalogue = null!;
+    private VBoxContainer _receipt = null!;
+    private Button? _selectedButton;
+
+    public void Configure(ShopScreenState state, string category, string selection)
     {
         if (IsInsideTree()) throw new InvalidOperationException("ShopScreen must be configured before it enters the scene tree.");
         _state = state ?? throw new ArgumentNullException(nameof(state));
+        _category = category;
+        _selection = selection;
     }
 
     public override void _Ready()
     {
         if (_state == null) throw new InvalidOperationException("ShopScreen must be configured before AddChild.");
-        AddThemeConstantOverride("separation", 4);
-        SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        AddChild(BuildSummary(_state));
-        AddChild(BuildAwning());
-        AddChild(BuildSectionLabel(Tr("UI_SHOP_TREATS_TITLE"), Tr("UI_SHOP_TREATS_SUBTITLE")));
-        AddChild(BuildTreatShelf(_state.TrainingItems));
-        AddChild(BuildSectionLabel(Tr("UI_SHOP_EGGS_TITLE"), Tr("UI_SHOP_EGGS_SUBTITLE")));
-        AddChild(BuildEggShelf(_state.Eggs));
-        AddChild(BuildSectionLabel(Tr("UI_SHOP_LAND_TITLE"), Tr("UI_SHOP_LAND_SUBTITLE")));
-        AddChild(BuildLandShelf(_state.LandPieces));
-    }
+        Name = "ShopLedger";
+        AddThemeConstantOverride("separation", 5);
+        SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        SizeFlagsVertical = SizeFlags.ExpandFill;
+        AddChild(BuildSummary());
 
-    private Control BuildSummary(ShopScreenState state)
-    {
-        var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 6);
-        var welcome = UiFactory.CreateLabel($"{Tr("UI_SHOP_WELCOME")}  •  Rotation {FormatRotation(state.EggRotationSecondsRemaining)}", 7);
-        welcome.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; welcome.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis; row.AddChild(welcome);
-        if (state.RareOffer is { } offer)
+        var body = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+        body.AddThemeConstantOverride("separation", 6);
+        AddChild(body);
+        _categories = new VBoxContainer { Name = "Categories", CustomMinimumSize = new Vector2(82, 0) };
+        _categories.AddThemeConstantOverride("separation", 5);
+        body.AddChild(_categories);
+
+        var catalogueColumn = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+        catalogueColumn.AddThemeConstantOverride("separation", 4);
+        body.AddChild(catalogueColumn);
+        var context = new HBoxContainer();
+        context.AddChild(new Control { CustomMinimumSize = new Vector2(32, 0) });
+        var typeHeader = UiFactory.CreateLabel(Tr("UI_SHOP_TYPE"), 7);
+        typeHeader.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        context.AddChild(typeHeader);
+        var priceHeader = UiFactory.CreateLabel(Tr("UI_SHOP_PRICE_HEADER"), 7);
+        priceHeader.CustomMinimumSize = new Vector2(38, 0);
+        priceHeader.HorizontalAlignment = HorizontalAlignment.Right;
+        context.AddChild(priceHeader);
+        catalogueColumn.AddChild(context);
+        var scroll = new ScrollContainer
         {
-            var rare = UiFactory.CreateButton($"{offer.DisplayName}  {offer.Price}"); rare.CustomMinimumSize = new Vector2(154, 24); rare.TooltipText = offer.Tooltip; UiFactory.ApplyPixelFont(rare, 6); rare.Pressed += () => RareOfferPurchaseRequested?.Invoke(offer.ItemId); row.AddChild(rare);
+            Name = "Catalogue",
+            CustomMinimumSize = new Vector2(185, 205),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ExpandFill
+        };
+        UiFactory.StyleScroll(scroll);
+        catalogueColumn.AddChild(scroll);
+        _catalogue = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        _catalogue.AddThemeConstantOverride("separation", 4);
+        scroll.AddChild(_catalogue);
+
+        var receiptPanel = UiFactory.CreatePanel(new Vector2(145, 225));
+        receiptPanel.Name = "Receipt";
+        var receiptStyle = (StyleBoxTexture)receiptPanel.GetThemeStylebox("panel").Duplicate();
+        receiptStyle.ModulateColor = new Color(230f / 220f, 212f / 224f, 173f / 210f);
+        receiptPanel.AddThemeStyleboxOverride("panel", receiptStyle);
+        body.AddChild(receiptPanel);
+        _receipt = new VBoxContainer();
+        _receipt.AddThemeConstantOverride("separation", 5);
+        receiptPanel.AddChild(_receipt);
+
+        NormalizeSelection();
+        RebuildCategories();
+        RebuildProducts();
+    }
+
+    public void FocusSelection()
+        => (_selectedButton ?? _categories.GetChildren().OfType<Button>().FirstOrDefault())?.GrabFocus();
+
+    private Control BuildSummary()
+    {
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 6);
+        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
+        var wallet = UiFactory.CreatePanel(new Vector2(112, 24));
+        var walletStyle = (StyleBoxTexture)wallet.GetThemeStylebox("panel").Duplicate();
+        walletStyle.ModulateColor = new Color(232f / 220f, 207f / 224f, 166f / 210f);
+        wallet.AddThemeStyleboxOverride("panel", walletStyle);
+        var walletRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        walletRow.AddThemeConstantOverride("separation", 3);
+        walletRow.AddChild(SproutIcon(12));
+        var walletLabel = UiFactory.CreateLabel(_state!.Coins.ToString(), 8);
+        walletLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        walletLabel.VerticalAlignment = VerticalAlignment.Center;
+        walletRow.AddChild(walletLabel);
+        wallet.AddChild(walletRow);
+        row.AddChild(wallet);
+        return row;
+    }
+
+    private void RebuildCategories()
+    {
+        Clear(_categories);
+        AddCategory(TreatsCategory, Tr("UI_SHOP_CATEGORY_TREATS"), AtlasIconTexture(TreatTexture, new Rect2(16, 0, 16, 16)));
+        AddCategory(EggsCategory, Tr("UI_SHOP_CATEGORY_EGGS"), EggTexture);
+        AddCategory(LandCategory, Tr("UI_SHOP_CATEGORY_LAND"), customIcon: BuildShapeSwatch(new[] { (0, 0) }, 18, 14));
+        if (_state!.RareOffer != null) AddCategory(SpecialCategory, Tr("UI_SHOP_CATEGORY_RARE"), UiFactory.CreateIcon(19));
+        _categories.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
+        var inventory = UiFactory.CreateButton(Tr("UI_SHOP_OPEN_INVENTORY"));
+        inventory.Name = "OpenInventory";
+        inventory.CustomMinimumSize = new Vector2(82, 24);
+        UiFactory.ApplyPixelFont(inventory, 6);
+        inventory.Pressed += () => InventoryRequested?.Invoke();
+        _categories.AddChild(inventory);
+    }
+
+    private void AddCategory(string category, string text, Texture2D? icon = null, Control? customIcon = null)
+    {
+        var button = UiFactory.CreateButton(text);
+        button.Name = "Category" + category;
+        button.ToggleMode = true;
+        button.ButtonPressed = category == _category;
+        button.CustomMinimumSize = new Vector2(82, 30);
+        button.Alignment = HorizontalAlignment.Left;
+        button.Icon = icon;
+        button.ExpandIcon = false;
+        button.IconAlignment = HorizontalAlignment.Left;
+        button.AddThemeConstantOverride("icon_max_width", 14);
+        if (customIcon != null)
+        {
+            button.Text = string.Empty;
+            var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+            row.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, 7);
+            row.AddThemeConstantOverride("separation", 5);
+            row.AddChild(customIcon);
+            row.AddChild(UiFactory.CreateLabel(text, 7));
+            button.AddChild(row);
         }
-        var wallet = UiFactory.CreatePanel(new Vector2(112, 24)); var walletLabel = UiFactory.CreateLabel(string.Format(Tr("UI_SHOP_WALLET"), state.Coins), 8); walletLabel.HorizontalAlignment = HorizontalAlignment.Center; walletLabel.VerticalAlignment = VerticalAlignment.Center; wallet.AddChild(walletLabel); row.AddChild(wallet); return row;
+        UiFactory.ApplyPixelFont(button, 6);
+        button.Pressed += () => SelectCategory(category);
+        _categories.AddChild(button);
     }
 
-    private static string FormatRotation(int secondsRemaining)
+    private void SelectCategory(string category)
     {
-        var safeSeconds = Math.Max(0, secondsRemaining); var time = TimeSpan.FromSeconds(safeSeconds); return time.TotalHours >= 1.0 ? $"{(int)time.TotalHours}:{time.Minutes:00}:{time.Seconds:00}" : $"{time.Minutes}:{time.Seconds:00}";
+        _category = category;
+        _selection = string.Empty;
+        NormalizeSelection();
+        SelectionChanged?.Invoke(_category, _selection);
+        foreach (var button in _categories.GetChildren().OfType<Button>())
+            button.ButtonPressed = button.Name == "Category" + _category;
+        RebuildProducts();
+        FocusSelection();
     }
 
-    private static Control BuildAwning()
+    private void SelectProduct(Product product)
     {
-        var awning = new HBoxContainer { CustomMinimumSize = new Vector2(518, 9) }; awning.AddThemeConstantOverride("separation", 0);
-        for (var i = 0; i < 14; i++) awning.AddChild(new ColorRect { Color = Color.FromHtml(i % 2 == 0 ? "#E8C977" : "#749B75"), CustomMinimumSize = new Vector2(24, 9), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Ignore });
-        return awning;
+        _selection = product.Key;
+        SelectionChanged?.Invoke(_category, _selection);
+        RebuildProducts();
+        FocusSelection();
     }
 
-    private static Control BuildSectionLabel(string title, string subtitle)
+    private void NormalizeSelection()
     {
-        var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 8); var heading = UiFactory.CreateLabel(title, 9); heading.CustomMinimumSize = new Vector2(125, 14); heading.AddThemeColorOverride("font_color", Color.FromHtml("#6B4B34")); row.AddChild(heading); var note = UiFactory.CreateLabel(subtitle, 6); note.VerticalAlignment = VerticalAlignment.Center; note.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; note.AddThemeColorOverride("font_color", Color.FromHtml("#786C5B")); row.AddChild(note); return row;
+        var products = Products().ToArray();
+        if (products.Length == 0) { _selection = string.Empty; return; }
+        if (products.All(product => product.Key != _selection)) _selection = products[0].Key;
     }
 
-    private Control BuildTreatShelf(IReadOnlyList<ShopTrainingItemViewState> items)
+    private void RebuildProducts()
     {
-        var shelf = CreateStallShelf(); var grid = new GridContainer { Columns = 5 }; grid.AddThemeConstantOverride("h_separation", 5); grid.AddThemeConstantOverride("v_separation", 3); shelf.GetNode<VBoxContainer>("ShelfBox").AddChild(grid); foreach (var item in items) grid.AddChild(BuildTreatProduct(item)); return shelf;
+        Clear(_catalogue);
+        Clear(_receipt);
+        _selectedButton = null;
+        var products = Products().ToArray();
+        if (products.Length == 0)
+        {
+            _catalogue.AddChild(UiFactory.CreateLabel(Tr("UI_SHOP_EMPTY"), 7));
+            _receipt.AddChild(UiFactory.CreateLabel(Tr("UI_SHOP_SELECT_HINT"), 7));
+            return;
+        }
+        foreach (var product in products)
+        {
+            var button = BuildProductRow(product);
+            _catalogue.AddChild(button);
+            if (product.Key == _selection) _selectedButton = button;
+        }
+        BuildReceipt(products.First(product => product.Key == _selection));
     }
 
-    private Control BuildEggShelf(IReadOnlyList<ShopEggViewState> eggs)
+    private Button BuildProductRow(Product product)
     {
-        var shelf = CreateStallShelf(); var grid = new GridContainer { Columns = 3 }; grid.AddThemeConstantOverride("h_separation", 7); grid.AddThemeConstantOverride("v_separation", 3); shelf.GetNode<VBoxContainer>("ShelfBox").AddChild(grid); foreach (var egg in eggs) grid.AddChild(BuildEggProduct(egg)); return shelf;
+        var button = UiFactory.CreateButton(string.Empty);
+        button.Name = "Product_" + product.Key.Replace(':', '_');
+        button.ToggleMode = true;
+        button.ButtonPressed = product.Key == _selection;
+        button.CustomMinimumSize = new Vector2(180, 36);
+        button.Pressed += () => SelectProduct(product);
+        var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+        row.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, 4);
+        row.AddThemeConstantOverride("separation", 6);
+        var icon = product.Icon();
+        icon.CustomMinimumSize = new Vector2(Mathf.Max(26, icon.CustomMinimumSize.X), Mathf.Max(26, icon.CustomMinimumSize.Y));
+        row.AddChild(icon);
+        var copy = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore, SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        copy.AddThemeConstantOverride("separation", 0);
+        copy.AddChild(UiFactory.CreateLabel(product.Name, 7));
+        copy.AddChild(UiFactory.CreateLabel(product.Status, 5));
+        row.AddChild(copy);
+        var price = new HBoxContainer { CustomMinimumSize = new Vector2(38, 26), Alignment = BoxContainer.AlignmentMode.End };
+        price.AddThemeConstantOverride("separation", 2);
+        price.AddChild(SproutIcon(10));
+        var priceValue = UiFactory.CreateLabel(product.Price.ToString(), 8);
+        priceValue.VerticalAlignment = VerticalAlignment.Center;
+        price.AddChild(priceValue);
+        row.AddChild(price);
+        button.AddChild(row);
+        return button;
     }
 
-    private Control BuildLandShelf(IReadOnlyList<ShopLandPieceViewState> pieces)
+    private void BuildReceipt(Product product)
     {
-        var shelf = CreateStallShelf(); var grid = new GridContainer { Columns = 5 }; grid.AddThemeConstantOverride("h_separation", 5); grid.AddThemeConstantOverride("v_separation", 3); shelf.GetNode<VBoxContainer>("ShelfBox").AddChild(grid); foreach (var piece in pieces) grid.AddChild(BuildLandProduct(piece)); return shelf;
+        var iconPanel = new PanelContainer { CustomMinimumSize = new Vector2(0, 48) };
+        iconPanel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+        {
+            BgColor = Color.FromHtml("#F7E5BD"),
+            CornerRadiusTopLeft = 3, CornerRadiusTopRight = 3,
+            CornerRadiusBottomLeft = 3, CornerRadiusBottomRight = 3
+        });
+        var iconCenter = new CenterContainer();
+        var icon = product.Icon();
+        icon.CustomMinimumSize = new Vector2(44, 44);
+        iconCenter.AddChild(icon);
+        iconPanel.AddChild(iconCenter);
+        _receipt.AddChild(iconPanel);
+        var name = UiFactory.CreateLabel(product.Name, 9);
+        name.HorizontalAlignment = HorizontalAlignment.Center;
+        name.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _receipt.AddChild(name);
+        _receipt.AddChild(UiFactory.CreateLabel(product.Status, 6));
+        _receipt.AddChild(new ColorRect { Color = Color.FromHtml("#B7926F"), CustomMinimumSize = new Vector2(1, 1), MouseFilter = MouseFilterEnum.Ignore });
+        var price = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        price.AddThemeConstantOverride("separation", 3);
+        price.AddChild(UiFactory.CreateLabel(Tr("UI_SHOP_PRICE_HEADER").ToUpperInvariant(), 8));
+        price.AddChild(SproutIcon(11));
+        price.AddChild(UiFactory.CreateLabel(product.Price.ToString(), 8));
+        _receipt.AddChild(price);
+        var buy = UiFactory.CreateButton(string.Format(Tr("UI_SHOP_BUY"), product.Price));
+        buy.Icon = UiFactory.CreateSproutIcon();
+        buy.AddThemeConstantOverride("icon_max_width", 12);
+        buy.Name = "BuySelected";
+        buy.CustomMinimumSize = new Vector2(125, 28);
+        UiFactory.ApplyPrimaryStyle(buy);
+        buy.Pressed += product.Buy;
+        _receipt.AddChild(buy);
     }
 
-    private Control BuildLandProduct(ShopLandPieceViewState piece)
+    private IEnumerable<Product> Products()
     {
-        var card = CreateMarketCard(new Vector2(94, 78)); card.TooltipText = Tr("UI_SHOP_LAND_SUBTITLE"); var column = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; column.AddThemeConstantOverride("separation", 1); card.AddChild(column);
-        column.AddChild(BuildShapeSwatch(piece.Cells));
-        var name = UiFactory.CreateLabel(piece.DisplayName, 6); name.HorizontalAlignment = HorizontalAlignment.Center; name.AddThemeColorOverride("font_color", LandSwatchColor.Darkened(0.4f)); column.AddChild(name);
-        var stock = UiFactory.CreateLabel(string.Format(Tr("UI_SHOP_OWNED"), piece.Stored), 5); stock.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(stock);
-        var buy = UiFactory.CreateButton(string.Format(Tr("UI_SHOP_BUY"), piece.Price)); buy.CustomMinimumSize = new Vector2(78, 19); UiFactory.ApplyPixelFont(buy, 6); buy.TooltipText = card.TooltipText; buy.Pressed += () => LandPurchaseRequested?.Invoke(piece.ShapeId); column.AddChild(buy); return card;
+        if (_category == TreatsCategory)
+        {
+            var index = 0;
+            foreach (var item in _state!.TrainingItems)
+            {
+                var iconIndex = index++;
+                yield return new Product("treat:" + item.StatId, item.DisplayName + " treat",
+                    string.Format(Tr("UI_SHOP_OWNED"), item.Owned), item.Price,
+                    () => AtlasIcon(TreatTexture, new Rect2(iconIndex % 4 * 16, iconIndex / 4 * 16, 16, 16)),
+                    () => TrainingItemPurchaseRequested?.Invoke(item.StatId));
+            }
+            yield break;
+        }
+        if (_category == EggsCategory)
+        {
+            foreach (var egg in _state!.Eggs)
+                yield return new Product("egg:" + egg.EggId, string.Format(Tr("UI_SHOP_MYSTERY_EGG"), egg.Number),
+                    Tr("UI_SHOP_IN_STOCK"), egg.Price,
+                    () => EggIcon(egg.TintColor), () => EggPurchaseRequested?.Invoke(egg.EggId));
+            yield break;
+        }
+        if (_category == LandCategory)
+        {
+            foreach (var piece in _state!.LandPieces)
+                yield return new Product("land:" + piece.ShapeId, piece.DisplayName,
+                    string.Format(Tr("UI_SHOP_OWNED"), piece.Stored), piece.Price,
+                    () => BuildShapeSwatch(piece.Cells), () => LandPurchaseRequested?.Invoke(piece.ShapeId));
+            yield break;
+        }
+        if (_state!.RareOffer is { } offer)
+            yield return new Product("special:" + offer.ItemId, offer.DisplayName, Tr("UI_SHOP_IN_STOCK"), offer.Price,
+                () => Icon(UiFactory.CreateIcon(19)), () => RareOfferPurchaseRequested?.Invoke(offer.ItemId));
     }
 
-    private static readonly Color LandSwatchColor = Color.FromHtml("#8FC57E");
+    private static TextureRect AtlasIcon(Texture2D atlas, Rect2 region)
+        => Icon(new AtlasTexture { Atlas = atlas, Region = region });
 
-    /// <summary>
-    /// The piece's own footprint, so the player buys the shape they can see rather than a word.
-    /// The hexes keep the island's proportions and are scaled down to fit the card, which is what
-    /// keeps a three-hex piece inside its own product tile.
-    /// </summary>
-    private static Control BuildShapeSwatch(IReadOnlyList<(int Q, int R)> cells)
+    private static TextureRect SproutIcon(float size)
     {
-        const float boxWidth = 78.0f;
-        const float boxHeight = 38.0f;
-        var shapeRatio = SwatchHeight / SwatchTopEdgeWidth;
+        var icon = Icon(UiFactory.CreateSproutIcon());
+        icon.CustomMinimumSize = new Vector2(size, size);
+        return icon;
+    }
 
-        // Cell centres in tile units: a hex is 2 top edges wide and 1 height tall.
+    private static AtlasTexture AtlasIconTexture(Texture2D atlas, Rect2 region)
+        => new() { Atlas = atlas, Region = region };
+
+    private static TextureRect EggIcon(Color tint)
+    {
+        var icon = Icon(EggTexture);
+        icon.SelfModulate = tint;
+        return icon;
+    }
+
+    private static TextureRect Icon(Texture2D texture)
+        => new() { Texture = texture, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, MouseFilter = MouseFilterEnum.Ignore };
+
+    private static Control BuildShapeSwatch(IReadOnlyList<(int Q, int R)> cells, float width = 42, float height = 28)
+    {
+        const float ratio = 1.7f;
         var units = cells.Select(cell => new Vector2(1.5f * cell.Q, cell.R + cell.Q * 0.5f)).ToArray();
-        var spanX = units.Max(unit => unit.X) - units.Min(unit => unit.X) + 2.0f;
-        var spanY = units.Max(unit => unit.Y) - units.Min(unit => unit.Y) + 1.0f;
-        var topEdge = Mathf.Min(boxWidth / spanX, boxHeight / (shapeRatio * spanY));
-        var height = topEdge * shapeRatio;
-
-        var centers = units.Select(unit => new Vector2(unit.X * topEdge, unit.Y * height)).ToArray();
-        var middle = new Vector2(
-            (centers.Max(center => center.X) + centers.Min(center => center.X)) * 0.5f,
-            (centers.Max(center => center.Y) + centers.Min(center => center.Y)) * 0.5f);
-        var origin = new Vector2(boxWidth * 0.5f, boxHeight * 0.5f) - middle;
-
-        var holder = new Control { CustomMinimumSize = new Vector2(boxWidth, boxHeight), MouseFilter = Control.MouseFilterEnum.Ignore };
+        var spanX = units.Max(point => point.X) - units.Min(point => point.X) + 2;
+        var spanY = units.Max(point => point.Y) - units.Min(point => point.Y) + 1;
+        var edge = Mathf.Min(width / spanX, height / (ratio * spanY));
+        var tileHeight = edge * ratio;
+        var centers = units.Select(point => new Vector2(point.X * edge, point.Y * tileHeight)).ToArray();
+        var middle = new Vector2((centers.Max(p => p.X) + centers.Min(p => p.X)) / 2, (centers.Max(p => p.Y) + centers.Min(p => p.Y)) / 2);
+        var origin = new Vector2(width / 2, height / 2) - middle;
+        var holder = new Control { CustomMinimumSize = new Vector2(width, height), MouseFilter = MouseFilterEnum.Ignore };
+        var tint = Color.FromHtml("#8FC57E");
         foreach (var center in centers)
         {
-            var polygon = HexShape.Corners(topEdge, height); for (var i = 0; i < polygon.Length; i++) polygon[i] += origin + center;
-            var outline = HexShape.Outline(topEdge, height); for (var i = 0; i < outline.Length; i++) outline[i] += origin + center;
-            holder.AddChild(new Polygon2D { Polygon = polygon, Color = LandSwatchColor });
-            holder.AddChild(new Line2D { Points = outline, DefaultColor = LandSwatchColor.Darkened(0.45f), Width = 1.5f, JointMode = Line2D.LineJointMode.Round });
+            var polygon = HexShape.Corners(edge, tileHeight);
+            var outline = HexShape.Outline(edge, tileHeight);
+            for (var i = 0; i < polygon.Length; i++) polygon[i] += origin + center;
+            for (var i = 0; i < outline.Length; i++) outline[i] += origin + center;
+            holder.AddChild(new Polygon2D { Polygon = polygon, Color = tint });
+            holder.AddChild(new Line2D { Points = outline, DefaultColor = tint.Darkened(0.45f), Width = 1 });
         }
-
         return holder;
     }
 
-    private Control BuildTreatProduct(ShopTrainingItemViewState item)
+    private static void Clear(Node node)
     {
-        var card = CreateMarketCard(new Vector2(94, 70)); card.TooltipText = TrainingItemEffectPresentation.Tooltip(item.DisplayName); var column = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; column.AddThemeConstantOverride("separation", 1); card.AddChild(column);
-        var display = new CenterContainer { CustomMinimumSize = new Vector2(82, 24) }; var packet = new PanelContainer { CustomMinimumSize = new Vector2(29, 21) }; var packetStyle = new StyleBoxFlat { BgColor = item.IdentityColor, BorderColor = Color.FromHtml("#66594C") }; packetStyle.SetBorderWidthAll(1); packetStyle.CornerRadiusTopLeft = packetStyle.CornerRadiusTopRight = 2; packetStyle.CornerRadiusBottomLeft = packetStyle.CornerRadiusBottomRight = 2; packet.AddThemeStyleboxOverride("panel", packetStyle);
-        var initialText = item.DisplayName.Length == 0 ? "?" : item.DisplayName[0].ToString().ToUpperInvariant(); var initial = UiFactory.CreateLabel(initialText, 9); initial.HorizontalAlignment = HorizontalAlignment.Center; initial.VerticalAlignment = VerticalAlignment.Center; packet.AddChild(initial); display.AddChild(packet); column.AddChild(display);
-        var name = UiFactory.CreateLabel($"{item.DisplayName} {TrainingItemEffectPresentation.BaseEffectText}", 6); name.HorizontalAlignment = HorizontalAlignment.Center; name.AddThemeColorOverride("font_color", item.IdentityColor.Darkened(0.35f)); column.AddChild(name); var stock = UiFactory.CreateLabel(string.Format(Tr("UI_SHOP_OWNED"), item.Owned), 5); stock.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(stock);
-        var buy = UiFactory.CreateButton(string.Format(Tr("UI_SHOP_BUY"), item.Price)); buy.CustomMinimumSize = new Vector2(78, 19); UiFactory.ApplyPixelFont(buy, 6); buy.TooltipText = card.TooltipText; buy.Pressed += () => TrainingItemPurchaseRequested?.Invoke(item.StatId); column.AddChild(buy); return card;
-    }
-
-    private Control BuildEggProduct(ShopEggViewState egg)
-    {
-        var card = CreateMarketCard(new Vector2(160, 70)); var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; row.AddThemeConstantOverride("separation", 5); card.AddChild(row); var eggVisual = new TextureRect { Texture = EggTexture, SelfModulate = egg.TintColor, CustomMinimumSize = new Vector2(34, 34), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, MouseFilter = Control.MouseFilterEnum.Ignore }; row.AddChild(eggVisual);
-        var info = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; info.AddThemeConstantOverride("separation", 1); info.AddChild(UiFactory.CreateLabel(string.Format(Tr("UI_SHOP_MYSTERY_EGG"), egg.Number), 6)); var hint = UiFactory.CreateLabel(Tr("UI_SHOP_HIDDEN_DNA"), 5); hint.AddThemeColorOverride("font_color", Color.FromHtml("#786C5B")); info.AddChild(hint); var buy = UiFactory.CreateButton(string.Format(Tr("UI_SHOP_BUY"), egg.Price)); buy.CustomMinimumSize = new Vector2(91, 19); UiFactory.ApplyPixelFont(buy, 6); buy.Pressed += () => EggPurchaseRequested?.Invoke(egg.EggId); info.AddChild(buy); row.AddChild(info); return card;
-    }
-
-    private static PanelContainer CreateStallShelf()
-    {
-        var shelf = new PanelContainer { CustomMinimumSize = new Vector2(518, 78) }; var wood = new StyleBoxFlat { BgColor = Color.FromHtml("#B98255"), BorderColor = Color.FromHtml("#76513C"), ContentMarginLeft = 7, ContentMarginRight = 7, ContentMarginTop = 5, ContentMarginBottom = 7 }; wood.SetBorderWidthAll(2); wood.CornerRadiusTopLeft = wood.CornerRadiusTopRight = 3; wood.CornerRadiusBottomLeft = wood.CornerRadiusBottomRight = 3; shelf.AddThemeStyleboxOverride("panel", wood); var shelfBox = new VBoxContainer { Name = "ShelfBox" }; shelfBox.AddThemeConstantOverride("separation", 2); shelf.AddChild(shelfBox); var lip = new ColorRect { Color = Color.FromHtml("#6E4936"), CustomMinimumSize = new Vector2(1, 5), MouseFilter = Control.MouseFilterEnum.Ignore }; shelfBox.AddChild(lip); shelfBox.MoveChild(lip, 0); return shelf;
-    }
-
-    private static PanelContainer CreateMarketCard(Vector2 minimumSize)
-    {
-        var card = new PanelContainer { CustomMinimumSize = minimumSize }; var style = new StyleBoxFlat { BgColor = Color.FromHtml("#F4E5BD"), BorderColor = Color.FromHtml("#8A6248"), ContentMarginLeft = 4, ContentMarginRight = 4, ContentMarginTop = 3, ContentMarginBottom = 3 }; style.SetBorderWidthAll(1); style.CornerRadiusTopLeft = style.CornerRadiusTopRight = 2; style.CornerRadiusBottomLeft = style.CornerRadiusBottomRight = 2; card.AddThemeStyleboxOverride("panel", style); return card;
+        foreach (var child in node.GetChildren())
+        {
+            if (child is CanvasItem canvasItem) canvasItem.Visible = false;
+            if (child is Control control) control.MouseFilter = MouseFilterEnum.Ignore;
+            child.QueueFree();
+        }
     }
 }

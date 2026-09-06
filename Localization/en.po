@@ -85,10 +85,37 @@ msgid "UI_SETTINGS_HINT"
 msgstr "ESC opens/closes this menu from the garden."
 
 msgid "UI_SHOP_TITLE"
-msgstr "SPROUT MARKET"
+msgstr "Sprout Market"
 
 msgid "UI_SHOP_WELCOME"
 msgstr "Pick something from the stall"
+
+msgid "UI_SHOP_ROTATION"
+msgstr "Egg refresh {0}"
+
+msgid "UI_SHOP_RECEIPT"
+msgstr "PURCHASE RECEIPT"
+
+msgid "UI_SHOP_PRICE"
+msgstr "PRICE  {0} SPROUTS"
+
+msgid "UI_SHOP_TYPE"
+msgstr "Type"
+
+msgid "UI_SHOP_PRICE_HEADER"
+msgstr "Price"
+
+msgid "UI_SHOP_IN_STOCK"
+msgstr "IN STOCK  1"
+
+msgid "UI_SHOP_SPECIAL_TITLE"
+msgstr "SPECIAL"
+
+msgid "UI_SHOP_EMPTY"
+msgstr "Nothing is available in this category."
+
+msgid "UI_SHOP_SELECT_HINT"
+msgstr "Choose an item to inspect it."
 
 msgid "UI_SHOP_WALLET"
 msgstr "SPROUTS  {0}"
@@ -109,7 +136,43 @@ msgid "UI_SHOP_OWNED"
 msgstr "OWNED {0}"
 
 msgid "UI_SHOP_BUY"
-msgstr "BUY {0}"
+msgstr "Buy {0}"
+
+msgid "UI_SHOP_CATEGORY_TREATS"
+msgstr "Treats"
+
+msgid "UI_SHOP_CATEGORY_EGGS"
+msgstr "Eggs"
+
+msgid "UI_SHOP_CATEGORY_LAND"
+msgstr "Land"
+
+msgid "UI_SHOP_CATEGORY_RARE"
+msgstr "Rare"
+
+msgid "UI_SHOP_CHOOSE_TREAT"
+msgstr "Choose a stat to train."
+
+msgid "UI_SHOP_CHOOSE_EGG"
+msgstr "Choose an egg to hatch."
+
+msgid "UI_SHOP_CHOOSE_LAND"
+msgstr "Choose a garden expansion."
+
+msgid "UI_SHOP_CHOOSE_RARE"
+msgstr "A special find for your garden."
+
+msgid "UI_SHOP_ITEM_COUNT"
+msgstr "{0} types"
+
+msgid "UI_SHOP_OPEN_INVENTORY"
+msgstr "Open inventory"
+
+msgid "UI_SHOP_INVENTORY_NOTE"
+msgstr "Goes to your Inventory."
+
+msgid "UI_SHOP_BACK_HINT"
+msgstr "ESC · Back to garden"
 
 msgid "UI_SHOP_MYSTERY_EGG"
 msgstr "MYSTERY EGG {0}"
@@ -154,7 +217,7 @@ msgid "UI_BREED_UNRELATED_CLEAN"
 msgstr "Unrelated pairing • no inbreeding penalty."
 
 msgid "UI_RACE_PICKER_TITLE"
-msgstr "CHOOSE A RACER"
+msgstr "RACE"
 
 msgid "UI_RACE_PICKER_EMPTY"
 msgstr "No Voidlings are currently on the farm."
@@ -164,6 +227,42 @@ msgstr "Choose one Voidling. All other racers are generated CPU opponents."
 
 msgid "UI_RACE_PICKER_COURSE"
 msgstr "COURSE"
+
+msgid "UI_RACE_STEP_COURSE"
+msgstr "COURSE SELECT"
+
+msgid "UI_RACE_STEP_RACER"
+msgstr "RACER SELECT"
+
+msgid "UI_RACE_STEP_CONFIRM"
+msgstr "READY TO RACE"
+
+msgid "UI_RACE_LEVEL"
+msgstr "LEVEL"
+
+msgid "UI_RACE_LEVEL_VALUE"
+msgstr "Level {0}"
+
+msgid "UI_RACE_CHOOSE_RACER"
+msgstr "Choose Racer"
+
+msgid "UI_RACE_ENTER"
+msgstr "Enter Race"
+
+msgid "UI_RACE_COURSE_RECORD"
+msgstr "COURSE RECORD"
+
+msgid "UI_RACE_NO_RECORD"
+msgstr "No record yet"
+
+msgid "UI_RACE_BLANK_TIME"
+msgstr "--:--.---"
+
+msgid "UI_RACE_RECORD_LINE"
+msgstr "Record: {0} · {1}"
+
+msgid "UI_RACE_ROSTER_PAGE"
+msgstr "{0} / {1}"
 
 msgid "UI_RACE_PICKER_NO_COURSES"
 msgstr "No race courses are available."
@@ -208,7 +307,7 @@ msgid "UI_SHOP_EGG_BOUGHT"
 msgstr "EGG ADDED TO INVENTORY"
 
 msgid "UI_GARDEN_VOIDLINGS"
-msgstr "VOIDLINGS"
+msgstr "Voidlings"
 
 msgid "UI_GARDEN_VOIDLINGS_SEARCH"
 msgstr "Search name or colour"
@@ -315,6 +414,54 @@ msgstr "CHEERING!"
 msgid "UI_RACE_STAMINA"
 msgstr "STAMINA {0} / {1}"
 
+msgid "UI_RACE_HUD_LOCAL"
+msgstr "LOCAL RACE"
+
+msgid "UI_RACE_HUD_ONLINE"
+msgstr "ONLINE RACE"
+
+msgid "UI_RACE_HUD_MENU"
+msgstr "ESC · Menu"
+
+msgid "UI_RACE_HUD_STANDINGS"
+msgstr "POSITIONS"
+
+msgid "UI_RACE_HUD_COURSE"
+msgstr "COURSE"
+
+msgid "UI_RACE_HUD_START"
+msgstr "Start"
+
+msgid "UI_RACE_HUD_FINISH"
+msgstr "Finish"
+
+msgid "UI_RACE_HUD_YOU"
+msgstr "YOU"
+
+msgid "UI_RACE_HUD_LEAD"
+msgstr "Lead"
+
+msgid "UI_RACE_HUD_PROGRESS"
+msgstr "{0}% · {1}"
+
+msgid "UI_RACE_HUD_PLACE"
+msgstr "{0} of {1}"
+
+msgid "UI_RACE_ORDINAL_1"
+msgstr "1st"
+
+msgid "UI_RACE_ORDINAL_2"
+msgstr "2nd"
+
+msgid "UI_RACE_ORDINAL_3"
+msgstr "3rd"
+
+msgid "UI_RACE_ORDINAL_4"
+msgstr "4th"
+
+msgid "UI_RACE_ORDINAL_N"
+msgstr "#{0}"
+
 msgid "UI_RACE_RESULT_WIN"
 msgstr "Congratulations!"
 
@@ -326,6 +473,15 @@ msgstr "Race complete!"
 
 msgid "UI_RACE_RESULT_PLACE"
 msgstr "You placed #{0}"
+
+msgid "UI_RACE_RESULT_EYEBROW"
+msgstr "{0} · RESULTS"
+
+msgid "UI_RACE_RESULT_REWARD"
+msgstr "+{0} sprouts"
+
+msgid "UI_RACE_RESULT_NEW_RECORD"
+msgstr "New course record!"
 
 msgid "UI_RACE_PAUSED"
 msgstr "RACE PAUSED"
@@ -340,7 +496,13 @@ msgid "UI_RACE_RETURN"
 msgstr "Return to Garden"
 
 msgid "UI_GARDEN_LOG_TITLE"
-msgstr "GARDEN LOG"
+msgstr "Garden log"
+
+msgid "UI_GARDEN_LOG_COLLAPSE"
+msgstr "Show one log line"
+
+msgid "UI_GARDEN_LOG_EXPAND"
+msgstr "Show more log lines"
 
 msgid "UI_GARDEN_LOG_STARTED"
 msgstr "Garden session started."
@@ -732,11 +894,17 @@ msgstr "{0} left the connected Garden."
 msgid "UI_GARDEN_LOG_RACE_RESULT"
 msgstr "Race finished — you placed #{0}."
 
+msgid "UI_GARDEN_LOG_COURSE_RECORD"
+msgstr "New course record — {0} at {1}."
+
 msgid "UI_GARDEN_LOG_TRADE_COMPLETE"
 msgstr "Trade complete — sent {0}, received {1}."
 
 msgid "UI_GARDEN_PLACE_LAND_HINT"
 msgstr "Click where the island should grow. R rotates the piece, right-click cancels."
+
+msgid "UI_GARDEN_PUT_IN_INVENTORY"
+msgstr "Put in inventory"
 
 msgid "UI_SHOP_LAND_TITLE"
 msgstr "LAND"
@@ -844,10 +1012,123 @@ msgid "UI_GARDEN_FOLLOW"
 msgstr "Follow this Voidling with the camera"
 
 msgid "UI_GARDEN_DETAILS"
-msgstr "View details"
+msgstr "Details"
 
 msgid "UI_GARDEN_FAMILY"
 msgstr "Family tree"
 
 msgid "UI_GARDEN_GOODBYE"
 msgstr "Goodbye"
+
+msgid "UI_GARDEN_MENU_HINT"
+msgstr "ESC · Menu"
+
+msgid "UI_GARDEN_MUTE"
+msgstr "Mute audio"
+
+msgid "UI_GARDEN_UNMUTE"
+msgstr "Restore audio"
+
+msgid "UI_GARDEN_MENU_TITLE"
+msgstr "Garden menu"
+
+msgid "UI_GARDEN_MENU_RUNNING"
+msgstr "Your Garden keeps growing while this menu is open."
+
+msgid "UI_GARDEN_RETURN"
+msgstr "Return to garden"
+
+msgid "UI_GARDEN_BUILD"
+msgstr "Build"
+
+msgid "UI_GARDEN_BUILD_LAND"
+msgstr "Land & training grounds"
+
+msgid "UI_GARDEN_BUILD_DECORATE"
+msgstr "Decorate"
+
+msgid "UI_GARDEN_ACTIVITIES"
+msgstr "Activities"
+
+msgid "UI_GARDEN_MISSIONS"
+msgstr "Daily missions"
+
+msgid "UI_GARDEN_CHECK_IN_STREAK"
+msgstr "Daily check-in · streak {0}"
+
+msgid "UI_GARDEN_CHECK_IN_CLAIM"
+msgstr "Claim +{0} sprouts"
+
+msgid "UI_GARDEN_CHECK_IN_CLAIMED"
+msgstr "Claimed today"
+
+msgid "UI_GARDEN_CHECK_IN_NEXT"
+msgstr "Next check-in: +{0} sprouts"
+
+msgid "UI_PROFILE_TRAINED_STAT"
+msgstr "Trained stat"
+
+msgid "UI_PROFILE_RANK"
+msgstr "Rank"
+
+msgid "UI_PROFILE_LEVEL"
+msgstr "Level"
+
+msgid "UI_PROFILE_LEVEL_VALUE"
+msgstr "Lv {0}"
+
+msgid "UI_PROFILE_EXP_PER_SECOND"
+msgstr "+{0:0.##} EXP/s"
+
+msgid "UI_PROFILE_ADULT_PERSONALITY"
+msgstr "Adult · {0}"
+
+msgid "UI_PROFILE_CHILD_PERSONALITY"
+msgstr "Child · {0}"
+
+msgid "UI_PROFILE_CONTENT"
+msgstr "Seems content and at ease."
+
+msgid "UI_PROFILE_RESTLESS"
+msgstr "Seems restless and could use some attention."
+
+msgid "UI_PROFILE_GIVE_TREAT"
+msgstr "Give treat"
+
+msgid "UI_PROFILE_GIVE"
+msgstr "Give"
+
+msgid "UI_PROFILE_FOLLOW"
+msgstr "Follow"
+
+msgid "UI_PROFILE_TREAT_STOCK"
+msgstr "{0} treat · {1} owned"
+
+msgid "UI_TUTORIAL_GARDEN_PROFILE"
+msgstr "This profile keeps care and training close to your selected Voidling. Give treat chooses an owned treat; Details shows the full stats and DNA."
+
+msgid "UI_TUTORIAL_GARDEN_SHOP"
+msgstr "Use the left rail to visit the Shop for treats, eggs and land. Activities beside the Garden log opens daily check-ins and missions."
+
+msgid "UI_TUTORIAL_GARDEN_BUILD"
+msgstr "Build groups your land and decorations. Open a land tile to manage its training, or place stored land from Inventory."
+msgid "UI_GARDEN_DAY"
+msgstr "Day"
+
+msgid "UI_GARDEN_NIGHT"
+msgstr "Night"
+
+msgid "UI_GARDEN_DAWN"
+msgstr "Dawn"
+
+msgid "UI_GARDEN_DUSK"
+msgstr "Dusk"
+
+msgid "UI_GARDEN_TIME_HINT"
+msgstr "{0} · follows your local time"
+
+msgid "UI_GARDEN_HIDE_RAIL"
+msgstr "Hide navigation"
+
+msgid "UI_GARDEN_SHOW_RAIL"
+msgstr "Show navigation"

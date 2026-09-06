@@ -17,6 +17,16 @@ public partial class MainController : Node
             ?? throw new InvalidOperationException($"Could not project race-picker data for '{creature.Id}'.");
         var statSummary = string.Join("   ", profile.Stats.Select(stat =>
             $"{StatPresentationCatalog.NameFor(stat.StatId)} {stat.InheritedRank} {stat.EffectiveValue}"));
+        var stats = profile.Stats
+            .Select(stat => new RacePickerStatViewState(
+                stat.StatId,
+                StatPresentationCatalog.NameFor(stat.StatId),
+                StatPresentationCatalog.ColorFor(stat.StatId),
+                stat.InheritedRank,
+                stat.TrainingLevel,
+                (float)stat.TrainingProgress,
+                (int)stat.EffectiveValue))
+            .ToArray();
 
         return new RacePickerVoidlingViewState(
             profile.CreatureId,
@@ -24,7 +34,8 @@ public partial class MainController : Node
             ProfileAppearance(profile),
             profile.HasAngelMutation,
             profile.OtherMutationCount,
-            statSummary);
+            statSummary,
+            stats);
     }
 
     private void ShowDetails()
@@ -71,6 +82,12 @@ public partial class MainController : Node
         var screen = new DetailsScreen();
         screen.Configure(state);
         box.AddChild(screen);
+        var goodbye = UiFactory.CreateButton(Tr("UI_GARDEN_GOODBYE"));
+        goodbye.Name = "Goodbye";
+        goodbye.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd;
+        goodbye.AddThemeColorOverride("font_color", Color.FromHtml("#914E42"));
+        goodbye.Pressed += () => ShowGoodbyeFirst(profile.CreatureId);
+        box.AddChild(goodbye);
     }
 
     private void ShowFamilyTree()

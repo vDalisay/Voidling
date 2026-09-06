@@ -26,6 +26,7 @@ public sealed record CreatureProfileStatProjection(
 {
     public int TrainingPoints { get; init; }
     public int TrainingPointCap { get; init; }
+    public double TrainingPointsPerSecond { get; init; }
 }
 
 public sealed record CreatureProfileRareTraitProjection(
@@ -96,17 +97,30 @@ public sealed class CreatureProfileProjectionService
         var stats = _statIds.Select(statId =>
         {
             var gene = StatCalculator.GetGene(creature, statId);
+            var progress = _stats.GetLevelProgress(creature, statId);
+            var pointsPerSecond = 0.0;
+            if (string.Equals(creature.PassiveTrainingStatId, statId, StringComparison.Ordinal) &&
+                _stats.GetLevel(creature, statId) < _rules.Stats.MaxLevel)
+            {
+                var pointsPerMinute = string.IsNullOrEmpty(creature.PassiveTrainingModuleId)
+                    ? _rules.PassiveTraining.PointsPerMinute
+                    : creature.PassiveTrainingPointsPerMinute;
+                pointsPerSecond = Math.Max(0.0, pointsPerMinute / 60.0);
+                progress = (float)Math.Min(1.0, progress + creature.PassiveTrainingPointRemainder /
+                    _rules.Stats.TrainingPointsPerLevel);
+            }
             return new CreatureProfileStatProjection(
                 statId,
                 GradeName(gene.ExpressedValue),
                 _stats.GetLevel(creature, statId),
                 Math.Clamp((int)MathF.Round(_stats.GetEffectiveStat(creature, statId)), 0, 100),
-                _stats.GetLevelProgress(creature, statId),
+                progress,
                 GradeName(gene.AlleleA),
                 GradeName(gene.AlleleB))
             {
                 TrainingPoints = _stats.GetTrainingPoints(creature, statId),
-                TrainingPointCap = _stats.GetTrainingPointCap(creature, statId)
+                TrainingPointCap = _stats.GetTrainingPointCap(creature, statId),
+                TrainingPointsPerSecond = pointsPerSecond
             };
         }).ToArray();
 

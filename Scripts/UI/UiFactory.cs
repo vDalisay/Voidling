@@ -16,6 +16,10 @@ public static class UiFactory
         GD.Load<Texture2D>("res://Assets/Sprout Lands - UI Pack - Basic pack/Sprite sheets/Icons/All Icons.png");
 
     private static readonly Texture2D PremiumIcons = GD.Load<Texture2D>(UiRoot + "Icons/All Icons.png");
+    private static readonly Texture2D SettingsIcons =
+        GD.Load<Texture2D>(UiRoot + "buttons/Icon Buttons/Icon Buttons Spritesheet.png");
+    private static readonly Texture2D FarmingPlants = GD.Load<Texture2D>(
+        "res://Assets/Sprout Lands - Sprites - premium pack/Objects/Farming Plants.png");
 
     private static readonly Font InterfaceFont = new SystemFont
     {
@@ -23,11 +27,22 @@ public static class UiFactory
         FontWeight = 500
     };
 
-    public static PanelContainer CreatePanel(Vector2 minimumSize)
+    public static PanelContainer CreatePanel(Vector2 minimumSize, bool wood = false)
     {
         var panel = new PanelContainer { CustomMinimumSize = minimumSize };
-        panel.AddThemeStyleboxOverride("panel", CreatePanelStyle());
+        var style = CreatePanelStyle();
+        if (wood)
+            style.Texture = new AtlasTexture { Atlas = ButtonTexture, Region = new Rect2(0, 80, 16, 16) };
+        panel.AddThemeStyleboxOverride("panel", style);
         return panel;
+    }
+
+    /// <summary>The premium panel chrome on its own, tinted, for surfaces that are not containers.</summary>
+    public static StyleBoxTexture CreatePanelStylebox(Color modulate)
+    {
+        var style = CreatePanelStyle();
+        style.ModulateColor = modulate;
+        return style;
     }
 
     public static Button CreateButton(string text, int iconIndex = -1)
@@ -261,6 +276,18 @@ public static class UiFactory
         Region = new Rect2(column * 16, row * 16, 16, 16)
     };
 
+    public static AtlasTexture CreateSettingsIcon(int column, int row) => new()
+    {
+        Atlas = SettingsIcons,
+        Region = new Rect2(column * 32, row * 32, 32, 32)
+    };
+
+    public static AtlasTexture CreateSproutIcon() => new()
+    {
+        Atlas = FarmingPlants,
+        Region = new Rect2(16, 16, 16, 16)
+    };
+
     public static MarginContainer Pad(Control child, int margin = 10)
     {
         var container = new MarginContainer();
@@ -270,6 +297,26 @@ public static class UiFactory
         container.AddThemeConstantOverride("margin_bottom", margin);
         container.AddChild(child);
         return container;
+    }
+
+    /// <summary>Green confirm chrome shared by the Shop's Buy and the race-entry Start action.</summary>
+    public static void ApplyPrimaryStyle(Button button)
+    {
+        static StyleBoxFlat Style(Color color) => new()
+        {
+            BgColor = color,
+            BorderColor = Color.FromHtml("#315A42"),
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            BorderWidthTop = 2, BorderWidthBottom = 2,
+            CornerRadiusTopLeft = 3, CornerRadiusTopRight = 3,
+            CornerRadiusBottomLeft = 3, CornerRadiusBottomRight = 3
+        };
+        button.AddThemeStyleboxOverride("normal", Style(Color.FromHtml("#477052")));
+        button.AddThemeStyleboxOverride("hover", Style(Color.FromHtml("#568761")));
+        button.AddThemeStyleboxOverride("pressed", Style(Color.FromHtml("#355D43")));
+        button.AddThemeColorOverride("font_color", Color.FromHtml("#FFF3D2"));
+        button.AddThemeColorOverride("font_hover_color", Colors.White);
+        button.AddThemeColorOverride("font_pressed_color", Colors.White);
     }
 
     public static void ApplyPixelFont(Control control, int size)

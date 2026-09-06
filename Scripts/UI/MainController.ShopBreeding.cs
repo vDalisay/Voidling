@@ -62,25 +62,18 @@ public partial class MainController : Node
                 Price: GameRules.GardenModuleRules.EmptyHexCost * shape.HexCount))
             .ToArray();
 
-        var rotationRemaining = (int)Math.Ceiling(Math.Max(
-            0.0,
-            GameRules.ShopEggRotationIntervalSeconds - state.ShopEggRotationElapsedSeconds));
-
-        var box = OpenModal(Tr("UI_SHOP_TITLE"), new Vector2(558, 344));
+        var box = OpenRailModal(Tr("UI_SHOP_TITLE"), new Vector2(520, 344),
+            panelTint: new Color(232f / 220f, 207f / 224f, 166f / 210f));
         box.AddThemeConstantOverride("separation", 4);
-        box.AddChild(CreateDailyLoginPanel());
-
-        // Three shelves no longer fit the stall at once, so the stock scrolls.
-        var stall = new ScrollContainer
-        {
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill
-        };
-        box.AddChild(stall);
-        UiFactory.StyleScroll(stall);
 
         var screen = new ShopScreen();
-        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rotationRemaining, rareOffer, landPieces));
+        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rareOffer, landPieces), _shopCategory, _shopSelection);
+        screen.SelectionChanged += (category, selection) =>
+        {
+            _shopCategory = category;
+            _shopSelection = selection;
+        };
+        screen.InventoryRequested += ShowInventory;
         screen.TrainingItemPurchaseRequested += statId =>
         {
             _session.BuyTrainingItem(statId);
@@ -110,10 +103,51 @@ public partial class MainController : Node
         };
         screen.LandPurchaseRequested += shapeId =>
         {
-            _session.BuyLandShape(shapeId);
-            RenderShop();
+            var moduleId = _session.BuyLandShape(shapeId);
+            if (moduleId == null)
+            {
+                RenderShop();
+                return;
+            }
+
+            CloseModal(false);
+            BeginShopLandPlacement(moduleId, shapeId);
         };
-        stall.AddChild(screen);
+        box.AddChild(screen);
+        Callable.From(screen.FocusSelection).CallDeferred();
+    }
+
+    private void BeginShopLandPlacement(string moduleId, string shapeId)
+    {
+        _garden.CancelLandPlacement();
+        _shopLandPurchaseId = moduleId;
+        _cancelShopLandPurchase = false;
+        _garden.BeginLandPlacement(moduleId, shapeId);
+    }
+
+    private async void FinishShopLandPlacement()
+    {
+        var moduleId = _shopLandPurchaseId;
+        var cancelPurchase = _cancelShopLandPurchase;
+        var placed = _session.State.GardenModules.Find(module => module.Id == moduleId)?.Placed == true;
+        _shopLandPurchaseId = string.Empty;
+        _cancelShopLandPurchase = false;
+        _landPurchaseActions.Visible = false;
+
+        if (cancelPurchase)
+            _session.CancelLandPurchase(moduleId);
+        else
+            _session.CommitLandPurchase(moduleId);
+
+        if (placed)
+        {
+            await ToSignal(
+                GetTree().CreateTimer(GardenController.LandPlacementAnimationSeconds + 0.5),
+                SceneTreeTimer.SignalName.Timeout);
+            if (!IsInsideTree())
+                return;
+        }
+        RenderShop();
     }
 
     private void ShowBreeding()

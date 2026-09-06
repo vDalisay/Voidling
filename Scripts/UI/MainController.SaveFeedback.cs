@@ -10,9 +10,11 @@ public partial class MainController
     private void BuildSaveFeedbackIndicator()
     {
         _saveStatusLabel = UiFactory.CreateLabel(string.Empty, 6);
-        _saveStatusLabel.Position = new Vector2(526, 340);
-        _saveStatusLabel.Size = new Vector2(104, 14);
-        _saveStatusLabel.HorizontalAlignment = HorizontalAlignment.Right;
+        _saveStatusLabel.Name = "GardenSaveStatus";
+        _saveStatusLabel.Position = new Vector2(12, 326);
+        _saveStatusLabel.Size = new Vector2(72, 24);
+        _saveStatusLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        _saveStatusLabel.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
         _saveStatusLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
         _saveStatusLabel.ZIndex = 120;
         _saveStatusLabel.Visible = false;
@@ -34,7 +36,8 @@ public partial class MainController
         _saveStatusLabel.Text = Tr(succeeded ? "UI_SAVE_STATUS_SAVED" : "UI_SAVE_STATUS_FAILED");
         _saveStatusLabel.AddThemeColorOverride(
             "font_color",
-            Color.FromHtml(succeeded ? "#6F8068" : "#9C514B"));
+            Color.FromHtml(succeeded ? "#36533D" : "#9C514B"));
+        _saveStatusLabel.TooltipText = _saveStatusLabel.Text;
         _saveStatusLabel.Visible = true;
         _saveStatusTimer.Start(succeeded ? 1.25 : 4.0);
     }
@@ -53,8 +56,6 @@ public partial class MainController
 
         var message = Tr(key);
         ShowToast(message);
-        if (GodotObject.IsInstanceValid(_gardenEventLog))
-            _gardenEventLog.Append(message);
     }
 
     private void HideSaveFeedback()

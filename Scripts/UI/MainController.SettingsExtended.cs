@@ -6,8 +6,14 @@ namespace VoidlingGame;
 public partial class MainController
 {
     private void ShowSettingsExtended()
+        => ShowSettingsExtended(ShowGardenMenu);
+
+    private void ShowSettingsFromRail()
+        => ShowSettingsExtended(CloseModal);
+
+    private void ShowSettingsExtended(System.Action backRequested)
     {
-        var box = OpenModal(Tr("UI_SETTINGS_TITLE"), new Vector2(410, 318));
+        var box = OpenModal(Tr("UI_SETTINGS_TITLE"), new Vector2(410, 318), backRequested);
         var screen = new SettingsScreen();
         screen.Configure(new SettingsScreenState(
             _session.State.MasterVolume,

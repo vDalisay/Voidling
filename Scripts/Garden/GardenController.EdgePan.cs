@@ -21,6 +21,10 @@ public partial class GardenController
             return;
 
         var viewport = GetViewport();
+        for (var hovered = viewport.GuiGetHoveredControl(); hovered != null; hovered = hovered.GetParent() as Control)
+        {
+            if (hovered.MouseFilter == Control.MouseFilterEnum.Stop) return;
+        }
         var mouse = viewport.GetMousePosition();
         var size = viewport.GetVisibleRect().Size;
         if (size.X <= 0.0f || size.Y <= 0.0f)

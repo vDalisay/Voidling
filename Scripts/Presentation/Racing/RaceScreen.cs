@@ -23,6 +23,7 @@ public partial class RaceScreen : Node2D
 
     /// <summary>True once the results overlay has been built. Read by the CI completion probe.</summary>
     internal bool ResultsShown => _resultsShown;
+    internal bool ResultsPending => _resultsPending;
 
     private const float ScreenWidth = 640.0f;
     private const float ScreenHeight = 360.0f;
@@ -62,10 +63,29 @@ public partial class RaceScreen : Node2D
     private const float MinZoom = 1.0f;
     private const float MaxZoom = 3.2f;
     private const float ZoomStepFactor = 1.18f;
+    private const float EdgePeekZoneFraction = 0.15f;
+    private const float MaxEdgePeekFraction = 0.30f;
+    private const double ResultsRevealDelaySeconds = 1.0;
     private const int MaxCatchUpStepsPerFrame = 30;
 
     /// <summary>Canvas layer the results overlay lives on. The CI completion probe looks for it.</summary>
     internal const int ResultsCanvasLayer = 50;
+
+    /// <summary>Node names on the results card. The CI completion probe asserts every one of them.</summary>
+    internal const string ResultsCanvasName = "RaceResults";
+    internal const string ResultsCardName = "ResultsCard";
+    internal const string ResultsHeadlineName = "ResultsHeadline";
+    internal const string ResultsPodiumName = "ResultsPodium";
+    internal const string ResultsPlacementName = "ResultsPlacement";
+    internal const string ResultsRewardName = "ResultsReward";
+    internal const string ResultsRecordName = "ResultsRecord";
+    internal const string ResultsReturnName = "ResultsReturn";
+
+    private static readonly Texture2D StarSheet =
+        GD.Load<Texture2D>(UiFactory.UiRoot + "Icons/special icons/stars.png");
+
+    private static readonly Texture2D StarInWood =
+        GD.Load<Texture2D>(UiFactory.UiRoot + "Icons/special icons/stars in wood.png");
 
     private RaceCourse Course => _entry?.CourseDefinition.Course ?? RaceCourse.Demo;
 
@@ -77,8 +97,6 @@ public partial class RaceScreen : Node2D
     /// </summary>
     private static readonly Color SubmergedWater = new(0.608f, 0.831f, 0.765f, 0.56f);
     private static readonly Color WakeRipple = new(1.0f, 1.0f, 1.0f, 0.42f);
-
-    private static readonly Color StaminaColor = Color.FromHtml("#F7F3E7");
 
     // Lanes spread across the full dirt band. The old 33px cluster stacked four racers on top of
     // each other on the start line and left most of the track empty.
@@ -97,7 +115,12 @@ public partial class RaceScreen : Node2D
     private bool _running;
     private bool _pausedRunning;
     private bool _resultsShown;
+    private bool _resultsPending;
     private bool _completionReported;
+    private int _resultPlace;
+    private Control? _resultRewardRow;
+    private Label? _resultRewardLabel;
+    private Control? _resultRecordRow;
     private string _playerId = "";
     private string? _firstFinisherId;
     private RacerVisual? _playerVisual;
@@ -105,14 +128,10 @@ public partial class RaceScreen : Node2D
     private float _waterPhase;
     private float _zoom = MinZoom;
     private float _zoomTarget = MinZoom;
+    private float _cameraPeekOffset;
+    private bool _pointerMoved;
     private Camera2D _camera = null!;
     private Polygon2D _playerMarker = null!;
-    private Button _cheerButton = null!;
-    private ProgressBar _staminaBar = null!;
-    private Label _staminaLabel = null!;
-    private Label _faultLabel = null!;
-    private ColorRect _faultPlaque = null!;
-    private RaceMiniMap _miniMap = null!;
 
     private sealed class RacerVisual
     {
@@ -216,13 +235,23 @@ public partial class RaceScreen : Node2D
         // during the opening flyover and on the results screen.
         _waterPhase = (_waterPhase + (float)delta * 2.2f) % 1.0f;
         UpdateZoom((float)delta);
+        UpdateCameraPeek((float)delta);
         QueueRedraw();
 
         // Keep the framing on the player between the countdown and the podium too, so a zoom taken
         // on the start line or after the finish is centred on the same Voidling. The flyover owns
         // the camera while it is running.
         if (!_running && !_flyoverRunning)
+        {
+            if (_resultsPending)
+            {
+                if (_simulation != null)
+                    SyncVisuals((float)delta);
+                else if (_multiplayerFrame != null)
+                    RenderMultiplayerFrame(_multiplayerFrame, (float)delta);
+            }
             UpdatePlayerTracking();
+        }
 
         if (!_running || _playerVisual == null)
             return;
@@ -240,14 +269,12 @@ public partial class RaceScreen : Node2D
         HandleCheerVfx((float)delta);
         UpdatePlayerTracking();
         UpdateHud();
-        HandleAutoFinish();
-
-        if (_simulation.IsComplete && !_resultsShown)
-        {
-            _running = false;
-            SyncVisuals(0.0f);
-            ShowResults();
-        }
+        if (!_resultsPending && _simulation.GetState(_playerId).Finished)
+            QueueResults();
+        if (!_resultsPending)
+            HandleAutoFinish();
+        if (!_resultsPending && _simulation.GetState(_playerId).Finished)
+            QueueResults();
     }
 
     private void ProcessMultiplayer(double delta)
@@ -277,11 +304,11 @@ public partial class RaceScreen : Node2D
         UpdatePlayerTracking();
         UpdateHud();
 
-        if (frame.IsComplete && !_resultsShown)
+        if (frame.IsComplete && !_resultsShown && !_resultsPending)
         {
             _running = false;
             RenderMultiplayerFrame(frame, 0.0f);
-            ShowResults(frame.Participants
+            QueueResults(frame.Participants
                 .Where(participant => participant.Placement.HasValue)
                 .OrderBy(participant => participant.Placement)
                 .Select(participant => participant.ParticipantId)
@@ -464,7 +491,6 @@ public partial class RaceScreen : Node2D
         if (playerState.Finished)
         {
             ApplySimulationEvents(_simulation.FastForwardToFinish());
-            SyncVisuals(0.0f);
             return;
         }
 
@@ -477,7 +503,6 @@ public partial class RaceScreen : Node2D
         var forcedFinish = _simulation.CompleteParticipantAsLast(_playerId);
         if (forcedFinish != null)
             ApplySimulationEvents(new RaceSimulationEvent[] { forcedFinish });
-        SyncVisuals(0.0f);
     }
 
     private void SyncVisuals(float delta)
@@ -643,7 +668,8 @@ public partial class RaceScreen : Node2D
 
     /// <summary>
     /// Carries a racer through the finish: it coasts a random distance past the line instead of
-    /// stopping dead on it, and the first one over sometimes celebrates by hopping on the spot.
+    /// stopping dead on it. The player's racer celebrates by hopping on the spot; the first CPU
+    /// finisher may celebrate too.
     ///
     /// The distance is a hash of the racer, not the VFX random stream, so a replay of the same race
     /// puts everyone in the same place. Driven from the snapshot rather than the finish event, so
@@ -665,10 +691,13 @@ public partial class RaceScreen : Node2D
             var variation = JumpVariation(id, 977);
             visual.FinishOverrun = Mathf.Lerp(FinishOverrunMin, FinishOverrunMax, variation);
 
+            if (string.Equals(id, _playerId, StringComparison.Ordinal))
+                visual.Celebrates = true;
+
             if (_firstFinisherId == null)
             {
                 _firstFinisherId = id;
-                visual.Celebrates = JumpVariation(id, 4211) < 0.6f;
+                visual.Celebrates |= JumpVariation(id, 4211) < 0.6f;
             }
         }
 
@@ -994,83 +1023,6 @@ public partial class RaceScreen : Node2D
         AddChild(_playerMarker);
     }
 
-    private void CreateHud()
-    {
-        var canvas = new CanvasLayer { Layer = 20 };
-        AddChild(canvas);
-
-        var title = UiFactory.CreateTitle("SPROUT RUN");
-        title.Position = new Vector2(255, 8);
-        title.Size = new Vector2(180, 24);
-        canvas.AddChild(title);
-
-        // The track no longer names its own sections. This strip only appears to report a fault the
-        // player has to know about, such as multiplayer losing sync.
-        _faultPlaque = new ColorRect
-        {
-            Color = new Color(0.16f, 0.20f, 0.17f, 0.72f),
-            Position = new Vector2(212, 35),
-            Size = new Vector2(216, 16),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-            Visible = false
-        };
-        canvas.AddChild(_faultPlaque);
-
-        _faultLabel = UiFactory.CreateLabel(string.Empty, 8);
-        _faultLabel.Position = new Vector2(212, 34);
-        _faultLabel.Size = new Vector2(216, 18);
-        _faultLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        _faultLabel.Visible = false;
-        canvas.AddChild(_faultLabel);
-
-        var cheerPanel = UiFactory.CreatePanel(new Vector2(228, 70));
-        cheerPanel.Position = new Vector2(14, 276);
-        cheerPanel.Size = new Vector2(228, 70);
-        canvas.AddChild(cheerPanel);
-
-        var cheerBox = new VBoxContainer();
-        cheerBox.AddThemeConstantOverride("separation", 3);
-        cheerPanel.AddChild(cheerBox);
-
-        var cheerRow = new HBoxContainer();
-        cheerRow.AddThemeConstantOverride("separation", 6);
-        _cheerButton = UiFactory.CreateButton("CHEER!");
-        _cheerButton.CustomMinimumSize = new Vector2(88, 27);
-        _cheerButton.Pressed += CheerPlayer;
-        cheerRow.AddChild(_cheerButton);
-        _staminaLabel = UiFactory.CreateLabel("STAMINA", 7);
-        _staminaLabel.VerticalAlignment = VerticalAlignment.Center;
-        cheerRow.AddChild(_staminaLabel);
-        cheerBox.AddChild(cheerRow);
-
-        _staminaBar = new ProgressBar
-        {
-            MinValue = 0,
-            MaxValue = 100,
-            Value = 100,
-            ShowPercentage = false,
-            CustomMinimumSize = new Vector2(196, 16)
-        };
-        UiFactory.ApplyPixelFont(_staminaBar, 7);
-        var background = new StyleBoxFlat { BgColor = Color.FromHtml("#66594C") };
-        background.CornerRadiusTopLeft = background.CornerRadiusTopRight = 2;
-        background.CornerRadiusBottomLeft = background.CornerRadiusBottomRight = 2;
-        var fill = new StyleBoxFlat { BgColor = StaminaColor };
-        fill.CornerRadiusTopLeft = fill.CornerRadiusTopRight = 2;
-        fill.CornerRadiusBottomLeft = fill.CornerRadiusBottomRight = 2;
-        _staminaBar.AddThemeStyleboxOverride("background", background);
-        _staminaBar.AddThemeStyleboxOverride("fill", fill);
-        cheerBox.AddChild(_staminaBar);
-
-        var mapPanel = UiFactory.CreatePanel(new Vector2(205, 64));
-        mapPanel.Position = new Vector2(421, 282);
-        mapPanel.Size = new Vector2(205, 64);
-        canvas.AddChild(mapPanel);
-
-        _miniMap = new RaceMiniMap { CustomMinimumSize = new Vector2(181, 40) };
-        mapPanel.AddChild(_miniMap);
-    }
-
     private void CheerPlayer()
     {
         if (!_running)
@@ -1150,31 +1102,6 @@ public partial class RaceScreen : Node2D
         tween.Finished += streak.QueueFree;
     }
 
-    private void UpdateHud()
-    {
-        if (_entry == null || _miniMap == null || !TryGetPlayerState(out var player))
-            return;
-
-        _staminaBar.MaxValue = player.MaxStamina;
-        _staminaBar.Value = player.CurrentStamina;
-        _staminaLabel.Text = $"STAMINA {Mathf.CeilToInt(player.CurrentStamina)} / {Mathf.CeilToInt(player.MaxStamina)}";
-        _cheerButton.Disabled = !_running || player.Finished || player.CheerSeconds > 0.0f || player.CurrentStamina < _entry.Rules.CheerCost;
-        _cheerButton.Text = player.CheerSeconds > 0.0f ? "CHEERING!" : "CHEER!";
-
-        var points = _entry.Entrants.Select(entrant =>
-        {
-            var state = GetParticipantState(entrant);
-            return new RaceMiniMapPoint
-            {
-                Id = entrant.Participant.CreatureId,
-                Color = ParseTint(entrant.Participant.TintHex),
-                Progress = Mathf.Clamp((state.X - Course.StartX) / (Course.EndX - Course.StartX), 0.0f, 1.0f),
-                IsPlayer = entrant.Participant.CreatureId == _playerId
-            };
-        }).ToList();
-        _miniMap.SetPoints(points);
-    }
-
     private RaceParticipantStateSnapshot GetParticipantState(RaceEntrant entrant)
     {
         if (_simulation != null)
@@ -1210,14 +1137,6 @@ public partial class RaceScreen : Node2D
         return true;
     }
 
-    private void ShowFault(string text)
-    {
-        _faultLabel.Text = text;
-        _faultLabel.AddThemeColorOverride("font_color", Color.FromHtml("#F2B6AF"));
-        _faultLabel.Visible = true;
-        _faultPlaque.Visible = true;
-    }
-
     /// <summary>Wheel zoom. Steps multiply, so each notch feels the same at any distance.</summary>
     internal void HandleZoomInput(InputEvent inputEvent)
     {
@@ -1243,6 +1162,35 @@ public partial class RaceScreen : Node2D
         _camera.Zoom = new Vector2(_zoom, _zoom);
     }
 
+    private void UpdateCameraPeek(float delta)
+    {
+        var viewportWidth = GetViewport().GetVisibleRect().Size.X;
+        var mousePosition = GetViewport().GetMousePosition();
+        var target = _running && _pointerMoved && !IsCameraPeekBlocked(mousePosition) &&
+                     mousePosition.X >= 0.0f && mousePosition.X <= viewportWidth
+            ? ComputeEdgePeekOffset(mousePosition.X, viewportWidth, ScreenWidth / Math.Max(_zoom, 0.001f))
+            : 0.0f;
+        _cameraPeekOffset = Mathf.Lerp(_cameraPeekOffset, target, 1.0f - Mathf.Pow(0.002f, delta));
+    }
+
+    internal bool IsCameraPeekBlocked(Vector2 mousePosition)
+        => _staminaHudPanel.GetGlobalRect().HasPoint(mousePosition) ||
+           _courseHudPanel.GetGlobalRect().HasPoint(mousePosition);
+
+    internal static float ComputeEdgePeekOffset(float mouseX, float screenWidth, float visibleWorldWidth)
+    {
+        if (screenWidth <= 0.0f || visibleWorldWidth <= 0.0f)
+            return 0.0f;
+
+        var edgeWidth = screenWidth * EdgePeekZoneFraction;
+        var strength = mouseX < edgeWidth
+            ? -(edgeWidth - mouseX) / edgeWidth
+            : mouseX > screenWidth - edgeWidth
+                ? (mouseX - (screenWidth - edgeWidth)) / edgeWidth
+                : 0.0f;
+        return Mathf.Clamp(strength, -1.0f, 1.0f) * visibleWorldWidth * MaxEdgePeekFraction;
+    }
+
     /// <summary>
     /// Keeps the camera on the player's own Voidling.
     ///
@@ -1263,64 +1211,105 @@ public partial class RaceScreen : Node2D
             ? ScreenHeight * 0.5f
             : Mathf.Clamp(focusY, halfHeight, ScreenHeight - halfHeight);
 
-        _camera.Position = new Vector2(player.X, cameraY);
+        _camera.Position = new Vector2(player.X + _cameraPeekOffset, cameraY);
         _playerMarker.Position = new Vector2(player.X, _playerVisual.Sprite.Position.Y - 21.0f);
     }
 
+    private async void QueueResults(IReadOnlyList<string>? multiplayerFinishOrder = null)
+    {
+        _resultsPending = true;
+        var finishOrder = multiplayerFinishOrder?.ToArray();
+        await ToSignal(GetTree().CreateTimer(ResultsRevealDelaySeconds), SceneTreeTimer.SignalName.Timeout);
+        if (!IsInsideTree())
+            return;
+
+        _running = false;
+        if (_simulation != null && !_simulation.IsComplete)
+            ApplySimulationEvents(_simulation.FastForwardToFinish());
+        ShowResults(finishOrder);
+        if (_simulation != null)
+            SyncVisuals(0.0f);
+    }
+
+    /// <summary>
+    /// Builds the podium card over the finished race and, last of all, tells the owner the race is
+    /// over. The owner's reward/record handling comes back through <see cref="PresentOutcome"/>, so
+    /// this screen reports what was granted and never grants anything itself.
+    /// </summary>
     private void ShowResults(IReadOnlyList<string>? multiplayerFinishOrder = null)
     {
         if (_entry == null || (_simulation == null && multiplayerFinishOrder == null))
             return;
 
+        _resultsPending = false;
         _resultsShown = true;
         var finishOrder = multiplayerFinishOrder ?? _simulation!.FinishOrder;
         var selectedPlace = finishOrder.ToList().IndexOf(_playerId) + 1;
         if (selectedPlace <= 0)
             selectedPlace = _entry.Entrants.Count;
+        _resultPlace = selectedPlace;
 
         var byId = _entry.Entrants.ToDictionary(entrant => entrant.Participant.CreatureId, StringComparer.Ordinal);
         var finishers = finishOrder.Select(id => byId[id]).ToList();
 
-        var canvas = new CanvasLayer { Layer = ResultsCanvasLayer };
+        var canvas = new CanvasLayer { Name = ResultsCanvasName, Layer = ResultsCanvasLayer };
         AddChild(canvas);
         var shade = new ColorRect
         {
-            Color = new Color(0.12f, 0.18f, 0.16f, 0.55f),
-            Position = Vector2.Zero,
-            Size = new Vector2(ScreenWidth, ScreenHeight),
+            Color = new Color(0.10f, 0.16f, 0.14f, 0.62f),
             MouseFilter = Control.MouseFilterEnum.Stop
         };
+        shade.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         canvas.AddChild(shade);
 
         var center = new CenterContainer();
         center.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         canvas.AddChild(center);
 
-        var panel = UiFactory.CreatePanel(new Vector2(520, 292));
-        center.AddChild(panel);
+        var card = UiFactory.CreatePanel(new Vector2(500, 300));
+        card.Name = ResultsCardName;
+        center.AddChild(card);
+
         var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         box.AddThemeConstantOverride("separation", 4);
-        panel.AddChild(box);
-        var resultTitle = UiFactory.CreateTitle($"RACE RESULTS — YOU #{selectedPlace}");
-        resultTitle.HorizontalAlignment = HorizontalAlignment.Center;
-        box.AddChild(resultTitle);
+        card.AddChild(box);
 
-        var stage = new Control { CustomMinimumSize = new Vector2(480, 192) };
-        box.AddChild(stage);
+        var eyebrow = UiFactory.CreateLabel(
+            string.Format(Tr("UI_RACE_RESULT_EYEBROW"), Tr(RaceCoursePresentationCatalog.KeysFor(_entry.CourseDefinition.Id).NameKey)),
+            6);
+        eyebrow.HorizontalAlignment = HorizontalAlignment.Center;
+        box.AddChild(eyebrow);
 
-        if (finishers.Count >= 2)
-            AddPodiumSlot(stage, finishers[1], 2, new Vector2(55, 105), new Vector2(100, 67));
-        if (finishers.Count >= 1)
-            AddPodiumSlot(stage, finishers[0], 1, new Vector2(181, 72), new Vector2(112, 100));
-        if (finishers.Count >= 3)
-            AddPodiumSlot(stage, finishers[2], 3, new Vector2(319, 120), new Vector2(92, 52));
-        if (finishers.Count >= 4)
-            AddFourthPlacePuddle(stage, finishers[3], new Vector2(428, 112));
+        box.AddChild(BuildOutcomeBanner(selectedPlace));
+
+        var podium = new Control
+        {
+            Name = ResultsPodiumName,
+            CustomMinimumSize = new Vector2(468, 140),
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
+        box.AddChild(podium);
+        BuildPodium(podium, finishers);
+
+        var placement = UiFactory.CreateLabel(PlacementLine(selectedPlace), 9);
+        placement.Name = ResultsPlacementName;
+        placement.HorizontalAlignment = HorizontalAlignment.Center;
+        box.AddChild(placement);
+
+        _resultRewardRow = BuildBadgeRow(ResultsRewardName, UiFactory.CreateSproutIcon(), out _resultRewardLabel);
+        box.AddChild(_resultRewardRow);
+        _resultRecordRow = BuildBadgeRow(ResultsRecordName, RecordStar(), out var recordLabel);
+        recordLabel.Text = Tr("UI_RACE_RESULT_NEW_RECORD");
+        box.AddChild(_resultRecordRow);
 
         var button = UiFactory.CreateButton(Tr("UI_RACE_RETURN"));
-        button.CustomMinimumSize = new Vector2(160, 25);
+        button.Name = ResultsReturnName;
+        button.CustomMinimumSize = new Vector2(180, 28);
+        button.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        UiFactory.ApplyPrimaryStyle(button);
         button.Pressed += () => ReturnRequested?.Invoke();
         box.AddChild(button);
+        button.CallDeferred(Control.MethodName.GrabFocus);
 
         // The owner is told last, and its faults are contained here. Rewards, saving and leaderboard
         // projection all run through this callback; if any of them throw, the player must still be
@@ -1340,64 +1329,180 @@ public partial class RaceScreen : Node2D
         }
     }
 
+    /// <summary>
+    /// Shows the outcome the owner already applied: the sprouts it awarded and whether the run set a
+    /// new course record. Called from the RaceCompleted handler, which fires once per race.
+    /// </summary>
+    public void PresentOutcome(int rewardSprouts, bool newCourseRecord)
+    {
+        if (_resultRewardRow != null && _resultRewardLabel != null && rewardSprouts > 0)
+        {
+            _resultRewardLabel.Text = string.Format(Tr("UI_RACE_RESULT_REWARD"), rewardSprouts);
+            _resultRewardRow.Visible = true;
+        }
+
+        if (_resultRecordRow != null)
+            _resultRecordRow.Visible = newCourseRecord;
+    }
+
+    private string PlacementLine(int selectedPlace)
+    {
+        var line = string.Format(Tr("UI_RACE_RESULT_PLACE"), selectedPlace);
+        return TryGetPlayerFinishMilliseconds(out var milliseconds)
+            ? $"{line}  ·  {FormatMilliseconds(milliseconds)}"
+            : line;
+    }
+
+    /// <summary>The headline, on the premium wood-and-amber plaque the entry screen's banner uses.</summary>
+    private Control BuildOutcomeBanner(int selectedPlace)
+    {
+        var banner = new PanelContainer
+        {
+            Name = ResultsHeadlineName,
+            SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter
+        };
+        var isLast = selectedPlace >= _entry!.Entrants.Count;
+        var style = new StyleBoxFlat
+        {
+            BgColor = Color.FromHtml(selectedPlace == 1 ? "#F0C255" : isLast ? "#CFC4A6" : "#E8CE8E"),
+            BorderColor = Color.FromHtml("#8A6633")
+        };
+        style.SetBorderWidthAll(2);
+        style.SetCornerRadiusAll(5);
+        style.SetContentMarginAll(4);
+        style.ContentMarginLeft = 14;
+        style.ContentMarginRight = 14;
+        banner.AddThemeStyleboxOverride("panel", style);
+
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 6);
+        banner.AddChild(row);
+        if (selectedPlace == 1)
+            row.AddChild(StarBadge(18));
+        var headline = UiFactory.CreateLabel(
+            selectedPlace == 1
+                ? Tr("UI_RACE_RESULT_WIN")
+                : isLast
+                    ? Tr("UI_RACE_RESULT_LAST")
+                    : Tr("UI_RACE_RESULT_COMPLETE"),
+            12);
+        headline.AddThemeColorOverride("font_color", Color.FromHtml("#4A3218"));
+        headline.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        row.AddChild(headline);
+        if (selectedPlace == 1)
+            row.AddChild(StarBadge(18));
+        return banner;
+    }
+
+    // Back to front: the winner's taller block is built last so its portrait overlaps the others.
+    private static void BuildPodium(Control stage, IReadOnlyList<RaceEntrant> finishers)
+    {
+        if (finishers.Count >= 4)
+            AddFourthPlacePuddle(stage, finishers[3], new Vector2(404, 66));
+        if (finishers.Count >= 3)
+            AddPodiumSlot(stage, finishers[2], 3, new Vector2(302, 90), new Vector2(88, 50));
+        if (finishers.Count >= 2)
+            AddPodiumSlot(stage, finishers[1], 2, new Vector2(44, 78), new Vector2(96, 62));
+        if (finishers.Count >= 1)
+            AddPodiumSlot(stage, finishers[0], 1, new Vector2(172, 52), new Vector2(108, 88));
+    }
+
     private static readonly Vector2 PodiumPortraitSize = new(48, 48);
+
+    /// <summary>Gold, silver and bronze applied to the premium panel chrome rather than flat boxes.</summary>
+    private static readonly Color[] PodiumTints =
+    {
+        Color.FromHtml("#F2CE63"),
+        Color.FromHtml("#DCE0D6"),
+        Color.FromHtml("#D3925C")
+    };
 
     private static void AddPodiumSlot(Control stage, RaceEntrant entrant, int place, Vector2 blockPosition, Vector2 blockSize)
     {
-        var block = new PanelContainer { Position = blockPosition, Size = blockSize };
-        var style = new StyleBoxFlat
+        var block = new Panel
         {
-            BgColor = place == 1 ? Color.FromHtml("#EBCB63") : place == 2 ? Color.FromHtml("#CDD0C8") : Color.FromHtml("#C28B5D"),
-            BorderColor = Color.FromHtml("#7E6856")
+            Name = $"PodiumBlock{place}",
+            Position = blockPosition,
+            Size = blockSize,
+            MouseFilter = Control.MouseFilterEnum.Ignore
         };
-        style.SetBorderWidthAll(2);
-        style.CornerRadiusTopLeft = style.CornerRadiusTopRight = 3;
-        block.AddThemeStyleboxOverride("panel", style);
+        block.AddThemeStyleboxOverride("panel", UiFactory.CreatePanelStylebox(PodiumTints[place - 1]));
         stage.AddChild(block);
 
-        var placeLabel = UiFactory.CreateLabel(place.ToString(), 14);
-        placeLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        var numberY = 8.0f;
+        if (place == 1)
+        {
+            var star = StarBadge(26);
+            star.Position = new Vector2((blockSize.X - 26.0f) * 0.5f, 6.0f);
+            block.AddChild(star);
+            numberY = 34.0f;
+        }
+
+        var placeLabel = UiFactory.CreateLabel(place.ToString(), 13);
+        placeLabel.Size = new Vector2(blockSize.X, 17);
+        placeLabel.Position = new Vector2(0, numberY);
         placeLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        placeLabel.VerticalAlignment = VerticalAlignment.Center;
         block.AddChild(placeLabel);
 
-        StandPortraitOn(stage, entrant, blockPosition, blockSize, blockPosition.Y);
+        var name = UiFactory.CreateLabel(entrant.Participant.DisplayName, 6);
+        name.Size = new Vector2(blockSize.X - 8, 12);
+        name.Position = new Vector2(4, numberY + 18.0f);
+        name.HorizontalAlignment = HorizontalAlignment.Center;
+        name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        block.AddChild(name);
+
+        StandPortraitOn(stage, entrant, place, blockPosition, blockSize, blockPosition.Y);
     }
 
     private static void AddFourthPlacePuddle(Control stage, RaceEntrant entrant, Vector2 position)
     {
-        var puddleSize = new Vector2(62, 14);
+        var puddleSize = new Vector2(62, 12);
         var puddlePosition = new Vector2(position.X - 8, position.Y + 41);
-        var puddle = new PanelContainer { Position = puddlePosition, Size = puddleSize };
+        var puddle = new Panel
+        {
+            Name = "PodiumPuddle",
+            Position = puddlePosition,
+            Size = puddleSize,
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        };
         var puddleStyle = new StyleBoxFlat
         {
             BgColor = Color.FromHtml("#7FC5C8"),
             BorderColor = Color.FromHtml("#5A9DA6")
         };
         puddleStyle.SetBorderWidthAll(1);
-        puddleStyle.CornerRadiusTopLeft = puddleStyle.CornerRadiusTopRight = 8;
-        puddleStyle.CornerRadiusBottomLeft = puddleStyle.CornerRadiusBottomRight = 8;
+        puddleStyle.SetCornerRadiusAll(6);
         puddle.AddThemeStyleboxOverride("panel", puddleStyle);
         stage.AddChild(puddle);
 
         // Fourth place stands in the puddle rather than on it.
-        StandPortraitOn(stage, entrant, puddlePosition, puddleSize, puddlePosition.Y + 6.0f, $"4th • {entrant.Participant.DisplayName}");
+        StandPortraitOn(stage, entrant, 4, puddlePosition, puddleSize, puddlePosition.Y + 5.0f);
+
+        var name = UiFactory.CreateLabel($"4  {entrant.Participant.DisplayName}", 6);
+        name.Size = new Vector2(70, 12);
+        name.Position = new Vector2(
+            puddlePosition.X + (puddleSize.X - 70.0f) * 0.5f,
+            puddlePosition.Y + puddleSize.Y + 2.0f);
+        name.HorizontalAlignment = HorizontalAlignment.Center;
+        name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        stage.AddChild(name);
     }
 
     /// <summary>
-    /// Places an entrant's portrait with its feet on <paramref name="groundY"/> and its name above
-    /// it, both centred on the award surface. The foot offset comes from the shared portrait pivot,
-    /// so new creature art cannot leave the podium standing in mid-air or sunk into the blocks.
+    /// Places an entrant's portrait with its feet on <paramref name="groundY"/>, centred on the award
+    /// surface. The foot offset comes from the shared portrait pivot, so new creature art cannot
+    /// leave the podium standing in mid-air or sunk into the blocks.
     /// </summary>
     private static void StandPortraitOn(
         Control stage,
         RaceEntrant entrant,
+        int place,
         Vector2 surfacePosition,
         Vector2 surfaceSize,
-        float groundY,
-        string? nameText = null)
+        float groundY)
     {
         var portrait = CreateEntrantPortrait(entrant, PodiumPortraitSize);
+        portrait.Name = $"PodiumPortrait{place}";
         portrait.Size = PodiumPortraitSize;
         portrait.Position = new Vector2(
             surfacePosition.X + (surfaceSize.X - PodiumPortraitSize.X) * 0.5f,
@@ -1405,15 +1510,48 @@ public partial class RaceScreen : Node2D
                 PodiumPortraitSize,
                 entrant.Participant.VisualTypeId));
         stage.AddChild(portrait);
-
-        var name = UiFactory.CreateLabel(nameText ?? entrant.Participant.DisplayName, 6);
-        name.Size = new Vector2(100, 14);
-        name.Position = new Vector2(
-            surfacePosition.X + (surfaceSize.X - name.Size.X) * 0.5f,
-            portrait.Position.Y - 12.0f);
-        name.HorizontalAlignment = HorizontalAlignment.Center;
-        stage.AddChild(name);
     }
+
+    /// <summary>A reward or record line: premium icon, then the text. Hidden until the owner fills it.</summary>
+    private static HBoxContainer BuildBadgeRow(string name, Texture2D icon, out Label label)
+    {
+        var row = new HBoxContainer
+        {
+            Name = name,
+            SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter,
+            Visible = false
+        };
+        row.AddThemeConstantOverride("separation", 5);
+        row.AddChild(new TextureRect
+        {
+            Texture = icon,
+            CustomMinimumSize = new Vector2(18, 18),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        });
+
+        label = UiFactory.CreateLabel(string.Empty, 9);
+        label.Name = "Text";
+        label.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        row.AddChild(label);
+        return row;
+    }
+
+    private static TextureRect StarBadge(float size) => new()
+    {
+        Texture = new AtlasTexture { Atlas = StarSheet, Region = new Rect2(48, 0, 32, 32) },
+        CustomMinimumSize = new Vector2(size, size),
+        Size = new Vector2(size, size),
+        ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+        StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+        SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+        MouseFilter = Control.MouseFilterEnum.Ignore
+    };
+
+    private static AtlasTexture RecordStar()
+        => new() { Atlas = StarInWood, Region = new Rect2(0, 0, 32, 32) };
 
     private static TextureRect CreateEntrantPortrait(RaceEntrant entrant, Vector2 size)
         => UiFactory.CreatePortrait(

@@ -53,18 +53,44 @@ public partial class GameSession
         RaiseGardenEvent(message);
     }
 
-    public bool BuyLandShape(string shapeId)
+    /// <summary>Starts a provisional land purchase; placement UI either commits or cancels it.</summary>
+    public string? BuyLandShape(string shapeId)
     {
-        var result = _training!.BuyLandShape(State, NewId(), shapeId);
+        var moduleId = NewId();
+        var result = _training!.BuyLandShape(State, moduleId, shapeId);
+        if (!result.Succeeded)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.ForGardenModule(result.Failure));
+            return null;
+        }
+
+        Save();
+        StateChanged?.Invoke();
+        return moduleId;
+    }
+
+    public void CommitLandPurchase(string moduleId)
+    {
+        var module = State.GardenModules.Find(candidate => candidate.Id == moduleId);
+        if (module == null)
+            return;
+
+        RecordDailyMissionEvent(DailyMissionEventKind.PurchaseShopItem);
+        SaveAndNotify("Bought a piece of land.");
+        if (!module.Placed)
+            RaiseGardenEvent("A new piece of land is waiting in your inventory.");
+    }
+
+    public bool CancelLandPurchase(string moduleId)
+    {
+        var result = _training!.CancelLandPurchase(State, moduleId);
         if (!result.Succeeded)
         {
             ToastRequested?.Invoke(PlayerActionFailureText.ForGardenModule(result.Failure));
             return false;
         }
 
-        RecordDailyMissionEvent(DailyMissionEventKind.PurchaseShopItem);
-        SaveAndNotify("Bought a piece of land.");
-        RaiseGardenEvent("A new piece of land is waiting in your inventory.");
+        SaveAndNotify("Land purchase cancelled.");
         return true;
     }
 

@@ -11,6 +11,8 @@ public partial class GardenController
 
     private Timer? _gardenEnvironmentTimer;
     private Tween? _gardenEnvironmentTween;
+    public DateTime EnvironmentLocalTime { get; private set; } = DateTime.Now;
+    public event Action<DateTime>? EnvironmentTimeChanged;
 
     private void InstallGardenEnvironmentPresentation()
     {
@@ -36,6 +38,8 @@ public partial class GardenController
 
     private void ApplyGardenEnvironment(DateTime localTime, bool immediate)
     {
+        EnvironmentLocalTime = localTime;
+        EnvironmentTimeChanged?.Invoke(localTime);
         var target = GardenEnvironmentPalette.Resolve(localTime);
         if (ColorsApproximatelyEqual(Modulate, target))
             return;

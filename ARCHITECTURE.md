@@ -346,6 +346,8 @@ MainController / ModalHost
 
 Standalone screens receive presentation-ready state and emit intent; they do not reach through a global session locator. `GameSession.Instance` has been removed and CI forbids its return.
 
+The Garden's `GardenInspector` consumes the existing immutable creature profile projection and emits care/navigation intent. Its controls remain alive across simulation updates so text editing and keyboard focus are preserved. `MainController` owns the manager's rail and modal return sequencing; layout changes do not pause Garden simulation or change application rules.
+
 `UiFactory` should remain reusable styling/widget construction. It must not become another controller or service locator.
 
 ## Garden architecture

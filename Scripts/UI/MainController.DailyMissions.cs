@@ -8,7 +8,7 @@ public partial class MainController
     private void ShowDailyMissions()
     {
         var status = _session.GetDailyMissionStatus();
-        var box = OpenModal("Daily missions", new Vector2(438, 244));
+        var box = OpenModal(Tr("UI_GARDEN_MISSIONS"), new Vector2(438, 244), ShowGardenActivities);
         box.AddThemeConstantOverride("separation", 5);
 
         var intro = UiFactory.CreateLabel(
@@ -21,11 +21,11 @@ public partial class MainController
         foreach (var mission in status.Missions)
             box.AddChild(CreateDailyMissionRow(mission));
 
-        var back = UiFactory.CreateButton("Back to Shop");
+        var back = UiFactory.CreateButton(Tr("UI_GARDEN_ACTIVITIES"));
         back.CustomMinimumSize = new Vector2(112, 22);
         back.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd;
         UiFactory.ApplyPixelFont(back, 7);
-        back.Pressed += RenderShop;
+        back.Pressed += ShowGardenActivities;
         box.AddChild(back);
     }
 
