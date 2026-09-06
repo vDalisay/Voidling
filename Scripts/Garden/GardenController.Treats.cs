@@ -303,6 +303,18 @@ public partial class GardenController
     internal int ChasingCountForProbe()
         => _actors.Values.Count(actor => GodotObject.IsInstanceValid(actor) && actor.IsChasingTreat);
 
+    internal (int Q, int R) HexUnderForProbe(Vector2 position) => Hex.At(position.X, position.Y);
+
+    internal Vector2 HexCenterForProbe((int Q, int R) hex)
+    {
+        var (x, y) = Hex.CenterOf(hex.Q, hex.R);
+        return new Vector2(x, y);
+    }
+
+    internal float HexInnerRadiusForProbe() => Hex.InnerRadius;
+
+    internal Vector2 ClampToLandForProbe(Vector2 position) => ClampToLand(position);
+
     internal bool AnyVoidlingEatingForProbe()
         => _actors.Values.Any(actor => GodotObject.IsInstanceValid(actor) && actor.IsEating);
 

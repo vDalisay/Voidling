@@ -303,3 +303,22 @@ and never the other's; the visual, race-presentation, race-completion, family-tr
 persistence-recovery probes; `git diff --check`.
 
 Review capture: [split egg categories](ui-overhaul/inventory-eggs.png).
+
+## Garden roaming fix
+
+A Voidling standing on plain ground could not leave the hex it was on. `ClampToLand` treated a
+position over placed ground by pulling it to within 60% of *that hex's* inner radius, so every step
+toward a neighbouring hex was yanked back toward the middle of the current one. The Voidling orbited
+a small disc, and because the movement loop repaths whenever the clamp moves it, it also repeatedly
+picked new targets it could never reach.
+
+A point over any placed hex is on land, so it is now left where it is. Only a point that has actually
+left the island is pulled back, to the nearest ground it can stand on, which is what turns a Voidling
+around at the shoreline. Training grounds are untouched: a trainee is held by its tile radius in
+`ClampToWanderArea` before the land clamp is ever consulted.
+
+The Garden smoke checks the clamp directly rather than waiting on a random walk: for every placed
+hex, a point out at 90% of the inner radius must not come back inside the old 60% disc, a point far
+off the island must still land on placed ground, and a real free-roaming Voidling must reach past
+that disc within ten seconds. Reverting the one-line clamp change fails the first of those, so the
+check is known to catch the regression rather than merely passing beside it.

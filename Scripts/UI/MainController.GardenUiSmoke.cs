@@ -296,6 +296,7 @@ public partial class MainController
                     !modalControls.Contains(control.GetNode<Control>(control.FocusPrevious)))
                     throw new InvalidOperationException("Tab navigation escapes the modal.");
             }
+            await VerifyFreeRoaming();
             await VerifyTreatDrop();
             await VerifyEggCategories();
             await CaptureGardenUi("garden-menu");
@@ -736,6 +737,57 @@ public partial class MainController
         // This check runs inside the Garden menu sequence, so hand that menu back to it.
         ShowGardenMenu();
         await SettleGardenUi();
+    }
+
+    /// <summary>
+    /// A Voidling on plain ground owns the whole island. It used to be pinned inside a disc at the
+    /// middle of whichever hex it stood on, so the land clamp is checked directly — a point out at
+    /// the rim of placed ground has to survive it — and then a real Voidling is watched reaching
+    /// ground that disc never let it touch.
+    /// </summary>
+    private async Task VerifyFreeRoaming()
+    {
+        var innerRadius = _garden.HexInnerRadiusForProbe();
+        // The radius the old clamp held every free-roaming Voidling inside.
+        var oldLimit = innerRadius * 0.6f;
+
+        foreach (var module in _session.State.GardenModules.Where(module => module.Placed))
+        {
+            var center = _garden.HexCenterForProbe((module.HexQ, module.HexR));
+            for (var step = 0; step < 6; step++)
+            {
+                var rim = center + Vector2.Right.Rotated(Mathf.Tau * step / 6.0f) * (innerRadius * 0.9f);
+                // Trees still push a Voidling aside, so the contract is that the rim stays reachable
+                // ground, not that the clamp is the identity function.
+                var clamped = _garden.ClampToLandForProbe(rim);
+                if (center.DistanceTo(clamped) <= oldLimit && _garden.HexUnderForProbe(rim) == (module.HexQ, module.HexR))
+                    throw new InvalidOperationException(
+                        $"Land clamp pulled ({rim.X:0},{rim.Y:0}) back into the centre of hex " +
+                        $"({module.HexQ},{module.HexR}); plain ground is confining Voidlings again.");
+            }
+        }
+
+        // Off the island is still off the island.
+        var faraway = _garden.ClampToLandForProbe(new Vector2(9000, 9000));
+        if (!_session.State.GardenModules.Any(module =>
+                module.Placed && _garden.HexUnderForProbe(faraway) == (module.HexQ, module.HexR)))
+            throw new InvalidOperationException("The land clamp let a position stay off the island.");
+
+        var creature = _session.State.Voidlings.First(candidate => candidate.PassiveTrainingModuleId.Length == 0);
+        var startCenter = _garden.HexCenterForProbe(
+            _garden.HexUnderForProbe(_garden.ActorPositionForProbe(creature.Id)));
+        var reached = 0.0f;
+        var deadline = Time.GetTicksMsec() + 10000;
+        while (Time.GetTicksMsec() < deadline && reached <= oldLimit)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            reached = Mathf.Max(reached, startCenter.DistanceTo(_garden.ActorPositionForProbe(creature.Id)));
+        }
+
+        if (reached <= oldLimit)
+            throw new InvalidOperationException(
+                $"A Voidling on plain ground stayed inside its hex's centre disc: reached {reached:0.#}px " +
+                $"of the {oldLimit:0.#}px the old clamp allowed.");
     }
 
     private RaceEntryScreen FindRaceEntry()
