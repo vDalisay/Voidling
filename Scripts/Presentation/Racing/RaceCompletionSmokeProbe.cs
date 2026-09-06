@@ -10,15 +10,17 @@ using VoidlingGame;
 namespace Voidling.Presentation.Racing;
 
 /// <summary>
-/// Headless CI probe that races a real RaceScreen to the finish line and requires the results
-/// screen to appear with a working return control.
+/// Headless CI probe that races a real RaceScreen to the finish line and requires the results card
+/// to appear on screen, complete, with a working return control.
 ///
 /// Guards the freeze where the simulation completed but the podium never rendered, leaving the
-/// player stuck on a motionless track with no way back to the Garden.
+/// player stuck on a motionless track with no way back to the Garden, and guards a reward being
+/// applied twice: the probe keeps the finished race processing and requires the owner to have been
+/// told exactly once.
 ///
-/// It also holds the live HUD to the "creature first" layout: the four groups exist, stay inside the
-/// viewport, never overlap each other, the player's portrait, place, stamina and Cheer stay together
-/// in one group, and the standings actually rank the field with the player's own row marked.
+/// It also holds the live HUD to its corner layout and requires the standings to track the player.
+///
+/// Add <c>--voidling-race-results-shot</c> with a graphical renderer to also save a review capture.
 /// </summary>
 public partial class RaceCompletionSmokeProbe : Node
 {
@@ -26,11 +28,19 @@ public partial class RaceCompletionSmokeProbe : Node
     // real 40-second race.
     private const double TimeScale = 40.0;
     private const double BudgetSeconds = 40.0;
+    private const string ShotPath = "res://.godot/ui-checks/race-results.png";
+
+    /// <summary>Sprouts the probe pretends the owner awarded, so the reward line has to render.</summary>
+    private const int ProbeReward = 12;
 
     public override async void _Ready()
     {
         try
         {
+            var capture = Array.Exists(
+                OS.GetCmdlineUserArgs(),
+                arg => string.Equals(arg, "--voidling-race-results-shot", StringComparison.OrdinalIgnoreCase));
+
             var rules = GameBalanceRules.DemoDefaults;
             var racer = new VoidlingData
             {
@@ -42,17 +52,29 @@ public partial class RaceCompletionSmokeProbe : Node
 
             var entry = new RaceEntryFactory(rules).Create(racer, 4242UL, RaceCourseCatalog.Demo);
             var completedPlacement = 0;
+            var completions = 0;
             var returnRequested = false;
 
             var race = new RaceScreen();
             race.Configure(entry, autoFinish: true);
-            race.RaceCompleted += placement => completedPlacement = placement;
+            race.RaceCompleted += placement =>
+            {
+                completions++;
+                completedPlacement = placement;
+
+                // Stands in for MainController's one-time reward and course-record handling.
+                race.PresentOutcome(ProbeReward, newCourseRecord: true);
+            };
             race.ReturnRequested += () => returnRequested = true;
             AddChild(race);
             // Containers only resolve their rects once layout has run, so settle before measuring.
             for (var frame = 0; frame < 6; frame++)
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             ValidateHudLayout(race);
+
+            // The menu scene would otherwise sit on top of the card in a rendered capture.
+            if (capture)
+                GetTree().CurrentScene?.QueueFree();
 
             Engine.TimeScale = TimeScale;
             var startedMsec = Time.GetTicksMsec();
@@ -66,9 +88,69 @@ public partial class RaceCompletionSmokeProbe : Node
             if (completedPlacement <= 0)
                 throw new InvalidOperationException("Race completion never reported a placement to its owner.");
 
-            var returnButton = FindReturnButton(race)
+            // Let the finished race keep processing. A second completion here would be a second
+            // reward, so the probe holds the card open well past the finish before checking.
+            for (var frame = 0; frame < 90; frame++)
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+            if (completions != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Race completion was reported {completions} times; the reward must be applied exactly once.");
+            }
+
+            var overlay = race.GetChildren()
+                .OfType<CanvasLayer>()
+                .FirstOrDefault(layer => layer.Layer == RaceScreen.ResultsCanvasLayer)
                 ?? throw new InvalidOperationException(
-                    "Race finished but the results screen has no return control, so the player is stranded on the track.");
+                    "Race finished but there is no results overlay, so the player is stranded on the track.");
+
+            if (overlay.Name != RaceScreen.ResultsCanvasName)
+                throw new InvalidOperationException($"The results overlay is named '{overlay.Name}'.");
+
+            var card = Require<Control>(overlay, RaceScreen.ResultsCardName);
+            Require<Control>(overlay, RaceScreen.ResultsHeadlineName);
+            Require<Control>(overlay, RaceScreen.ResultsPodiumName);
+            var placement = Require<Label>(overlay, RaceScreen.ResultsPlacementName);
+            var reward = Require<Control>(overlay, RaceScreen.ResultsRewardName);
+            var record = Require<Control>(overlay, RaceScreen.ResultsRecordName);
+            var returnButton = Require<Button>(overlay, RaceScreen.ResultsReturnName);
+
+            if (string.IsNullOrWhiteSpace(placement.Text) ||
+                placement.Text.Contains("UI_RACE", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"The results card shows no readable placement: '{placement.Text}'.");
+            }
+
+            if (!reward.Visible)
+                throw new InvalidOperationException("The awarded reward is not shown on the results card.");
+
+            if (reward.FindChild("Text", true, false) is not Label rewardText ||
+                !rewardText.Text.Contains(ProbeReward.ToString(), StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The reward line does not report the sprouts that were awarded.");
+            }
+
+            if (!record.Visible)
+                throw new InvalidOperationException("A new course record was set but the results card does not say so.");
+
+            // Bounds: the card, and every part of it the player has to read or press, stays inside
+            // the viewport rather than hanging off an edge.
+            var screen = new Rect2(Vector2.Zero, GetViewport().GetVisibleRect().Size);
+            foreach (var control in new Control[] { card, placement, reward, record, returnButton })
+            {
+                var rect = control.GetGlobalRect();
+                if (!screen.Encloses(rect))
+                    throw new InvalidOperationException($"Results control '{control.Name}' at {rect} is off screen {screen}.");
+            }
+
+            if (capture)
+            {
+                await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+                DirAccess.MakeDirRecursiveAbsolute(ProjectSettings.GlobalizePath(ShotPath).GetBaseDir());
+                GetViewport().GetTexture().GetImage().SavePng(ShotPath);
+                GD.Print($"[race-completion-smoke] wrote {ProjectSettings.GlobalizePath(ShotPath)}");
+            }
 
             returnButton.EmitSignal(BaseButton.SignalName.Pressed);
             if (!returnRequested)
@@ -222,4 +304,7 @@ public partial class RaceCompletionSmokeProbe : Node
 
         return null;
     }
+    private static T Require<T>(Node overlay, string name) where T : Node
+        => overlay.FindChild(name, true, false) as T
+           ?? throw new InvalidOperationException($"The results card has no {typeof(T).Name} named '{name}'.");
 }

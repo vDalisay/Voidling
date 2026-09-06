@@ -474,6 +474,15 @@ msgstr "Race complete!"
 msgid "UI_RACE_RESULT_PLACE"
 msgstr "You placed #{0}"
 
+msgid "UI_RACE_RESULT_EYEBROW"
+msgstr "{0} · RESULTS"
+
+msgid "UI_RACE_RESULT_REWARD"
+msgstr "+{0} sprouts"
+
+msgid "UI_RACE_RESULT_NEW_RECORD"
+msgstr "New course record!"
+
 msgid "UI_RACE_PAUSED"
 msgstr "RACE PAUSED"
 

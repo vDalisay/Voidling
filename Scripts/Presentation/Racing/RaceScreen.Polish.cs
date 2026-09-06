@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using Godot;
 using VoidlingGame;
 
@@ -28,59 +26,26 @@ public partial class RaceScreen
         }
     }
 
+    /// <summary>
+    /// Pops the finished card in and throws confetti (or one sweat drop for last place). It only
+    /// animates named nodes the card built; it never rewrites the card's text.
+    /// </summary>
     private void PolishResultPresentation()
     {
-        if (_simulation == null || _entry == null)
+        if (_entry == null)
             return;
 
-        var canvas = GetChildren()
-            .OfType<CanvasLayer>()
-            .FirstOrDefault(layer => layer.Layer == 50);
-        if (canvas == null)
+        var canvas = GetNodeOrNull<CanvasLayer>(ResultsCanvasName);
+        if (canvas?.FindChild(ResultsCardName, true, false) is not Control card)
             return;
 
-        var panel = FindDescendant<PanelContainer>(canvas, candidate =>
-            candidate.CustomMinimumSize.X >= 500.0f && candidate.CustomMinimumSize.Y >= 280.0f);
-        if (panel == null)
-            return;
-
-        var selectedPlace = _simulation.FinishOrder.IndexOf(_playerId) + 1;
-        if (selectedPlace <= 0)
-            selectedPlace = _entry.Entrants.Count;
-        var isLast = selectedPlace == _entry.Entrants.Count;
-
-        var title = FindDescendant<Label>(panel, label =>
-            label.Text.StartsWith("RACE RESULTS", StringComparison.Ordinal));
-        if (title != null)
-        {
-            title.Text = selectedPlace == 1
-                ? Tr("UI_RACE_RESULT_WIN")
-                : isLast
-                    ? Tr("UI_RACE_RESULT_LAST")
-                    : Tr("UI_RACE_RESULT_COMPLETE");
-
-            if (title.GetParent() is VBoxContainer box)
-            {
-                var placement = UiFactory.CreateLabel(
-                    string.Format(Tr("UI_RACE_RESULT_PLACE"), selectedPlace),
-                    8);
-                placement.HorizontalAlignment = HorizontalAlignment.Center;
-                box.AddChild(placement);
-                box.MoveChild(placement, title.GetIndex() + 1);
-            }
-        }
-
-        var returnButton = FindDescendant<Button>(panel, button =>
-            string.Equals(button.Text, "Return to Garden", StringComparison.Ordinal));
-        if (returnButton != null)
-            returnButton.Text = Tr("UI_RACE_RETURN");
-
-        AnimateResultPanel(panel, isLast);
+        var isLast = _resultPlace >= _entry.Entrants.Count;
+        AnimateResultPanel(card, isLast);
 
         if (isLast)
             SpawnAnimeSweatDrop(canvas);
         else
-            SpawnCelebrationParticles(canvas, selectedPlace == 1 ? 38 : 24);
+            SpawnCelebrationParticles(canvas, _resultPlace == 1 ? 38 : 24);
     }
 
     private void AnimateResultPanel(Control panel, bool isLast)
@@ -219,20 +184,6 @@ public partial class RaceScreen
         fall.Finished += drop.QueueFree;
     }
 
-    private static T? FindDescendant<T>(Node root, Func<T, bool> predicate) where T : Node
-    {
-        foreach (var child in root.GetChildren())
-        {
-            if (child is T match && predicate(match))
-                return match;
-
-            var nested = FindDescendant(child, predicate);
-            if (nested != null)
-                return nested;
-        }
-
-        return null;
-    }
 }
 
 internal sealed partial class RaceScreenPolishDriver : Node

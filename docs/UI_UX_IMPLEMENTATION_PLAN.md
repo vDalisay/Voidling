@@ -1,6 +1,6 @@
 # Selected UI overhaul — staged implementation
 
-Status: **Stages 1–4 implemented and verified; waiting for race-entry and live-race player testing.** Each subsequent screen waits for the previous screen's player test.
+Status: **Stages 1–3 and 5 implemented and verified; waiting for race-entry and results player testing.** Each subsequent screen waits for the previous screen's player test.
 
 Branch: `codex/ui-overhaul-managers-rail`  
 Workspace: `C:/Users/Home/Documents/Voidling-ui-overhaul`  
@@ -274,74 +274,56 @@ record keeping), architecture/localization checks, `git diff --check`, Godot imp
 runtime, and the Garden UI, Voidling visual, race presentation, race completion, family tree and
 persistence recovery probes.
 
-## Stage 4 handoff
+## Stage 5 handoff
 
-Implemented the option 05 "creature first" live-race HUD. The race world keeps the screen; the chrome
-is now four named premium panels around it:
+Implemented the option 01 Classic dock results card over the finished race. The podium is now built
+from premium art rather than flat rectangles: gold, silver and bronze blocks use the Sprout Lands
+panel chrome, the winner's block carries a gold star from `Icons/special icons/stars.png`, the
+headline sits on an amber plaque flanked by stars on a win, the reward line uses the farming sprout
+icon, and a new course record shows the wood-framed star from `stars in wood.png`. Portraits still
+stand on their blocks through the shared portrait pivot, so new creature art cannot leave a finisher
+floating or sunk.
 
-- **Bottom centre — the player.** One group holding the portrait, the name, the live place
-  (`3rd of 4`), the premium stamina dial and bar with its numbers, and a large green Cheer action.
-  Everything the player acts on is in one place instead of split between a bottom-left box and a
-  bottom-right strip.
-- **Right — opponent standings.** A positional `POSITIONS` list: finishers keep the order they
-  actually finished in, everyone still racing is ranked by distance along the course, and the
-  player's own row is highlighted and marked `YOU` rather than repeating an ordinal.
-- **Bottom left — course progress.** The course strip now draws the authored segments in their own
-  colours (the same colours the race-entry `CourseMinimap` uses) with every racer's dot on it, under
-  a `34% · SWIM` readout and between Start and Finish posts.
-- **Top left — the race banner.** `LOCAL RACE` / `ONLINE RACE`, the course's own name, and the
-  section being raced. The old centred `SPROUT RUN` title is gone, and a small non-interactive
-  `ESC · Menu` reminder sits top right.
+The card now reads: course eyebrow, outcome headline, podium, `You placed #N · time`, the reward that
+was granted, the new-record badge when one was set, and one green **Return to Garden** action that
+takes focus. Every part is a named node (`ResultsCard`, `ResultsHeadline`, `ResultsPodium`,
+`ResultsPlacement`, `ResultsReward`, `ResultsRecord`, `ResultsReturn`) so the CI probe can assert the
+layout instead of matching English text.
 
-The premium art carries it rather than flat rectangles: `UiFactory.CreatePanel` chrome with tighter
-content margins for the small viewport, `UiFactory.ApplyPrimaryStyle` on Cheer, and the premium
-`Stamina circle with black outline` sheet as a 37-frame radial dial that fills and changes colour
-with the racer's stamina.
+Three things beyond the layout were needed:
 
-### Deliberately unchanged
+- `RaceScreen.PresentOutcome(reward, newCourseRecord)` lets the owner report what it already applied.
+  `MainController.OnRaceCompleted` keeps its single reward/record call and passes the results back;
+  the card never awards anything itself. `RecordCourseFinish` now returns whether the run became the
+  record — the persistence added in stage 3 is read, not extended.
+- `RaceScreen.Polish.cs` used to find the results title and return button by their English text and
+  rewrite them after the fact. That is deleted: the card builds its own localized text and Polish
+  only animates the named card and throws the confetti or the sweat drop.
+- Race times had two copies of the same formatter. `RaceScreen.FormatMilliseconds` is now the single
+  one, so the time on the results card and the time filed as a course record cannot disagree.
 
-The race simulation, fixed-step determinism, seeds, rewards, telemetry, results podium, completion
-callback and the local and online exit/pause semantics are untouched — Escape still opens the pause
-menu on its own layer, quitting still raises `ReturnRequested`, and the multiplayer lockstep bridge,
-cheer request and sync-fault strip behave exactly as before. No save schema, economy, genetics or
-balance change. The HUD only reads the snapshots the screen already had.
+Deliberately unchanged: **Race again** is not added — it is illustrative in the mockup and not
+approved. The in-race HUD is untouched, so stage 4 merges cleanly. Rewards, the one-time
+`_completionReported` guard, daily-race leaderboard handling, multiplayer results and both local and
+online return paths are exactly as they were; a multiplayer or daily race simply shows no reward line
+because none is granted. No save schema, economy, genetics or race-simulation change.
 
-Two presentation-only judgement calls worth a look during the playtest:
+Review captures: [results, last place with reward and record](ui-overhaul/race-results.png),
+[results, win headline](ui-overhaul/race-results-win.png). The win capture was produced by forcing
+the placement for review only; that change is not in the branch.
 
-- **The `ESC · Menu` chip is a label, not a button.** Garden feedback removed the visible Escape
-  button, and a clickable control in that corner would sit under the pointer during the skippable
-  opening flyover. Say the word if it should be pressable.
-- **Standings show `Lead` for first place and `YOU` for the player's row**, following the mockup, so
-  the player's own row never states its ordinal twice. The ordinal is in the bottom-centre group.
-
-Review captures: [running section](ui-overhaul/live-race.png), [swim section](ui-overhaul/live-race-swim.png).
-
-### Launch the live-race playtest
+### Launch the results playtest
 
 From this workspace in PowerShell:
 
 ```powershell
-.\playgame.bat --no-build --voidling-dev-profile=ui_overhaul_live_race_playtest
+.\playgame.bat --no-build --voidling-dev-profile=ui_overhaul_results_playtest
 ```
 
-Open **Races** from the left rail, pick a course and racer, and start the race.
-
-## Live race player checklist
-
-- Watch the bottom-centre group through a whole race: name, place, stamina numbers and the dial
-  should all follow the same creature, and Cheer should grey out while cheering and when stamina is
-  below the cheer cost.
-- Cheer at least twice and confirm the dial and bar drop together and recover together.
-- Watch the standings reorder as racers pass each other; your row should stay highlighted and marked
-  `YOU` wherever it sits, and finishers should hold their finishing order.
-- Watch the banner's section line and the bottom-left percentage change as you cross into the swim,
-  climb and glide stretches.
-- Press Escape mid-race: the pause menu should open over the HUD, Resume should return to the same
-  race, and Quit should return to the Garden.
-- Finish a race: the podium should cover the HUD and Return to Garden should still work.
-- Run an online race and confirm the banner reads ONLINE RACE and the standings follow both peers.
-- Verify the HUD stays readable at 1280×720 and a larger desktop window, and that the world is never
-  hidden behind a group.
+Race from **Races** on the left rail and finish a course. Check that the placement, the sprouts you
+were actually given and the return action are all obvious, that a faster run shows the new-record
+badge and a slower one does not, that the sprout balance moves exactly once, and that Return to
+Garden works from a local race and from an online one.
 
 ### Verification completed
 
@@ -349,24 +331,21 @@ Local environment: Windows, .NET 8, Godot 4.6.1 Mono (CI uses Linux/Godot 4.6.0)
 
 | Check | Result |
 |---|---|
-| Restore; Debug and Release builds | Pass; the two pre-existing `TradeNegotiationCoordinator` warnings remain |
-| `dotnet test Tests/Voidling.Tests.csproj -c Release` | 241 passed, zero failures |
-| Architecture and canonical creature-art greps from `ci.yml` | Pass |
-| Localization source; every new HUD key resolves | Pass |
-| `godot --headless --path . --import` | Pass |
-| `godot --headless --path . --quit-after 30` | Pass; no ERROR/SCRIPT ERROR lines |
-| Garden UI smoke (`ci_garden_ui` profile) | Pass |
-| Race presentation smoke | Pass; now also asserts the HUD's own strings are authored |
-| Race completion smoke | Pass; now also asserts the HUD layout and readouts |
-| Rendered live-race review at 1280×720 | Pass |
+| Debug and Release builds | Pass; the two existing `TradeNegotiationCoordinator` warnings only |
+| `dotnet test` (Release) | 241 passed, zero failures |
+| Architecture, canonical creature-art and localization greps | Pass |
+| Godot import and main-scene runtime | Pass; no ERROR/SCRIPT ERROR lines |
+| Garden UI smoke | Pass |
+| Race completion smoke, extended | Pass — named nodes, on-screen bounds, reward text, record badge, return action, and one single completion callback after 90 further frames |
+| Race presentation, Voidling visual, family tree, persistence recovery smoke | Pass |
+| Rendered results review at 1280×720 | Pass for last place and for a win |
 | `git diff --check` | Pass |
 
-The race completion probe was extended the way `MainController.GardenUiSmoke.cs` covers the Garden
-and Shop. It now requires each named HUD group (`RaceHudBanner`, `RaceHudMenuHint`,
-`RaceHudStandings`, `RaceHudCourse`, `RaceHudPlayer`) to exist with a usable size, stay inside the
-viewport and never intersect another group; requires the player's group to hold the portrait, name,
-place, stamina dial, stamina bar and a keyboard-accessible Cheer together; and, after the race has
-run, requires every standings row to name a racer with exactly one row marked as the player, plus a
-filled place and course-progress readout. The presentation probe covers the new localization keys
-through `RaceCoursePresentationCatalog.AllKeys()`, so a missing HUD string fails CI rather than
-showing a raw key.
+The reusable results check is:
+
+```text
+godot --headless --path . -- --voidling-race-completion-smoke
+```
+
+Add `--voidling-race-results-shot` with a graphical renderer to write the review capture to
+`.godot/ui-checks/race-results.png`.

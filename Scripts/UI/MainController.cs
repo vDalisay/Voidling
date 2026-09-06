@@ -562,15 +562,21 @@ public partial class MainController : Node
     private void OnRaceCompleted(int placement)
     {
         _gardenEventLog.Append(string.Format(Tr("UI_GARDEN_LOG_RACE_RESULT"), placement));
-        _session.ApplyRacePlacementReward(placement);
+        var reward = _session.ApplyRacePlacementReward(placement);
+        var newCourseRecord = false;
 
         if (_race != null &&
             GodotObject.IsInstanceValid(_race) &&
             _race.TryGetPlayerFinishMilliseconds(out var finishedMilliseconds))
         {
-            RecordCourseFinish(finishedMilliseconds);
+            newCourseRecord = RecordCourseFinish(finishedMilliseconds);
             ProjectSinglePlayerCourseBestTime(finishedMilliseconds);
         }
+
+        // The results card reports what was granted here; it never grants anything itself, so this
+        // one-time handler stays the only place a race reward and a course record are applied.
+        if (_race != null && GodotObject.IsInstanceValid(_race))
+            _race.PresentOutcome(reward, newCourseRecord);
     }
 
     private void EndRace()
