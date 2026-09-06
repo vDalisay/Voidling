@@ -48,6 +48,25 @@ public sealed class PlayerInformationProjectionTests
         Assert.Equal(LineageRiskBand.Moderate, projection.LineageRisk);
     }
 
+    [Fact]
+    public void CreatureProfile_IncludesLivePassiveTrainingRemainderInProgress()
+    {
+        var state = new GameStateData();
+        var creature = CreateCreature("training");
+        creature.TrainingPoints["run"] = 5;
+        creature.PassiveTrainingStatId = "run";
+        creature.PassiveTrainingPointsPerMinute = 3;
+        creature.PassiveTrainingModuleId = "run-ground";
+        creature.PassiveTrainingPointRemainder = 0.5;
+        state.Voidlings.Add(creature);
+
+        var run = new CreatureProfileProjectionService(Rules).Create(state, creature.Id)!.Stats
+            .Single(stat => stat.StatId == "run");
+
+        Assert.InRange(run.TrainingProgress, 5.49 / 12.0, 5.51 / 12.0);
+        Assert.Equal(0.05, run.TrainingPointsPerSecond, 3);
+    }
+
     [Theory]
     [InlineData(0, LineageRiskBand.None)]
     [InlineData(1, LineageRiskBand.Low)]

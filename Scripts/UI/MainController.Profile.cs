@@ -51,7 +51,6 @@ public partial class MainController : Node
                 _garden.ToggleFollowVoidling(creatureId);
                 RebuildDetailsPanel();
             };
-            inspector.StopTrainingRequested += () => _session.StopPassiveTraining(creatureId);
             _detailsPanel = inspector;
             _uiRoot.AddChild(inspector);
         }

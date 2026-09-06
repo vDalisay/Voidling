@@ -18,19 +18,17 @@ public partial class GardenInspector : PanelContainer
     public event Action? DetailsRequested;
     public event Action? FamilyRequested;
     public event Action? FollowRequested;
-    public event Action? StopTrainingRequested;
 
     private LineEdit _name = null!;
     private Label _stage = null!;
     private Label _care = null!;
     private Label _favorite = null!;
-    private Label _training = null!;
     private Button _follow = null!;
     private Button _treat = null!;
-    private Button _stop = null!;
     private TextureRect _portrait = null!;
     private CreatureProfileProjection _visualProfile = null!;
-    private readonly Dictionary<string, (Label rank, Label level)> _stats = new();
+    private readonly Dictionary<string, (Label rank, Label level, Label rate, ProgressBar progress, StyleBoxFlat background)> _stats = new();
+    private string _trainingStat = string.Empty;
     public string CreatureId { get; private set; } = string.Empty;
 
     public void Build(CreatureProfileProjection profile)
@@ -86,21 +84,34 @@ public partial class GardenInspector : PanelContainer
         _favorite.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
         box.AddChild(_favorite);
 
-        var table = new GridContainer { Columns = 3, SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        table.AddThemeConstantOverride("h_separation", 8);
-        table.AddThemeConstantOverride("v_separation", 2);
-        foreach (var key in new[] { "UI_PROFILE_TRAINED_STAT", "UI_PROFILE_RANK", "UI_PROFILE_LEVEL" })
-            table.AddChild(UiFactory.CreateLabel(Tr(key), 8));
+        var table = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        table.AddThemeConstantOverride("separation", 2);
+        table.AddChild(CreateStatRow(
+            UiFactory.CreateLabel(Tr("UI_PROFILE_TRAINED_STAT"), 7),
+            UiFactory.CreateLabel(Tr("UI_PROFILE_RANK"), 7),
+            UiFactory.CreateLabel(Tr("UI_PROFILE_LEVEL"), 7)));
         foreach (var stat in profile.Stats)
         {
             var label = UiFactory.CreateLabel(StatPresentationCatalog.NameFor(stat.StatId), 8);
-            label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-            table.AddChild(label);
+            label.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(stat.StatId));
+            label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
+            label.AddThemeConstantOverride("outline_size", 1);
+            var statName = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+            statName.AddThemeConstantOverride("separation", 3);
+            statName.AddChild(label);
+            var rate = UiFactory.CreateLabel(string.Empty, 6);
+            rate.Name = "Rate_" + stat.StatId;
+            rate.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            statName.AddChild(rate);
             var rank = UiFactory.CreateLabel(string.Empty, 8);
             var level = UiFactory.CreateLabel(string.Empty, 8);
-            table.AddChild(rank);
-            table.AddChild(level);
-            _stats.Add(stat.StatId, (rank, level));
+            var block = new VBoxContainer();
+            block.AddThemeConstantOverride("separation", 1);
+            block.AddChild(CreateStatRow(statName, rank, level));
+            var (progress, background) = CreateProgressBar(stat.StatId);
+            block.AddChild(progress);
+            table.AddChild(block);
+            _stats.Add(stat.StatId, (rank, level, rate, progress, background));
         }
         box.AddChild(table);
         var actions = new GridContainer { Columns = 2 };
@@ -123,16 +134,19 @@ public partial class GardenInspector : PanelContainer
         _follow.ToggleMode = true;
         actions.AddChild(_follow);
         box.AddChild(actions);
-        var training = new HBoxContainer();
-        _training = UiFactory.CreateLabel(string.Empty, 8);
-        _training.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        _training.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        _training.TooltipText = Tr("UI_PROFILE_PASSIVE_HINT");
-        training.AddChild(_training);
-        _stop = MakeButton("StopTraining", "UI_PROFILE_PASSIVE_STOP", () => StopTrainingRequested?.Invoke());
-        _stop.CustomMinimumSize = new Vector2(34, 19);
-        training.AddChild(_stop);
-        box.AddChild(training);
+    }
+
+    public override void _Process(double delta)
+    {
+        var pulse = (Mathf.Sin((float)Time.GetTicksMsec() / 240.0f) + 1.0f) * 0.5f;
+        foreach (var (statId, view) in _stats)
+        {
+            var active = string.Equals(statId, _trainingStat, StringComparison.Ordinal);
+            view.background.SetBorderWidthAll(active ? 1 : 0);
+            var border = StatPresentationCatalog.ColorFor(statId);
+            border.A = 0.45f + pulse * 0.45f;
+            view.background.BorderColor = border;
+        }
     }
 
     public void FocusCare() => _treat.GrabFocus();
@@ -164,12 +178,46 @@ public partial class GardenInspector : PanelContainer
         {
             _stats[stat.StatId].rank.Text = stat.InheritedRank;
             _stats[stat.StatId].level.Text = string.Format(Tr("UI_PROFILE_LEVEL_VALUE"), stat.TrainingLevel);
+            _stats[stat.StatId].progress.Value = stat.TrainingProgress;
+            _stats[stat.StatId].rate.Visible = stat.TrainingPointsPerSecond > 0;
+            _stats[stat.StatId].rate.Text = stat.TrainingPointsPerSecond > 0
+                ? string.Format(Tr("UI_PROFILE_EXP_PER_SECOND"), stat.TrainingPointsPerSecond)
+                : string.Empty;
         }
         _follow.SetPressedNoSignal(following);
-        _stop.Visible = trainingStat.Length > 0;
-        _training.Text = trainingStat.Length > 0
-            ? string.Format(Tr("UI_PROFILE_PASSIVE_ON"), StatPresentationCatalog.NameFor(trainingStat))
-            : Tr("UI_PROFILE_PASSIVE_OFF");
+        _trainingStat = trainingStat;
+    }
+
+    private static HBoxContainer CreateStatRow(Control name, Control rank, Control level)
+    {
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 4);
+        name.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        rank.CustomMinimumSize = new Vector2(24, 0);
+        level.CustomMinimumSize = new Vector2(29, 0);
+        row.AddChild(name);
+        row.AddChild(rank);
+        row.AddChild(level);
+        return row;
+    }
+
+    private static (ProgressBar bar, StyleBoxFlat background) CreateProgressBar(string statId)
+    {
+        var bar = new ProgressBar
+        {
+            Name = "Progress_" + statId,
+            MinValue = 0,
+            MaxValue = 1,
+            ShowPercentage = false,
+            CustomMinimumSize = new Vector2(0, 4)
+        };
+        var background = new StyleBoxFlat { BgColor = Color.FromHtml("#C5B798") };
+        var fill = new StyleBoxFlat { BgColor = StatPresentationCatalog.ColorFor(statId) };
+        background.SetCornerRadiusAll(1);
+        fill.SetCornerRadiusAll(1);
+        bar.AddThemeStyleboxOverride("background", background);
+        bar.AddThemeStyleboxOverride("fill", fill);
+        return (bar, background);
     }
 
     private static TextureRect CreatePortrait(CreatureProfileProjection profile)

@@ -632,7 +632,10 @@ public partial class GardenController
     /// </summary>
     private void UpdateLandHover()
     {
-        var hovered = _draggedId.Length > 0 ? ModuleIdUnderPointer() : "";
+        var pointerOverVoidling = _draggedId.Length == 0 && _actors.Values.Any(actor => actor.IsPointerHovered);
+        var hovered = _inputEnabled && !IsPlacingLand && !IsPlacingEgg && !pointerOverVoidling
+            ? ModuleIdUnderPointer()
+            : "";
         if (hovered == _hoveredModuleId)
             return;
 
@@ -643,6 +646,14 @@ public partial class GardenController
             {
                 visual.Highlight.Visible = false;
                 visual.Ground.Modulate = visual.IdleTint;
+                continue;
+            }
+
+            if (_draggedId.Length == 0)
+            {
+                visual.Highlight.Visible = true;
+                visual.Highlight.DefaultColor = new Color(1, 1, 1, 0.32f);
+                visual.Ground.Modulate = visual.IdleTint.Lerp(Colors.White, 0.12f);
                 continue;
             }
 

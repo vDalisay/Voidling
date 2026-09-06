@@ -85,10 +85,37 @@ msgid "UI_SETTINGS_HINT"
 msgstr "ESC opens/closes this menu from the garden."
 
 msgid "UI_SHOP_TITLE"
-msgstr "SPROUT MARKET"
+msgstr "Sprout Market"
 
 msgid "UI_SHOP_WELCOME"
 msgstr "Pick something from the stall"
+
+msgid "UI_SHOP_ROTATION"
+msgstr "Egg refresh {0}"
+
+msgid "UI_SHOP_RECEIPT"
+msgstr "PURCHASE RECEIPT"
+
+msgid "UI_SHOP_PRICE"
+msgstr "PRICE  {0} SPROUTS"
+
+msgid "UI_SHOP_TYPE"
+msgstr "Type"
+
+msgid "UI_SHOP_PRICE_HEADER"
+msgstr "Price"
+
+msgid "UI_SHOP_IN_STOCK"
+msgstr "IN STOCK  1"
+
+msgid "UI_SHOP_SPECIAL_TITLE"
+msgstr "SPECIAL"
+
+msgid "UI_SHOP_EMPTY"
+msgstr "Nothing is available in this category."
+
+msgid "UI_SHOP_SELECT_HINT"
+msgstr "Choose an item to inspect it."
 
 msgid "UI_SHOP_WALLET"
 msgstr "SPROUTS  {0}"
@@ -109,7 +136,43 @@ msgid "UI_SHOP_OWNED"
 msgstr "OWNED {0}"
 
 msgid "UI_SHOP_BUY"
-msgstr "BUY {0}"
+msgstr "Buy {0}"
+
+msgid "UI_SHOP_CATEGORY_TREATS"
+msgstr "Treats"
+
+msgid "UI_SHOP_CATEGORY_EGGS"
+msgstr "Eggs"
+
+msgid "UI_SHOP_CATEGORY_LAND"
+msgstr "Land"
+
+msgid "UI_SHOP_CATEGORY_RARE"
+msgstr "Rare"
+
+msgid "UI_SHOP_CHOOSE_TREAT"
+msgstr "Choose a stat to train."
+
+msgid "UI_SHOP_CHOOSE_EGG"
+msgstr "Choose an egg to hatch."
+
+msgid "UI_SHOP_CHOOSE_LAND"
+msgstr "Choose a garden expansion."
+
+msgid "UI_SHOP_CHOOSE_RARE"
+msgstr "A special find for your garden."
+
+msgid "UI_SHOP_ITEM_COUNT"
+msgstr "{0} types"
+
+msgid "UI_SHOP_OPEN_INVENTORY"
+msgstr "Open inventory"
+
+msgid "UI_SHOP_INVENTORY_NOTE"
+msgstr "Goes to your Inventory."
+
+msgid "UI_SHOP_BACK_HINT"
+msgstr "ESC · Back to garden"
 
 msgid "UI_SHOP_MYSTERY_EGG"
 msgstr "MYSTERY EGG {0}"
@@ -861,6 +924,12 @@ msgstr "Goodbye"
 msgid "UI_GARDEN_MENU_HINT"
 msgstr "ESC · Menu"
 
+msgid "UI_GARDEN_MUTE"
+msgstr "Mute audio"
+
+msgid "UI_GARDEN_UNMUTE"
+msgstr "Restore audio"
+
 msgid "UI_GARDEN_MENU_TITLE"
 msgstr "Garden menu"
 
@@ -908,6 +977,9 @@ msgstr "Level"
 
 msgid "UI_PROFILE_LEVEL_VALUE"
 msgstr "Lv {0}"
+
+msgid "UI_PROFILE_EXP_PER_SECOND"
+msgstr "+{0:0.##} EXP/s"
 
 msgid "UI_PROFILE_ADULT_PERSONALITY"
 msgstr "Adult · {0}"

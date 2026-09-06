@@ -10,6 +10,7 @@ public partial class VoidlingActor : Node2D
 
     public string CreatureId { get; private set; } = "";
     public LifeStage Stage { get; private set; }
+    public bool IsPointerHovered => _hovered;
 
     private readonly RandomNumberGenerator _rng = new();
     private AnimatedSprite2D _sprite = null!;
@@ -22,6 +23,7 @@ public partial class VoidlingActor : Node2D
     private float _restSecondsMin = 0.20f;
     private float _restSecondsMax = 0.60f;
     private bool _selected;
+    private bool _hovered;
     private bool _interactionLocked;
     private bool _pickedUp;
     private float _baseScale;
@@ -81,6 +83,8 @@ public partial class VoidlingActor : Node2D
         };
         area.AddChild(collision);
         area.InputEvent += OnInputEvent;
+        area.MouseEntered += () => SetHovered(true);
+        area.MouseExited += () => SetHovered(false);
         AddChild(area);
 
         PickNewTarget();
@@ -102,7 +106,7 @@ public partial class VoidlingActor : Node2D
 
     public override void _Process(double delta)
     {
-        if (_selected)
+        if (_selected || _hovered)
             QueueRedraw();
 
         if (_sprite == null || _interactionLocked || _pickedUp)
@@ -226,6 +230,12 @@ public partial class VoidlingActor : Node2D
         QueueRedraw();
     }
 
+    private void SetHovered(bool hovered)
+    {
+        _hovered = hovered;
+        QueueRedraw();
+    }
+
     public void SetInteractionLocked(bool locked)
     {
         _interactionLocked = locked;
@@ -313,14 +323,14 @@ public partial class VoidlingActor : Node2D
             shadowRadii,
             new Color(0.20f, 0.24f, 0.20f, shadowAlpha));
 
-        if (_selected)
+        if (_selected || _hovered)
         {
             var phase = (float)Time.GetTicksMsec() / 220.0f;
             var pulse = (Mathf.Sin(phase) + 1.0f) * 0.5f;
             var baseRadius = _baseScale < 0.5f ? 4.2f : 7.2f;
-            var radius = baseRadius + pulse * 1.25f;
+            var radius = baseRadius + (_selected ? pulse * 1.25f : 0.6f);
             var color = Color.FromHtml("#FFF4A8");
-            color.A = 0.70f + pulse * 0.25f;
+            color.A = _selected ? 0.70f + pulse * 0.25f : 0.38f;
             DrawArc(Vector2.Zero, radius, 0.0f, Mathf.Tau, 24, color, 1.0f, false);
         }
     }
