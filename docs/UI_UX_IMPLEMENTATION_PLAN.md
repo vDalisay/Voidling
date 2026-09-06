@@ -117,7 +117,7 @@ Add `--voidling-garden-ui-shots` with a graphical renderer to capture the review
 - Removed the redundant “Garden log” heading, reduced the log panel artwork to 50% opacity, and added a keyboard-accessible top-left toggle that animates between the full history and a one-line view while preserving the same bottom margin in both states.
 - Extended the Garden smoke check with clock boundaries, collapse/expand and interrupted animation, keyboard access, and notification deduplication. All 236 tests and the CI-equivalent local checks passed; graphical review passed at 1280×720.
 
-Review captures: [expanded](ui-overhaul/garden-refined.png), [collapsed navigation](ui-overhaul/garden-collapsed.png), [one-line log](ui-overhaul/garden-log-compact.png).
+Review captures: [expanded](ui-overhaul/garden-refined.png), [collapsed navigation](ui-overhaul/garden-collapsed.png), [one-line log](ui-overhaul/garden-log-compact.png), [land inspector](ui-overhaul/land-inspector.png).
 
 ## Stage 2 handoff
 
@@ -138,3 +138,10 @@ From this workspace in PowerShell:
 Choose **Skip** in the tutorial if the isolated profile is new, then open **Shop** from the left rail. Complete the Shop checklist above before race-entry work begins.
 
 Stage 2 passed Debug and Release builds, all 236 tests, architecture/localization checks, Godot import and runtime, Garden/visual/race/family/persistence/trade probes, and both two-process LAN probes. The extended Garden UI smoke also completed the Shop purchase and focus checks and produced the three review captures at 1280×720.
+
+### Shop and Garden refinement
+
+- Removed the garden-name eyebrow, stall prompt and Escape footer from Sprout Market; lightened the paper to match option 04 and added item previews to the Treats, Eggs and Land category buttons.
+- Clicking the shaded area outside any modal now closes it through `ModalHost`, covering Settings and every rail submenu that uses the shared host.
+- Moved the Garden name and numeric sprout balance to the upper right with the premium sprout icon, moved the day/night dial into the former garden-card position, and removed Center.
+- Added faint pointer hover outlines for Voidlings and hexes. Clicking a placed hex now opens its conversion, occupancy and upgrade controls in the right-side Garden inspector without blocking the world.

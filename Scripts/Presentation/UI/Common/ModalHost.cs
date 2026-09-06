@@ -51,6 +51,11 @@ public partial class ModalHost : Control
 
         _blocker = new ColorRect { Color = Colors.Transparent, MouseFilter = MouseFilterEnum.Stop };
         _blocker.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        _blocker.GuiInput += inputEvent =>
+        {
+            if (inputEvent is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true })
+                closeRequested();
+        };
         AddChild(_blocker);
 
         var center = new CenterContainer { MouseFilter = MouseFilterEnum.Ignore };

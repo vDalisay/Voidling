@@ -8,6 +8,8 @@ namespace VoidlingGame;
 
 public partial class MainController
 {
+    private PanelContainer? _landInspector;
+
     /// <summary>
     /// Land ledger. Buying happens in the Shop and placing happens in the Garden, so this modal
     /// only reports what the island holds and opens the ground menu for a hex.
@@ -101,7 +103,11 @@ public partial class MainController
         var open = UiFactory.CreateButton(Tr(trainingGround ? "UI_LAND_MANAGE" : "UI_LAND_BUILD"));
         open.CustomMinimumSize = new Vector2(96, 24);
         UiFactory.ApplyPixelFont(open, 6);
-        open.Pressed += () => ShowLandHexMenu(capturedModuleId);
+        open.Pressed += () =>
+        {
+            CloseModal();
+            ShowLandHexMenu(capturedModuleId);
+        };
         controls.AddChild(open);
         return row;
     }
@@ -142,10 +148,7 @@ public partial class MainController
         return row;
     }
 
-    /// <summary>
-    /// The ground menu for one hex: plain grass offers the training grounds it could become,
-    /// training ground reports what it does and offers its upgrade.
-    /// </summary>
+    /// <summary>The selected hex uses the same non-blocking right inspector slot as a Voidling.</summary>
     private void ShowLandHexMenu(string moduleId)
     {
         var module = _session.State.GardenModules.FirstOrDefault(candidate =>
@@ -153,19 +156,42 @@ public partial class MainController
         if (module == null)
             return;
 
+        CloseLandInspector();
+        _selectedId = string.Empty;
+        _garden.ClearSelection();
+        _garden.StopFollowing();
+        RebuildDetailsPanel();
+
         var trainingGround = module.StatId.Length > 0;
-        var box = OpenModal(Tr(trainingGround ? "UI_LAND_HEX_TITLE" : "UI_LAND_HEX_EMPTY_TITLE"), new Vector2(420, 250));
+        var inspector = UiFactory.CreatePanel(new Vector2(162, 210));
+        inspector.Name = "LandInspector";
+        inspector.Position = new Vector2(468, 82);
+        inspector.Size = new Vector2(162, 210);
+        inspector.ZIndex = 18;
+        var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 5);
+        inspector.AddChild(box);
+
+        var heading = new HBoxContainer();
+        var title = UiFactory.CreateLabel(Tr(trainingGround ? "UI_LAND_HEX_TITLE" : "UI_LAND_HEX_EMPTY_TITLE"), 9);
+        title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        heading.AddChild(title);
+        var close = UiFactory.CreateButton("×");
+        close.Name = "CloseLandInspector";
+        close.CustomMinimumSize = new Vector2(20, 20);
+        close.Pressed += CloseLandInspector;
+        heading.AddChild(close);
+        box.AddChild(heading);
 
         if (!trainingGround)
         {
             var cost = GameRules.GardenModuleRules.TrainingConversionCost;
             var intro = UiFactory.CreateLabel(string.Format(Tr("UI_LAND_BUILD_PROMPT"), cost), 7);
             intro.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-            intro.CustomMinimumSize = new Vector2(396, 30);
+            intro.CustomMinimumSize = new Vector2(138, 42);
             box.AddChild(intro);
 
-            var grid = new GridContainer { Columns = 3 };
+            var grid = new GridContainer { Columns = 2 };
             grid.AddThemeConstantOverride("h_separation", 4);
             grid.AddThemeConstantOverride("v_separation", 4);
             box.AddChild(grid);
@@ -174,53 +200,61 @@ public partial class MainController
             {
                 var capturedStatId = statId;
                 var button = UiFactory.CreateButton(StatPresentationCatalog.NameFor(statId).ToUpperInvariant());
-                button.CustomMinimumSize = new Vector2(124, 28);
+                button.CustomMinimumSize = new Vector2(67, 28);
                 UiFactory.ApplyPixelFont(button, 7);
                 button.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(statId).Darkened(0.4f));
                 button.Disabled = _session.State.Coins < cost;
                 button.Pressed += () =>
                 {
                     if (_session.ConvertHexToTrainingGround(moduleId, capturedStatId))
-                        CloseModal();
+                        CallDeferred(nameof(ShowLandHexMenu), moduleId);
                 };
                 grid.AddChild(button);
             }
-
-            return;
+        }
+        else
+        {
+            var rate = GameRules.GardenModuleRules.PointsPerMinuteForLevel(module.Level);
+            var residents = _session.State.Voidlings
+                .Where(creature => string.Equals(creature.PassiveTrainingModuleId, moduleId, StringComparison.Ordinal))
+                .Select(creature => creature.Name)
+                .ToList();
+            var detail = UiFactory.CreateLabel(
+                $"{StatPresentationCatalog.NameFor(module.StatId).ToUpperInvariant()}  •  L{module.Level}\n{rate:0.#}/min",
+                8);
+            detail.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(module.StatId));
+            box.AddChild(detail);
+            var occupancy = UiFactory.CreateLabel(
+                residents.Count > 0
+                    ? string.Format(Tr("UI_LAND_HEX_RESIDENT"), string.Join(", ", residents))
+                    : Tr("UI_LAND_HEX_VACANT"),
+                7);
+            occupancy.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            occupancy.CustomMinimumSize = new Vector2(138, 42);
+            box.AddChild(occupancy);
+            var upgradeCost = GameRules.GardenModuleRules.UpgradeCostForLevel(module.Level);
+            var upgrade = UiFactory.CreateButton(
+                upgradeCost < 0 ? Tr("UI_LAND_MAX_LEVEL") : string.Format(Tr("UI_LAND_UPGRADE"), upgradeCost));
+            upgrade.CustomMinimumSize = new Vector2(138, 28);
+            UiFactory.ApplyPixelFont(upgrade, 7);
+            upgrade.Disabled = upgradeCost < 0 || _session.State.Coins < upgradeCost;
+            upgrade.Pressed += () =>
+            {
+                if (_session.UpgradeGardenModule(moduleId))
+                    CallDeferred(nameof(ShowLandHexMenu), moduleId);
+            };
+            box.AddChild(upgrade);
         }
 
-        var rate = GameRules.GardenModuleRules.PointsPerMinuteForLevel(module.Level);
-        var residents = _session.State.Voidlings
-            .Where(creature => string.Equals(creature.PassiveTrainingModuleId, moduleId, StringComparison.Ordinal))
-            .Select(creature => creature.Name)
-            .ToList();
+        _landInspector = inspector;
+        _uiRoot.AddChild(inspector);
+    }
 
-        var detail = UiFactory.CreateLabel(
-            $"{StatPresentationCatalog.NameFor(module.StatId).ToUpperInvariant()}  •  L{module.Level}  •  {rate:0.#}/min",
-            8);
-        detail.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(module.StatId));
-        box.AddChild(detail);
-
-        var occupancy = UiFactory.CreateLabel(
-            residents.Count > 0
-                ? string.Format(Tr("UI_LAND_HEX_RESIDENT"), string.Join(", ", residents))
-                : Tr("UI_LAND_HEX_VACANT"),
-            7);
-        occupancy.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        occupancy.CustomMinimumSize = new Vector2(396, 30);
-        box.AddChild(occupancy);
-
-        var upgradeCost = GameRules.GardenModuleRules.UpgradeCostForLevel(module.Level);
-        var upgrade = UiFactory.CreateButton(
-            upgradeCost < 0 ? Tr("UI_LAND_MAX_LEVEL") : string.Format(Tr("UI_LAND_UPGRADE"), upgradeCost));
-        upgrade.CustomMinimumSize = new Vector2(160, 28);
-        UiFactory.ApplyPixelFont(upgrade, 7);
-        upgrade.Disabled = upgradeCost < 0 || _session.State.Coins < upgradeCost;
-        upgrade.Pressed += () =>
-        {
-            if (_session.UpgradeGardenModule(moduleId))
-                CallDeferred(nameof(ShowLandHexMenu), moduleId);
-        };
-        box.AddChild(upgrade);
+    private void CloseLandInspector()
+    {
+        if (_landInspector == null || !GodotObject.IsInstanceValid(_landInspector)) return;
+        _landInspector.Visible = false;
+        _landInspector.QueueFree();
+        _landInspector = null;
     }
 }

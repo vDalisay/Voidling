@@ -95,7 +95,7 @@ public partial class ShopScreen : VBoxContainer
         var receiptPanel = UiFactory.CreatePanel(new Vector2(145, 225));
         receiptPanel.Name = "Receipt";
         var receiptStyle = (StyleBoxTexture)receiptPanel.GetThemeStylebox("panel").Duplicate();
-        receiptStyle.ModulateColor = Color.FromHtml("#E5C38D");
+        receiptStyle.ModulateColor = Color.FromHtml("#FFF0C8");
         receiptPanel.AddThemeStyleboxOverride("panel", receiptStyle);
         body.AddChild(receiptPanel);
         _receipt = new VBoxContainer();
@@ -105,10 +105,6 @@ public partial class ShopScreen : VBoxContainer
         NormalizeSelection();
         RebuildCategories();
         RebuildProducts();
-
-        var footer = UiFactory.CreateLabel(Tr("UI_SHOP_BACK_HINT"), 7);
-        footer.HorizontalAlignment = HorizontalAlignment.Right;
-        AddChild(footer);
     }
 
     public void FocusSelection()
@@ -118,12 +114,9 @@ public partial class ShopScreen : VBoxContainer
     {
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 6);
-        var welcome = UiFactory.CreateLabel($"{Tr("UI_SHOP_WELCOME")}  •  {string.Format(Tr("UI_SHOP_ROTATION"), FormatRotation(_state!.EggRotationSecondsRemaining))}", 7);
-        welcome.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        welcome.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-        row.AddChild(welcome);
+        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
         var wallet = UiFactory.CreatePanel(new Vector2(112, 24));
-        var walletLabel = UiFactory.CreateLabel(string.Format(Tr("UI_SHOP_WALLET"), _state.Coins), 8);
+        var walletLabel = UiFactory.CreateLabel(string.Format(Tr("UI_SHOP_WALLET"), _state!.Coins), 8);
         walletLabel.HorizontalAlignment = HorizontalAlignment.Center;
         walletLabel.VerticalAlignment = VerticalAlignment.Center;
         wallet.AddChild(walletLabel);
@@ -134,10 +127,10 @@ public partial class ShopScreen : VBoxContainer
     private void RebuildCategories()
     {
         Clear(_categories);
-        AddCategory(TreatsCategory, Tr("UI_SHOP_CATEGORY_TREATS"));
-        AddCategory(EggsCategory, Tr("UI_SHOP_CATEGORY_EGGS"));
-        AddCategory(LandCategory, Tr("UI_SHOP_CATEGORY_LAND"));
-        if (_state!.RareOffer != null) AddCategory(SpecialCategory, Tr("UI_SHOP_CATEGORY_RARE"));
+        AddCategory(TreatsCategory, Tr("UI_SHOP_CATEGORY_TREATS"), AtlasIconTexture(TreatTexture, new Rect2(16, 0, 16, 16)));
+        AddCategory(EggsCategory, Tr("UI_SHOP_CATEGORY_EGGS"), EggTexture);
+        AddCategory(LandCategory, Tr("UI_SHOP_CATEGORY_LAND"), customIcon: BuildShapeSwatch(new[] { (0, 0) }, 18, 14));
+        if (_state!.RareOffer != null) AddCategory(SpecialCategory, Tr("UI_SHOP_CATEGORY_RARE"), UiFactory.CreateIcon(19));
         _categories.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
         var inventory = UiFactory.CreateButton(Tr("UI_SHOP_OPEN_INVENTORY"));
         inventory.Name = "OpenInventory";
@@ -147,13 +140,28 @@ public partial class ShopScreen : VBoxContainer
         _categories.AddChild(inventory);
     }
 
-    private void AddCategory(string category, string text)
+    private void AddCategory(string category, string text, Texture2D? icon = null, Control? customIcon = null)
     {
         var button = UiFactory.CreateButton(text);
         button.Name = "Category" + category;
         button.ToggleMode = true;
         button.ButtonPressed = category == _category;
         button.CustomMinimumSize = new Vector2(82, 30);
+        button.Alignment = HorizontalAlignment.Left;
+        button.Icon = icon;
+        button.ExpandIcon = false;
+        button.IconAlignment = HorizontalAlignment.Left;
+        button.AddThemeConstantOverride("icon_max_width", 14);
+        if (customIcon != null)
+        {
+            button.Text = string.Empty;
+            var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+            row.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, 7);
+            row.AddThemeConstantOverride("separation", 5);
+            row.AddChild(customIcon);
+            row.AddChild(UiFactory.CreateLabel(text, 7));
+            button.AddChild(row);
+        }
         UiFactory.ApplyPixelFont(button, 6);
         button.Pressed += () => SelectCategory(category);
         _categories.AddChild(button);
@@ -277,7 +285,7 @@ public partial class ShopScreen : VBoxContainer
     private string CategoryPrompt() => _category switch
     {
         TreatsCategory => Tr("UI_SHOP_CHOOSE_TREAT"),
-        EggsCategory => Tr("UI_SHOP_CHOOSE_EGG"),
+        EggsCategory => $"{Tr("UI_SHOP_CHOOSE_EGG")}  ·  {string.Format(Tr("UI_SHOP_ROTATION"), FormatRotation(_state!.EggRotationSecondsRemaining))}",
         LandCategory => Tr("UI_SHOP_CHOOSE_LAND"),
         _ => Tr("UI_SHOP_CHOOSE_RARE")
     };
@@ -346,6 +354,9 @@ public partial class ShopScreen : VBoxContainer
     private static TextureRect AtlasIcon(Texture2D atlas, Rect2 region)
         => Icon(new AtlasTexture { Atlas = atlas, Region = region });
 
+    private static AtlasTexture AtlasIconTexture(Texture2D atlas, Rect2 region)
+        => new() { Atlas = atlas, Region = region };
+
     private static TextureRect EggIcon(Color tint)
     {
         var icon = Icon(EggTexture);
@@ -357,9 +368,9 @@ public partial class ShopScreen : VBoxContainer
         => new() { Texture = texture, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, MouseFilter = MouseFilterEnum.Ignore };
 
-    private static Control BuildShapeSwatch(IReadOnlyList<(int Q, int R)> cells)
+    private static Control BuildShapeSwatch(IReadOnlyList<(int Q, int R)> cells, float width = 42, float height = 28)
     {
-        const float width = 42, height = 28, ratio = 1.7f;
+        const float ratio = 1.7f;
         var units = cells.Select(cell => new Vector2(1.5f * cell.Q, cell.R + cell.Q * 0.5f)).ToArray();
         var spanX = units.Max(point => point.X) - units.Min(point => point.X) + 2;
         var spanY = units.Max(point => point.Y) - units.Min(point => point.Y) + 1;

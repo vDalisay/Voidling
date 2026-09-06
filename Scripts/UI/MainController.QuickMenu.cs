@@ -51,6 +51,7 @@ public partial class MainController
             return;
 
         _quickMenu.Close();
+        CloseLandInspector();
         _selectedId = creatureId;
         RefreshUi();
         if (!_garden.IsFollowing(creatureId))

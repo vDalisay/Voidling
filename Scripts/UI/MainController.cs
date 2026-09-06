@@ -146,7 +146,7 @@ public partial class MainController : Node
     {
         _gardenStatus = UiFactory.CreatePanel(new Vector2(120, 50));
         _gardenStatus.Name = "GardenStatus";
-        _gardenStatus.Position = new Vector2(110, 10);
+        _gardenStatus.Position = new Vector2(510, 10);
         _gardenStatus.Size = new Vector2(120, 50);
         _uiRoot.AddChild(_gardenStatus);
 
@@ -160,17 +160,20 @@ public partial class MainController : Node
         _gardenNameField = BuildGardenNameField();
         column.AddChild(_gardenNameField);
 
-        _coinsLabel = UiFactory.CreateLabel(string.Format(Tr("UI_TOP_SPROUTS"), 0), 8);
+        var wallet = new HBoxContainer();
+        wallet.AddThemeConstantOverride("separation", 3);
+        wallet.AddChild(new TextureRect
+        {
+            Texture = UiFactory.CreateSettingsIcon(0, 12),
+            CustomMinimumSize = new Vector2(14, 14),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        });
+        _coinsLabel = UiFactory.CreateLabel("0", 8);
         _coinsLabel.VerticalAlignment = VerticalAlignment.Center;
-        column.AddChild(_coinsLabel);
-
-        var camera = UiFactory.CreateButton(Tr("UI_TOP_CENTER"));
-        camera.Name = "GardenCamera";
-        camera.Position = new Vector2(590, 50);
-        camera.CustomMinimumSize = new Vector2(40, 20);
-        UiFactory.ApplyPixelFont(camera, 8);
-        camera.Pressed += _garden.ResetCamera;
-        _uiRoot.AddChild(camera);
+        wallet.AddChild(_coinsLabel);
+        column.AddChild(wallet);
 
         var dock = UiFactory.CreatePanel(new Vector2(0, ScreenHeight), wood: true);
         _gardenRail = dock;
@@ -206,7 +209,7 @@ public partial class MainController : Node
             actions.AddChild(button);
             if (destination.name == "Voidlings") _rosterButton = button;
         }
-        _dayNightDial = new GardenDayNightDial { Position = new Vector2(9, 8), ZIndex = 15 };
+        _dayNightDial = new GardenDayNightDial { Position = new Vector2(_railWidth + 14, 10), ZIndex = 15 };
         _uiRoot.AddChild(_dayNightDial);
         _dayNightDial.ShowTime(_garden.EnvironmentLocalTime);
         _garden.EnvironmentTimeChanged += _dayNightDial.ShowTime;
@@ -276,8 +279,7 @@ public partial class MainController : Node
         _railTween.TweenProperty(_gardenRail, "position:x", _railCollapsed ? -_expandedRailWidth : 0f, 0.22);
         _railTween.TweenProperty(_railUtilities, "position:x", _railCollapsed ? -_expandedRailWidth : (_expandedRailWidth - 68) / 2, 0.22);
         _railTween.TweenProperty(_railResizeHandle, "position:x", _railCollapsed ? -6f : _expandedRailWidth - 3, 0.22);
-        _railTween.TweenProperty(_gardenStatus, "position:x", _railCollapsed ? 10f : _expandedRailWidth + 14, 0.22);
-        _railTween.TweenProperty(_dayNightDial, "position", _railCollapsed ? new Vector2(10, 66) : new Vector2((_expandedRailWidth - 78) / 2, 8), 0.22);
+        _railTween.TweenProperty(_dayNightDial, "position:x", _railCollapsed ? 10f : _expandedRailWidth + 14, 0.22);
         _railTween.TweenProperty(_gardenEventLog, "position:x", _railCollapsed ? 10f : _expandedRailWidth + 14, 0.22);
         if (_modalUsesRail) _modalHost.SetLeftInset(_railCollapsed ? 0 : _expandedRailWidth + 12);
         _railTween.Finished += () =>
@@ -320,8 +322,7 @@ public partial class MainController : Node
         _gardenRail.Size = new Vector2(width, ScreenHeight);
         _railResizeHandle.Position = new Vector2(width - 3, 0);
         _railUtilities.Position = new Vector2((width - 68) / 2, 326);
-        _gardenStatus.Position = new Vector2(width + 14, _gardenStatus.Position.Y);
-        _dayNightDial.Position = new Vector2((width - 78) / 2, 8);
+        _dayNightDial.Position = new Vector2(width + 14, 10);
         _gardenEventLog.Position = new Vector2(width + 14, _gardenEventLog.Position.Y);
         if (_modalUsesRail) _modalHost.SetLeftInset(width + 12);
     }
@@ -417,7 +418,7 @@ public partial class MainController : Node
 
     private void RefreshUi()
     {
-        _coinsLabel.Text = string.Format(Tr("UI_TOP_SPROUTS"), _session.State.Coins);
+        _coinsLabel.Text = _session.State.Coins.ToString();
         if (!_gardenNameField.HasFocus() && !string.Equals(_gardenNameField.Text, _session.State.GardenName, StringComparison.Ordinal))
             _gardenNameField.Text = _session.State.GardenName;
         RefreshMuteButton();
@@ -432,6 +433,8 @@ public partial class MainController : Node
 
         if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))
             _gardenEventLog.Visible = !_modalHost.IsOpen;
+        if (_landInspector != null && GodotObject.IsInstanceValid(_landInspector))
+            _landInspector.Visible = !_modalHost.IsOpen;
 
         if (_modalHost.IsOpen)
             HideGardenHudPanels();
@@ -479,6 +482,8 @@ public partial class MainController : Node
             _detailsPanel.Visible = false;
         if (_gardenEventLog != null && GodotObject.IsInstanceValid(_gardenEventLog))
             _gardenEventLog.Visible = false;
+        if (_landInspector != null && GodotObject.IsInstanceValid(_landInspector))
+            _landInspector.Visible = false;
     }
 
     private void CloseModal() => CloseModal(true);
@@ -577,6 +582,7 @@ public partial class MainController : Node
 
     private void OnVoidlingSelected(string creatureId)
     {
+        CloseLandInspector();
         if (_selectedId != creatureId)
             _garden.StopFollowing();
 
