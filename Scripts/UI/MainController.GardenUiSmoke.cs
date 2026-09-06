@@ -164,6 +164,7 @@ public partial class MainController
                 if (!_modalHost.IsOpen || _gardenEventLog.Visible)
                     throw new InvalidOperationException("Rail destination did not open an unobstructed modal.");
                 RequireOnScreen(ModalPanel());
+                if (button.Name == "Shop") await VerifyShopUi(rail);
                 await CaptureGardenUi($"menu-{button.Name}");
                 CloseModal();
                 await SettleGardenUi();
@@ -235,8 +236,50 @@ public partial class MainController
     private PanelContainer ModalPanel()
         => _modalHost.GetChildren().OfType<CenterContainer>().Single(child => !child.IsQueuedForDeletion()).GetChild<PanelContainer>(0);
 
+    private async Task VerifyShopUi(Control rail)
+    {
+        RequireSeparate(rail, ModalPanel());
+        var ledger = _modalHost.FindChildren("ShopLedger", string.Empty, true, false).OfType<Voidling.Presentation.UI.Shop.ShopScreen>().Single();
+        RequireOnScreen(ledger);
+        foreach (var category in new[] { "Treats", "Eggs", "Land" })
+            FindGardenButton(ledger, "Category" + category);
+        if (ledger.FindChild("Categories", true, false) == null || ledger.FindChild("Catalogue", true, false) == null ||
+            ledger.FindChild("Receipt", true, false) == null)
+            throw new InvalidOperationException("Keeper ledger is missing a layout band.");
+
+        var statId = GameRules.StatIds[0];
+        var coins = _session.State.Coins;
+        var owned = _session.State.TrainingItems[statId];
+        await CaptureGardenUi("shop-treats");
+        await ClickGardenControl(FindShopBuy(ledger));
+        await SettleGardenUi();
+        if (_session.State.Coins != coins - GameRules.TrainingItemPrice || _session.State.TrainingItems[statId] != owned + 1 || !_modalHost.IsOpen)
+            throw new InvalidOperationException("Keeper ledger treat purchase did not use the existing transaction.");
+        ledger = _modalHost.FindChildren("ShopLedger", string.Empty, true, false).OfType<Voidling.Presentation.UI.Shop.ShopScreen>().Single();
+        if (!FindGardenButton(ledger, "CategoryTreats").ButtonPressed || !FindGardenButton(ledger, "Product_treat_run*").HasFocus())
+            throw new InvalidOperationException("Shop selection or focus was not preserved after purchase.");
+
+        var eggIds = _session.State.StoreEggs.Select(egg => egg.Id).ToArray();
+        await ClickGardenControl(FindGardenButton(ledger, "CategoryEggs"));
+        await CaptureGardenUi("shop-eggs");
+        await ClickGardenControl(FindShopBuy(ledger));
+        await SettleGardenUi();
+        if (_session.State.StoreEggs.Count != eggIds.Length - 1 || _session.State.StoreEggs.Any(egg => egg.Id == eggIds[0]))
+            throw new InvalidOperationException("Bought egg slot was refilled or changed identity during the Shop visit.");
+        ledger = _modalHost.FindChildren("ShopLedger", string.Empty, true, false).OfType<Voidling.Presentation.UI.Shop.ShopScreen>().Single();
+        if (!FindGardenButton(ledger, "CategoryEggs").ButtonPressed)
+            throw new InvalidOperationException("Shop category was not preserved after egg purchase.");
+        await ClickGardenControl(FindGardenButton(ledger, "CategoryLand"));
+        await ToSignal(GetTree().CreateTimer(1.6), SceneTreeTimer.SignalName.Timeout);
+        await CaptureGardenUi("shop-land");
+    }
+
     private static Button FindGardenButton(Node node, string name)
         => node.FindChildren(name, "Button", true, false).OfType<Button>().First(button => !button.IsQueuedForDeletion() && button.IsVisibleInTree());
+
+    private static Button FindShopBuy(Node ledger)
+        => ledger.FindChild("Receipt", true, false).FindChildren("*", "Button", true, false)
+            .OfType<Button>().First(button => !button.IsQueuedForDeletion() && button.IsVisibleInTree());
 
     private async Task PressGardenEscape()
     {

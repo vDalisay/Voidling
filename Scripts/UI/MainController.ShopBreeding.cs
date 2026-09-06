@@ -66,21 +66,16 @@ public partial class MainController : Node
             0.0,
             GameRules.ShopEggRotationIntervalSeconds - state.ShopEggRotationElapsedSeconds));
 
-        var box = OpenModal(Tr("UI_SHOP_TITLE"), new Vector2(558, 344));
+        var box = OpenRailModal(Tr("UI_SHOP_TITLE"), new Vector2(520, 344));
         box.AddThemeConstantOverride("separation", 4);
-        box.AddChild(CreateDailyLoginPanel());
-
-        // Three shelves no longer fit the stall at once, so the stock scrolls.
-        var stall = new ScrollContainer
-        {
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill
-        };
-        box.AddChild(stall);
-        UiFactory.StyleScroll(stall);
 
         var screen = new ShopScreen();
-        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rotationRemaining, rareOffer, landPieces));
+        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rotationRemaining, rareOffer, landPieces), _shopCategory, _shopSelection);
+        screen.SelectionChanged += (category, selection) =>
+        {
+            _shopCategory = category;
+            _shopSelection = selection;
+        };
         screen.TrainingItemPurchaseRequested += statId =>
         {
             _session.BuyTrainingItem(statId);
@@ -113,7 +108,8 @@ public partial class MainController : Node
             _session.BuyLandShape(shapeId);
             RenderShop();
         };
-        stall.AddChild(screen);
+        box.AddChild(screen);
+        Callable.From(screen.FocusSelection).CallDeferred();
     }
 
     private void ShowBreeding()

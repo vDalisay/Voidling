@@ -23,12 +23,15 @@ public partial class ModalHost : Control
         string title,
         Vector2 size,
         Action closeRequested,
-        Action? backRequested = null)
+        Action? backRequested = null,
+        float leftInset = 0)
     {
         if (closeRequested == null)
             throw new ArgumentNullException(nameof(closeRequested));
 
         ClearContent();
+        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        OffsetLeft = leftInset;
         IsOpen = true;
         Visible = true;
         MouseFilter = MouseFilterEnum.Stop;

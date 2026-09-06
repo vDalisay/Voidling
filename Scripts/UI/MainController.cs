@@ -5,6 +5,7 @@ using Voidling.Presentation.Racing;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Garden;
 using Voidling.Presentation.UI.Multiplayer;
+using Voidling.Presentation.UI.Shop;
 
 using Voidling.Application.Persistence;
 
@@ -38,6 +39,8 @@ public partial class MainController : Node
     private Action? _modalBack;
     private Control? _modalReturnFocus;
     private Button _rosterButton = null!;
+    private string _shopCategory = ShopScreen.TreatsCategory;
+    private string _shopSelection = string.Empty;
 
     public override void _Ready()
     {
@@ -317,19 +320,25 @@ public partial class MainController : Node
     }
 
     private VBoxContainer OpenModal(string title, Vector2 size)
-        => OpenModal(title, size, null);
-
-    private VBoxContainer OpenOnlineModal(string title, Vector2 size, Action backRequested)
-        => OpenModal(title, size, backRequested);
+        => OpenModal(title, size, null, 0);
 
     private VBoxContainer OpenModal(string title, Vector2 size, Action? backRequested)
+        => OpenModal(title, size, backRequested, 0);
+
+    private VBoxContainer OpenOnlineModal(string title, Vector2 size, Action backRequested)
+        => OpenModal(title, size, backRequested, 0);
+
+    private VBoxContainer OpenRailModal(string title, Vector2 size)
+        => OpenModal(title, size, null, 108);
+
+    private VBoxContainer OpenModal(string title, Vector2 size, Action? backRequested, float leftInset)
     {
         if (_modalHost.IsOpen)
             CloseModal(false);
         else
             _modalReturnFocus = GetViewport().GuiGetFocusOwner();
         _modalBack = backRequested;
-        var box = _modalHost.Open(title, size, NavigateModalBack, backRequested);
+        var box = _modalHost.Open(title, size, NavigateModalBack, backRequested, leftInset);
         HideGardenHudPanels();
         Callable.From(() => FocusFirstModalControl(box)).CallDeferred();
         return box;

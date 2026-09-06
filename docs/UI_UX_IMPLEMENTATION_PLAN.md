@@ -1,6 +1,6 @@
 # Selected UI overhaul — staged implementation
 
-Status: **Stage 1 implemented and verified; waiting for Garden player testing.** Each subsequent screen waits for the previous screen's player test.
+Status: **Stages 1–2 implemented and verified; waiting for Shop player testing.** Each subsequent screen waits for the previous screen's player test.
 
 Branch: `codex/ui-overhaul-managers-rail`  
 Workspace: `C:/Users/Home/Documents/Voidling-ui-overhaul`  
@@ -28,6 +28,14 @@ Baseline: `e03691b` from main. No save schema, economy, genetics or race simulat
 6. Extend the existing Garden runtime smoke to exercise rail destinations, roster selection, inspector, treat inventory consumption, ESC/back/focus behavior, and non-overlapping bounds. Run Debug/Release builds, tests and the Godot checks from CI, then inspect rendered Garden screenshots.
 7. Provide the branch, workspace, screenshots, isolated-save launch command and a short player checklist. Do not start stage 2 until the user has tested and asked to proceed.
 
+## Stage 2 sequence
+
+1. Keep the manager's rail visible and usable while the Shop is open; place the ledger window in the remaining screen area.
+2. Replace the stacked stall with three stable bands: vertical categories, readable product rows, and a persistent receipt containing the selected item's description, ownership, price, and Buy action.
+3. Reuse premium paper/button chrome and premium produce art for treats. Keep egg tint identity, land footprints, stock, prices, rare offers, rotation timing, and the existing purchase use cases unchanged.
+4. Preserve the selected category/item across a purchase redraw. Remove daily check-in from the Shop because it now lives under Garden log → Activities.
+5. Extend the UI smoke check for rail access, category/item focus, purchases, fixed egg stock during a visit, and bounds; render the actual Shop and stop for Shop playtesting before race-entry work.
+
 ## Garden player checklist
 
 - Find/select another Voidling through both the world and rail; search by name/color; follow and Center work.
@@ -37,6 +45,16 @@ Baseline: `e03691b` from main. No save schema, economy, genetics or race simulat
 - ESC opens the Garden menu, Settings returns to it, and returning restores usable focus/selection.
 - Verify rail, log and inspector remain readable at 1280×720 and a larger desktop window; long names stay inside their panels.
 - Pet/drag/pan around the UI; clicking UI must not select/drop a creature underneath it.
+
+## Shop player checklist
+
+- Open Shop from the manager's rail, then switch directly to another rail destination and back.
+- Browse Training treats, Mystery eggs, Land, and Special when a rare offer is present; the selected product should remain clear in the receipt.
+- Buy a treat and confirm its owned count and sprouts update without losing the current category or selection.
+- Buy an egg and confirm that exact egg slot stays sold out for the rest of the visit while the other egg identities remain unchanged.
+- Buy land when affordable and confirm the owned count and sprouts update through the existing purchase flow.
+- Use keyboard/controller focus across categories, products, Buy, Close, and the rail; Escape should close the Shop and return focus to Shop on the rail.
+- Verify the ledger remains readable at 1280×720 and a larger desktop window without covering the manager's rail.
 
 ## Scope and source rules
 
@@ -98,4 +116,24 @@ Add `--voidling-garden-ui-shots` with a graphical renderer to capture the review
 - Removed the redundant “Garden log” heading, reduced the log panel artwork to 50% opacity, and added a keyboard-accessible top-left toggle that animates between the full history and a one-line view while keeping the panel against the bottom edge.
 - Extended the Garden smoke check with clock boundaries, collapse/expand and interrupted animation, keyboard access, and notification deduplication. All 236 tests and the CI-equivalent local checks passed; graphical review passed at 1280×720.
 
-Review captures: [expanded](ui-overhaul/garden-refined.png), [collapsed navigation](ui-overhaul/garden-collapsed.png), [one-line log](ui-overhaul/garden-log-compact.png). Garden remains the active playtest gate before Shop implementation.
+Review captures: [expanded](ui-overhaul/garden-refined.png), [collapsed navigation](ui-overhaul/garden-collapsed.png), [one-line log](ui-overhaul/garden-log-compact.png).
+
+## Stage 2 handoff
+
+Implemented Keeper's Leisure as a paper ledger beside the manager's rail. Its category column, scrollable product rows, and persistent purchase receipt share one selection state, so buying redraws the current view without returning the player to the first category. Treats use the premium produce sheet; fixed egg tints, per-visit stock, land shapes, rare offers, prices, owned counts, refresh timing, and existing purchase services remain authoritative.
+
+Daily check-in no longer appears in the Shop because it is available through Garden log → Activities. The rail and its collapse control remain usable while the ledger is open, and Escape returns focus to Shop on the rail. No economy, inventory, save, or simulation rules changed.
+
+Review captures: [training treats](ui-overhaul/shop-treats.png), [mystery eggs](ui-overhaul/shop-eggs.png), [land](ui-overhaul/shop-land.png).
+
+### Launch the Shop playtest
+
+From this workspace in PowerShell:
+
+```powershell
+.\playgame.bat --no-build --voidling-dev-profile=ui_overhaul_shop_playtest
+```
+
+Choose **Skip** in the tutorial if the isolated profile is new, then open **Shop** from the left rail. Complete the Shop checklist above before race-entry work begins.
+
+Stage 2 passed Debug and Release builds, all 236 tests, architecture/localization checks, Godot import and runtime, Garden/visual/race/family/persistence/trade probes, and both two-process LAN probes. The extended Garden UI smoke also completed the Shop purchase and focus checks and produced the three review captures at 1280×720.
