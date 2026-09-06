@@ -293,7 +293,9 @@ public partial class MainController
     private async Task VerifyShopUi(Control rail)
     {
         if (_session.State.StoreEggs.Count == 0) _session.RefillStoreEggs();
-        _session.State.Coins = Math.Max(_session.State.Coins, GameRules.TrainingItemPrice + GameRules.StoreEggPrice + 10);
+        _session.State.Coins = Math.Max(
+            _session.State.Coins,
+            GameRules.TrainingItemPrice + GameRules.StoreEggPrice + GameRules.GardenModuleRules.EmptyHexCost + 10);
         RenderShop();
         await SettleGardenUi();
         RequireSeparate(rail, ModalPanel());
@@ -334,11 +336,30 @@ public partial class MainController
         await ClickGardenControl(FindGardenButton(ledger, "CategoryLand"));
         await ToSignal(GetTree().CreateTimer(1.6), SceneTreeTimer.SignalName.Timeout);
         await CaptureGardenUi("shop-land");
-        await ClickGardenPosition(new Vector2(4, ScreenHeight / 2f));
-        if (_modalHost.IsOpen)
-            throw new InvalidOperationException("Clicking the left side did not close the Shop.");
-        RenderShop();
+
+        var landCount = _session.State.GardenModules.Count;
+        var landCoins = _session.State.Coins;
+        await ClickGardenControl(FindShopBuy(ledger));
         await SettleGardenUi();
+        if (_modalHost.IsOpen || !_garden.IsPlacingLand || !_landPurchaseActions.Visible ||
+            _session.State.GardenModules.Count != landCount + 1 ||
+            _session.State.Coins != landCoins - GameRules.GardenModuleRules.EmptyHexCost)
+            throw new InvalidOperationException("Buying land did not move directly into placement mode.");
+        RequireOnScreen(_landPurchaseActions);
+        await ClickGardenControl(FindGardenButton(_landPurchaseActions, "CancelLandPurchase"));
+        await SettleGardenUi();
+        if (!_modalHost.IsOpen || _garden.IsPlacingLand || _session.State.GardenModules.Count != landCount ||
+            _session.State.Coins != landCoins)
+            throw new InvalidOperationException("Cancelling land placement did not refund and reopen the Shop.");
+
+        ledger = _modalHost.FindChildren("ShopLedger", string.Empty, true, false).OfType<Voidling.Presentation.UI.Shop.ShopScreen>().Single();
+        await ClickGardenControl(FindShopBuy(ledger));
+        await SettleGardenUi();
+        await ClickGardenControl(FindGardenButton(_landPurchaseActions, "PutLandInInventory"));
+        await SettleGardenUi();
+        if (!_modalHost.IsOpen || _garden.IsPlacingLand ||
+            _session.State.GardenModules.Count(module => !module.Placed) == 0)
+            throw new InvalidOperationException("Putting bought land in inventory did not reopen the Shop.");
     }
 
     // Race entry is a three-step full-screen flow. The probe walks course -> racer -> confirm,

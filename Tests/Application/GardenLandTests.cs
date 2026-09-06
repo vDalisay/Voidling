@@ -47,6 +47,18 @@ public sealed class GardenLandTests
     }
 
     [Fact]
+    public void CancellingALandPurchaseRemovesThePieceAndRefundsItsFullPrice()
+    {
+        var (training, state, _) = CreateGarden(coins: 500);
+        training.BuyLandShape(state, "piece", GardenTileShape.Line.Id);
+
+        Assert.True(training.CancelLandPurchase(state, "piece").Succeeded);
+
+        Assert.DoesNotContain(state.GardenModules, module => module.Id == "piece");
+        Assert.Equal(500, state.Coins);
+    }
+
+    [Fact]
     public void APieceBecomesOneTileForEveryHexItCovers()
     {
         var (training, state, _) = CreateGarden(coins: 500);

@@ -469,7 +469,7 @@ public partial class MainController : Node
     {
         if (_modalHost.IsOpen)
             CloseModal(false);
-        else
+        else if (_modalReturnFocus == null || !GodotObject.IsInstanceValid(_modalReturnFocus))
             _modalReturnFocus = GetViewport().GuiGetFocusOwner();
         _modalBack = backRequested;
         _modalUsesRail = usesRail;

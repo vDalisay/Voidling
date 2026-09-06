@@ -903,6 +903,9 @@ msgstr "Trade complete — sent {0}, received {1}."
 msgid "UI_GARDEN_PLACE_LAND_HINT"
 msgstr "Click where the island should grow. R rotates the piece, right-click cancels."
 
+msgid "UI_GARDEN_PUT_IN_INVENTORY"
+msgstr "Put in inventory"
+
 msgid "UI_SHOP_LAND_TITLE"
 msgstr "LAND"
 

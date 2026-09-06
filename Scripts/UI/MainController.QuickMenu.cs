@@ -10,6 +10,9 @@ public partial class MainController
 {
     private GardenVoidlingQuickMenu _quickMenu = null!;
     private Label _placementHint = null!;
+    private PanelContainer _landPurchaseActions = null!;
+    private string _shopLandPurchaseId = string.Empty;
+    private bool _cancelShopLandPurchase;
 
     private void BuildQuickMenu()
     {
@@ -31,9 +34,42 @@ public partial class MainController
         _placementHint.Visible = false;
         _uiRoot.AddChild(_placementHint);
 
+        _landPurchaseActions = UiFactory.CreatePanel(new Vector2(258, 38));
+        _landPurchaseActions.Name = "LandPurchaseActions";
+        _landPurchaseActions.Position = new Vector2((ScreenWidth - 258) / 2f, 312);
+        _landPurchaseActions.Size = new Vector2(258, 38);
+        _landPurchaseActions.ZIndex = 25;
+        _landPurchaseActions.Visible = false;
+        var actions = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        actions.AddThemeConstantOverride("separation", 6);
+        var inventory = UiFactory.CreateButton(Tr("UI_GARDEN_PUT_IN_INVENTORY"));
+        inventory.Name = "PutLandInInventory";
+        inventory.CustomMinimumSize = new Vector2(145, 26);
+        inventory.Pressed += _garden.CancelLandPlacement;
+        actions.AddChild(inventory);
+        var cancel = UiFactory.CreateButton(Tr("UI_COMMON_CANCEL"));
+        cancel.Name = "CancelLandPurchase";
+        cancel.CustomMinimumSize = new Vector2(86, 26);
+        cancel.Pressed += () =>
+        {
+            _cancelShopLandPurchase = true;
+            _garden.CancelLandPlacement();
+        };
+        actions.AddChild(cancel);
+        _landPurchaseActions.AddChild(actions);
+        _uiRoot.AddChild(_landPurchaseActions);
+
         _garden.EggPlacementModeChanged += placing => ShowPlacementHint(placing, "UI_GARDEN_PLACE_EGG_HINT");
-        _garden.LandPlacementModeChanged += placing => ShowPlacementHint(placing, "UI_GARDEN_PLACE_LAND_HINT");
+        _garden.LandPlacementModeChanged += OnLandPlacementModeChanged;
         _garden.LandHexSelected += ShowLandHexMenu;
+    }
+
+    private void OnLandPlacementModeChanged(bool placing)
+    {
+        ShowPlacementHint(placing, "UI_GARDEN_PLACE_LAND_HINT");
+        _landPurchaseActions.Visible = placing && _shopLandPurchaseId.Length > 0;
+        if (!placing && _shopLandPurchaseId.Length > 0)
+            FinishShopLandPlacement();
     }
 
     private void ShowPlacementHint(bool placing, string hintKey)

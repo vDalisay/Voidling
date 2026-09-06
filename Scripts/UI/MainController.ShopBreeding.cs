@@ -103,11 +103,41 @@ public partial class MainController : Node
         };
         screen.LandPurchaseRequested += shapeId =>
         {
-            _session.BuyLandShape(shapeId);
-            RenderShop();
+            var moduleId = _session.BuyLandShape(shapeId);
+            if (moduleId == null)
+            {
+                RenderShop();
+                return;
+            }
+
+            CloseModal(false);
+            BeginShopLandPlacement(moduleId, shapeId);
         };
         box.AddChild(screen);
         Callable.From(screen.FocusSelection).CallDeferred();
+    }
+
+    private void BeginShopLandPlacement(string moduleId, string shapeId)
+    {
+        _garden.CancelLandPlacement();
+        _shopLandPurchaseId = moduleId;
+        _cancelShopLandPurchase = false;
+        _garden.BeginLandPlacement(moduleId, shapeId);
+    }
+
+    private void FinishShopLandPlacement()
+    {
+        var moduleId = _shopLandPurchaseId;
+        var cancelPurchase = _cancelShopLandPurchase;
+        _shopLandPurchaseId = string.Empty;
+        _cancelShopLandPurchase = false;
+        _landPurchaseActions.Visible = false;
+
+        if (cancelPurchase)
+            _session.CancelLandPurchase(moduleId);
+        else
+            _session.CommitLandPurchase(moduleId);
+        RenderShop();
     }
 
     private void ShowBreeding()
