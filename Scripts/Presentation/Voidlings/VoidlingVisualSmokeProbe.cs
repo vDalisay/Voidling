@@ -170,10 +170,18 @@ public partial class VoidlingVisualSmokeProbe : Node
         {
             var expected = expectedLayers[i];
             var actual = actualLayers[i];
-            if (actual.ZIndex != expected.ZIndexOffset)
+            // In the world a layer never rises above the body's own layer, so a tree that hides the
+            // body hides its wings and crown with it. Authored order still decides which is on top.
+            if (actual.ZIndex != VoidlingVisualLayerSync2D.WorldLayerZ(expected.ZIndexOffset))
             {
                 throw new InvalidOperationException(
                     $"{(race ? "Race" : "World")} layer '{expected.LayerId}' for '{visualTypeId}' changed relative Z order.");
+            }
+            if (actual.ZIndex > 0)
+            {
+                throw new InvalidOperationException(
+                    $"{(race ? "Race" : "World")} layer '{expected.LayerId}' for '{visualTypeId}' draws above the body, " +
+                    "so trees cannot hide it.");
             }
             if (actual.SpriteFrames == null || !actual.SpriteFrames.HasAnimation(animation))
             {

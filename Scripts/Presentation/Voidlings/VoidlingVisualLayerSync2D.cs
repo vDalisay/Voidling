@@ -64,7 +64,7 @@ public partial class VoidlingVisualLayerSync2D : Node2D
                 SpriteFrames = VoidlingVisualFactory.CreateLayerFrames(definition, layerDefinition, race),
                 Position = layerDefinition.OffsetAtScaleOne,
                 Scale = Vector2.One * layerDefinition.ScaleMultiplier,
-                ZIndex = layerDefinition.ZIndexOffset,
+                ZIndex = WorldLayerZ(layerDefinition.ZIndexOffset),
                 ZAsRelative = true,
                 Centered = target.Centered
             };
@@ -75,6 +75,15 @@ public partial class VoidlingVisualLayerSync2D : Node2D
 
         SyncNow();
     }
+
+    /// <summary>
+    /// The layer's z relative to the body. Anything authored in front of the body collapses onto
+    /// the body's own layer: these sprites are children of the body, so draw order already puts
+    /// them on top, and staying on one layer is what lets a tree hide the whole Voidling instead
+    /// of just its middle. Authored order still decides which of them is on top, because
+    /// <see cref="VoidlingVisualFactory.ResolveLayers"/> adds them in that order.
+    /// </summary>
+    internal static int WorldLayerZ(int authoredOffset) => Math.Min(0, authoredOffset);
 
     public override void _Process(double delta)
     {

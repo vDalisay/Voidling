@@ -329,17 +329,36 @@ public partial class GardenController
     }
 
     /// <summary>
-    /// Body sprite layer and mutation layer for one Voidling. Island trees are actor-layer props
-    /// that y-sort against the body, and z_index is compared before that sort, so wings and crowns
-    /// have to sit on the body's layer or they draw over every tree.
+    /// The body's draw layer and the highest layer anything else on the Voidling uses. Island trees
+    /// are actor-layer props that y-sort against the body, and z_index is compared before that sort,
+    /// so a wing, crown or halo above the body's layer draws over every tree.
     /// </summary>
-    internal (int Body, int Mutations) MutationLayersForProbe(string creatureId)
+    internal (int Body, int Highest) VoidlingLayersForProbe(string creatureId)
     {
         if (!_actors.TryGetValue(creatureId, out var actor) || !GodotObject.IsInstanceValid(actor))
             return (0, 0);
-        var body = actor.FindChildren("*", "AnimatedSprite2D", true, false).OfType<AnimatedSprite2D>().First();
-        var adornment = actor.FindChildren("*", "Node2D", true, false).OfType<MutationAdornment2D>().First();
-        return (body.ZIndex, adornment.ZIndex);
+
+        var body = actor.FindChildren("*", "AnimatedSprite2D", true, false)
+            .OfType<AnimatedSprite2D>().First();
+        var highest = actor.FindChildren("*", "CanvasItem", true, false)
+            .OfType<CanvasItem>()
+            .Select(EffectiveZ)
+            .DefaultIfEmpty(EffectiveZ(body))
+            .Max();
+        return (EffectiveZ(body), highest);
+    }
+
+    /// <summary>A canvas item's layer, following relative z up through its parents.</summary>
+    private static int EffectiveZ(CanvasItem item)
+    {
+        var z = item.ZIndex;
+        var relative = item.ZAsRelative;
+        for (var parent = item.GetParent() as CanvasItem; parent != null && relative; parent = parent.GetParent() as CanvasItem)
+        {
+            z += parent.ZIndex;
+            relative = parent.ZAsRelative;
+        }
+        return z;
     }
 
     internal bool IsOnTileForProbe(string creatureId)

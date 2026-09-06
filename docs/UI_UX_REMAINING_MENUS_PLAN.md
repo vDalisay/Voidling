@@ -368,3 +368,20 @@ plain ground is neither tile-bound nor assigned to training, that it walks off t
 generous budget, and that mutations share the body's draw layer. The clamp and layer checks are
 deterministic; the walk-off check was given its budget from the measurement above rather than a
 guess, after earlier tighter versions proved to be timing lotteries rather than real assertions.
+
+### Tree occlusion, second pass
+
+Levelling the halo with the body was not enough: the crown and wings are authored appearance
+*layers*, not mutations. They spread across four layers around the body — back wing at -1, body,
+front wing at +1, crown at +2 — and island trees sit on the body's layer, so everything authored in
+front of the body drew over every canopy.
+
+Layers that belong in front now collapse onto the body's own layer. They are children of the body
+sprite, so draw order already puts them on top of it, and authored order still decides which of them
+is on top of the others; staying on one layer is what lets a tree hide the whole Voidling rather
+than only its middle. The back wing keeps its layer below the body. Portraits are unaffected — they
+have no trees to sort against and keep the authored spread.
+
+The Voidling visual smoke asserts the collapsed layer rather than the authored offset, and refuses
+any world layer above the body. The Garden smoke walks every canvas item on every actor, following
+relative z up through its parents, and fails if anything at all draws above the body's layer.

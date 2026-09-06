@@ -772,13 +772,14 @@ public partial class MainController
                 module.Placed && _garden.HexUnderForProbe(faraway) == (module.HexQ, module.HexR)))
             throw new InvalidOperationException("The land clamp let a position stay off the island.");
 
-        // Wings and crowns must share the body's layer, or trees stop hiding them.
+        // Nothing on a Voidling may draw above its body's layer, or a tree that hides the body
+        // leaves its wings, crown or halo floating over the canopy.
         foreach (var voidling in _session.State.Voidlings)
         {
-            var (body, mutations) = _garden.MutationLayersForProbe(voidling.Id);
-            if (body != mutations)
+            var (body, highest) = _garden.VoidlingLayersForProbe(voidling.Id);
+            if (highest > body)
                 throw new InvalidOperationException(
-                    $"Mutations draw on layer {mutations} and the body on {body}; trees cannot hide them.");
+                    $"A Voidling draws on layer {highest} above its body on {body}; trees cannot hide it.");
         }
 
         // The case the player reports: pick a Voidling up, put it down on plain ground, and watch.
