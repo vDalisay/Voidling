@@ -18,11 +18,45 @@ Baseline: `e03691b` from main. No save schema, economy, genetics or race simulat
 
 “Keeper's Leisure” in the selection refers to option 04, labelled Keeper's ledger in the studies.
 
+## Selected mockups — visual source of truth
+
+These are the exact studies selected by the user. Use them as composition references together with the written refinements later in this plan. When a later refinement conflicts with text or controls visible in a mockup, the later refinement wins. The implemented Garden and Shop captures linked below show the current result after those refinements.
+
+### Garden — 02 Manager's rail
+
+Keep the persistent left destination rail, central garden world, lower event log, and right contextual inspector. Later feedback replaces the mockup's fixed collapse button with a draggable rail edge, removes Center and the visible ESC button, moves Online into the rail, and moves garden identity/resources to the upper right.
+
+![Selected Garden mockup — option 02 Manager's rail](ui-overhaul/selected-mockups/garden-02-managers-rail.png)
+
+### Shop — 04 Keeper's Leisure / Keeper's ledger, with the 02 rail
+
+Keep option 04's warm paper window, vertical categories, product list, and selected-product purchase area. Replace its top navigation with option 02's left rail. Later feedback removes the garden-name eyebrow, prompts, item count, long receipt description, inventory note, and Escape footer; Type/Price headers and sprout currency icons take their place.
+
+![Selected Shop mockup — option 04 Keeper's ledger](ui-overhaul/selected-mockups/shop-04-keepers-ledger.png)
+
+### Race entry — 02 Manager's rail
+
+Keep the left manager's rail while presenting course choice and racer choice together, followed by one clear Start race action. This is the next unimplemented stage and its primary visual reference.
+
+![Selected race-entry mockup — option 02 Manager's rail](ui-overhaul/selected-mockups/race-entry-02-managers-rail.png)
+
+### Live race — 05 Creature first
+
+Keep the race world dominant. Group the player's portrait, place, stamina, and Cheer at bottom centre; keep course progress at bottom left and opponent standings on the right.
+
+![Selected live-race mockup — option 05 Creature first](ui-overhaul/selected-mockups/live-race-05-creature-first.png)
+
+### Race results — 01 Classic dock
+
+Use a centered podium/result card over the completed race, with the outcome, reward, and Return to garden action clearly visible. Preserve current one-time reward/result handling. “Race again” is illustrative and is not approved as new functionality by this selection.
+
+![Selected race-results mockup — option 01 Classic dock](ui-overhaul/selected-mockups/race-results-01-classic-dock.png)
+
 ## Stage 1 sequence
 
 1. Reuse `UiFactory` premium panel/button atlas, premium icon sheet, existing system font and canonical `VoidlingVisualFactory` portraits. Match reference 02's composition at the existing 640×360 logical viewport (1280×720 desktop window), without changing world art or zoom rules.
 2. Replace the bottom dock with a left rail. Open the existing searchable roster beside it. Keep world selection, petting, dragging and follow behavior.
-3. Compact the right inspector: identity, stage/personality, qualitative care, five rank/level rows, Give treat / Details / Family / Follow, and passive-training status/Stop. Keep detailed statistics in Details and permanent departure behind Details with both existing confirmations. Treat choice calls the existing training action.
+3. Compact the right inspector: identity, stage/personality, qualitative care, five colored rank/level/progress rows, and Give treat / Details / Family / Follow. The actively trained stat's progress bar pulses and updates with live fractional progress; do not restore the removed passive-training text/Stop row. Keep detailed statistics in Details and permanent departure behind Details with both existing confirmations. Treat choice calls the existing training action.
 4. Escape first unwinds an open interaction, then opens the Garden menu. Settings remains mouse-accessible from the rail and returns directly to the Garden; Settings opened from the Escape menu returns to that menu. Menus do not pause Garden simulation. Keep camera recovery outside Settings.
 5. Add Build → land/training grounds and decorations, plus log Activities → daily check-in and missions. Reuse current feature screens. The legacy Shop links are removed during the Shop stage, when that screen is replaced.
 6. Extend the existing Garden runtime smoke to exercise rail destinations, roster selection, inspector, treat inventory consumption, ESC/back/focus behavior, and non-overlapping bounds. Run Debug/Release builds, tests and the Godot checks from CI, then inspect rendered Garden screenshots.
@@ -31,15 +65,15 @@ Baseline: `e03691b` from main. No save schema, economy, genetics or race simulat
 ## Stage 2 sequence
 
 1. Keep the manager's rail visible and usable while the Shop is open; place the ledger window in the remaining screen area.
-2. Replace the stacked stall with three stable bands: vertical categories, readable product rows, and a persistent receipt containing the selected item's description, ownership, price, and Buy action.
+2. Replace the stacked stall with three stable bands: vertical categories, readable Type/Price product rows, and a persistent purchase area containing selected-item art, ownership, sprout price, and Buy action. The later refinement deliberately removes long descriptions and inventory-note copy.
 3. Reuse premium paper/button chrome and premium produce art for treats. Keep egg tint identity, land footprints, stock, prices, rare offers, rotation timing, and the existing purchase use cases unchanged.
 4. Preserve the selected category/item across a purchase redraw. Remove daily check-in from the Shop because it now lives under Garden log → Activities.
 5. Extend the UI smoke check for rail access, category/item focus, purchases, fixed egg stock during a visit, and bounds; render the actual Shop and stop for Shop playtesting before race-entry work.
 
 ## Garden player checklist
 
-- Find/select another Voidling through both the world and rail; search by name/color; follow and Center work.
-- Read all five rank/level rows; give a treat; inspect Details and Family; stop passive training.
+- Find/select another Voidling through both the world and rail; search by name/color and use Follow.
+- Read all five colored rank/level/progress rows; give a treat; inspect Details and Family; verify the actively trained stat pulses and progresses while the inspector remains open.
 - Open every rail destination and return; Build reaches owned ground and decorations.
 - Read and scroll the Garden log; Activities reaches rewards and missions.
 - ESC opens the Garden menu, Settings returns to it, and returning restores usable focus/selection.
@@ -121,7 +155,7 @@ Review captures: [expanded](ui-overhaul/garden-refined.png), [companion stats](u
 
 ## Stage 2 handoff
 
-Implemented the option 04 Sprout Market composition beside the manager's rail: garden name and market title at the top, warm paper window, simple category column, contextual product rows, highlighted item preview, green purchase action, inventory shortcut, and Escape footer. Treats keep the premium produce art; fixed egg tints, per-visit stock, land shapes, rare offers, prices, owned counts, refresh timing, and existing purchase services remain authoritative.
+Implemented the option 04 Sprout Market composition beside the manager's rail: warm paper window, icon category column, Type/Price product rows, selected-item art, ownership, sprout price, green purchase action, and inventory shortcut. The garden-name eyebrow, prompt/count line, long receipt copy, inventory note, and Escape footer were removed through player feedback. Treats keep the premium produce art; fixed egg tints, per-visit stock, land shapes, rare offers, prices, owned counts, refresh timing, and existing purchase services remain authoritative.
 
 Daily check-in no longer appears in the Shop because it is available through Garden log → Activities. The full-screen shade now covers the Garden and rail while the rail's controls remain usable; Escape returns focus to Shop on the rail. No economy, inventory, save, or simulation rules changed.
 
