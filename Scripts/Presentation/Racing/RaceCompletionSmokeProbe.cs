@@ -120,6 +120,7 @@ public partial class RaceCompletionSmokeProbe : Node
             var card = Require<Control>(overlay, RaceScreen.ResultsCardName);
             Require<Control>(overlay, RaceScreen.ResultsHeadlineName);
             Require<Control>(overlay, RaceScreen.ResultsPodiumName);
+            Require<TextureRect>(overlay, "PodiumPortrait1");
             var placement = Require<Label>(overlay, RaceScreen.ResultsPlacementName);
             var reward = Require<Control>(overlay, RaceScreen.ResultsRewardName);
             var record = Require<Control>(overlay, RaceScreen.ResultsRecordName);

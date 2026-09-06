@@ -242,7 +242,16 @@ public partial class RaceScreen : Node2D
         // on the start line or after the finish is centred on the same Voidling. The flyover owns
         // the camera while it is running.
         if (!_running && !_flyoverRunning)
+        {
+            if (_resultsPending)
+            {
+                if (_simulation != null)
+                    SyncVisuals((float)delta);
+                else if (_multiplayerFrame != null)
+                    RenderMultiplayerFrame(_multiplayerFrame, (float)delta);
+            }
             UpdatePlayerTracking();
+        }
 
         if (!_running || _playerVisual == null)
             return;
@@ -260,13 +269,12 @@ public partial class RaceScreen : Node2D
         HandleCheerVfx((float)delta);
         UpdatePlayerTracking();
         UpdateHud();
-        HandleAutoFinish();
-
-        if (_simulation.IsComplete && !_resultsShown && !_resultsPending)
-        {
-            _running = false;
+        if (!_resultsPending && _simulation.GetState(_playerId).Finished)
             QueueResults();
-        }
+        if (!_resultsPending)
+            HandleAutoFinish();
+        if (!_resultsPending && _simulation.GetState(_playerId).Finished)
+            QueueResults();
     }
 
     private void ProcessMultiplayer(double delta)
@@ -660,7 +668,8 @@ public partial class RaceScreen : Node2D
 
     /// <summary>
     /// Carries a racer through the finish: it coasts a random distance past the line instead of
-    /// stopping dead on it, and the first one over sometimes celebrates by hopping on the spot.
+    /// stopping dead on it. The player's racer celebrates by hopping on the spot; the first CPU
+    /// finisher may celebrate too.
     ///
     /// The distance is a hash of the racer, not the VFX random stream, so a replay of the same race
     /// puts everyone in the same place. Driven from the snapshot rather than the finish event, so
@@ -682,10 +691,13 @@ public partial class RaceScreen : Node2D
             var variation = JumpVariation(id, 977);
             visual.FinishOverrun = Mathf.Lerp(FinishOverrunMin, FinishOverrunMax, variation);
 
+            if (string.Equals(id, _playerId, StringComparison.Ordinal))
+                visual.Celebrates = true;
+
             if (_firstFinisherId == null)
             {
                 _firstFinisherId = id;
-                visual.Celebrates = JumpVariation(id, 4211) < 0.6f;
+                visual.Celebrates |= JumpVariation(id, 4211) < 0.6f;
             }
         }
 
@@ -1208,12 +1220,15 @@ public partial class RaceScreen : Node2D
         _resultsPending = true;
         var finishOrder = multiplayerFinishOrder?.ToArray();
         await ToSignal(GetTree().CreateTimer(ResultsRevealDelaySeconds), SceneTreeTimer.SignalName.Timeout);
-        if (IsInsideTree())
-        {
-            ShowResults(finishOrder);
-            if (_simulation != null)
-                SyncVisuals(0.0f);
-        }
+        if (!IsInsideTree())
+            return;
+
+        _running = false;
+        if (_simulation != null && !_simulation.IsComplete)
+            ApplySimulationEvents(_simulation.FastForwardToFinish());
+        ShowResults(finishOrder);
+        if (_simulation != null)
+            SyncVisuals(0.0f);
     }
 
     /// <summary>
@@ -1436,7 +1451,7 @@ public partial class RaceScreen : Node2D
         name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
         block.AddChild(name);
 
-        StandPortraitOn(stage, entrant, blockPosition, blockSize, blockPosition.Y);
+        StandPortraitOn(stage, entrant, place, blockPosition, blockSize, blockPosition.Y);
     }
 
     private static void AddFourthPlacePuddle(Control stage, RaceEntrant entrant, Vector2 position)
@@ -1461,7 +1476,7 @@ public partial class RaceScreen : Node2D
         stage.AddChild(puddle);
 
         // Fourth place stands in the puddle rather than on it.
-        StandPortraitOn(stage, entrant, puddlePosition, puddleSize, puddlePosition.Y + 5.0f);
+        StandPortraitOn(stage, entrant, 4, puddlePosition, puddleSize, puddlePosition.Y + 5.0f);
 
         var name = UiFactory.CreateLabel($"4  {entrant.Participant.DisplayName}", 6);
         name.Size = new Vector2(70, 12);
@@ -1481,11 +1496,13 @@ public partial class RaceScreen : Node2D
     private static void StandPortraitOn(
         Control stage,
         RaceEntrant entrant,
+        int place,
         Vector2 surfacePosition,
         Vector2 surfaceSize,
         float groundY)
     {
         var portrait = CreateEntrantPortrait(entrant, PodiumPortraitSize);
+        portrait.Name = $"PodiumPortrait{place}";
         portrait.Size = PodiumPortraitSize;
         portrait.Position = new Vector2(
             surfacePosition.X + (surfaceSize.X - PodiumPortraitSize.X) * 0.5f,

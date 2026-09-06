@@ -46,6 +46,34 @@ public partial class RaceScreen
             SpawnAnimeSweatDrop(canvas);
         else
             SpawnCelebrationParticles(canvas, _resultPlace == 1 ? 38 : 24);
+
+        if (_resultPlace == 1 && canvas.FindChild("PodiumPortrait1", true, false) is TextureRect winner)
+            AnimateWinnerPortrait(winner);
+    }
+
+    private async void AnimateWinnerPortrait(TextureRect portrait)
+    {
+        portrait.PivotOffset = portrait.Size * 0.5f;
+        var groundY = portrait.Position.Y;
+        var facing = 1.0f;
+
+        while (_resultsShown && IsInstanceValid(portrait) && portrait.IsInsideTree())
+        {
+            await ToSignal(
+                GetTree().CreateTimer(0.12 + _vfxRandom.NextDouble() * 0.34),
+                SceneTreeTimer.SignalName.Timeout);
+            if (!IsInstanceValid(portrait) || !portrait.IsInsideTree())
+                return;
+
+            facing = -facing;
+            portrait.Scale = new Vector2(facing, 1.0f);
+            var jump = CreateTween();
+            jump.TweenProperty(portrait, "position:y", groundY - 9.0f, 0.15)
+                .SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+            jump.TweenProperty(portrait, "position:y", groundY, 0.19)
+                .SetTrans(Tween.TransitionType.Bounce).SetEase(Tween.EaseType.Out);
+            await ToSignal(jump, Tween.SignalName.Finished);
+        }
     }
 
     private void AnimateResultPanel(Control panel, bool isLast)
