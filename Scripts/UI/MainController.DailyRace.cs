@@ -78,20 +78,43 @@ public partial class MainController
         box.AddChild(UiFactory.CreateLabel(Tr("UI_DAILY_PICK_HINT"), 7));
         box.AddChild(UiFactory.CreateLabel(Tr("UI_DAILY_ONCE_PER_DAY"), 7));
 
+        var pick = UiFactory.CreateButton(Tr("UI_RACE_CHOOSE_RACER"));
+        pick.Name = "DailyChooseRacer";
+        pick.CustomMinimumSize = new Vector2(180, 26);
+        pick.Pressed += ShowDailyRacerSelect;
+        box.AddChild(pick);
+    }
+
+    /// <summary>
+    /// The daily race has one fixed course, so it reuses only the race-entry roster step. Course and
+    /// difficulty stay authored by the daily itself and are not offered to the player here.
+    /// </summary>
+    private void ShowDailyRacerSelect()
+    {
         var owned = _session.State.Voidlings.ToArray();
         var selectedId = owned.Any(value => value.Id == _selectedId)
             ? _selectedId
             : owned.FirstOrDefault()?.Id ?? string.Empty;
         var dailyCourse = CreateRacePickerCourseView(RaceCourseCatalog.Demo);
-        var picker = new RacePickerScreen();
-        picker.Configure(new RacePickerScreenState(
-            owned.Select(CreateRacePickerView).ToArray(),
-            selectedId,
-            new[] { dailyCourse },
-            dailyCourse.Id,
-            dailyCourse.Version));
-        picker.RaceRequested += (creatureId, _, _) => BeginOrResumeDailyRace(creatureId);
-        box.AddChild(picker);
+
+        var box = OpenFullScreenModal(Tr("UI_DAILY_TITLE"));
+        var screen = new RaceEntryScreen();
+        screen.Configure(
+            new RacePickerScreenState(
+                owned.Select(CreateRacePickerView).ToArray(),
+                selectedId,
+                new[] { dailyCourse },
+                dailyCourse.Id,
+                dailyCourse.Version,
+                RaceEntryScreen.MinLevel,
+                CreateCourseRecordViews()),
+            RaceEntryStep.Racer,
+            courseLocked: true);
+        screen.SelectionChanged += (creatureId, _, _, _) => _selectedId = creatureId;
+        screen.Dismissed += ShowDailyRace;
+        screen.RaceRequested += (creatureId, _, _, _) => BeginOrResumeDailyRace(creatureId);
+        box.AddChild(screen);
+        Callable.From(screen.FocusSelection).CallDeferred();
     }
 
     private void BeginOrResumeDailyRace(string creatureId)

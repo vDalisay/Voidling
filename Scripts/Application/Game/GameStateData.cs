@@ -19,6 +19,7 @@ public sealed class GameStateData
     private string _shopRareOfferItemId = string.Empty;
     private List<GardenDecorationData> _gardenDecorations = new();
     private List<string> _completedCupIds = new();
+    private List<RaceCourseRecordData> _courseRecords = new();
 
     public int SaveVersion { get; set; } = 20;
 
@@ -70,6 +71,16 @@ public sealed class GameStateData
         set => _completedCupIds = value ?? new List<string>();
     }
 
+    /// <summary>
+    /// Best local finish per authored course, version and difficulty level. Purely additive: saves
+    /// written before course records existed load as having none, and no existing field changes.
+    /// </summary>
+    public List<RaceCourseRecordData> CourseRecords
+    {
+        get => _courseRecords;
+        set => _courseRecords = value ?? new List<RaceCourseRecordData>();
+    }
+
     // Multiplayer transaction durability. These remain harmless empty collections for players who
     // never use multiplayer and do not make Steam/network access part of save loading.
     public List<PendingTradeJournalEntry> PendingTradeJournal { get; set; } = new();
@@ -94,4 +105,16 @@ public sealed class GameStateData
     public bool EdgePanning { get; set; } = true;
 
     public bool TutorialCompleted { get; set; }
+}
+
+/// <summary>Best finish a save has recorded for one authored course version at one difficulty level.</summary>
+public sealed class RaceCourseRecordData
+{
+    public string CourseId { get; set; } = string.Empty;
+    public int CourseVersion { get; set; }
+    public int Level { get; set; } = 1;
+    public int Milliseconds { get; set; }
+
+    /// <summary>Display name captured when the record was set; the creature may since have departed.</summary>
+    public string CreatureName { get; set; } = string.Empty;
 }

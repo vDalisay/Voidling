@@ -19,6 +19,26 @@ public sealed record RaceEntry(
     IReadOnlyList<RaceEntrant> Entrants)
 {
     public RaceCourseDefinition CourseDefinition { get; init; } = RaceCourseCatalog.Demo;
+
+    /// <summary>Authored CPU difficulty tier this race was created at. See <see cref="RaceDifficulty"/>.</summary>
+    public int DifficultyLevel { get; init; } = RaceDifficulty.Easiest;
+}
+
+/// <summary>
+/// Fixed CPU difficulty tiers for an authored course, like a beginner/intermediate/expert race.
+/// A tier is a share of the training-point cap the generated opponents are given, so it does not
+/// rubber-band to the player and a recorded time stays comparable between attempts.
+/// </summary>
+public static class RaceDifficulty
+{
+    public const int Easiest = 1;
+    public const int Hardest = 3;
+
+    private static readonly float[] TrainedShareByLevel = { 0.0f, 0.4f, 0.8f };
+
+    public static int Clamp(int level) => Math.Clamp(level, Easiest, Hardest);
+
+    public static float TrainedShare(int level) => TrainedShareByLevel[Clamp(level) - 1];
 }
 
 /// <summary>
@@ -50,9 +70,16 @@ public sealed class RaceEntryFactory
         VoidlingData selected,
         ulong simulationSeed,
         RaceCourseDefinition courseDefinition)
+        => Create(selected, simulationSeed, courseDefinition, RaceDifficulty.Easiest);
+
+    public RaceEntry Create(
+        VoidlingData selected,
+        ulong simulationSeed,
+        RaceCourseDefinition courseDefinition,
+        int difficultyLevel)
     {
         ArgumentNullException.ThrowIfNull(selected);
-        return Create(CreateOwnedEntrant(selected), simulationSeed, courseDefinition);
+        return Create(CreateOwnedEntrant(selected), simulationSeed, courseDefinition, difficultyLevel);
     }
 
     /// <summary>
@@ -67,6 +94,13 @@ public sealed class RaceEntryFactory
         RaceEntrant selected,
         ulong simulationSeed,
         RaceCourseDefinition courseDefinition)
+        => Create(selected, simulationSeed, courseDefinition, RaceDifficulty.Easiest);
+
+    public RaceEntry Create(
+        RaceEntrant selected,
+        ulong simulationSeed,
+        RaceCourseDefinition courseDefinition,
+        int difficultyLevel)
     {
         ArgumentNullException.ThrowIfNull(selected);
         ArgumentNullException.ThrowIfNull(selected.Participant);
@@ -76,6 +110,8 @@ public sealed class RaceEntryFactory
         {
             selected
         };
+        var level = RaceDifficulty.Clamp(difficultyLevel);
+        var cpuTrainingPoints = (int)MathF.Round(_rules.Stats.MaxTrainingPoints * RaceDifficulty.TrainedShare(level));
 
         for (var cpuIndex = 0; cpuIndex < 3; cpuIndex++)
         {
@@ -94,14 +130,15 @@ public sealed class RaceEntryFactory
                     VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
                     PaletteHue = paletteHue
                 },
-                TrainingPoints = _rules.Genetics.StatIds.ToDictionary(id => id, _ => 0)
+                TrainingPoints = _rules.Genetics.StatIds.ToDictionary(id => id, _ => cpuTrainingPoints)
             };
             entrants.Add(new RaceEntrant(_snapshotFactory.Create(cpu), false, 0));
         }
 
         return new RaceEntry(simulationSeed, _rules.Racing, entrants.AsReadOnly())
         {
-            CourseDefinition = courseDefinition
+            CourseDefinition = courseDefinition,
+            DifficultyLevel = level
         };
     }
 

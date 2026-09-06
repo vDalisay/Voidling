@@ -449,6 +449,14 @@ public partial class MainController : Node
     private VBoxContainer OpenOnlineModal(string title, Vector2 size, Action backRequested)
         => OpenModal(title, size, backRequested, 0, false);
 
+    /// <summary>
+    /// A screen that owns the whole viewport, including the rail. Used by flows whose only job is
+    /// the choice on screen, so nothing competes with it.
+    /// </summary>
+    private VBoxContainer OpenFullScreenModal(string title)
+        => OpenModal(title, new Vector2(ScreenWidth, ScreenHeight), null, 0, false,
+            panelTint: new Color(232f / 220f, 207f / 224f, 166f / 210f));
+
     private VBoxContainer OpenRailModal(string title, Vector2 size, string eyebrow = "", Color? panelTint = null)
     {
         var inset = _railCollapsed ? 0 : _expandedRailWidth + 12;
@@ -560,6 +568,7 @@ public partial class MainController : Node
             GodotObject.IsInstanceValid(_race) &&
             _race.TryGetPlayerFinishMilliseconds(out var finishedMilliseconds))
         {
+            RecordCourseFinish(finishedMilliseconds);
             ProjectSinglePlayerCourseBestTime(finishedMilliseconds);
         }
     }

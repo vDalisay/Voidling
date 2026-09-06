@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using Voidling.Domain.Racing;
+using Voidling.Presentation.UI.Racing;
 
 namespace VoidlingGame;
 
@@ -217,7 +218,7 @@ public partial class MainController
                     throw new InvalidOperationException("Rail destination did not open an unobstructed modal.");
                 RequireOnScreen(ModalPanel());
                 if (button.Name == "Shop") await VerifyShopUi(rail);
-                if (button.Name == "Races") await VerifyRaceEntryUi(rail);
+                if (button.Name == "Races") await VerifyRaceEntryUi();
                 await CaptureGardenUi($"menu-{button.Name}");
                 CloseModal();
                 await SettleGardenUi();
@@ -340,47 +341,93 @@ public partial class MainController
         await SettleGardenUi();
     }
 
-    // Race entry must read beside the rail and swap racers without starting a race, so the probe
-    // exercises selection and focus only up to the Start action.
-    private async Task VerifyRaceEntryUi(Control rail)
+    // Race entry is a three-step full-screen flow. The probe walks course -> racer -> confirm,
+    // checking each step's bands and selections, and stops at Start rather than starting a race.
+    private async Task VerifyRaceEntryUi()
     {
-        var entry = _modalHost.FindChildren("RaceEntry", string.Empty, true, false)
-            .OfType<Voidling.Presentation.UI.Racing.RacePickerScreen>().Single();
+        var entry = FindRaceEntry();
         RequireOnScreen(entry);
-        RequireSeparate(rail, ModalPanel());
-        foreach (var band in new[] { "CourseList", "RacerList", "RacerStats" })
+        if (entry.Step != RaceEntryStep.Course)
+            throw new InvalidOperationException("Race entry did not open on course select.");
+        foreach (var band in new[] { "CourseList", "CourseRecord", "Minimap" })
         {
             if (entry.FindChild(band, true, false) == null)
-                throw new InvalidOperationException($"Race entry is missing the {band} band.");
+                throw new InvalidOperationException($"Course select is missing the {band} band.");
         }
 
         var courses = RaceCourseCatalog.All.ToArray();
-        var last = FindGardenButton(entry, "Course_" + courses[^1].Id);
-        await ClickGardenControl(last);
+        var lastCourse = courses[^1];
+        await ClickGardenControl(FindGardenButton(entry, $"Level_{lastCourse.Id}_{RaceEntryScreen.MaxLevel}"));
         await SettleGardenUi();
-        if (!last.ButtonPressed || courses.Take(courses.Length - 1)
-                .Any(course => FindGardenButton(entry, "Course_" + course.Id).ButtonPressed))
-            throw new InvalidOperationException("Race entry did not keep exactly one selected course.");
+        entry = FindRaceEntry();
+        if (!FindGardenButton(entry, "Course_" + lastCourse.Id).ButtonPressed ||
+            !FindGardenButton(entry, $"Level_{lastCourse.Id}_{RaceEntryScreen.MaxLevel}").ButtonPressed ||
+            courses.Take(courses.Length - 1).Any(course => FindGardenButton(entry, "Course_" + course.Id).ButtonPressed))
+            throw new InvalidOperationException("Course select did not keep exactly one course and level.");
+        await CaptureGardenUi("race-course-select");
+
+        await ClickGardenControl(FindGardenButton(entry, "EntryPrimary"));
+        await SettleGardenUi();
+        entry = FindRaceEntry();
+        if (entry.Step != RaceEntryStep.Racer)
+            throw new InvalidOperationException("Course select did not advance to racer select.");
+        foreach (var band in new[] { "RosterGrid", "RacerStats" })
+        {
+            if (entry.FindChild(band, true, false) == null)
+                throw new InvalidOperationException($"Racer select is missing the {band} band.");
+        }
+        var grid = (GridContainer)entry.FindChild("RosterGrid", true, false);
+        if (grid.Columns != 3 || grid.GetChildCount() != 9)
+            throw new InvalidOperationException("Racer roster is not a 3x3 page.");
+        FindGardenButton(entry, "RosterPrev");
+        FindGardenButton(entry, "RosterNext");
 
         var racers = _session.State.Voidlings.ToArray();
         if (racers.Length > 1)
         {
-            var second = FindGardenButton(entry, "Racer_" + racers[1].Id);
-            await ClickGardenControl(second);
+            await ClickGardenControl(FindGardenButton(entry, "Racer_" + racers[1].Id));
             await SettleGardenUi();
-            if (!second.ButtonPressed || FindGardenButton(entry, "Racer_" + racers[0].Id).ButtonPressed)
-                throw new InvalidOperationException("Race entry did not keep exactly one selected racer.");
+            entry = FindRaceEntry();
+            if (!FindGardenButton(entry, "Racer_" + racers[1].Id).ButtonPressed ||
+                FindGardenButton(entry, "Racer_" + racers[0].Id).ButtonPressed)
+                throw new InvalidOperationException("Racer select did not keep exactly one selected racer.");
             var stats = entry.FindChild("RacerStats", true, false);
-            if (stats.FindChildren("*", "Label", true, false).OfType<Label>()
-                    .All(label => label.Text != racers[1].Name + " · trained stats"))
-                throw new InvalidOperationException("Race entry stats did not follow the selected racer.");
+            if (stats.FindChildren("*", "Label", true, false).OfType<Label>().All(label => label.Text != racers[1].Name))
+                throw new InvalidOperationException("Racer stats did not follow the selected racer.");
+            if (GameRules.StatIds.Any(statId => stats.FindChild("Progress_" + statId, true, false) == null))
+                throw new InvalidOperationException("Racer stats are missing a per-stat bar.");
         }
+        await CaptureGardenUi("race-racer-select");
 
-        var start = FindGardenButton(entry, "StartRace");
+        await ClickGardenControl(FindGardenButton(entry, "EntryPrimary"));
+        await SettleGardenUi();
+        entry = FindRaceEntry();
+        if (entry.Step != RaceEntryStep.Confirm)
+            throw new InvalidOperationException("Racer select did not advance to the confirmation step.");
+        foreach (var band in new[] { "ConfirmCourse", "RacerStats", "Minimap" })
+        {
+            if (entry.FindChild(band, true, false) == null)
+                throw new InvalidOperationException($"Confirmation is missing the {band} band.");
+        }
+        var start = FindGardenButton(entry, "EntryPrimary");
         start.GrabFocus();
         if (!start.HasFocus()) throw new InvalidOperationException("Race entry Start action is not focusable.");
-        await CaptureGardenUi("race-entry");
+        await CaptureGardenUi("race-confirm");
+
+        // Back must unwind step by step rather than dropping the player out of the flow.
+        await ClickGardenControl(FindGardenButton(entry, "EntryBack"));
+        await SettleGardenUi();
+        if (FindRaceEntry().Step != RaceEntryStep.Racer)
+            throw new InvalidOperationException("Back did not return to racer select.");
+        await ClickGardenControl(FindGardenButton(FindRaceEntry(), "EntryBack"));
+        await SettleGardenUi();
+        if (FindRaceEntry().Step != RaceEntryStep.Course)
+            throw new InvalidOperationException("Back did not return to course select.");
     }
+
+    private RaceEntryScreen FindRaceEntry()
+        => _modalHost.FindChildren("RaceEntry", string.Empty, true, false)
+            .OfType<RaceEntryScreen>().Single(screen => !screen.IsQueuedForDeletion());
 
     private static Button FindGardenButton(Node node, string name)
         => node.FindChildren(name, "Button", true, false).OfType<Button>().First(button => !button.IsQueuedForDeletion() && button.IsVisibleInTree());

@@ -12,7 +12,7 @@ Baseline: `e03691b` from main. No save schema, economy, genetics or race simulat
 |---|---|---|
 | 1. Garden | 02 — Manager's rail | Warm premium wood rail at left; Voidlings, Inventory, Shop, Breed, Races, Build and Online in that order. The rail resizes from its edge and collapses to a half-circle handle. Settings and mute sit at its lower edge; Escape alone opens the Garden menu. Stop for Garden playtesting. |
 | 2. Shop | 04 — Keeper's ledger window, with 02's side rail replacing the top menu | Preserve option 04's paper window, category column, readable product rows and purchase receipt. Keep the manager's rail on the left. Preserve fixed egg identities, stock, prices and ownership. Stop for Shop playtesting. |
-| 3. Race entry | 02 — Manager's rail | Course and creature selection beside the rail, clear selected entrant and one Start action. Stop for entry playtesting. |
+| 3. Race entry | Chao Garden course/character select, rebuilt with our premium assets | Three full-screen steps: course and difficulty level, then a 3x3 racer roster with a stat inspector, then a confirmation with the track and racer. Stop for entry playtesting. |
 | 4. Live race | 05 — Creature first | Player portrait, stamina and Cheer together at bottom centre; opponents right; course progress bottom left. Preserve existing simulation and local/online exit semantics. Stop for live-race playtesting. |
 | 5. Results | 01 — Classic dock | Central podium and clear Return to garden action. Preserve rewards and one-time result handling. Stop for results playtesting. |
 
@@ -34,11 +34,16 @@ Keep option 04's warm paper window, vertical categories, product list, and selec
 
 ![Selected Shop mockup — option 04 Keeper's ledger](ui-overhaul/selected-mockups/shop-04-keepers-ledger.png)
 
-### Race entry — 02 Manager's rail
+### Race entry — Chao Garden course and character select
 
-Keep the left manager's rail while presenting course choice and racer choice together, followed by one clear Start race action.
+Superseded by later feedback: the manager's-rail mockup below is no longer the reference for this
+screen. Race entry follows the Chao Garden structure instead — a full-screen course select listing
+each course with its difficulty levels, a track miniature and the course record; a full-screen
+character select with a 3x3 roster, paging arrows and a stat inspector; then a confirmation screen
+with the track, the chosen racer and one Start action. The structure is copied, the art is not: every
+surface is built from the premium Sprout Lands packs already in the repository.
 
-![Selected race-entry mockup — option 02 Manager's rail](ui-overhaul/selected-mockups/race-entry-02-managers-rail.png)
+![Superseded race-entry mockup — option 02 Manager's rail](ui-overhaul/selected-mockups/race-entry-02-managers-rail.png)
 
 ### Live race — 05 Creature first
 
@@ -72,20 +77,37 @@ Use a centered podium/result card over the completed race, with the outcome, rew
 
 ## Stage 3 sequence
 
-1. Keep the manager's rail visible and usable while race entry is open; place the paper entry window in the remaining screen area with the same rail modal and paper tint the Shop uses.
-2. Present course choice and racer choice side by side: a scrolling course column whose cards name the course, its summary, its section kinds and its length, and a racer row of canonical portraits.
-3. Show the selected racer's five trained stats beneath the racer row, using stat identity colors darkened for the paper background, with the rank letter under each level.
-4. Keep a single Start race action in the footer beside a course · racer confirmation line, sharing the Shop's green confirm chrome. Course IDs/versions, the entry use case and race simulation stay unchanged.
-5. Extend the Garden UI smoke to cover rail separation, the three race-entry bands, single-selection course and racer toggles, stats following the selected racer, and a focusable Start action without starting a race; render the screen and stop for entry playtesting.
+1. Race entry becomes its own full-screen flow rather than a window beside the rail. Each step owns
+   the whole viewport so the choice being made is the only thing on screen.
+2. Course select lists every authored course with three difficulty pills, beside a card holding the
+   course record and a miniature of the track drawn from the authored segments and obstacles.
+3. The difficulty level sets how trained the generated opponents are. Tiers are fixed shares of the
+   training-point cap, not a scale of the player's own creature, so a recorded time stays comparable
+   between attempts.
+4. Racer select shows a 3x3 roster page with paging arrows and empty slots that keep the grid shape,
+   beside a stat inspector with each stat's colour, level, rank, progress bar and value.
+5. The confirmation step repeats the course name, level, track miniature and record beside the
+   chosen racer's stats, behind one Start race action.
+6. Course records persist per course, course version and difficulty level, keeping only a faster
+   finish. The field is additive; saves written before it load as having no records.
+7. Extend the Garden UI smoke to walk course → racer → confirm, checking each step's bands, single
+   selection of course/level/racer, the 3x3 grid, stats following the racer, and step-by-step Back,
+   without starting a race. Render all three steps and stop for entry playtesting.
 
 ## Race entry player checklist
 
-- Open Races from the manager's rail, then switch directly to another rail destination and back.
-- Switch between Sprout Dash and Long Haul; each card should read its sections and length, and only one course stays selected.
-- Switch racers; the trained-stat row and the footer line should follow the selection immediately.
-- Start a race from this screen and confirm the race that runs matches the course and racer shown.
-- Use keyboard/controller focus across courses, racers, Start and the rail; Escape should close entry and return focus to Races on the rail.
-- Verify the window remains readable at 1280×720 and a larger desktop window without covering the manager's rail.
+- Open Races from the manager's rail; course select should fill the screen.
+- Switch courses and levels; the record card and track miniature should follow the selection, and
+  only one course and one level should stay lit.
+- Continue to racer select, page the roster with the arrows, and click through Voidlings; the stat
+  inspector should follow each click.
+- Enter a race, confirm the final screen shows the course, level, track and racer you chose, then
+  start it and confirm the race that runs matches.
+- Finish a race and reopen entry: the course record for that course and level should show your time.
+- Race the same course at level 1 and level 3 and confirm the opponents are noticeably harder.
+- Use keyboard/controller focus across courses, levels, roster, arrows, Back and the primary action;
+  Back should unwind one step at a time and leave the flow only from the first step.
+- Verify all three steps stay readable at 1280×720 and a larger desktop window.
 
 ## Garden player checklist
 
@@ -218,3 +240,36 @@ From this workspace in PowerShell:
 Open **Races** from the left rail and complete the race-entry checklist above before live-race work begins.
 
 Stage 3 passed Debug and Release builds, 237 tests, architecture/localization checks, `git diff --check`, Godot import and main-scene runtime, and the Garden UI, Voidling visual, race presentation, race completion, family tree and persistence recovery probes. The extended Garden UI smoke also completed the new race-entry selection and focus checks and produced the review capture at 1280×720.
+
+## Stage 3 rework — Chao Garden structure
+
+Player feedback replaced the single rail-side window with the Chao Garden flow. Race entry is now
+three full-screen steps built from the premium Sprout Lands packs: the round button sheet supplies
+the difficulty pills, the panel chrome supplies the paper cards, and portraits still resolve through
+the canonical visual factory.
+
+- **Course select** lists each authored course with levels 1–3 beside a card carrying the course
+  record and a `CourseMinimap` strip drawn from the course's own segments and obstacles.
+- **Racer select** shows a 3x3 roster page with paging arrows, drawn empty slots so the grid keeps
+  its shape, and a stat inspector with colour, level, rank, progress and value per stat.
+- **Confirmation** repeats course, level, track and record beside the racer's stats behind Start.
+
+The descriptive course summary was removed from selection, as asked. The daily race reuses only the
+roster step, because its course and difficulty are authored by the daily itself.
+
+Two things beyond presentation were needed to make the screen honest:
+
+- `RaceDifficulty` gives the generated opponents a share of the training-point cap per tier (0%,
+  40%, 80%). Fixed tiers rather than scaling to the player, so a recorded time stays comparable.
+  Existing callers that pass no level keep today's untrained opponents.
+- `GameStateData.CourseRecords` persists the best finish per course, course version and level, and
+  keeps only a faster time. Purely additive: older saves load with no records and no existing field
+  changed.
+
+Review captures: [course select](ui-overhaul/race-course-select.png),
+[racer select](ui-overhaul/race-racer-select.png), [confirmation](ui-overhaul/race-confirm.png).
+
+Verified with Debug and Release builds, 241 tests (four new ones cover the difficulty tiers and the
+record keeping), architecture/localization checks, `git diff --check`, Godot import and main-scene
+runtime, and the Garden UI, Voidling visual, race presentation, race completion, family tree and
+persistence recovery probes.

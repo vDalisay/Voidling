@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://drvyuqt6k8w8s"
-path="res://.godot/imported/race-entry.png-6ce5e9c8bc8bdedac29220d742cf4906.ctex"
+uid="uid://nq3khm1vwim0"
+path="res://.godot/imported/race-confirm.png-809221125b74cbdf5478ece68e00b6f8.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://docs/ui-overhaul/race-entry.png"
-dest_files=["res://.godot/imported/race-entry.png-6ce5e9c8bc8bdedac29220d742cf4906.ctex"]
+source_file="res://docs/ui-overhaul/race-confirm.png"
+dest_files=["res://.godot/imported/race-confirm.png-809221125b74cbdf5478ece68e00b6f8.ctex"]
 
 [params]
 

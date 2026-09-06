@@ -217,7 +217,7 @@ msgid "UI_BREED_UNRELATED_CLEAN"
 msgstr "Unrelated pairing • no inbreeding penalty."
 
 msgid "UI_RACE_PICKER_TITLE"
-msgstr "CHOOSE YOUR RACE"
+msgstr "RACE"
 
 msgid "UI_RACE_PICKER_EMPTY"
 msgstr "No Voidlings are currently on the farm."
@@ -228,11 +228,41 @@ msgstr "Choose one Voidling. All other racers are generated CPU opponents."
 msgid "UI_RACE_PICKER_COURSE"
 msgstr "COURSE"
 
-msgid "UI_RACE_PICKER_RACER"
-msgstr "YOUR RACER"
+msgid "UI_RACE_STEP_COURSE"
+msgstr "COURSE SELECT"
 
-msgid "UI_RACE_PICKER_TRAINED"
-msgstr "{0} · trained stats"
+msgid "UI_RACE_STEP_RACER"
+msgstr "RACER SELECT"
+
+msgid "UI_RACE_STEP_CONFIRM"
+msgstr "READY TO RACE"
+
+msgid "UI_RACE_LEVEL"
+msgstr "LEVEL"
+
+msgid "UI_RACE_LEVEL_VALUE"
+msgstr "Level {0}"
+
+msgid "UI_RACE_CHOOSE_RACER"
+msgstr "Choose Racer"
+
+msgid "UI_RACE_ENTER"
+msgstr "Enter Race"
+
+msgid "UI_RACE_COURSE_RECORD"
+msgstr "COURSE RECORD"
+
+msgid "UI_RACE_NO_RECORD"
+msgstr "No record yet"
+
+msgid "UI_RACE_BLANK_TIME"
+msgstr "--:--.---"
+
+msgid "UI_RACE_RECORD_LINE"
+msgstr "Record: {0} · {1}"
+
+msgid "UI_RACE_ROSTER_PAGE"
+msgstr "{0} / {1}"
 
 msgid "UI_RACE_PICKER_NO_COURSES"
 msgstr "No race courses are available."
@@ -806,6 +836,9 @@ msgstr "{0} left the connected Garden."
 
 msgid "UI_GARDEN_LOG_RACE_RESULT"
 msgstr "Race finished — you placed #{0}."
+
+msgid "UI_GARDEN_LOG_COURSE_RECORD"
+msgstr "New course record — {0} at {1}."
 
 msgid "UI_GARDEN_LOG_TRADE_COMPLETE"
 msgstr "Trade complete — sent {0}, received {1}."

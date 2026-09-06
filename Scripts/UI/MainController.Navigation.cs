@@ -19,10 +19,13 @@ public partial class MainController : Node
             $"{StatPresentationCatalog.NameFor(stat.StatId)} {stat.InheritedRank} {stat.EffectiveValue}"));
         var stats = profile.Stats
             .Select(stat => new RacePickerStatViewState(
+                stat.StatId,
                 StatPresentationCatalog.NameFor(stat.StatId),
                 StatPresentationCatalog.ColorFor(stat.StatId),
                 stat.InheritedRank,
-                stat.TrainingLevel))
+                stat.TrainingLevel,
+                (float)stat.TrainingProgress,
+                (int)stat.EffectiveValue))
             .ToArray();
 
         return new RacePickerVoidlingViewState(
