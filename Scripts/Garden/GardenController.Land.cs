@@ -11,6 +11,7 @@ namespace VoidlingGame;
 
 public partial class GardenController
 {
+    public const double LandPlacementAnimationSeconds = 0.4;
     /// <summary>Raised when land placement is armed or cleared so the HUD can show its own hint.</summary>
     public event Action<bool>? LandPlacementModeChanged;
 
@@ -279,7 +280,7 @@ public partial class GardenController
             if (_initialRefreshComplete && !known.Contains(module.Id))
             {
                 visual.Holder.Scale = Vector2.Zero;
-                CreateTween().TweenProperty(visual.Holder, "scale", Vector2.One, 0.4)
+                CreateTween().TweenProperty(visual.Holder, "scale", Vector2.One, LandPlacementAnimationSeconds)
                     .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
             }
         }

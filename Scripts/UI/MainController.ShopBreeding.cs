@@ -125,10 +125,11 @@ public partial class MainController : Node
         _garden.BeginLandPlacement(moduleId, shapeId);
     }
 
-    private void FinishShopLandPlacement()
+    private async void FinishShopLandPlacement()
     {
         var moduleId = _shopLandPurchaseId;
         var cancelPurchase = _cancelShopLandPurchase;
+        var placed = _session.State.GardenModules.Find(module => module.Id == moduleId)?.Placed == true;
         _shopLandPurchaseId = string.Empty;
         _cancelShopLandPurchase = false;
         _landPurchaseActions.Visible = false;
@@ -137,6 +138,15 @@ public partial class MainController : Node
             _session.CancelLandPurchase(moduleId);
         else
             _session.CommitLandPurchase(moduleId);
+
+        if (placed)
+        {
+            await ToSignal(
+                GetTree().CreateTimer(GardenController.LandPlacementAnimationSeconds + 0.3),
+                SceneTreeTimer.SignalName.Timeout);
+            if (!IsInsideTree())
+                return;
+        }
         RenderShop();
     }
 
