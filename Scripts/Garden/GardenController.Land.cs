@@ -632,7 +632,10 @@ public partial class GardenController
     /// </summary>
     private void UpdateLandHover()
     {
-        var hovered = _inputEnabled && !IsPlacingLand && !IsPlacingEgg ? ModuleIdUnderPointer() : "";
+        var pointerOverVoidling = _draggedId.Length == 0 && _actors.Values.Any(actor => actor.IsPointerHovered);
+        var hovered = _inputEnabled && !IsPlacingLand && !IsPlacingEgg && !pointerOverVoidling
+            ? ModuleIdUnderPointer()
+            : "";
         if (hovered == _hoveredModuleId)
             return;
 

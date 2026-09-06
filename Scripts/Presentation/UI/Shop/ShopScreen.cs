@@ -95,7 +95,7 @@ public partial class ShopScreen : VBoxContainer
         var receiptPanel = UiFactory.CreatePanel(new Vector2(145, 225));
         receiptPanel.Name = "Receipt";
         var receiptStyle = (StyleBoxTexture)receiptPanel.GetThemeStylebox("panel").Duplicate();
-        receiptStyle.ModulateColor = Color.FromHtml("#FFF0C8");
+        receiptStyle.ModulateColor = new Color(230f / 220f, 212f / 224f, 173f / 210f);
         receiptPanel.AddThemeStyleboxOverride("panel", receiptStyle);
         body.AddChild(receiptPanel);
         _receipt = new VBoxContainer();
@@ -116,6 +116,9 @@ public partial class ShopScreen : VBoxContainer
         row.AddThemeConstantOverride("separation", 6);
         row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
         var wallet = UiFactory.CreatePanel(new Vector2(112, 24));
+        var walletStyle = (StyleBoxTexture)wallet.GetThemeStylebox("panel").Duplicate();
+        walletStyle.ModulateColor = new Color(232f / 220f, 207f / 224f, 166f / 210f);
+        wallet.AddThemeStyleboxOverride("panel", walletStyle);
         var walletLabel = UiFactory.CreateLabel(string.Format(Tr("UI_SHOP_WALLET"), _state!.Coins), 8);
         walletLabel.HorizontalAlignment = HorizontalAlignment.Center;
         walletLabel.VerticalAlignment = VerticalAlignment.Center;

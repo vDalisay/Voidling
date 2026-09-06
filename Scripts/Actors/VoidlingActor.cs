@@ -10,6 +10,7 @@ public partial class VoidlingActor : Node2D
 
     public string CreatureId { get; private set; } = "";
     public LifeStage Stage { get; private set; }
+    public bool IsPointerHovered => _hovered;
 
     private readonly RandomNumberGenerator _rng = new();
     private AnimatedSprite2D _sprite = null!;

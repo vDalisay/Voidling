@@ -141,7 +141,7 @@ Stage 2 passed Debug and Release builds, all 236 tests, architecture/localizatio
 
 ### Shop and Garden refinement
 
-- Removed the garden-name eyebrow, stall prompt and Escape footer from Sprout Market; lightened the paper to match option 04 and added item previews to the Treats, Eggs and Land category buttons.
+- Removed the garden-name eyebrow, stall prompt and Escape footer from Sprout Market; matched the reference's warm beige paper palette and added item previews to the Treats, Eggs and Land category buttons.
 - Clicking the shaded area outside any modal now closes it through `ModalHost`, covering Settings and every rail submenu that uses the shared host.
 - Moved the Garden name and numeric sprout balance to the upper right with the premium sprout icon, moved the day/night dial into the former garden-card position, and removed Center.
-- Added faint pointer hover outlines for Voidlings and hexes. Clicking a placed hex now opens its conversion, occupancy and upgrade controls in the right-side Garden inspector without blocking the world.
+- Added faint pointer hover outlines for Voidlings and hexes, with the Voidling taking priority when both overlap. Clicking a placed hex now opens its conversion, occupancy and upgrade controls in the right-side Garden inspector without blocking the world.

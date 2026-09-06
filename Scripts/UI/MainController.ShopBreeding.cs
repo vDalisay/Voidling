@@ -67,7 +67,7 @@ public partial class MainController : Node
             GameRules.ShopEggRotationIntervalSeconds - state.ShopEggRotationElapsedSeconds));
 
         var box = OpenRailModal(Tr("UI_SHOP_TITLE"), new Vector2(520, 344),
-            panelTint: Color.FromHtml("#FFEDC4"));
+            panelTint: new Color(232f / 220f, 207f / 224f, 166f / 210f));
         box.AddThemeConstantOverride("separation", 4);
 
         var screen = new ShopScreen();
