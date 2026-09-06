@@ -1,9 +1,9 @@
 # Selected UI overhaul — staged implementation
 
-Status: **Stages 1–3 and 5 implemented and verified; waiting for race-entry and results player testing.** Each subsequent screen waits for the previous screen's player test.
+Status: **Stages 1–5 implemented and verified; waiting for live-race and results player testing.** Each subsequent screen waits for the previous screen's player test.
 
-Branch: `codex/ui-overhaul-managers-rail`  
-Workspace: `C:/Users/Home/Documents/Voidling-ui-overhaul`  
+Branch: `codex/ui-stage4-live-race`
+Workspace: `C:/Users/Home/Documents/Voidling-ui-live-race`
 Baseline: `e03691b` from main. No save schema, economy, genetics or race simulation changes.
 
 ## Approved visual combination

@@ -175,7 +175,6 @@ public partial class RaceScreen
         _cheerButton.ExpandIcon = true;
         _cheerButton.CustomMinimumSize = new Vector2(34, 34);
         _cheerButton.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        _cheerButton.TooltipText = Tr("UI_RACE_CHEER");
         StyleCheerIcon(_cheerButton);
         _cheerButton.Pressed += CheerPlayer;
         var cheerCost = UiFactory.CreateLabel(Mathf.CeilToInt(_entry!.Rules.CheerCost).ToString(CultureInfo.CurrentCulture), 7);
@@ -325,7 +324,6 @@ public partial class RaceScreen
                                 player.Finished ||
                                 player.CheerSeconds > 0.0f ||
                                 player.CurrentStamina < _entry!.Rules.CheerCost;
-        _cheerButton.TooltipText = Tr(player.CheerSeconds > 0.0f ? "UI_RACE_CHEERING" : "UI_RACE_CHEER");
     }
 
     private void RebuildStaminaTicks(double maximum)

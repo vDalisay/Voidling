@@ -78,6 +78,15 @@ public partial class RaceCompletionSmokeProbe : Node
 
             Engine.TimeScale = TimeScale;
             var startedMsec = Time.GetTicksMsec();
+            while (!race.ResultsPending && !race.ResultsShown &&
+                   (Time.GetTicksMsec() - startedMsec) < BudgetSeconds * 1000.0)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            }
+
+            if (!race.ResultsPending || race.ResultsShown)
+                throw new InvalidOperationException("The results card did not pause after the finish.");
+
             while (!race.ResultsShown && (Time.GetTicksMsec() - startedMsec) < BudgetSeconds * 1000.0)
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             Engine.TimeScale = 1.0;
@@ -236,6 +245,13 @@ public partial class RaceCompletionSmokeProbe : Node
             hud.GetNode<Control>("RaceHudCourse").GetGlobalRect().End.X < viewport.X - 10.0f)
         {
             throw new InvalidOperationException("Stamina and course progress are not anchored to opposite bottom corners.");
+        }
+
+        if (!Mathf.IsEqualApprox(RaceScreen.ComputeEdgePeekOffset(0.0f, 640.0f, 640.0f), -192.0f) ||
+            !Mathf.IsZeroApprox(RaceScreen.ComputeEdgePeekOffset(320.0f, 640.0f, 640.0f)) ||
+            !Mathf.IsEqualApprox(RaceScreen.ComputeEdgePeekOffset(640.0f, 640.0f, 640.0f), 192.0f))
+        {
+            throw new InvalidOperationException("Camera edge peek is not capped at 30% of the visible width.");
         }
     }
 

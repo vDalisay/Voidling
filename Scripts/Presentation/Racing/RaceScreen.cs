@@ -23,6 +23,7 @@ public partial class RaceScreen : Node2D
 
     /// <summary>True once the results overlay has been built. Read by the CI completion probe.</summary>
     internal bool ResultsShown => _resultsShown;
+    internal bool ResultsPending => _resultsPending;
 
     private const float ScreenWidth = 640.0f;
     private const float ScreenHeight = 360.0f;
@@ -62,6 +63,9 @@ public partial class RaceScreen : Node2D
     private const float MinZoom = 1.0f;
     private const float MaxZoom = 3.2f;
     private const float ZoomStepFactor = 1.18f;
+    private const float EdgePeekZoneFraction = 0.15f;
+    private const float MaxEdgePeekFraction = 0.30f;
+    private const double ResultsRevealDelaySeconds = 1.0;
     private const int MaxCatchUpStepsPerFrame = 30;
 
     /// <summary>Canvas layer the results overlay lives on. The CI completion probe looks for it.</summary>
@@ -111,6 +115,7 @@ public partial class RaceScreen : Node2D
     private bool _running;
     private bool _pausedRunning;
     private bool _resultsShown;
+    private bool _resultsPending;
     private bool _completionReported;
     private int _resultPlace;
     private Control? _resultRewardRow;
@@ -123,6 +128,8 @@ public partial class RaceScreen : Node2D
     private float _waterPhase;
     private float _zoom = MinZoom;
     private float _zoomTarget = MinZoom;
+    private float _cameraPeekOffset;
+    private bool _pointerMoved;
     private Camera2D _camera = null!;
     private Polygon2D _playerMarker = null!;
 
@@ -228,6 +235,7 @@ public partial class RaceScreen : Node2D
         // during the opening flyover and on the results screen.
         _waterPhase = (_waterPhase + (float)delta * 2.2f) % 1.0f;
         UpdateZoom((float)delta);
+        UpdateCameraPeek((float)delta);
         QueueRedraw();
 
         // Keep the framing on the player between the countdown and the podium too, so a zoom taken
@@ -254,11 +262,11 @@ public partial class RaceScreen : Node2D
         UpdateHud();
         HandleAutoFinish();
 
-        if (_simulation.IsComplete && !_resultsShown)
+        if (_simulation.IsComplete && !_resultsShown && !_resultsPending)
         {
             _running = false;
             SyncVisuals(0.0f);
-            ShowResults();
+            QueueResults();
         }
     }
 
@@ -289,11 +297,11 @@ public partial class RaceScreen : Node2D
         UpdatePlayerTracking();
         UpdateHud();
 
-        if (frame.IsComplete && !_resultsShown)
+        if (frame.IsComplete && !_resultsShown && !_resultsPending)
         {
             _running = false;
             RenderMultiplayerFrame(frame, 0.0f);
-            ShowResults(frame.Participants
+            QueueResults(frame.Participants
                 .Where(participant => participant.Placement.HasValue)
                 .OrderBy(participant => participant.Placement)
                 .Select(participant => participant.ParticipantId)
@@ -1145,6 +1153,30 @@ public partial class RaceScreen : Node2D
         _camera.Zoom = new Vector2(_zoom, _zoom);
     }
 
+    private void UpdateCameraPeek(float delta)
+    {
+        var viewportWidth = GetViewport().GetVisibleRect().Size.X;
+        var mouseX = GetViewport().GetMousePosition().X;
+        var target = _running && _pointerMoved && mouseX >= 0.0f && mouseX <= viewportWidth
+            ? ComputeEdgePeekOffset(mouseX, viewportWidth, ScreenWidth / Math.Max(_zoom, 0.001f))
+            : 0.0f;
+        _cameraPeekOffset = Mathf.Lerp(_cameraPeekOffset, target, 1.0f - Mathf.Pow(0.002f, delta));
+    }
+
+    internal static float ComputeEdgePeekOffset(float mouseX, float screenWidth, float visibleWorldWidth)
+    {
+        if (screenWidth <= 0.0f || visibleWorldWidth <= 0.0f)
+            return 0.0f;
+
+        var edgeWidth = screenWidth * EdgePeekZoneFraction;
+        var strength = mouseX < edgeWidth
+            ? -(edgeWidth - mouseX) / edgeWidth
+            : mouseX > screenWidth - edgeWidth
+                ? (mouseX - (screenWidth - edgeWidth)) / edgeWidth
+                : 0.0f;
+        return Mathf.Clamp(strength, -1.0f, 1.0f) * visibleWorldWidth * MaxEdgePeekFraction;
+    }
+
     /// <summary>
     /// Keeps the camera on the player's own Voidling.
     ///
@@ -1165,8 +1197,17 @@ public partial class RaceScreen : Node2D
             ? ScreenHeight * 0.5f
             : Mathf.Clamp(focusY, halfHeight, ScreenHeight - halfHeight);
 
-        _camera.Position = new Vector2(player.X, cameraY);
+        _camera.Position = new Vector2(player.X + _cameraPeekOffset, cameraY);
         _playerMarker.Position = new Vector2(player.X, _playerVisual.Sprite.Position.Y - 21.0f);
+    }
+
+    private async void QueueResults(IReadOnlyList<string>? multiplayerFinishOrder = null)
+    {
+        _resultsPending = true;
+        var finishOrder = multiplayerFinishOrder?.ToArray();
+        await ToSignal(GetTree().CreateTimer(ResultsRevealDelaySeconds), SceneTreeTimer.SignalName.Timeout);
+        if (IsInsideTree())
+            ShowResults(finishOrder);
     }
 
     /// <summary>
@@ -1179,6 +1220,7 @@ public partial class RaceScreen : Node2D
         if (_entry == null || (_simulation == null && multiplayerFinishOrder == null))
             return;
 
+        _resultsPending = false;
         _resultsShown = true;
         var finishOrder = multiplayerFinishOrder ?? _simulation!.FinishOrder;
         var selectedPlace = finishOrder.ToList().IndexOf(_playerId) + 1;

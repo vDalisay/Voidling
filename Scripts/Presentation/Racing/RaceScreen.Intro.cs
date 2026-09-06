@@ -20,6 +20,8 @@ public partial class RaceScreen
     public override void _Input(InputEvent inputEvent)
     {
         HandleZoomInput(inputEvent);
+        if (inputEvent is InputEventMouseMotion)
+            _pointerMoved = true;
 
         if (!_flyoverRunning)
             return;
