@@ -7,13 +7,16 @@ using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Racing;
 
+public readonly record struct RacePickerStatViewState(string Name, Color Color, string Rank, int Level);
+
 public readonly record struct RacePickerVoidlingViewState(
     string Id,
     string Name,
     VoidlingVisualAppearance Appearance,
     bool HasAngelMutation,
     int OtherMutationCount,
-    string StatSummary);
+    string StatSummary,
+    IReadOnlyList<RacePickerStatViewState> Stats);
 
 public readonly record struct RacePickerCourseViewState(
     string Id,
@@ -31,8 +34,9 @@ public sealed record RacePickerScreenState(
     int SelectedCourseVersion);
 
 /// <summary>
-/// Standalone race-selection view. Appearance remains semantic until the shared visual factory
-/// composes portraits/cards; course selection likewise emits only stable semantic IDs/versions.
+/// Race entry beside the manager's rail: course choice on the left, racer choice and the chosen
+/// racer's trained stats on the right, and one Start action. Appearance remains semantic until the
+/// shared visual factory composes portraits; course selection emits only stable semantic IDs/versions.
 /// </summary>
 public partial class RacePickerScreen : VBoxContainer
 {
@@ -42,6 +46,11 @@ public partial class RacePickerScreen : VBoxContainer
     private string _selectedId = string.Empty;
     private string _selectedCourseId = string.Empty;
     private int _selectedCourseVersion;
+
+    private readonly Dictionary<string, Button> _courseButtons = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Button> _racerButtons = new(StringComparer.Ordinal);
+    private VBoxContainer _statsColumn = null!;
+    private Label _footer = null!;
 
     public void Configure(RacePickerScreenState state)
     {
@@ -55,8 +64,10 @@ public partial class RacePickerScreen : VBoxContainer
         if (_state == null)
             throw new InvalidOperationException("RacePickerScreen must be configured before AddChild.");
 
+        Name = "RaceEntry";
         AddThemeConstantOverride("separation", 5);
-        SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        SizeFlagsVertical = SizeFlags.ExpandFill;
 
         if (_state.Voidlings.Count == 0)
         {
@@ -79,110 +90,93 @@ public partial class RacePickerScreen : VBoxContainer
         _selectedCourseId = selectedCourse.Id;
         _selectedCourseVersion = selectedCourse.Version;
 
-        AddChild(UiFactory.CreateLabel(Tr("UI_RACE_PICKER_HINT"), 7));
-        BuildPicker(_state.Voidlings, _state.Courses);
+        var body = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+        body.AddThemeConstantOverride("separation", 8);
+        AddChild(body);
+        body.AddChild(BuildCourseColumn(_state.Courses));
+        body.AddChild(BuildRacerColumn(_state.Voidlings));
+        AddChild(BuildFooter());
+
+        UpdateCourse(selectedCourse);
+        UpdateRacer(_state.Voidlings.First(v => v.Id == _selectedId));
     }
 
-    // Courses are picked from cards that spell out the sections ahead, so a player can tell a
-    // Climb/Power course from a Swim one before committing to the start line.
-    private void BuildCourseCards(IReadOnlyList<RacePickerCourseViewState> courses)
+    public void FocusSelection()
+        => (_courseButtons.TryGetValue(CourseKey(_selectedCourseId, _selectedCourseVersion), out var course)
+            ? course
+            : _courseButtons.Values.FirstOrDefault())?.GrabFocus();
+
+    // Courses spell out the sections ahead, so a player can tell a Climb/Power course from a Swim
+    // one before committing to the start line.
+    private Control BuildCourseColumn(IReadOnlyList<RacePickerCourseViewState> courses)
     {
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 6);
-        AddChild(row);
-
-        var summary = UiFactory.CreateLabel(string.Empty, 6);
-        summary.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        summary.CustomMinimumSize = new Vector2(500, 16);
-        AddChild(summary);
-
-        var buttons = new Dictionary<string, Button>(StringComparer.Ordinal);
-        foreach (var course in courses)
-        {
-            var captured = course;
-            var key = CourseKey(course);
-            var card = new Button
-            {
-                ToggleMode = true,
-                CustomMinimumSize = new Vector2(168, 42),
-                FocusMode = Control.FocusModeEnum.All,
-                ButtonPressed = key == CourseKey(_selectedCourseId, _selectedCourseVersion)
-            };
-            UiFactory.ApplyButtonChrome(card);
-            UiFactory.ApplyPixelFont(card, 7);
-            card.Text = $"{course.Name}\n{string.Join(" - ", course.Sections)}\n{course.LengthMeters} M";
-            card.Pressed += () =>
-            {
-                _selectedCourseId = captured.Id;
-                _selectedCourseVersion = captured.Version;
-                summary.Text = captured.Summary;
-                foreach (var pair in buttons)
-                    pair.Value.ButtonPressed = pair.Key == CourseKey(captured);
-            };
-            buttons[key] = card;
-            row.AddChild(card);
-        }
-
-        summary.Text = courses
-            .First(course => CourseKey(course) == CourseKey(_selectedCourseId, _selectedCourseVersion))
-            .Summary;
-    }
-
-    private static string CourseKey(RacePickerCourseViewState course) => CourseKey(course.Id, course.Version);
-
-    private static string CourseKey(string id, int version) => $"{id}@{version}";
-
-    private void BuildPicker(
-        IReadOnlyList<RacePickerVoidlingViewState> voidlings,
-        IReadOnlyList<RacePickerCourseViewState> courses)
-    {
-        AddChild(UiFactory.CreateLabel(Tr("UI_RACE_PICKER_COURSE"), 7));
-        BuildCourseCards(courses);
+        var column = new VBoxContainer { CustomMinimumSize = new Vector2(212, 0), SizeFlagsVertical = SizeFlags.ExpandFill };
+        column.AddThemeConstantOverride("separation", 4);
+        column.AddChild(UiFactory.CreateLabel(Tr("UI_RACE_PICKER_COURSE"), 8));
 
         var scroll = new ScrollContainer
         {
-            CustomMinimumSize = new Vector2(510, 90),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            Name = "CourseList",
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled
+        };
+        UiFactory.StyleScroll(scroll);
+        column.AddChild(scroll);
+        var list = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        list.AddThemeConstantOverride("separation", 4);
+        scroll.AddChild(list);
+
+        foreach (var course in courses)
+        {
+            var captured = course;
+            var card = new Button
+            {
+                Name = "Course_" + course.Id,
+                ToggleMode = true,
+                CustomMinimumSize = new Vector2(200, 62),
+                FocusMode = FocusModeEnum.All,
+                SizeFlagsHorizontal = SizeFlags.ExpandFill,
+                ButtonPressed = CourseKey(course) == CourseKey(_selectedCourseId, _selectedCourseVersion)
+            };
+            UiFactory.ApplyButtonChrome(card);
+            var copy = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+            copy.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, 6);
+            copy.AddThemeConstantOverride("separation", 1);
+            copy.AddChild(UiFactory.CreateLabel(course.Name, 8));
+            var summary = UiFactory.CreateLabel(course.Summary, 6);
+            summary.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            summary.SizeFlagsVertical = SizeFlags.ExpandFill;
+            copy.AddChild(summary);
+            copy.AddChild(UiFactory.CreateLabel(
+                $"{string.Join(" · ", course.Sections)}   {course.LengthMeters} M", 6));
+            card.AddChild(copy);
+            card.Pressed += () => UpdateCourse(captured);
+            _courseButtons[CourseKey(course)] = card;
+            list.AddChild(card);
+        }
+
+        return column;
+    }
+
+    private Control BuildRacerColumn(IReadOnlyList<RacePickerVoidlingViewState> voidlings)
+    {
+        var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+        column.AddThemeConstantOverride("separation", 4);
+        column.AddChild(UiFactory.CreateLabel(Tr("UI_RACE_PICKER_RACER"), 8));
+
+        var scroll = new ScrollContainer
+        {
+            Name = "RacerList",
+            CustomMinimumSize = new Vector2(250, 82),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
             VerticalScrollMode = ScrollContainer.ScrollMode.Disabled
         };
+        UiFactory.StyleScroll(scroll);
+        column.AddChild(scroll);
         var cards = new HBoxContainer();
-        cards.AddThemeConstantOverride("separation", 7);
+        cards.AddThemeConstantOverride("separation", 6);
         scroll.AddChild(cards);
-        AddChild(scroll);
-
-        var selected = voidlings.First(v => v.Id == _selectedId);
-        var previewRow = new HBoxContainer();
-        previewRow.AddThemeConstantOverride("separation", 12);
-        var previewPortrait = UiFactory.CreatePortrait(
-            selected.Appearance,
-            selected.HasAngelMutation,
-            selected.OtherMutationCount,
-            new Vector2(48, 48));
-        previewRow.AddChild(previewPortrait);
-
-        var previewText = new VBoxContainer();
-        previewText.AddThemeConstantOverride("separation", 2);
-        var previewName = UiFactory.CreateTitle(selected.Name);
-        var previewStats = UiFactory.CreateLabel(selected.StatSummary, 7);
-        previewText.AddChild(previewName);
-        previewText.AddChild(previewStats);
-        previewRow.AddChild(previewText);
-        AddChild(previewRow);
-
-        var cardButtons = new Dictionary<string, Button>(StringComparer.Ordinal);
-        void UpdatePreview(RacePickerVoidlingViewState candidate)
-        {
-            _selectedId = candidate.Id;
-            UiFactory.SetPortraitData(
-                previewPortrait,
-                candidate.Appearance,
-                candidate.HasAngelMutation,
-                candidate.OtherMutationCount);
-            previewName.Text = candidate.Name;
-            previewStats.Text = candidate.StatSummary;
-            foreach (var pair in cardButtons)
-                pair.Value.ButtonPressed = pair.Key == candidate.Id;
-        }
 
         foreach (var creature in voidlings)
         {
@@ -194,22 +188,102 @@ public partial class RacePickerScreen : VBoxContainer
                 creature.OtherMutationCount,
                 pressed =>
                 {
-                    if (pressed)
-                        UpdatePreview(captured);
+                    if (pressed) UpdateRacer(captured);
                 },
                 out var card);
-            cardButtons[creature.Id] = card;
+            card.Name = "Racer_" + creature.Id;
+            _racerButtons[creature.Id] = card;
             cards.AddChild(entry);
         }
 
-        UpdatePreview(selected);
+        _statsColumn = new VBoxContainer { Name = "RacerStats", SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        _statsColumn.AddThemeConstantOverride("separation", 3);
+        column.AddChild(_statsColumn);
+
+        var hint = UiFactory.CreateLabel(Tr("UI_RACE_PICKER_HINT"), 6);
+        hint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        column.AddChild(hint);
+        column.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
+        return column;
+    }
+
+    private Control BuildFooter()
+    {
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 6);
+        _footer = UiFactory.CreateLabel(string.Empty, 6);
+        _footer.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        _footer.VerticalAlignment = VerticalAlignment.Center;
+        _footer.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        row.AddChild(_footer);
 
         var start = UiFactory.CreateButton(Tr("UI_RACE_START"));
-        start.CustomMinimumSize = new Vector2(170, 26);
-        start.Pressed += () => RaceRequested?.Invoke(
-            _selectedId,
-            _selectedCourseId,
-            _selectedCourseVersion);
-        AddChild(start);
+        start.Name = "StartRace";
+        start.CustomMinimumSize = new Vector2(170, 28);
+        UiFactory.ApplyPrimaryStyle(start);
+        start.Pressed += () => RaceRequested?.Invoke(_selectedId, _selectedCourseId, _selectedCourseVersion);
+        row.AddChild(start);
+        return row;
     }
+
+    private void UpdateCourse(RacePickerCourseViewState course)
+    {
+        _selectedCourseId = course.Id;
+        _selectedCourseVersion = course.Version;
+        foreach (var pair in _courseButtons)
+            pair.Value.ButtonPressed = pair.Key == CourseKey(course);
+        RefreshFooter();
+    }
+
+    private void UpdateRacer(RacePickerVoidlingViewState racer)
+    {
+        _selectedId = racer.Id;
+        foreach (var pair in _racerButtons)
+            pair.Value.SetPressedNoSignal(pair.Key == racer.Id);
+
+        foreach (var child in _statsColumn.GetChildren())
+        {
+            if (child is Control control) control.MouseFilter = MouseFilterEnum.Ignore;
+            child.QueueFree();
+        }
+
+        _statsColumn.AddChild(UiFactory.CreateLabel(
+            string.Format(Tr("UI_RACE_PICKER_TRAINED"), racer.Name), 7));
+        var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        row.AddThemeConstantOverride("separation", 4);
+        foreach (var stat in racer.Stats)
+        {
+            var cell = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+            cell.AddThemeConstantOverride("separation", 0);
+            var name = UiFactory.CreateLabel(stat.Name, 6);
+            name.HorizontalAlignment = HorizontalAlignment.Center;
+            name.AddThemeColorOverride("font_color", PaperInk(stat.Color));
+            cell.AddChild(name);
+            var level = UiFactory.CreateLabel(string.Format(Tr("UI_PROFILE_LEVEL_VALUE"), stat.Level), 8);
+            level.HorizontalAlignment = HorizontalAlignment.Center;
+            cell.AddChild(level);
+            var rank = UiFactory.CreateLabel(stat.Rank, 6);
+            rank.HorizontalAlignment = HorizontalAlignment.Center;
+            cell.AddChild(rank);
+            row.AddChild(cell);
+        }
+        _statsColumn.AddChild(row);
+        RefreshFooter();
+    }
+
+    private void RefreshFooter()
+    {
+        var course = _state!.Courses.First(c => CourseKey(c) == CourseKey(_selectedCourseId, _selectedCourseVersion));
+        var racer = _state.Voidlings.First(v => v.Id == _selectedId);
+        _footer.Text = $"{course.Name} · {racer.Name}";
+    }
+
+    // Stat identity colours are authored for the dark Garden inspector; on the ledger's paper the
+    // pale ones (swim yellow, stamina white) vanish, so darken by however much luminance is over.
+    private static Color PaperInk(Color color)
+        => color.Darkened(Mathf.Clamp(color.Luminance - 0.35f, 0f, 0.6f));
+
+    private static string CourseKey(RacePickerCourseViewState course) => CourseKey(course.Id, course.Version);
+
+    private static string CourseKey(string id, int version) => $"{id}@{version}";
 }

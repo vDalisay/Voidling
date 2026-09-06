@@ -291,6 +291,26 @@ public static class UiFactory
         return container;
     }
 
+    /// <summary>Green confirm chrome shared by the Shop's Buy and the race-entry Start action.</summary>
+    public static void ApplyPrimaryStyle(Button button)
+    {
+        static StyleBoxFlat Style(Color color) => new()
+        {
+            BgColor = color,
+            BorderColor = Color.FromHtml("#315A42"),
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            BorderWidthTop = 2, BorderWidthBottom = 2,
+            CornerRadiusTopLeft = 3, CornerRadiusTopRight = 3,
+            CornerRadiusBottomLeft = 3, CornerRadiusBottomRight = 3
+        };
+        button.AddThemeStyleboxOverride("normal", Style(Color.FromHtml("#477052")));
+        button.AddThemeStyleboxOverride("hover", Style(Color.FromHtml("#568761")));
+        button.AddThemeStyleboxOverride("pressed", Style(Color.FromHtml("#355D43")));
+        button.AddThemeColorOverride("font_color", Color.FromHtml("#FFF3D2"));
+        button.AddThemeColorOverride("font_hover_color", Colors.White);
+        button.AddThemeColorOverride("font_pressed_color", Colors.White);
+    }
+
     public static void ApplyPixelFont(Control control, int size)
     {
         // Keep the existing call sites and size hierarchy; use readable mixed-case UI type.

@@ -1,6 +1,6 @@
 # Selected UI overhaul — staged implementation
 
-Status: **Stages 1–2 implemented and verified; waiting for Shop player testing.** Each subsequent screen waits for the previous screen's player test.
+Status: **Stages 1–3 implemented and verified; waiting for race-entry player testing.** Each subsequent screen waits for the previous screen's player test.
 
 Branch: `codex/ui-overhaul-managers-rail`  
 Workspace: `C:/Users/Home/Documents/Voidling-ui-overhaul`  
@@ -36,7 +36,7 @@ Keep option 04's warm paper window, vertical categories, product list, and selec
 
 ### Race entry — 02 Manager's rail
 
-Keep the left manager's rail while presenting course choice and racer choice together, followed by one clear Start race action. This is the next unimplemented stage and its primary visual reference.
+Keep the left manager's rail while presenting course choice and racer choice together, followed by one clear Start race action.
 
 ![Selected race-entry mockup — option 02 Manager's rail](ui-overhaul/selected-mockups/race-entry-02-managers-rail.png)
 
@@ -69,6 +69,23 @@ Use a centered podium/result card over the completed race, with the outcome, rew
 3. Reuse premium paper/button chrome and premium produce art for treats. Keep egg tint identity, land footprints, stock, prices, rare offers, rotation timing, and the existing purchase use cases unchanged.
 4. Preserve the selected category/item across a purchase redraw. Remove daily check-in from the Shop because it now lives under Garden log → Activities.
 5. Extend the UI smoke check for rail access, category/item focus, purchases, fixed egg stock during a visit, and bounds; render the actual Shop and stop for Shop playtesting before race-entry work.
+
+## Stage 3 sequence
+
+1. Keep the manager's rail visible and usable while race entry is open; place the paper entry window in the remaining screen area with the same rail modal and paper tint the Shop uses.
+2. Present course choice and racer choice side by side: a scrolling course column whose cards name the course, its summary, its section kinds and its length, and a racer row of canonical portraits.
+3. Show the selected racer's five trained stats beneath the racer row, using stat identity colors darkened for the paper background, with the rank letter under each level.
+4. Keep a single Start race action in the footer beside a course · racer confirmation line, sharing the Shop's green confirm chrome. Course IDs/versions, the entry use case and race simulation stay unchanged.
+5. Extend the Garden UI smoke to cover rail separation, the three race-entry bands, single-selection course and racer toggles, stats following the selected racer, and a focusable Start action without starting a race; render the screen and stop for entry playtesting.
+
+## Race entry player checklist
+
+- Open Races from the manager's rail, then switch directly to another rail destination and back.
+- Switch between Sprout Dash and Long Haul; each card should read its sections and length, and only one course stays selected.
+- Switch racers; the trained-stat row and the footer line should follow the selection immediately.
+- Start a race from this screen and confirm the race that runs matches the course and racer shown.
+- Use keyboard/controller focus across courses, racers, Start and the rail; Escape should close entry and return focus to Races on the rail.
+- Verify the window remains readable at 1280×720 and a larger desktop window without covering the manager's rail.
 
 ## Garden player checklist
 
@@ -181,3 +198,23 @@ Stage 2 passed Debug and Release builds, all 236 tests, architecture/localizatio
 - Added faint pointer hover outlines for Voidlings and hexes, with the Voidling taking priority when both overlap. Clicking a placed hex now opens its conversion, occupancy and upgrade controls in the right-side Garden inspector without blocking the world.
 - Restored per-stat training progress bars in the compact companion inspector. Stat names and fills use their stat colors; the active bar has a visible pulsing outline, includes fractional live progress, and shows its actual `+… EXP/s` rate beside the stat name. The redundant passive/stop row is removed.
 - Simplified the Shop catalogue to Type and Price columns, replaced currency wording with the premium farming sprout, and removed receipt description and inventory-note copy.
+
+## Stage 3 handoff
+
+Implemented the option 02 race-entry composition beside the manager's rail: paper window, a scrolling course column with per-course summary/sections/length, a racer portrait row, the selected racer's five trained stats, a course · racer confirmation line and a single green Start race action. The window title now reads CHOOSE YOUR RACE because the screen selects both. The green confirm chrome moved out of the Shop into `UiFactory.ApplyPrimaryStyle` so both screens share it.
+
+Stat identity colors are authored for the dark Garden inspector, so swim yellow and stamina white disappeared on the paper panel; they are darkened by their excess luminance here. Course IDs and versions, `CreateRaceEntryFor`, race simulation, rewards and the daily-race entry path are unchanged — the daily race reuses the same screen with its single course.
+
+Review capture: [race entry](ui-overhaul/race-entry.png).
+
+### Launch the race-entry playtest
+
+From this workspace in PowerShell:
+
+```powershell
+.\playgame.bat --no-build --voidling-dev-profile=ui_overhaul_race_playtest
+```
+
+Open **Races** from the left rail and complete the race-entry checklist above before live-race work begins.
+
+Stage 3 passed Debug and Release builds, 237 tests, architecture/localization checks, `git diff --check`, Godot import and main-scene runtime, and the Garden UI, Voidling visual, race presentation, race completion, family tree and persistence recovery probes. The extended Garden UI smoke also completed the new race-entry selection and focus checks and produced the review capture at 1280×720.

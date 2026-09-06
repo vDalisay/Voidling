@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
+using Voidling.Domain.Racing;
 
 namespace VoidlingGame;
 
@@ -216,6 +217,7 @@ public partial class MainController
                     throw new InvalidOperationException("Rail destination did not open an unobstructed modal.");
                 RequireOnScreen(ModalPanel());
                 if (button.Name == "Shop") await VerifyShopUi(rail);
+                if (button.Name == "Races") await VerifyRaceEntryUi(rail);
                 await CaptureGardenUi($"menu-{button.Name}");
                 CloseModal();
                 await SettleGardenUi();
@@ -336,6 +338,48 @@ public partial class MainController
             throw new InvalidOperationException("Clicking the left side did not close the Shop.");
         RenderShop();
         await SettleGardenUi();
+    }
+
+    // Race entry must read beside the rail and swap racers without starting a race, so the probe
+    // exercises selection and focus only up to the Start action.
+    private async Task VerifyRaceEntryUi(Control rail)
+    {
+        var entry = _modalHost.FindChildren("RaceEntry", string.Empty, true, false)
+            .OfType<Voidling.Presentation.UI.Racing.RacePickerScreen>().Single();
+        RequireOnScreen(entry);
+        RequireSeparate(rail, ModalPanel());
+        foreach (var band in new[] { "CourseList", "RacerList", "RacerStats" })
+        {
+            if (entry.FindChild(band, true, false) == null)
+                throw new InvalidOperationException($"Race entry is missing the {band} band.");
+        }
+
+        var courses = RaceCourseCatalog.All.ToArray();
+        var last = FindGardenButton(entry, "Course_" + courses[^1].Id);
+        await ClickGardenControl(last);
+        await SettleGardenUi();
+        if (!last.ButtonPressed || courses.Take(courses.Length - 1)
+                .Any(course => FindGardenButton(entry, "Course_" + course.Id).ButtonPressed))
+            throw new InvalidOperationException("Race entry did not keep exactly one selected course.");
+
+        var racers = _session.State.Voidlings.ToArray();
+        if (racers.Length > 1)
+        {
+            var second = FindGardenButton(entry, "Racer_" + racers[1].Id);
+            await ClickGardenControl(second);
+            await SettleGardenUi();
+            if (!second.ButtonPressed || FindGardenButton(entry, "Racer_" + racers[0].Id).ButtonPressed)
+                throw new InvalidOperationException("Race entry did not keep exactly one selected racer.");
+            var stats = entry.FindChild("RacerStats", true, false);
+            if (stats.FindChildren("*", "Label", true, false).OfType<Label>()
+                    .All(label => label.Text != racers[1].Name + " · trained stats"))
+                throw new InvalidOperationException("Race entry stats did not follow the selected racer.");
+        }
+
+        var start = FindGardenButton(entry, "StartRace");
+        start.GrabFocus();
+        if (!start.HasFocus()) throw new InvalidOperationException("Race entry Start action is not focusable.");
+        await CaptureGardenUi("race-entry");
     }
 
     private static Button FindGardenButton(Node node, string name)

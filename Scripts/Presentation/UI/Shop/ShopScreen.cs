@@ -285,28 +285,9 @@ public partial class ShopScreen : VBoxContainer
         buy.AddThemeConstantOverride("icon_max_width", 12);
         buy.Name = "BuySelected";
         buy.CustomMinimumSize = new Vector2(125, 28);
-        ApplyBuyStyle(buy);
+        UiFactory.ApplyPrimaryStyle(buy);
         buy.Pressed += product.Buy;
         _receipt.AddChild(buy);
-    }
-
-    private static void ApplyBuyStyle(Button button)
-    {
-        static StyleBoxFlat Style(Color color) => new()
-        {
-            BgColor = color,
-            BorderColor = Color.FromHtml("#315A42"),
-            BorderWidthLeft = 2, BorderWidthRight = 2,
-            BorderWidthTop = 2, BorderWidthBottom = 2,
-            CornerRadiusTopLeft = 3, CornerRadiusTopRight = 3,
-            CornerRadiusBottomLeft = 3, CornerRadiusBottomRight = 3
-        };
-        button.AddThemeStyleboxOverride("normal", Style(Color.FromHtml("#477052")));
-        button.AddThemeStyleboxOverride("hover", Style(Color.FromHtml("#568761")));
-        button.AddThemeStyleboxOverride("pressed", Style(Color.FromHtml("#355D43")));
-        button.AddThemeColorOverride("font_color", Color.FromHtml("#FFF3D2"));
-        button.AddThemeColorOverride("font_hover_color", Colors.White);
-        button.AddThemeColorOverride("font_pressed_color", Colors.White);
     }
 
     private IEnumerable<Product> Products()

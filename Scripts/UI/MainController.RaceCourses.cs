@@ -19,7 +19,8 @@ public partial class MainController
         var viewState = owned.Select(CreateRacePickerView).ToArray();
         var courses = RaceCourseCatalog.All.Select(CreateRacePickerCourseView).ToArray();
 
-        var box = OpenModal(Tr("UI_RACE_PICKER_TITLE"), new Vector2(552, 335));
+        var box = OpenRailModal(Tr("UI_RACE_PICKER_TITLE"), new Vector2(540, 330),
+            panelTint: new Color(232f / 220f, 207f / 224f, 166f / 210f));
         var screen = new RacePickerScreen();
         screen.Configure(new RacePickerScreenState(
             viewState,
@@ -36,6 +37,7 @@ public partial class MainController
             StartRaceWithCourse(creatureId, courseId, courseVersion);
         };
         box.AddChild(screen);
+        Callable.From(screen.FocusSelection).CallDeferred();
     }
 
     // The section list is read off the authored course instead of being written by hand, so a course
