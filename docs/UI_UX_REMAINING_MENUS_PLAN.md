@@ -269,5 +269,37 @@ loop uncapped and a frame count says nothing about whether a three-second beat h
 rather than localization keys, leaving `UI_BREED_RELATED`, `UI_BREED_CLEAN_OUTCROSS` and
 `UI_BREED_UNRELATED_BURDEN` orphaned in `en.po`. It predates this branch and is left alone here.
 
-A treat left on the ground when the game closes is lost, because a drop is presentation state and is
-not persisted. The treat is not spent either, so nothing the player owns disappears with it.
+(A treat left on the ground used to be lost on quit. That is fixed in the pass below.)
+
+## Stage 6 second feedback pass
+
+**Shop eggs and bred eggs are separate.** The satchel's single Eggs category became two, Shop eggs
+and Bred eggs, each appearing only when the save holds one of that kind. An egg is named for its own
+source and numbered within it, so a player with one bred egg reads "Bred egg 1" rather than whatever
+position it happened to hold among the shop's. Stored, incubating and failed eggs all follow their
+source, and neither category ever lists the other's egg. The genome still stays hidden until it
+hatches; only where the egg came from is shown.
+
+**A treat on the ground survives a quit.** A drop was presentation state living in the
+`GardenController`. It is now `GameStateData.DroppedTreats`, additive and non-null, so a save written
+before it loads with bare ground. `GameSession.DropTreat` records the drop and refuses to put down
+more of one treat than the satchel holds; `ClaimDroppedTreat` takes the drop off the ground *before*
+calling `UseTrainingItem`, so a second claim in the same frame, or a quit mid-animation, cannot spend
+the same treat twice. The Garden now renders drops from state exactly as it renders eggs — building a
+visual for each and freeing the ones the save no longer has — and a treat restored from a save skips
+the drop hop, because it was already lying there.
+
+Nothing the player owns changes by dropping: the training item stays in the satchel until something
+eats it, which is what makes a saved drop free.
+
+### Verification
+
+Debug and Release builds; 249 tests — three new ones cover the JSON round trip the repository
+performs, an older save loading with bare ground, and migration discarding a drop that lost its stat;
+architecture greps; every `UI_*` key referenced by `Scripts/` resolves, with the keys this pass
+orphaned removed; Godot import; the Garden UI smoke, extended to check that putting a treat down does
+not spend it, that the drop is recorded in save state, and that each egg category lists its own eggs
+and never the other's; the visual, race-presentation, race-completion, family-tree and
+persistence-recovery probes; `git diff --check`.
+
+Review capture: [split egg categories](ui-overhaul/inventory-eggs.png).

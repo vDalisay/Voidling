@@ -97,6 +97,16 @@ public partial class MainController : Node
         }
     }
 
+    /// <summary>This egg's position among the ones it shares a source with, counting from one.</summary>
+    private static int NumberWithinSource(GameStateData state, EggData egg)
+        => state.OwnedEggs
+            .Where(candidate => candidate.Source == egg.Source)
+            .ToList()
+            .FindIndex(candidate => ReferenceEquals(candidate, egg)) + 1;
+
+    private static string EggNameKey(EggData egg)
+        => egg.Source == EggSource.Bred ? "UI_INVENTORY_BRED_EGG" : "UI_INVENTORY_SHOP_EGG";
+
     private void ShowInventory()
     {
         var state = _session.State;
@@ -112,15 +122,18 @@ public partial class MainController : Node
                 state.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0,
                 18 + index))
             .ToList();
+        // Each kind counts from one: a player with a single bred egg should read "Bred egg 1",
+        // not whatever position it happens to hold among the shop's.
         var storedEggs = state.OwnedEggs
             .Where(egg => egg.State == EggState.Stored)
-            .Select((egg, index) => new StoredEggViewState(
+            // What the player already knows about an unhatched egg: where it came from. Its genome
+            // stays hidden until it hatches.
+            .Select(egg => new StoredEggViewState(
                 egg.Id,
-                string.Format(Tr("UI_INVENTORY_STORED_EGG"), index + 1),
-                // What the player already knows about an unhatched egg: where it came from. Its
-                // genome stays hidden until it hatches.
+                string.Format(Tr(EggNameKey(egg)), NumberWithinSource(state, egg)),
                 Tr(egg.Source == EggSource.Bred ? "UI_INVENTORY_EGG_BRED" : "UI_INVENTORY_EGG_COMMON"),
-                GameRules.TintColor(egg.TintHex)))
+                GameRules.TintColor(egg.TintHex),
+                egg.Source == EggSource.Bred))
             .ToList();
 
         var storedLand = state.GardenModules
@@ -137,7 +150,10 @@ public partial class MainController : Node
 
         var failedEggs = state.OwnedEggs
             .Where(egg => egg.State == EggState.Failed)
-            .Select((egg, index) => new FailedEggViewState(egg.Id, string.Format(Tr("UI_INVENTORY_FAILED_EGG"), index + 1)))
+            .Select((egg, index) => new FailedEggViewState(
+                egg.Id,
+                string.Format(Tr("UI_INVENTORY_FAILED_EGG"), index + 1),
+                egg.Source == EggSource.Bred))
             .ToList();
         var eggShells = state.EggShells
             .Select((shell, index) => new EggShellViewState(shell.Id, string.Format(Tr("UI_INVENTORY_SHELL"), index + 1), GameRules.EggShellSalePrice))
@@ -145,7 +161,11 @@ public partial class MainController : Node
         var incubationSkipCount = state.UtilityItems.TryGetValue(ShopItemIds.FullIncubationSkip, out var ownedSkips) ? Math.Max(0, ownedSkips) : 0;
         var incubatingEggs = state.OwnedEggs
             .Where(egg => egg.State == EggState.Incubating && egg.IncubationSeconds < egg.RequiredIncubationSeconds)
-            .Select((egg, index) => new IncubatingEggViewState(egg.Id, string.Format(Tr("UI_INVENTORY_EGG"), index + 1), Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds))))
+            .Select(egg => new IncubatingEggViewState(
+                egg.Id,
+                string.Format(Tr(EggNameKey(egg)), NumberWithinSource(state, egg)),
+                Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds)),
+                egg.Source == EggSource.Bred))
             .ToList();
 
         var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(520, 292));
@@ -164,9 +184,9 @@ public partial class MainController : Node
         screen.PlaceTreatRequested += statId =>
         {
             // A treat is only spent when something eats it, so the ground must never hold more of
-            // one than the satchel actually has.
+            // one than the satchel actually has. The session enforces that on the drop itself.
             var owned = _session.State.TrainingItems.TryGetValue(statId, out var stock) ? stock : 0;
-            if (owned <= _garden.DroppedTreatCount(statId))
+            if (owned <= _session.DroppedTreatCount(statId))
                 return;
             CloseModal();
             _garden.BeginTreatPlacement(statId);

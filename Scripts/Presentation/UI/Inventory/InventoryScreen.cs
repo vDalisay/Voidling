@@ -9,10 +9,11 @@ namespace Voidling.Presentation.UI.Inventory;
 
 /// <summary>A treat: what it is, how many, and the one line saying what it does.</summary>
 public readonly record struct InventoryItemViewState(string DisplayName, string Description, string StatId, int Count, int IconIndex, bool UsesEggIcon = false);
-public readonly record struct FailedEggViewState(string EggId, string DisplayName);
+public readonly record struct FailedEggViewState(string EggId, string DisplayName, bool Bred);
 public readonly record struct EggShellViewState(string ShellId, string DisplayName, int SaleValue);
-public readonly record struct IncubatingEggViewState(string EggId, string DisplayName, int SecondsRemaining);
-public readonly record struct StoredEggViewState(string EggId, string DisplayName, string Description, Color TintColor);
+public readonly record struct IncubatingEggViewState(string EggId, string DisplayName, int SecondsRemaining, bool Bred);
+/// <summary>An egg waiting in the satchel. <paramref name="Bred"/> splits the shop's from your own.</summary>
+public readonly record struct StoredEggViewState(string EggId, string DisplayName, string Description, Color TintColor, bool Bred);
 /// <summary>A piece of ground waiting in the inventory, named and shaped by what was bought.</summary>
 public readonly record struct StoredLandViewState(string ModuleId, string DisplayName, string ShapeId, Color Tint);
 public sealed record InventoryScreenState(IReadOnlyList<InventoryItemViewState> Items, IReadOnlyList<FailedEggViewState> FailedEggs, IReadOnlyList<EggShellViewState> EggShells, int IncubationSkipCount, IReadOnlyList<IncubatingEggViewState> IncubatingEggs, IReadOnlyList<StoredEggViewState> StoredEggs, IReadOnlyList<StoredLandViewState> StoredLand);
@@ -25,7 +26,8 @@ public sealed record InventoryScreenState(IReadOnlyList<InventoryItemViewState> 
 public partial class InventoryScreen : HBoxContainer
 {
     public const string TreatsCategory = "Treats";
-    public const string EggsCategory = "Eggs";
+    public const string ShopEggsCategory = "ShopEggs";
+    public const string BredEggsCategory = "BredEggs";
     public const string LandCategory = "Land";
     public const string ShellsCategory = "Shells";
 
@@ -104,11 +106,16 @@ public partial class InventoryScreen : HBoxContainer
     private IEnumerable<string> AvailableCategories()
     {
         if (_state!.Items.Any(item => !item.UsesEggIcon && item.Count > 0)) yield return TreatsCategory;
-        if (_state.StoredEggs.Count > 0 || _state.IncubatingEggs.Count > 0 ||
-            _state.FailedEggs.Count > 0 || _state.IncubationSkipCount > 0) yield return EggsCategory;
+        if (HasEggs(bred: false)) yield return ShopEggsCategory;
+        if (HasEggs(bred: true)) yield return BredEggsCategory;
         if (_state.StoredLand.Count > 0) yield return LandCategory;
         if (_state.EggShells.Count > 0) yield return ShellsCategory;
     }
+
+    private bool HasEggs(bool bred)
+        => _state!.StoredEggs.Any(egg => egg.Bred == bred) ||
+           _state.IncubatingEggs.Any(egg => egg.Bred == bred) ||
+           _state.FailedEggs.Any(egg => egg.Bred == bred);
 
     private void NormalizeCategory()
     {
@@ -259,16 +266,17 @@ public partial class InventoryScreen : HBoxContainer
             }
             yield break;
         }
-        if (_category == EggsCategory)
+        if (_category == ShopEggsCategory || _category == BredEggsCategory)
         {
-            foreach (var egg in _state!.StoredEggs)
+            var bred = _category == BredEggsCategory;
+            foreach (var egg in _state!.StoredEggs.Where(candidate => candidate.Bred == bred))
             {
                 var captured = egg;
                 yield return new Slot("egg:" + egg.EggId, egg.DisplayName, egg.Description, 1, egg.TintColor,
                     () => TintedEgg(captured.TintColor), Tr("UI_INVENTORY_PLACE"),
                     () => PlaceStoredEggRequested?.Invoke(captured));
             }
-            foreach (var egg in _state.IncubatingEggs)
+            foreach (var egg in _state.IncubatingEggs.Where(candidate => candidate.Bred == bred))
             {
                 var captured = egg;
                 var canSkip = _state.IncubationSkipCount > 0;
@@ -278,7 +286,7 @@ public partial class InventoryScreen : HBoxContainer
                     canSkip ? string.Format(Tr("UI_INVENTORY_USE_SKIP"), _state.IncubationSkipCount) : null,
                     canSkip ? () => UseIncubationSkipRequested?.Invoke(captured.EggId) : null);
             }
-            foreach (var failed in _state.FailedEggs)
+            foreach (var failed in _state.FailedEggs.Where(candidate => candidate.Bred == bred))
             {
                 var captured = failed;
                 yield return new Slot("failed:" + failed.EggId, failed.DisplayName, Tr("UI_INVENTORY_EGG_FAILED"), 1,

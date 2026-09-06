@@ -31,24 +31,20 @@ public partial class GardenController
     /// <summary>Creature ID and stat ID of a treat that was actually eaten.</summary>
     public event Action<string, string>? TreatEaten;
 
-    private sealed class TreatDrop
+    private sealed class TreatVisual
     {
         public required string StatId { get; init; }
         public required Node2D Holder { get; init; }
         public required Sprite2D Sprite { get; init; }
-        public bool Claimed { get; set; }
     }
 
-    private readonly List<TreatDrop> _treatDrops = new();
+    /// <summary>Drops the session still owns, keyed by drop ID; an eaten one leaves this at once.</summary>
+    private readonly Dictionary<string, TreatVisual> _treatVisuals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Tween> _eatingTweens = new(StringComparer.Ordinal);
     private string _placingTreatStatId = "";
     private Node2D? _treatGhost;
 
     public bool IsPlacingTreat => _placingTreatStatId.Length > 0;
-
-    /// <summary>How many treats of one stat are already lying on the ground unclaimed.</summary>
-    public int DroppedTreatCount(string statId)
-        => _treatDrops.Count(drop => string.Equals(drop.StatId, statId, StringComparison.Ordinal));
 
     /// <summary>
     /// Arms "click the garden to put this treat down". Nothing is spent until a Voidling eats it,
@@ -99,25 +95,52 @@ public partial class GardenController
         var statId = _placingTreatStatId;
         var position = ClampToGarden(_eggsRoot.ToLocal(GetCanvasTransform().AffineInverse() * viewportPosition));
         CancelTreatPlacement();
-        DropTreat(statId, position);
+        // The session owns what is on the ground, so a drop survives a quit exactly like an egg.
+        if (_session.DropTreat(statId, position.X, position.Y) != null)
+            WakeVoidlingsFor(position);
         return true;
     }
 
-    private void DropTreat(string statId, Vector2 position)
+    /// <summary>
+    /// Mirrors the eggs: build a visual for every drop the save holds and free the ones it no
+    /// longer does. A treat being eaten has already left the state, and its visual is freed by the
+    /// eating animation instead.
+    /// </summary>
+    private void RefreshTreats()
     {
-        var holder = new Node2D { Position = position, ZIndex = 6 };
-        var sprite = CreateTreatSprite(statId);
-        holder.AddChild(sprite);
-        _eggsRoot.AddChild(holder);
-        _treatDrops.Add(new TreatDrop { StatId = statId, Holder = holder, Sprite = sprite });
+        var drops = _session.State.DroppedTreats;
+        foreach (var staleId in _treatVisuals.Keys
+                     .Where(id => drops.All(drop => !string.Equals(drop.Id, id, StringComparison.Ordinal)))
+                     .ToArray())
+        {
+            if (GodotObject.IsInstanceValid(_treatVisuals[staleId].Holder))
+                _treatVisuals[staleId].Holder.QueueFree();
+            _treatVisuals.Remove(staleId);
+        }
 
-        // A small hop so the treat reads as having been dropped rather than having always been there.
-        holder.Scale = Vector2.Zero;
-        var drop = CreateTween();
-        drop.TweenProperty(holder, "scale", Vector2.One, 0.32)
-            .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+        foreach (var drop in drops)
+        {
+            if (_treatVisuals.TryGetValue(drop.Id, out var existing))
+            {
+                existing.Holder.Position = new Vector2(drop.X, drop.Y);
+                continue;
+            }
 
-        WakeVoidlingsFor(holder.Position);
+            var holder = new Node2D { Position = new Vector2(drop.X, drop.Y), ZIndex = 6 };
+            var sprite = CreateTreatSprite(drop.StatId);
+            holder.AddChild(sprite);
+            _eggsRoot.AddChild(holder);
+            _treatVisuals[drop.Id] = new TreatVisual { StatId = drop.StatId, Holder = holder, Sprite = sprite };
+
+            // A small hop, but only for a treat put down during play. Ones restored from a save
+            // were already lying there and should not re-announce themselves.
+            if (!_initialRefreshComplete)
+                continue;
+            holder.Scale = Vector2.Zero;
+            var pop = CreateTween();
+            pop.TweenProperty(holder, "scale", Vector2.One, 0.32)
+                .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+        }
     }
 
     /// <summary>
@@ -138,28 +161,28 @@ public partial class GardenController
     /// <summary>Runs every frame from the Garden's own process, beside the egg pulse.</summary>
     private void UpdateTreatDrops()
     {
-        if (_treatDrops.Count == 0)
+        if (_treatVisuals.Count == 0)
             return;
 
-        for (var index = _treatDrops.Count - 1; index >= 0; index--)
+        foreach (var (dropId, visual) in _treatVisuals.ToArray())
         {
-            var drop = _treatDrops[index];
-            if (!GodotObject.IsInstanceValid(drop.Holder))
+            if (!GodotObject.IsInstanceValid(visual.Holder))
             {
-                _treatDrops.RemoveAt(index);
+                _treatVisuals.Remove(dropId);
                 continue;
             }
-            if (drop.Claimed)
-                continue;
 
-            var eater = NearestChaserWithinReach(drop.Holder.Position);
+            var eater = NearestChaserWithinReach(visual.Holder.Position);
             if (eater == null)
                 continue;
 
-            drop.Claimed = true;
-            _treatDrops.RemoveAt(index);
-            ReleaseChasers(drop.Holder.Position);
-            EatTreat(eater, drop.StatId, drop.Holder, drop.Sprite);
+            // Hand the visual to the eating animation before the state changes, so the refresh
+            // that follows the claim does not free the food mid-bite.
+            _treatVisuals.Remove(dropId);
+            ReleaseChasers(visual.Holder.Position);
+            PlayEatingSquish(eater);
+            PlayFoodShrink(visual.Holder, visual.Sprite);
+            _session.ClaimDroppedTreat(dropId, eater.CreatureId);
         }
     }
 
@@ -189,32 +212,22 @@ public partial class GardenController
     }
 
     /// <summary>
-    /// The eating beat: the Voidling squishes for three seconds while the food shrinks and fades
-    /// 30% inward each pass until nothing is left. The session applies the actual training.
+    /// The food half of the eating beat: three 30% bites while the whole thing fades, then gone.
     /// </summary>
-    private void EatTreat(VoidlingActor eater, string statId, Node2D food, Node2D sprite)
+    private void PlayFoodShrink(Node2D holder, Node2D sprite)
     {
-        var creatureId = eater.CreatureId;
-        PlayEatingSquish(eater);
-
-        var shrink = CreateTween();
-        shrink.SetParallel(true);
-        // Three 30% steps read as bites rather than one smooth fade.
-        var sequence = CreateTween();
         var scale = sprite.Scale;
+        var bites = CreateTween();
         for (var bite = 1; bite <= 3; bite++)
         {
             scale *= 0.70f;
-            sequence.TweenProperty(sprite, "scale", scale, TreatEatingSeconds / 3.0f)
+            bites.TweenProperty(sprite, "scale", scale, TreatEatingSeconds / 3.0f)
                 .SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
         }
-        shrink.TweenProperty(sprite, "modulate:a", 0.0f, TreatEatingSeconds)
+        var fade = CreateTween();
+        fade.TweenProperty(sprite, "modulate:a", 0.0f, TreatEatingSeconds)
             .SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
-        sequence.Finished += () =>
-        {
-            if (GodotObject.IsInstanceValid(food)) food.QueueFree();
-            TreatEaten?.Invoke(creatureId, statId);
-        };
+        bites.Finished += () => { if (GodotObject.IsInstanceValid(holder)) holder.QueueFree(); };
     }
 
     /// <summary>
@@ -230,22 +243,11 @@ public partial class GardenController
         if (!spawnFood)
             return;
 
+        var holder = new Node2D { Position = new Vector2(0, 6), ZIndex = 3 };
         var sprite = CreateTreatSprite(statId);
-        sprite.Position = new Vector2(0, 6);
-        sprite.ZIndex = 3;
-        actor.AddChild(sprite);
-        var scale = sprite.Scale;
-        var bites = CreateTween();
-        for (var bite = 1; bite <= 3; bite++)
-        {
-            scale *= 0.70f;
-            bites.TweenProperty(sprite, "scale", scale, TreatEatingSeconds / 3.0f)
-                .SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
-        }
-        var fade = CreateTween();
-        fade.TweenProperty(sprite, "modulate:a", 0.0f, TreatEatingSeconds)
-            .SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
-        bites.Finished += () => { if (GodotObject.IsInstanceValid(sprite)) sprite.QueueFree(); };
+        holder.AddChild(sprite);
+        actor.AddChild(holder);
+        PlayFoodShrink(holder, sprite);
     }
 
     private void PlayEatingSquish(VoidlingActor actor)
@@ -287,7 +289,11 @@ public partial class GardenController
     // The CI smoke drives the drop directly instead of synthesising a click at a world position
     // it would have to compute itself.
 
-    internal void DropTreatForProbe(string statId, Vector2 position) => DropTreat(statId, position);
+    internal void DropTreatForProbe(string statId, Vector2 position)
+    {
+        if (_session.DropTreat(statId, position.X, position.Y) != null)
+            WakeVoidlingsFor(position);
+    }
 
     internal Vector2 ActorPositionForProbe(string creatureId)
         => _actors.TryGetValue(creatureId, out var actor) && GodotObject.IsInstanceValid(actor)

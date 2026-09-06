@@ -443,6 +443,7 @@ public partial class GardenController : Node2D
 
         Select(_selectedId);
         RefreshEggs();
+        RefreshTreats();
         RefreshTileResidents(landChanged);
     }
 

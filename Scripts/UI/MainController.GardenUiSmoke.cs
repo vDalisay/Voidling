@@ -297,6 +297,7 @@ public partial class MainController
                     throw new InvalidOperationException("Tab navigation escapes the modal.");
             }
             await VerifyTreatDrop();
+            await VerifyEggCategories();
             await CaptureGardenUi("garden-menu");
             var age = _session.State.Voidlings.First().AdultAgeSeconds;
             await ToSignal(GetTree().CreateTimer(1.1), SceneTreeTimer.SignalName.Timeout);
@@ -651,8 +652,14 @@ public partial class MainController
         // Drop it right where a Voidling already stands, so the chase resolves in a few frames
         // rather than depending on how far it happened to wander.
         _garden.DropTreatForProbe(statId, _garden.ActorPositionForProbe(creature.Id));
-        if (_garden.DroppedTreatCount(statId) != 1)
+        if (_session.DroppedTreatCount(statId) != 1)
             throw new InvalidOperationException("The treat did not land in the Garden.");
+        // A dropped treat is owned state and stays in the satchel until something eats it, which
+        // is also why it can be saved without costing the player anything.
+        if (_session.State.TrainingItems[statId] != stock)
+            throw new InvalidOperationException("Putting a treat down spent it before anything ate it.");
+        if (_session.State.DroppedTreats.Count != 1)
+            throw new InvalidOperationException("The treat on the ground was not recorded in the save state.");
 
         // Wall-clock, not frames: headless runs the idle loop uncapped, so a frame budget says
         // nothing about whether the three-second eating beat has finished.
@@ -662,15 +669,73 @@ public partial class MainController
 
         if (_session.State.TrainingItems[statId] != stock - 1)
             throw new InvalidOperationException(
-                $"Nobody ate the treat. dropped={_garden.DroppedTreatCount(statId)} " +
+                $"Nobody ate the treat. dropped={_session.DroppedTreatCount(statId)} " +
                 $"chasing={_garden.ChasingCountForProbe()} eating={_garden.AnyVoidlingEatingForProbe()} " +
                 $"stock={_session.State.TrainingItems[statId]} expected={stock - 1}");
-        if (_garden.DroppedTreatCount(statId) != 0)
+        if (_session.DroppedTreatCount(statId) != 0)
             throw new InvalidOperationException("The eaten treat stayed on the ground.");
 
-        await ToSignal(GetTree().CreateTimer(1.0), SceneTreeTimer.SignalName.Timeout);
+        // The treat is spent the moment it is claimed, so the beat is still running here; wait it
+        // out before checking that the Voidling goes back to roaming.
+        await ToSignal(
+            GetTree().CreateTimer(GardenController.TreatEatingSeconds + 1.0f),
+            SceneTreeTimer.SignalName.Timeout);
         if (_garden.AnyVoidlingEatingForProbe())
             throw new InvalidOperationException("A Voidling never finished eating.");
+    }
+
+    /// <summary>
+    /// Shop eggs and bred eggs are different things to the player, so the satchel keeps them in
+    /// their own categories and never mixes one into the other's grid.
+    /// </summary>
+    private async Task VerifyEggCategories()
+    {
+        _session.State.OwnedEggs.Add(new EggData
+        {
+            Id = "probe-shop-egg", Source = EggSource.Store, State = EggState.Stored, TintHex = "#F6F0C9"
+        });
+        _session.State.OwnedEggs.Add(new EggData
+        {
+            Id = "probe-bred-egg", Source = EggSource.Bred, State = EggState.Stored, TintHex = "#C9E0F6"
+        });
+
+        ShowInventory();
+        await SettleGardenUi();
+        var satchel = _modalHost.FindChildren("Satchel", string.Empty, true, false)
+            .OfType<InventoryScreen>().Single(screen => !screen.IsQueuedForDeletion());
+        var categories = satchel.GetNode<VBoxContainer>("Categories");
+        FindGardenButton(categories, "Category" + InventoryScreen.ShopEggsCategory);
+        FindGardenButton(categories, "Category" + InventoryScreen.BredEggsCategory);
+
+        // Neither category may ever list an egg belonging to the other.
+        foreach (var (category, mine, theirs) in new[]
+                 {
+                     (InventoryScreen.ShopEggsCategory, "Slot_egg_probe-shop-egg", "Slot_egg_probe-bred-egg"),
+                     (InventoryScreen.BredEggsCategory, "Slot_egg_probe-bred-egg", "Slot_egg_probe-shop-egg")
+                 })
+        {
+            await ClickGardenControl(FindGardenButton(categories, "Category" + category));
+            await SettleGardenUi();
+            var slots = satchel.GetNode<PanelContainer>("Slots")
+                .FindChildren("Slot_*", "Button", true, false)
+                .OfType<Button>().Where(button => !button.IsQueuedForDeletion())
+                .Select(button => button.Name.ToString()).ToArray();
+            if (!slots.Contains(mine))
+                throw new InvalidOperationException($"{category} did not list its own egg.");
+            if (slots.Contains(theirs))
+                throw new InvalidOperationException($"{category} listed an egg from the other source.");
+            RequireOnScreen(satchel.GetNode<PanelContainer>("ItemDetail"));
+        }
+
+        await CaptureGardenUi("inventory-eggs");
+        CloseModal();
+        await SettleGardenUi();
+        if (_modalHost.IsOpen)
+            throw new InvalidOperationException("The satchel stayed open after the egg category check.");
+        _session.State.OwnedEggs.RemoveAll(egg => egg.Id.StartsWith("probe-", StringComparison.Ordinal));
+        // This check runs inside the Garden menu sequence, so hand that menu back to it.
+        ShowGardenMenu();
+        await SettleGardenUi();
     }
 
     private RaceEntryScreen FindRaceEntry()

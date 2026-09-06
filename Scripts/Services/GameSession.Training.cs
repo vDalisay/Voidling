@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using Voidling.Application.Garden;
 using Voidling.Application.Training;
 using Voidling.Domain.Rules;
 
@@ -17,6 +19,48 @@ public partial class GameSession
 
         RecordDailyMissionEvent(DailyMissionEventKind.PurchaseShopItem);
         SaveAndNotify($"Bought a {DisplayStatId(statId)} treat.");
+    }
+
+    /// <summary>
+    /// Puts a treat on the ground. Nothing is spent yet — the item leaves the satchel only when a
+    /// Voidling eats it — so the ground may never hold more of one treat than the player owns, and
+    /// a drop that survives a quit costs nothing.
+    /// </summary>
+    public string? DropTreat(string statId, float x, float y)
+    {
+        if (string.IsNullOrWhiteSpace(statId))
+            return null;
+
+        var owned = State.TrainingItems.TryGetValue(statId, out var stock) ? stock : 0;
+        if (owned <= DroppedTreatCount(statId))
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.ForTraining(TrainingFailure.NoItemOwned, DisplayStatId(statId)));
+            return null;
+        }
+
+        var drop = new DroppedTreatData { Id = NewId(), StatId = statId, X = x, Y = y };
+        State.DroppedTreats.Add(drop);
+        SaveAndNotify($"Put a {DisplayStatId(statId)} treat on the ground.");
+        return drop.Id;
+    }
+
+    /// <summary>How many treats of one stat are already lying on the ground unclaimed.</summary>
+    public int DroppedTreatCount(string statId)
+        => State.DroppedTreats.Count(drop => string.Equals(drop.StatId, statId, StringComparison.Ordinal));
+
+    /// <summary>
+    /// A Voidling reached a dropped treat. The drop is taken off the ground first so a second
+    /// claim in the same frame, or a quit mid-animation, cannot spend the treat twice.
+    /// </summary>
+    public bool ClaimDroppedTreat(string dropId, string creatureId)
+    {
+        var drop = State.DroppedTreats.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, dropId, StringComparison.Ordinal));
+        if (drop == null || !State.DroppedTreats.Remove(drop))
+            return false;
+
+        UseTrainingItem(creatureId, drop.StatId);
+        return true;
     }
 
     public void UseTrainingItem(string creatureId, string statId)

@@ -267,9 +267,6 @@ msgstr "GROWING THE RACE TRACK..."
 msgid "UI_RACE_COUNTDOWN_GO"
 msgstr "RACE!"
 
-msgid "UI_INVENTORY_STORED_EGG"
-msgstr "Unplaced egg {0}"
-
 msgid "UI_INVENTORY_PLACE"
 msgstr "Place"
 
@@ -1112,9 +1109,6 @@ msgstr "Sell {0}"
 msgid "UI_INVENTORY_SHELL"
 msgstr "Eggshell {0}"
 
-msgid "UI_INVENTORY_EGG"
-msgstr "Egg {0}"
-
 msgid "UI_BREED_PICK_PARENTS"
 msgstr "Pick two adults"
 
@@ -1192,3 +1186,15 @@ msgstr "Take back"
 
 msgid "UI_GARDEN_EGG_FAILED_TITLE"
 msgstr "FAILED EGG"
+
+msgid "UI_INVENTORY_CATEGORY_SHOPEGGS"
+msgstr "Shop eggs"
+
+msgid "UI_INVENTORY_CATEGORY_BREDEGGS"
+msgstr "Bred eggs"
+
+msgid "UI_INVENTORY_SHOP_EGG"
+msgstr "Shop egg {0}"
+
+msgid "UI_INVENTORY_BRED_EGG"
+msgstr "Bred egg {0}"
