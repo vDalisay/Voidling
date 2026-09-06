@@ -93,7 +93,7 @@ public partial class RaceCompletionSmokeProbe : Node
 
     /// <summary>
     /// The layout contract: each named group is present, inside the viewport, and clear of every
-    /// other group, and the player's own group carries the portrait, stamina and Cheer together.
+    /// other group, with stamina and Cheer together at bottom-left and course progress bottom-right.
     /// </summary>
     private void ValidateHudLayout(RaceScreen race)
     {
@@ -129,7 +129,7 @@ public partial class RaceCompletionSmokeProbe : Node
         }
 
         var player = hud.GetNode<Control>("RaceHudPlayer");
-        foreach (var part in new[] { "PlayerPortrait", "PlayerName", "PlayerPlace", "StaminaDial", "StaminaBar", "CheerButton" })
+        foreach (var part in new[] { "StaminaBar", "StaminaValue", "CheerButton", "CheerCost" })
         {
             if (player.FindChild(part, recursive: true, owned: false) == null)
                 throw new InvalidOperationException($"The player's race HUD group is missing '{part}'.");
@@ -141,13 +141,25 @@ public partial class RaceCompletionSmokeProbe : Node
             throw new InvalidOperationException("The Cheer action is not keyboard accessible.");
         }
 
+        if (player.FindChild("StaminaTicks", recursive: true, owned: false) is not Control ticks ||
+            ticks.GetChildCount() < 2)
+        {
+            throw new InvalidOperationException("The stamina bar is missing its 50-point chunk marks.");
+        }
+
         if (hud.GetNode<Control>("RaceHudCourse").FindChild("CourseStrip", recursive: true, owned: false) == null)
             throw new InvalidOperationException("Course progress is missing its course strip.");
+
+        if (player.GetGlobalRect().Position.X > 10.0f ||
+            hud.GetNode<Control>("RaceHudCourse").GetGlobalRect().End.X < viewport.X - 10.0f)
+        {
+            throw new InvalidOperationException("Stamina and course progress are not anchored to opposite bottom corners.");
+        }
     }
 
     /// <summary>
     /// The readouts the groups exist to carry: every standings row names a racer, exactly one row is
-    /// the player's, and the player's group states a place. All are filled by the live HUD update,
+    /// the player's, and course progress states a position. All are filled by the live HUD update,
     /// so an empty one means the HUD stopped following the race.
     /// </summary>
     private void ValidateHudReadouts(RaceScreen race)
@@ -179,12 +191,6 @@ public partial class RaceCompletionSmokeProbe : Node
 
         if (playerRows != 1)
             throw new InvalidOperationException($"Standings marked {playerRows} rows as the player instead of one.");
-
-        if (hud.GetNode<Control>("RaceHudPlayer").FindChild("PlayerPlace", recursive: true, owned: false)
-                is not Label place || string.IsNullOrWhiteSpace(place.Text))
-        {
-            throw new InvalidOperationException("The player's HUD group never reported a place.");
-        }
 
         if (hud.GetNode<Control>("RaceHudCourse").FindChild("CourseProgress", recursive: true, owned: false)
                 is not Label progress || string.IsNullOrWhiteSpace(progress.Text))

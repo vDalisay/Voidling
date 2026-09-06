@@ -12,10 +12,8 @@ using VoidlingGame;
 namespace Voidling.Presentation.Racing;
 
 /// <summary>
-/// The live race HUD, composed as the "creature first" reference asks: the world stays dominant and
-/// the chrome sits in four named groups around it — the course banner top left, the opponent
-/// standings on the right, course progress bottom left, and the player's own portrait, place,
-/// stamina and Cheer together at bottom centre.
+/// The live race HUD keeps the world dominant: standings stay on the right, while the actionable
+/// stamina/Cheer unit and course progress occupy opposite bottom corners.
 ///
 /// Presentation only. Every value shown is read from the simulation or lockstep snapshot the rest of
 /// <see cref="RaceScreen"/> already owns; nothing here can change a race outcome.
@@ -26,19 +24,13 @@ public partial class RaceScreen
     internal const int HudCanvasLayer = 20;
 
     /// <summary>
-    /// The four groups the "creature first" layout is made of, plus the pause reminder. Named so the
+    /// The HUD groups, including the pause reminder. Named so the
     /// CI probe can require each one on screen and clear of the others.
     /// </summary>
     internal static readonly string[] HudGroupNames =
     {
-        "RaceHudBanner", "RaceHudMenuHint", "RaceHudStandings", "RaceHudCourse", "RaceHudPlayer"
+        "RaceHudMenuHint", "RaceHudStandings", "RaceHudCourse", "RaceHudPlayer"
     };
-
-    /// <summary>Frames in the premium stamina dial sheet, empty through full.</summary>
-    private const int StaminaDialFrames = 37;
-
-    private static readonly Texture2D StaminaDialSheet = GD.Load<Texture2D>(
-        UiFactory.UiRoot + "Other UI sprites/Stamina circle with black outline sprite sheet .png");
 
     private static readonly Color StaminaColor = Color.FromHtml("#7FB56B");
     private static readonly Color StandingHighlight = Color.FromHtml("#8FBF7C");
@@ -46,16 +38,13 @@ public partial class RaceScreen
     private Button _cheerButton = null!;
     private ProgressBar _staminaBar = null!;
     private Label _staminaLabel = null!;
-    private TextureRect _staminaDial = null!;
-    private AtlasTexture _staminaDialTexture = null!;
+    private Control _staminaTicks = null!;
+    private double _staminaTickMaximum = -1.0;
     private Label _faultLabel = null!;
     private ColorRect _faultPlaque = null!;
     private RaceMiniMap _miniMap = null!;
 
-    private Label _sectionLabel = null!;
     private Label _progressLabel = null!;
-    private Label _playerNameLabel = null!;
-    private Label _playerPlaceLabel = null!;
     private readonly List<StandingRow> _standingRows = new();
 
     /// <summary>One opponent-standings line. Positional: row 0 always shows whoever is leading.</summary>
@@ -66,7 +55,6 @@ public partial class RaceScreen
         var canvas = new CanvasLayer { Layer = HudCanvasLayer, Name = "RaceHud" };
         AddChild(canvas);
 
-        canvas.AddChild(BuildBanner());
         canvas.AddChild(BuildMenuHint());
         canvas.AddChild(BuildStandings());
         canvas.AddChild(BuildCoursePanel());
@@ -75,32 +63,6 @@ public partial class RaceScreen
     }
 
     // ---- Groups -------------------------------------------------------------------------------
-
-    private Control BuildBanner()
-    {
-        var panel = HudPanel("RaceHudBanner", new Vector2(8, 6), new Vector2(176, 50));
-        var box = new VBoxContainer();
-        box.AddThemeConstantOverride("separation", 0);
-        panel.AddChild(box);
-
-        var eyebrow = UiFactory.CreateLabel(
-            Tr(_multiplayerBridge != null ? "UI_RACE_HUD_ONLINE" : "UI_RACE_HUD_LOCAL"),
-            6);
-        eyebrow.AddThemeColorOverride("font_color", Color.FromHtml("#7A8A6F"));
-        box.AddChild(eyebrow);
-
-        var (nameKey, _) = RaceCoursePresentationCatalog.KeysFor(_entry!.CourseDefinition.Id);
-        var title = UiFactory.CreateLabel(Tr(nameKey), 12);
-        title.AddThemeColorOverride("font_color", Color.FromHtml("#3B5044"));
-        UiFactory.SetLabelBold(title, true);
-        box.AddChild(title);
-
-        _sectionLabel = UiFactory.CreateLabel(string.Empty, 7);
-        _sectionLabel.Name = "CourseSection";
-        _sectionLabel.AddThemeColorOverride("font_color", Color.FromHtml("#6F7F66"));
-        box.AddChild(_sectionLabel);
-        return panel;
-    }
 
     /// <summary>
     /// A reminder of the pause key, not a control: the race is already left through Escape, and a
@@ -164,7 +126,7 @@ public partial class RaceScreen
 
     private Control BuildCoursePanel()
     {
-        var panel = HudPanel("RaceHudCourse", new Vector2(8, 288), new Vector2(164, 64));
+        var panel = ButtonChromePanel("RaceHudCourse", new Vector2(468, 288), new Vector2(164, 64));
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 2);
         panel.AddChild(box);
@@ -203,52 +165,30 @@ public partial class RaceScreen
 
     private Control BuildPlayerPanel()
     {
-        var panel = HudPanel("RaceHudPlayer", new Vector2(180, 282), new Vector2(280, 70));
+        var panel = ButtonChromePanel("RaceHudPlayer", new Vector2(8, 306), new Vector2(228, 46));
         var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 6);
         panel.AddChild(row);
 
-        var entrant = _entry!.Entrants.FirstOrDefault(value =>
-            string.Equals(value.Participant.CreatureId, _playerId, StringComparison.Ordinal))
-            ?? _entry.Entrants[0];
-        var portrait = CreateEntrantPortrait(entrant, new Vector2(44, 44));
-        portrait.Name = "PlayerPortrait";
-        portrait.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        row.AddChild(portrait);
-
-        var column = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-        column.AddThemeConstantOverride("separation", 3);
-        row.AddChild(column);
-
-        var identity = new HBoxContainer();
-        identity.AddThemeConstantOverride("separation", 4);
-        _playerNameLabel = UiFactory.CreateLabel(entrant.Participant.DisplayName, 10);
-        _playerNameLabel.Name = "PlayerName";
-        _playerNameLabel.AddThemeColorOverride("font_color", Color.FromHtml("#3B5044"));
-        _playerNameLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        _playerNameLabel.ClipText = true;
-        UiFactory.SetLabelBold(_playerNameLabel, true);
-        identity.AddChild(_playerNameLabel);
-        _playerPlaceLabel = UiFactory.CreateLabel(string.Empty, 8);
-        _playerPlaceLabel.Name = "PlayerPlace";
-        _playerPlaceLabel.HorizontalAlignment = HorizontalAlignment.Right;
-        identity.AddChild(_playerPlaceLabel);
-        column.AddChild(identity);
-
-        var staminaRow = new HBoxContainer();
-        staminaRow.AddThemeConstantOverride("separation", 4);
-        _staminaDialTexture = new AtlasTexture { Atlas = StaminaDialSheet, Region = new Rect2(0, 0, 16, 16) };
-        _staminaDial = new TextureRect
-        {
-            Name = "StaminaDial",
-            Texture = _staminaDialTexture,
-            CustomMinimumSize = new Vector2(20, 20),
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
-            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter
-        };
-        staminaRow.AddChild(_staminaDial);
+        _cheerButton = UiFactory.CreateButton(string.Empty);
+        _cheerButton.Name = "CheerButton";
+        _cheerButton.Icon = UiFactory.CreateGardenIcon(14, 0);
+        _cheerButton.ExpandIcon = true;
+        _cheerButton.CustomMinimumSize = new Vector2(34, 34);
+        _cheerButton.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        _cheerButton.TooltipText = Tr("UI_RACE_CHEER");
+        StyleCheerIcon(_cheerButton);
+        _cheerButton.Pressed += CheerPlayer;
+        var cheerCost = UiFactory.CreateLabel(Mathf.CeilToInt(_entry!.Rules.CheerCost).ToString(CultureInfo.CurrentCulture), 7);
+        cheerCost.Name = "CheerCost";
+        cheerCost.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        cheerCost.HorizontalAlignment = HorizontalAlignment.Center;
+        cheerCost.VerticalAlignment = VerticalAlignment.Center;
+        cheerCost.MouseFilter = Control.MouseFilterEnum.Ignore;
+        cheerCost.AddThemeColorOverride("font_color", Color.FromHtml("#5B431F"));
+        cheerCost.AddThemeConstantOverride("outline_size", 2);
+        cheerCost.AddThemeColorOverride("font_outline_color", Color.FromHtml("#FFF0B0"));
+        _cheerButton.AddChild(cheerCost);
+        row.AddChild(_cheerButton);
 
         _staminaBar = new ProgressBar
         {
@@ -257,7 +197,7 @@ public partial class RaceScreen
             MaxValue = 100,
             Value = 100,
             ShowPercentage = false,
-            CustomMinimumSize = new Vector2(0, 12),
+            CustomMinimumSize = new Vector2(0, 18),
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             SizeFlagsVertical = Control.SizeFlags.ShrinkCenter
         };
@@ -268,21 +208,39 @@ public partial class RaceScreen
         fill.SetCornerRadiusAll(2);
         _staminaBar.AddThemeStyleboxOverride("background", background);
         _staminaBar.AddThemeStyleboxOverride("fill", fill);
-        staminaRow.AddChild(_staminaBar);
-        column.AddChild(staminaRow);
 
+        _staminaTicks = new Control { Name = "StaminaTicks", MouseFilter = Control.MouseFilterEnum.Ignore };
+        _staminaTicks.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        _staminaBar.AddChild(_staminaTicks);
         _staminaLabel = UiFactory.CreateLabel(string.Empty, 7);
-        _staminaLabel.AddThemeColorOverride("font_color", Color.FromHtml("#5C6B54"));
-        column.AddChild(_staminaLabel);
-
-        _cheerButton = UiFactory.CreateButton(Tr("UI_RACE_CHEER"));
-        _cheerButton.Name = "CheerButton";
-        _cheerButton.CustomMinimumSize = new Vector2(80, 44);
-        _cheerButton.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        UiFactory.ApplyPrimaryStyle(_cheerButton);
-        _cheerButton.Pressed += CheerPlayer;
-        row.AddChild(_cheerButton);
+        _staminaLabel.Name = "StaminaValue";
+        _staminaLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        _staminaLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        _staminaLabel.VerticalAlignment = VerticalAlignment.Center;
+        _staminaLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _staminaLabel.AddThemeColorOverride("font_color", Color.FromHtml("#34452F"));
+        _staminaLabel.AddThemeConstantOverride("outline_size", 2);
+        _staminaLabel.AddThemeColorOverride("font_outline_color", Color.FromHtml("#EEF4DF"));
+        _staminaBar.AddChild(_staminaLabel);
+        row.AddChild(_staminaBar);
         return panel;
+    }
+
+    private static void StyleCheerIcon(Button button)
+    {
+        static StyleBoxFlat State(Color color) => new() { BgColor = color, CornerRadiusTopLeft = 4,
+            CornerRadiusTopRight = 4, CornerRadiusBottomLeft = 4, CornerRadiusBottomRight = 4 };
+
+        button.AddThemeStyleboxOverride("normal", new StyleBoxEmpty());
+        button.AddThemeStyleboxOverride("hover", State(new Color(1.0f, 0.91f, 0.48f, 0.35f)));
+        button.AddThemeStyleboxOverride("pressed", State(new Color(0.65f, 0.43f, 0.16f, 0.35f)));
+        button.AddThemeStyleboxOverride("disabled", new StyleBoxEmpty());
+        var focus = State(new Color(1.0f, 0.95f, 0.68f, 0.22f));
+        focus.DrawCenter = false;
+        focus.BorderColor = Color.FromHtml("#8A682F");
+        focus.SetBorderWidthAll(2);
+        button.AddThemeStyleboxOverride("focus", focus);
+        button.AddThemeColorOverride("icon_disabled_color", new Color(0.55f, 0.55f, 0.48f, 0.65f));
     }
 
     // The strip only appears to report a fault the player has to know about, such as multiplayer
@@ -329,6 +287,16 @@ public partial class RaceScreen
         return panel;
     }
 
+    /// <summary>Uses the same premium normal-state texture as Return to Garden.</summary>
+    private static PanelContainer ButtonChromePanel(string name, Vector2 position, Vector2 size)
+    {
+        var source = UiFactory.CreateButton(string.Empty);
+        var panel = new PanelContainer { Name = name, Position = position, Size = size, CustomMinimumSize = size };
+        panel.AddThemeStyleboxOverride("panel", (StyleBox)source.GetThemeStylebox("normal").Duplicate());
+        source.Free();
+        return panel;
+    }
+
     // ---- Live values --------------------------------------------------------------------------
 
     private void UpdateHud()
@@ -337,46 +305,56 @@ public partial class RaceScreen
             return;
 
         var standings = ComputeStandings();
-        UpdatePlayerGroup(player, standings);
+        UpdatePlayerGroup(player);
         UpdateStandings(standings);
         UpdateCourseGroup(player);
     }
 
-    private void UpdatePlayerGroup(
-        RaceParticipantStateSnapshot player,
-        IReadOnlyList<(RaceEntrant Entrant, RaceParticipantStateSnapshot State)> standings)
+    private void UpdatePlayerGroup(RaceParticipantStateSnapshot player)
     {
         _staminaBar.MaxValue = player.MaxStamina;
         _staminaBar.Value = player.CurrentStamina;
-        var fraction = player.MaxStamina <= 0.0f
-            ? 0.0f
-            : Mathf.Clamp(player.CurrentStamina / player.MaxStamina, 0.0f, 1.0f);
-        _staminaDialTexture.Region = new Rect2(
-            Mathf.RoundToInt(fraction * (StaminaDialFrames - 1)) * 16,
-            0,
-            16,
-            16);
+        RebuildStaminaTicks(player.MaxStamina);
         _staminaLabel.Text = string.Format(
             CultureInfo.CurrentCulture,
             Tr("UI_RACE_STAMINA"),
             Mathf.CeilToInt(player.CurrentStamina),
             Mathf.CeilToInt(player.MaxStamina));
 
-        var place = 1 + standings.ToList().FindIndex(value =>
-            string.Equals(value.Entrant.Participant.CreatureId, _playerId, StringComparison.Ordinal));
-        if (place <= 0)
-            place = standings.Count;
-        _playerPlaceLabel.Text = string.Format(
-            CultureInfo.CurrentCulture,
-            Tr("UI_RACE_HUD_PLACE"),
-            Ordinal(place),
-            standings.Count);
-
         _cheerButton.Disabled = !_running ||
                                 player.Finished ||
                                 player.CheerSeconds > 0.0f ||
                                 player.CurrentStamina < _entry!.Rules.CheerCost;
-        _cheerButton.Text = Tr(player.CheerSeconds > 0.0f ? "UI_RACE_CHEERING" : "UI_RACE_CHEER");
+        _cheerButton.TooltipText = Tr(player.CheerSeconds > 0.0f ? "UI_RACE_CHEERING" : "UI_RACE_CHEER");
+    }
+
+    private void RebuildStaminaTicks(double maximum)
+    {
+        if (Mathf.IsEqualApprox((float)_staminaTickMaximum, (float)maximum))
+            return;
+
+        foreach (var child in _staminaTicks.GetChildren())
+            child.QueueFree();
+        _staminaTickMaximum = maximum;
+        if (maximum <= 0.0)
+            return;
+
+        for (var stamina = 50; stamina < maximum; stamina += 50)
+        {
+            var tick = new ColorRect
+            {
+                Name = $"StaminaTick{stamina}",
+                Color = new Color(0.96f, 0.92f, 0.70f, 0.9f),
+                MouseFilter = Control.MouseFilterEnum.Ignore
+            };
+            var anchor = (float)(stamina / maximum);
+            tick.SetAnchor(Side.Left, anchor);
+            tick.SetAnchor(Side.Right, anchor);
+            tick.SetAnchor(Side.Bottom, 1.0f);
+            tick.OffsetLeft = -1.0f;
+            tick.OffsetRight = 1.0f;
+            _staminaTicks.AddChild(tick);
+        }
     }
 
     private void UpdateStandings(
@@ -419,12 +397,12 @@ public partial class RaceScreen
     private void UpdateCourseGroup(RaceParticipantStateSnapshot player)
     {
         var progress = Mathf.Clamp((player.X - Course.StartX) / (Course.EndX - Course.StartX), 0.0f, 1.0f);
-        _sectionLabel.Text = Tr(RaceCoursePresentationCatalog.SectionKeyFor(player.Terrain));
+        var section = Tr(RaceCoursePresentationCatalog.SectionKeyFor(player.Terrain));
         _progressLabel.Text = string.Format(
             CultureInfo.CurrentCulture,
             Tr("UI_RACE_HUD_PROGRESS"),
             Mathf.RoundToInt(progress * 100.0f),
-            _sectionLabel.Text);
+            section);
 
         _miniMap.SetPoints(_entry!.Entrants.Select(entrant =>
         {
