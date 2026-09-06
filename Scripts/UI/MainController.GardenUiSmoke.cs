@@ -315,6 +315,11 @@ public partial class MainController
         await ClickGardenControl(FindGardenButton(ledger, "CategoryLand"));
         await ToSignal(GetTree().CreateTimer(1.6), SceneTreeTimer.SignalName.Timeout);
         await CaptureGardenUi("shop-land");
+        await ClickGardenPosition(new Vector2(4, ScreenHeight / 2f));
+        if (_modalHost.IsOpen)
+            throw new InvalidOperationException("Clicking the left side did not close the Shop.");
+        RenderShop();
+        await SettleGardenUi();
     }
 
     private static Button FindGardenButton(Node node, string name)

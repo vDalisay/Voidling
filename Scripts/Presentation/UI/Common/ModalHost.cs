@@ -110,7 +110,6 @@ public partial class ModalHost : Control
 
     public void SetLeftInset(float leftInset)
     {
-        if (_blocker != null) _blocker.OffsetLeft = leftInset;
         if (_contentRegion != null) _contentRegion.OffsetLeft = leftInset;
         if (_panel != null)
             _panel.CustomMinimumSize = new Vector2(Mathf.Min(_requestedPanelSize.X, Size.X - leftInset - 8), _requestedPanelSize.Y);
