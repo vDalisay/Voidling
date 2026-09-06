@@ -11,6 +11,10 @@ namespace Voidling.Presentation.UI.Common;
 public partial class ModalHost : Control
 {
     public bool IsOpen { get; private set; }
+    private Control? _blocker;
+    private Control? _contentRegion;
+    private PanelContainer? _panel;
+    private Vector2 _requestedPanelSize;
 
     public override void _Ready()
     {
@@ -24,34 +28,48 @@ public partial class ModalHost : Control
         Vector2 size,
         Action closeRequested,
         Action? backRequested = null,
-        float leftInset = 0)
+        float leftInset = 0,
+        string eyebrow = "",
+        Color? panelTint = null)
     {
         if (closeRequested == null)
             throw new ArgumentNullException(nameof(closeRequested));
 
         ClearContent();
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        OffsetLeft = leftInset;
         IsOpen = true;
         Visible = true;
-        MouseFilter = MouseFilterEnum.Stop;
+        MouseFilter = MouseFilterEnum.Ignore;
 
         var shade = new ColorRect
         {
             Color = new Color(0.16f, 0.24f, 0.20f, 0.48f),
-            MouseFilter = MouseFilterEnum.Stop
+            MouseFilter = MouseFilterEnum.Ignore
         };
         shade.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         AddChild(shade);
 
-        var center = new CenterContainer();
+        _blocker = new ColorRect { Color = Colors.Transparent, MouseFilter = MouseFilterEnum.Stop };
+        _blocker.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        AddChild(_blocker);
+
+        var center = new CenterContainer { MouseFilter = MouseFilterEnum.Ignore };
         center.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        center.MouseFilter = MouseFilterEnum.Ignore;
+        _contentRegion = center;
         AddChild(center);
+        SetLeftInset(leftInset);
 
         var panel = UiFactory.CreatePanel(size);
+        _panel = panel;
+        _requestedPanelSize = size;
         panel.CustomMinimumSize = size;
         panel.MouseFilter = MouseFilterEnum.Stop;
+        if (panelTint.HasValue)
+        {
+            var style = (StyleBoxTexture)panel.GetThemeStylebox("panel").Duplicate();
+            style.ModulateColor = panelTint.Value;
+            panel.AddThemeStyleboxOverride("panel", style);
+        }
         center.AddChild(panel);
 
         var box = new VBoxContainer();
@@ -67,10 +85,14 @@ public partial class ModalHost : Control
             back.Pressed += backRequested;
             heading.AddChild(back);
         }
+        var titles = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        titles.AddThemeConstantOverride("separation", 0);
+        if (eyebrow.Length > 0)
+            titles.AddChild(UiFactory.CreateLabel(eyebrow, 7));
         var titleLabel = UiFactory.CreateTitle(title);
-        titleLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         titleLabel.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-        heading.AddChild(titleLabel);
+        titles.AddChild(titleLabel);
+        heading.AddChild(titles);
 
         var close = UiFactory.CreateButton("X");
         close.CustomMinimumSize = new Vector2(30, 23);
@@ -81,12 +103,23 @@ public partial class ModalHost : Control
         return box;
     }
 
+    public void SetLeftInset(float leftInset)
+    {
+        if (_blocker != null) _blocker.OffsetLeft = leftInset;
+        if (_contentRegion != null) _contentRegion.OffsetLeft = leftInset;
+        if (_panel != null)
+            _panel.CustomMinimumSize = new Vector2(Mathf.Min(_requestedPanelSize.X, Size.X - leftInset - 8), _requestedPanelSize.Y);
+    }
+
     public void Close()
     {
         ClearContent();
         IsOpen = false;
         Visible = false;
         MouseFilter = MouseFilterEnum.Ignore;
+        _blocker = null;
+        _contentRegion = null;
+        _panel = null;
     }
 
     private void ClearContent()

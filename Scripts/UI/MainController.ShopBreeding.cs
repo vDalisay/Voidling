@@ -66,7 +66,8 @@ public partial class MainController : Node
             0.0,
             GameRules.ShopEggRotationIntervalSeconds - state.ShopEggRotationElapsedSeconds));
 
-        var box = OpenRailModal(Tr("UI_SHOP_TITLE"), new Vector2(520, 344));
+        var box = OpenRailModal(Tr("UI_SHOP_TITLE"), new Vector2(520, 344),
+            state.GardenName, Color.FromHtml("#F1D3A0"));
         box.AddThemeConstantOverride("separation", 4);
 
         var screen = new ShopScreen();
@@ -76,6 +77,7 @@ public partial class MainController : Node
             _shopCategory = category;
             _shopSelection = selection;
         };
+        screen.InventoryRequested += ShowInventory;
         screen.TrainingItemPurchaseRequested += statId =>
         {
             _session.BuyTrainingItem(statId);

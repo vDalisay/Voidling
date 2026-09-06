@@ -14,7 +14,7 @@ public partial class GardenEventLog : Control
     public event Action? ActivitiesRequested;
     private const int MaxEntries = 300;
     private const float ExpandedHeight = 80;
-    private const float CompactHeight = 45;
+    private const float CompactHeight = 57;
 
     private sealed record Entry(string Id, string Text, Action? Action);
 

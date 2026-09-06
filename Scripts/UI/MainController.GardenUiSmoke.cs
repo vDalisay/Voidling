@@ -29,6 +29,27 @@ public partial class MainController
                 if (button.FocusMode != Control.FocusModeEnum.All)
                     throw new InvalidOperationException("Rail action is not keyboard accessible.");
             }
+            FindGardenButton(actions, "Online");
+            var resizeHandle = _uiRoot.GetNode<Control>("GardenRailResize");
+            if (resizeHandle.MouseDefaultCursorShape != Control.CursorShape.Hsize || _railToggle.Visible)
+                throw new InvalidOperationException("Expanded rail must use its resize edge without showing the collapse arrow.");
+            HandleRailResizeInput(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = true });
+            HandleRailResizeInput(new InputEventMouseMotion { Relative = new Vector2(24, 0) });
+            HandleRailResizeInput(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = false });
+            if (Mathf.Abs(_expandedRailWidth - 120) > 1 || Mathf.Abs(_gardenStatus.Position.X - 134) > 1 ||
+                Mathf.Abs(_railResizeHandle.Position.X - 117) > 1)
+                throw new InvalidOperationException("Dragging the rail edge did not resize the sidebar and adjacent Garden HUD.");
+            var settingsButton = FindGardenButton(_railUtilities, "Settings");
+            if (_session.State.MasterVolume <= 0.001f) _session.SetMasterVolume(1);
+            var originalVolume = _session.State.MasterVolume;
+            await ClickGardenControl(_muteButton);
+            if (_session.State.MasterVolume > 0.001f) throw new InvalidOperationException("Rail mute did not mute audio.");
+            await ClickGardenControl(_muteButton);
+            if (Mathf.Abs(_session.State.MasterVolume - originalVolume) > 0.001f) throw new InvalidOperationException("Rail mute did not restore audio.");
+            await ClickGardenControl(settingsButton);
+            if (!_modalHost.IsOpen) throw new InvalidOperationException("Rail settings button did not open Settings.");
+            await PressGardenEscape();
+            if (_modalHost.IsOpen) throw new InvalidOperationException("Rail Settings did not return directly to the Garden.");
             RequireSeparate(rail, _gardenEventLog);
             await CaptureGardenUi("garden");
 
@@ -42,7 +63,9 @@ public partial class MainController
                 await CaptureGardenUi("garden-" + key.ToLowerInvariant());
             }
             _dayNightDial.ShowTime(_garden.EnvironmentLocalTime);
-            await ClickGardenControl(_railToggle);
+            HandleRailResizeInput(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = true });
+            HandleRailResizeInput(new InputEventMouseMotion { Relative = new Vector2(-64, 0) });
+            HandleRailResizeInput(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = false });
             await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
             RequireOnScreen(_railToggle);
             if (rail.Visible || !_gardenStatus.Visible || !_dayNightDial.Visible || !_gardenEventLog.Visible ||
@@ -51,17 +74,20 @@ public partial class MainController
             foreach (var control in new Control[] { _gardenStatus, _dayNightDial, _gardenEventLog })
                 if (Mathf.Abs(control.Position.X - 10) > 1)
                     throw new InvalidOperationException($"{control.Name} did not move into the free left-side space.");
+            if (Mathf.Abs(_dayNightDial.Position.Y - 66) > 1)
+                throw new InvalidOperationException("Collapsed navigation did not move the day/night dial below the Garden name.");
             if (Mathf.Abs(_railToggle.Position.Y - (ScreenHeight - _railToggle.Size.Y) / 2) > 1)
                 throw new InvalidOperationException("Navigation handle is not centered on the screen edge.");
             await CaptureGardenUi("garden-collapsed");
             await ClickGardenControl(_railToggle);
-            ToggleGardenRail();
-            ToggleGardenRail();
+            SetGardenRailCollapsed(true);
+            SetGardenRailCollapsed(false);
             await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
             RequireOnScreen(rail);
             if (!rail.Visible || !_gardenStatus.Visible || !_dayNightDial.Visible || !_gardenEventLog.Visible ||
-                Mathf.Abs(_gardenStatus.Position.X - 110) > 1 || Mathf.Abs(_dayNightDial.Position.X - 110) > 1 ||
-                Mathf.Abs(_gardenEventLog.Position.X - 110) > 1 ||
+                Mathf.Abs(_gardenStatus.Position.X - (_expandedRailWidth + 14)) > 1 ||
+                Mathf.Abs(_dayNightDial.Position.X - (_expandedRailWidth - 78) / 2) > 1 || Mathf.Abs(_dayNightDial.Position.Y - 8) > 1 ||
+                Mathf.Abs(_gardenEventLog.Position.X - (_expandedRailWidth + 14)) > 1 || _railToggle.Visible ||
                 actions.GetChildren().OfType<Button>().Any(b => b.FocusMode != Control.FocusModeEnum.All))
                 throw new InvalidOperationException("Navigation did not recover from interrupted animation.");
 
@@ -80,9 +106,11 @@ public partial class MainController
 
             var logToggle = FindGardenButton(_gardenEventLog, "ToggleHeight");
             var logBottom = _gardenEventLog.Position.Y + _gardenEventLog.Size.Y;
+            if (Mathf.Abs(logBottom - (ScreenHeight - 10)) > 1)
+                throw new InvalidOperationException("Expanded Garden log does not keep its screen margin.");
             await ClickGardenControl(logToggle);
             await ToSignal(GetTree().CreateTimer(0.25), SceneTreeTimer.SignalName.Timeout);
-            if (!_gardenEventLog.IsCompact || Mathf.Abs(_gardenEventLog.Size.Y - 45) > 1 || history.Size.Y > 25 ||
+            if (!_gardenEventLog.IsCompact || Mathf.Abs(_gardenEventLog.Size.Y - 57) > 1 || history.Size.Y > 25 ||
                 !history.GetParsedText().Contains(notification, StringComparison.Ordinal) ||
                 history.GetParsedText().Trim().Contains('\n') ||
                 Mathf.Abs(_gardenEventLog.Position.Y + _gardenEventLog.Size.Y - logBottom) > 1 || !logToggle.HasFocus())
@@ -238,6 +266,10 @@ public partial class MainController
 
     private async Task VerifyShopUi(Control rail)
     {
+        if (_session.State.StoreEggs.Count == 0) _session.RefillStoreEggs();
+        _session.State.Coins = Math.Max(_session.State.Coins, GameRules.TrainingItemPrice + GameRules.StoreEggPrice + 10);
+        RenderShop();
+        await SettleGardenUi();
         RequireSeparate(rail, ModalPanel());
         var ledger = _modalHost.FindChildren("ShopLedger", string.Empty, true, false).OfType<Voidling.Presentation.UI.Shop.ShopScreen>().Single();
         RequireOnScreen(ledger);
@@ -246,6 +278,10 @@ public partial class MainController
         if (ledger.FindChild("Categories", true, false) == null || ledger.FindChild("Catalogue", true, false) == null ||
             ledger.FindChild("Receipt", true, false) == null)
             throw new InvalidOperationException("Keeper ledger is missing a layout band.");
+        FindGardenButton(ledger, "OpenInventory");
+        var shade = _modalHost.GetChildren().OfType<ColorRect>().First(control => control.Color.A > 0);
+        if (shade.GetGlobalRect() != new Rect2(Vector2.Zero, new Vector2(ScreenWidth, ScreenHeight)))
+            throw new InvalidOperationException("Shop shade does not cover the full viewport.");
 
         var statId = GameRules.StatIds[0];
         var coins = _session.State.Coins;

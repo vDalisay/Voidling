@@ -85,7 +85,7 @@ msgid "UI_SETTINGS_HINT"
 msgstr "ESC opens/closes this menu from the garden."
 
 msgid "UI_SHOP_TITLE"
-msgstr "KEEPER'S LEISURE"
+msgstr "Sprout Market"
 
 msgid "UI_SHOP_WELCOME"
 msgstr "Pick something from the stall"
@@ -130,7 +130,43 @@ msgid "UI_SHOP_OWNED"
 msgstr "OWNED {0}"
 
 msgid "UI_SHOP_BUY"
-msgstr "BUY {0}"
+msgstr "Buy · {0} sprouts"
+
+msgid "UI_SHOP_CATEGORY_TREATS"
+msgstr "Treats"
+
+msgid "UI_SHOP_CATEGORY_EGGS"
+msgstr "Eggs"
+
+msgid "UI_SHOP_CATEGORY_LAND"
+msgstr "Land"
+
+msgid "UI_SHOP_CATEGORY_RARE"
+msgstr "Rare"
+
+msgid "UI_SHOP_CHOOSE_TREAT"
+msgstr "Choose a stat to train."
+
+msgid "UI_SHOP_CHOOSE_EGG"
+msgstr "Choose an egg to hatch."
+
+msgid "UI_SHOP_CHOOSE_LAND"
+msgstr "Choose a garden expansion."
+
+msgid "UI_SHOP_CHOOSE_RARE"
+msgstr "A special find for your garden."
+
+msgid "UI_SHOP_ITEM_COUNT"
+msgstr "{0} types"
+
+msgid "UI_SHOP_OPEN_INVENTORY"
+msgstr "Open inventory"
+
+msgid "UI_SHOP_INVENTORY_NOTE"
+msgstr "Goes to your Inventory."
+
+msgid "UI_SHOP_BACK_HINT"
+msgstr "ESC · Back to garden"
 
 msgid "UI_SHOP_MYSTERY_EGG"
 msgstr "MYSTERY EGG {0}"
@@ -881,6 +917,12 @@ msgstr "Goodbye"
 
 msgid "UI_GARDEN_MENU_HINT"
 msgstr "ESC · Menu"
+
+msgid "UI_GARDEN_MUTE"
+msgstr "Mute audio"
+
+msgid "UI_GARDEN_UNMUTE"
+msgstr "Restore audio"
 
 msgid "UI_GARDEN_MENU_TITLE"
 msgstr "Garden menu"

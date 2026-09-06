@@ -10,7 +10,7 @@ Baseline: `e03691b` from main. No save schema, economy, genetics or race simulat
 
 | Stage | Selected reference | Implementation and test gate |
 |---|---|---|
-| 1. Garden | 02 — Manager's rail | Warm premium wood rail at left; Voidlings, Inventory, Shop, Breed, Races, Build in that order. Status beside rail; quiet Online/ESC controls upper right; small Center control; compact selected-creature inspector right; readable log with Activities below the world. Stop for Garden playtesting. |
+| 1. Garden | 02 — Manager's rail | Warm premium wood rail at left; Voidlings, Inventory, Shop, Breed, Races, Build and Online in that order. The rail resizes from its edge and collapses to a half-circle handle. Settings and mute sit at its lower edge; Escape alone opens the Garden menu. Stop for Garden playtesting. |
 | 2. Shop | 04 — Keeper's ledger window, with 02's side rail replacing the top menu | Preserve option 04's paper window, category column, readable product rows and purchase receipt. Keep the manager's rail on the left. Preserve fixed egg identities, stock, prices and ownership. Stop for Shop playtesting. |
 | 3. Race entry | 02 — Manager's rail | Course and creature selection beside the rail, clear selected entrant and one Start action. Stop for entry playtesting. |
 | 4. Live race | 05 — Creature first | Player portrait, stamina and Cheer together at bottom centre; opponents right; course progress bottom left. Preserve existing simulation and local/online exit semantics. Stop for live-race playtesting. |
@@ -23,7 +23,7 @@ Baseline: `e03691b` from main. No save schema, economy, genetics or race simulat
 1. Reuse `UiFactory` premium panel/button atlas, premium icon sheet, existing system font and canonical `VoidlingVisualFactory` portraits. Match reference 02's composition at the existing 640×360 logical viewport (1280×720 desktop window), without changing world art or zoom rules.
 2. Replace the bottom dock with a left rail. Open the existing searchable roster beside it. Keep world selection, petting, dragging and follow behavior.
 3. Compact the right inspector: identity, stage/personality, qualitative care, five rank/level rows, Give treat / Details / Family / Follow, and passive-training status/Stop. Keep detailed statistics in Details and permanent departure behind Details with both existing confirmations. Treat choice calls the existing training action.
-4. Move system access behind a mouse-accessible ESC menu. Escape first unwinds an open interaction; Settings returns to the menu. Menus do not pause Garden simulation. Keep camera recovery outside Settings.
+4. Escape first unwinds an open interaction, then opens the Garden menu. Settings remains mouse-accessible from the rail and returns directly to the Garden; Settings opened from the Escape menu returns to that menu. Menus do not pause Garden simulation. Keep camera recovery outside Settings.
 5. Add Build → land/training grounds and decorations, plus log Activities → daily check-in and missions. Reuse current feature screens. The legacy Shop links are removed during the Shop stage, when that screen is replaced.
 6. Extend the existing Garden runtime smoke to exercise rail destinations, roster selection, inspector, treat inventory consumption, ESC/back/focus behavior, and non-overlapping bounds. Run Debug/Release builds, tests and the Godot checks from CI, then inspect rendered Garden screenshots.
 7. Provide the branch, workspace, screenshots, isolated-save launch command and a short player checklist. Do not start stage 2 until the user has tested and asked to proceed.
@@ -110,19 +110,20 @@ Add `--voidling-garden-ui-shots` with a graphical renderer to capture the review
 
 ### Garden feedback refinement
 
-- Added a premium weather-sheet sun/moon display below My garden, following the same local clock as Garden lighting (dawn, day, dusk, night).
+- Added a premium weather-sheet sun/moon display in the rail's upper-left area, following the same local clock as Garden lighting (dawn, day, dusk, night). When the rail collapses it moves below the Garden name.
 - Removed the floating notification line. Toast-only notices now reach the Garden log, while matching toast/event notifications within one deferred batch produce one entry.
-- Added a 0.22-second sliding rail toggle centered on the rail edge. When the rail closes, the Garden name/sprouts, day/night dial, and Garden log stay visible and slide left into the freed space; the centered expand arrow remains on the left edge. Hidden navigation leaves keyboard traversal, and repeated clicks can reverse the slide.
-- Removed the redundant “Garden log” heading, reduced the log panel artwork to 50% opacity, and added a keyboard-accessible top-left toggle that animates between the full history and a one-line view while keeping the panel against the bottom edge.
+- Replaced the expanded rail toggle with a draggable resize edge and horizontal-resize cursor. Dragging below the collapse threshold closes the rail; only the collapsed state shows a centered half-circle expand arrow. The Garden name/sprouts and log slide into the freed space while the day/night dial moves below the Garden name.
+- Moved Online into the rail and replaced the upper-right Escape button with premium settings and mute icon buttons at the rail's lower-left edge. The Garden menu now opens only from the Escape key.
+- Removed the redundant “Garden log” heading, reduced the log panel artwork to 50% opacity, and added a keyboard-accessible top-left toggle that animates between the full history and a one-line view while preserving the same bottom margin in both states.
 - Extended the Garden smoke check with clock boundaries, collapse/expand and interrupted animation, keyboard access, and notification deduplication. All 236 tests and the CI-equivalent local checks passed; graphical review passed at 1280×720.
 
 Review captures: [expanded](ui-overhaul/garden-refined.png), [collapsed navigation](ui-overhaul/garden-collapsed.png), [one-line log](ui-overhaul/garden-log-compact.png).
 
 ## Stage 2 handoff
 
-Implemented Keeper's Leisure as a paper ledger beside the manager's rail. Its category column, scrollable product rows, and persistent purchase receipt share one selection state, so buying redraws the current view without returning the player to the first category. Treats use the premium produce sheet; fixed egg tints, per-visit stock, land shapes, rare offers, prices, owned counts, refresh timing, and existing purchase services remain authoritative.
+Implemented the option 04 Sprout Market composition beside the manager's rail: garden name and market title at the top, warm paper window, simple category column, contextual product rows, highlighted item preview, green purchase action, inventory shortcut, and Escape footer. Treats keep the premium produce art; fixed egg tints, per-visit stock, land shapes, rare offers, prices, owned counts, refresh timing, and existing purchase services remain authoritative.
 
-Daily check-in no longer appears in the Shop because it is available through Garden log → Activities. The rail and its collapse control remain usable while the ledger is open, and Escape returns focus to Shop on the rail. No economy, inventory, save, or simulation rules changed.
+Daily check-in no longer appears in the Shop because it is available through Garden log → Activities. The full-screen shade now covers the Garden and rail while the rail's controls remain usable; Escape returns focus to Shop on the rail. No economy, inventory, save, or simulation rules changed.
 
 Review captures: [training treats](ui-overhaul/shop-treats.png), [mystery eggs](ui-overhaul/shop-eggs.png), [land](ui-overhaul/shop-land.png).
 

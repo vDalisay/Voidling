@@ -30,6 +30,7 @@ public partial class ShopScreen : VBoxContainer
     public event Action<string>? EggPurchaseRequested;
     public event Action<string>? RareOfferPurchaseRequested;
     public event Action<string>? LandPurchaseRequested;
+    public event Action? InventoryRequested;
     public event Action<string, string>? SelectionChanged;
 
     private sealed record Product(string Key, string Name, string Description, string Status, int Price, Func<Control> Icon, Action Buy);
@@ -40,6 +41,8 @@ public partial class ShopScreen : VBoxContainer
     private VBoxContainer _categories = null!;
     private VBoxContainer _catalogue = null!;
     private VBoxContainer _receipt = null!;
+    private Label _prompt = null!;
+    private Label _itemCount = null!;
     private Button? _selectedButton;
 
     public void Configure(ShopScreenState state, string category, string selection)
@@ -62,25 +65,38 @@ public partial class ShopScreen : VBoxContainer
         var body = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
         body.AddThemeConstantOverride("separation", 6);
         AddChild(body);
-        _categories = new VBoxContainer { Name = "Categories", CustomMinimumSize = new Vector2(88, 0) };
+        _categories = new VBoxContainer { Name = "Categories", CustomMinimumSize = new Vector2(82, 0) };
         _categories.AddThemeConstantOverride("separation", 5);
         body.AddChild(_categories);
 
+        var catalogueColumn = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+        catalogueColumn.AddThemeConstantOverride("separation", 4);
+        body.AddChild(catalogueColumn);
+        var context = new HBoxContainer();
+        _prompt = UiFactory.CreateLabel(CategoryPrompt(), 7);
+        _prompt.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        context.AddChild(_prompt);
+        _itemCount = UiFactory.CreateLabel(string.Empty, 7);
+        context.AddChild(_itemCount);
+        catalogueColumn.AddChild(context);
         var scroll = new ScrollContainer
         {
             Name = "Catalogue",
-            CustomMinimumSize = new Vector2(220, 250),
+            CustomMinimumSize = new Vector2(185, 205),
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill
         };
         UiFactory.StyleScroll(scroll);
-        body.AddChild(scroll);
+        catalogueColumn.AddChild(scroll);
         _catalogue = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         _catalogue.AddThemeConstantOverride("separation", 4);
         scroll.AddChild(_catalogue);
 
-        var receiptPanel = UiFactory.CreatePanel(new Vector2(170, 250));
+        var receiptPanel = UiFactory.CreatePanel(new Vector2(145, 225));
         receiptPanel.Name = "Receipt";
+        var receiptStyle = (StyleBoxTexture)receiptPanel.GetThemeStylebox("panel").Duplicate();
+        receiptStyle.ModulateColor = Color.FromHtml("#E5C38D");
+        receiptPanel.AddThemeStyleboxOverride("panel", receiptStyle);
         body.AddChild(receiptPanel);
         _receipt = new VBoxContainer();
         _receipt.AddThemeConstantOverride("separation", 5);
@@ -89,6 +105,10 @@ public partial class ShopScreen : VBoxContainer
         NormalizeSelection();
         RebuildCategories();
         RebuildProducts();
+
+        var footer = UiFactory.CreateLabel(Tr("UI_SHOP_BACK_HINT"), 7);
+        footer.HorizontalAlignment = HorizontalAlignment.Right;
+        AddChild(footer);
     }
 
     public void FocusSelection()
@@ -114,10 +134,17 @@ public partial class ShopScreen : VBoxContainer
     private void RebuildCategories()
     {
         Clear(_categories);
-        AddCategory(TreatsCategory, Tr("UI_SHOP_TREATS_TITLE"));
-        AddCategory(EggsCategory, Tr("UI_SHOP_EGGS_TITLE"));
-        AddCategory(LandCategory, Tr("UI_SHOP_LAND_TITLE"));
-        if (_state!.RareOffer != null) AddCategory(SpecialCategory, Tr("UI_SHOP_SPECIAL_TITLE"));
+        AddCategory(TreatsCategory, Tr("UI_SHOP_CATEGORY_TREATS"));
+        AddCategory(EggsCategory, Tr("UI_SHOP_CATEGORY_EGGS"));
+        AddCategory(LandCategory, Tr("UI_SHOP_CATEGORY_LAND"));
+        if (_state!.RareOffer != null) AddCategory(SpecialCategory, Tr("UI_SHOP_CATEGORY_RARE"));
+        _categories.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
+        var inventory = UiFactory.CreateButton(Tr("UI_SHOP_OPEN_INVENTORY"));
+        inventory.Name = "OpenInventory";
+        inventory.CustomMinimumSize = new Vector2(82, 24);
+        UiFactory.ApplyPixelFont(inventory, 6);
+        inventory.Pressed += () => InventoryRequested?.Invoke();
+        _categories.AddChild(inventory);
     }
 
     private void AddCategory(string category, string text)
@@ -126,7 +153,7 @@ public partial class ShopScreen : VBoxContainer
         button.Name = "Category" + category;
         button.ToggleMode = true;
         button.ButtonPressed = category == _category;
-        button.CustomMinimumSize = new Vector2(88, 30);
+        button.CustomMinimumSize = new Vector2(82, 30);
         UiFactory.ApplyPixelFont(button, 6);
         button.Pressed += () => SelectCategory(category);
         _categories.AddChild(button);
@@ -155,6 +182,8 @@ public partial class ShopScreen : VBoxContainer
     private void NormalizeSelection()
     {
         var products = Products().ToArray();
+        _prompt.Text = CategoryPrompt();
+        _itemCount.Text = string.Format(Tr("UI_SHOP_ITEM_COUNT"), products.Length);
         if (products.Length == 0) { _selection = string.Empty; return; }
         if (products.All(product => product.Key != _selection)) _selection = products[0].Key;
     }
@@ -186,13 +215,13 @@ public partial class ShopScreen : VBoxContainer
         button.Name = "Product_" + product.Key.Replace(':', '_');
         button.ToggleMode = true;
         button.ButtonPressed = product.Key == _selection;
-        button.CustomMinimumSize = new Vector2(208, 44);
+        button.CustomMinimumSize = new Vector2(180, 36);
         button.Pressed += () => SelectProduct(product);
         var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
         row.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, 4);
         row.AddThemeConstantOverride("separation", 6);
         var icon = product.Icon();
-        icon.CustomMinimumSize = new Vector2(Mathf.Max(28, icon.CustomMinimumSize.X), Mathf.Max(28, icon.CustomMinimumSize.Y));
+        icon.CustomMinimumSize = new Vector2(Mathf.Max(26, icon.CustomMinimumSize.X), Mathf.Max(26, icon.CustomMinimumSize.Y));
         row.AddChild(icon);
         var copy = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         copy.AddThemeConstantOverride("separation", 0);
@@ -200,7 +229,7 @@ public partial class ShopScreen : VBoxContainer
         copy.AddChild(UiFactory.CreateLabel(product.Status, 5));
         row.AddChild(copy);
         var price = UiFactory.CreateLabel(product.Price.ToString(), 8);
-        price.CustomMinimumSize = new Vector2(35, 28);
+        price.CustomMinimumSize = new Vector2(28, 26);
         price.HorizontalAlignment = HorizontalAlignment.Right;
         price.VerticalAlignment = VerticalAlignment.Center;
         row.AddChild(price);
@@ -210,20 +239,25 @@ public partial class ShopScreen : VBoxContainer
 
     private void BuildReceipt(Product product)
     {
-        var title = UiFactory.CreateLabel(Tr("UI_SHOP_RECEIPT"), 7);
-        title.HorizontalAlignment = HorizontalAlignment.Center;
-        _receipt.AddChild(title);
-        var iconCenter = new CenterContainer { CustomMinimumSize = new Vector2(0, 54) };
+        var iconPanel = new PanelContainer { CustomMinimumSize = new Vector2(0, 48) };
+        iconPanel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+        {
+            BgColor = Color.FromHtml("#F7E5BD"),
+            CornerRadiusTopLeft = 3, CornerRadiusTopRight = 3,
+            CornerRadiusBottomLeft = 3, CornerRadiusBottomRight = 3
+        });
+        var iconCenter = new CenterContainer();
         var icon = product.Icon();
-        icon.CustomMinimumSize = new Vector2(48, 48);
+        icon.CustomMinimumSize = new Vector2(44, 44);
         iconCenter.AddChild(icon);
-        _receipt.AddChild(iconCenter);
+        iconPanel.AddChild(iconCenter);
+        _receipt.AddChild(iconPanel);
         var name = UiFactory.CreateLabel(product.Name, 9);
         name.HorizontalAlignment = HorizontalAlignment.Center;
         name.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _receipt.AddChild(name);
         var description = UiFactory.CreateLabel(product.Description, 6);
-        description.CustomMinimumSize = new Vector2(0, 67);
+        description.CustomMinimumSize = new Vector2(0, 55);
         description.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _receipt.AddChild(description);
         _receipt.AddChild(UiFactory.CreateLabel(product.Status, 6));
@@ -233,9 +267,38 @@ public partial class ShopScreen : VBoxContainer
         _receipt.AddChild(price);
         var buy = UiFactory.CreateButton(string.Format(Tr("UI_SHOP_BUY"), product.Price));
         buy.Name = "BuySelected";
-        buy.CustomMinimumSize = new Vector2(148, 26);
+        buy.CustomMinimumSize = new Vector2(125, 28);
+        ApplyBuyStyle(buy);
         buy.Pressed += product.Buy;
         _receipt.AddChild(buy);
+        _receipt.AddChild(UiFactory.CreateLabel(Tr("UI_SHOP_INVENTORY_NOTE"), 6));
+    }
+
+    private string CategoryPrompt() => _category switch
+    {
+        TreatsCategory => Tr("UI_SHOP_CHOOSE_TREAT"),
+        EggsCategory => Tr("UI_SHOP_CHOOSE_EGG"),
+        LandCategory => Tr("UI_SHOP_CHOOSE_LAND"),
+        _ => Tr("UI_SHOP_CHOOSE_RARE")
+    };
+
+    private static void ApplyBuyStyle(Button button)
+    {
+        static StyleBoxFlat Style(Color color) => new()
+        {
+            BgColor = color,
+            BorderColor = Color.FromHtml("#315A42"),
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            BorderWidthTop = 2, BorderWidthBottom = 2,
+            CornerRadiusTopLeft = 3, CornerRadiusTopRight = 3,
+            CornerRadiusBottomLeft = 3, CornerRadiusBottomRight = 3
+        };
+        button.AddThemeStyleboxOverride("normal", Style(Color.FromHtml("#477052")));
+        button.AddThemeStyleboxOverride("hover", Style(Color.FromHtml("#568761")));
+        button.AddThemeStyleboxOverride("pressed", Style(Color.FromHtml("#355D43")));
+        button.AddThemeColorOverride("font_color", Color.FromHtml("#FFF3D2"));
+        button.AddThemeColorOverride("font_hover_color", Colors.White);
+        button.AddThemeColorOverride("font_pressed_color", Colors.White);
     }
 
     private IEnumerable<Product> Products()
