@@ -43,6 +43,8 @@ public partial class RaceScreen
     private Label _faultLabel = null!;
     private ColorRect _faultPlaque = null!;
     private RaceMiniMap _miniMap = null!;
+    private Control _courseHudPanel = null!;
+    private Control _staminaHudPanel = null!;
 
     private Label _progressLabel = null!;
     private readonly List<StandingRow> _standingRows = new();
@@ -127,6 +129,7 @@ public partial class RaceScreen
     private Control BuildCoursePanel()
     {
         var panel = ButtonChromePanel("RaceHudCourse", new Vector2(468, 288), new Vector2(164, 64));
+        _courseHudPanel = panel;
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 2);
         panel.AddChild(box);
@@ -166,6 +169,7 @@ public partial class RaceScreen
     private Control BuildPlayerPanel()
     {
         var panel = ButtonChromePanel("RaceHudPlayer", new Vector2(8, 306), new Vector2(228, 46));
+        _staminaHudPanel = panel;
         var row = new HBoxContainer();
         panel.AddChild(row);
 

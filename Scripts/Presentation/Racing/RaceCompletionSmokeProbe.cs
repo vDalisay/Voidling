@@ -253,6 +253,12 @@ public partial class RaceCompletionSmokeProbe : Node
         {
             throw new InvalidOperationException("Camera edge peek is not capped at 30% of the visible width.");
         }
+
+        if (!race.IsCameraPeekBlocked(player.GetGlobalRect().GetCenter()) ||
+            !race.IsCameraPeekBlocked(hud.GetNode<Control>("RaceHudCourse").GetGlobalRect().GetCenter()))
+        {
+            throw new InvalidOperationException("Camera edge peek is active over a bottom HUD panel.");
+        }
     }
 
     /// <summary>

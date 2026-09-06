@@ -265,7 +265,6 @@ public partial class RaceScreen : Node2D
         if (_simulation.IsComplete && !_resultsShown && !_resultsPending)
         {
             _running = false;
-            SyncVisuals(0.0f);
             QueueResults();
         }
     }
@@ -484,7 +483,6 @@ public partial class RaceScreen : Node2D
         if (playerState.Finished)
         {
             ApplySimulationEvents(_simulation.FastForwardToFinish());
-            SyncVisuals(0.0f);
             return;
         }
 
@@ -497,7 +495,6 @@ public partial class RaceScreen : Node2D
         var forcedFinish = _simulation.CompleteParticipantAsLast(_playerId);
         if (forcedFinish != null)
             ApplySimulationEvents(new RaceSimulationEvent[] { forcedFinish });
-        SyncVisuals(0.0f);
     }
 
     private void SyncVisuals(float delta)
@@ -1156,12 +1153,17 @@ public partial class RaceScreen : Node2D
     private void UpdateCameraPeek(float delta)
     {
         var viewportWidth = GetViewport().GetVisibleRect().Size.X;
-        var mouseX = GetViewport().GetMousePosition().X;
-        var target = _running && _pointerMoved && mouseX >= 0.0f && mouseX <= viewportWidth
-            ? ComputeEdgePeekOffset(mouseX, viewportWidth, ScreenWidth / Math.Max(_zoom, 0.001f))
+        var mousePosition = GetViewport().GetMousePosition();
+        var target = _running && _pointerMoved && !IsCameraPeekBlocked(mousePosition) &&
+                     mousePosition.X >= 0.0f && mousePosition.X <= viewportWidth
+            ? ComputeEdgePeekOffset(mousePosition.X, viewportWidth, ScreenWidth / Math.Max(_zoom, 0.001f))
             : 0.0f;
         _cameraPeekOffset = Mathf.Lerp(_cameraPeekOffset, target, 1.0f - Mathf.Pow(0.002f, delta));
     }
+
+    internal bool IsCameraPeekBlocked(Vector2 mousePosition)
+        => _staminaHudPanel.GetGlobalRect().HasPoint(mousePosition) ||
+           _courseHudPanel.GetGlobalRect().HasPoint(mousePosition);
 
     internal static float ComputeEdgePeekOffset(float mouseX, float screenWidth, float visibleWorldWidth)
     {
@@ -1207,7 +1209,11 @@ public partial class RaceScreen : Node2D
         var finishOrder = multiplayerFinishOrder?.ToArray();
         await ToSignal(GetTree().CreateTimer(ResultsRevealDelaySeconds), SceneTreeTimer.SignalName.Timeout);
         if (IsInsideTree())
+        {
             ShowResults(finishOrder);
+            if (_simulation != null)
+                SyncVisuals(0.0f);
+        }
     }
 
     /// <summary>
