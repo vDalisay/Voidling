@@ -18,6 +18,7 @@ public sealed class GameStateData
     private Dictionary<string, int> _utilityItems = new(StringComparer.Ordinal);
     private string _shopRareOfferItemId = string.Empty;
     private List<GardenDecorationData> _gardenDecorations = new();
+    private List<DroppedTreatData> _droppedTreats = new();
     private List<string> _completedCupIds = new();
     private List<RaceCourseRecordData> _courseRecords = new();
 
@@ -59,6 +60,17 @@ public sealed class GameStateData
     {
         get => _gardenDecorations;
         set => _gardenDecorations = value ?? new List<GardenDecorationData>();
+    }
+
+    /// <summary>
+    /// Treats lying on the island. Additive and non-null: a save written before this loads with an
+    /// empty ground, and nothing the player owns changes, because a dropped treat is still in the
+    /// satchel until something eats it.
+    /// </summary>
+    public List<DroppedTreatData> DroppedTreats
+    {
+        get => _droppedTreats;
+        set => _droppedTreats = value ?? new List<DroppedTreatData>();
     }
 
     /// <summary>

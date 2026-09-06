@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Application.Garden;
@@ -9,143 +10,215 @@ namespace VoidlingGame;
 public partial class MainController
 {
     private PanelContainer? _landInspector;
+    private string _selectedModuleId = string.Empty;
+
+    private static readonly Vector2 LandSlotSize = new(58, 48);
+    private const int LandSlotColumns = 5;
+    private const int LandSlotRows = 3;
 
     /// <summary>
-    /// Land ledger. Buying happens in the Shop and placing happens in the Garden, so this modal
-    /// only reports what the island holds and opens the ground menu for a hex.
+    /// The island's ground: a grid of the pieces you own, each drawn as its own footprint, and one
+    /// card carrying the single thing that piece can do. Buying still happens in the Shop and
+    /// placing still happens in the Garden; a hex coordinate is never shown, because the shape is
+    /// what the player recognises.
     /// </summary>
     private void ShowGardenModules()
     {
-        var state = _session.State;
-        var box = OpenModal(Tr("UI_LAND_TITLE"), new Vector2(510, 320), ShowGardenBuild);
+        var box = OpenModal(Tr("UI_LAND_TITLE"), new Vector2(520, 292), ShowGardenBuild);
         box.AddThemeConstantOverride("separation", 5);
 
-        var placed = state.GardenModules.Where(module => module.Placed).ToList();
-        var training = placed.Count(module => module.StatId.Length > 0);
-        var summary = UiFactory.CreateLabel(
-            string.Format(
-                Tr("UI_LAND_SUMMARY"),
-                placed.Count,
-                training,
-                state.GardenModules.Count - placed.Count,
-                state.Coins),
-            7);
-        summary.TooltipText = Tr("UI_LAND_HINT");
-        box.AddChild(summary);
+        var body = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ExpandFill };
+        body.AddThemeConstantOverride("separation", 6);
+        box.AddChild(body);
 
-        var hint = UiFactory.CreateLabel(Tr("UI_LAND_HINT"), 6);
-        hint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        hint.CustomMinimumSize = new Vector2(486, 26);
-        hint.AddThemeColorOverride("font_color", Color.FromHtml("#6B4B34"));
-        box.AddChild(hint);
+        var gridPanel = PaperCard.Panel(new Vector2(316, 0));
+        gridPanel.Name = "LandSlots";
+        gridPanel.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
+        body.AddChild(gridPanel);
+        var grid = new GridContainer { Columns = LandSlotColumns };
+        grid.AddThemeConstantOverride("h_separation", 3);
+        grid.AddThemeConstantOverride("v_separation", 3);
+        gridPanel.AddChild(grid);
 
-        var scroll = new ScrollContainer
+        var detailPanel = PaperCard.Panel(new Vector2(172, 232));
+        detailPanel.Name = "LandDetail";
+        body.AddChild(detailPanel);
+        var detail = new VBoxContainer();
+        detail.AddThemeConstantOverride("separation", 4);
+        detailPanel.AddChild(detail);
+
+        var pieces = LandPieces().ToArray();
+        if (pieces.Length == 0)
         {
-            CustomMinimumSize = new Vector2(486, 210),
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill
-        };
-        box.AddChild(scroll);
-
-        var list = new VBoxContainer
-        {
-            CustomMinimumSize = new Vector2(474, 1),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
-        };
-        list.AddThemeConstantOverride("separation", 4);
-        scroll.AddChild(list);
-
-        foreach (var module in placed
-                     .OrderByDescending(module => module.StatId.Length > 0)
-                     .ThenBy(module => module.HexR)
-                     .ThenBy(module => module.HexQ))
-        {
-            list.AddChild(CreateLandRow(module));
+            for (var filler = 0; filler < LandSlotColumns * LandSlotRows; filler++)
+                grid.AddChild(PaperCard.EmptySlot(LandSlotSize));
+            detail.AddChild(UiFactory.CreateLabel(Tr("UI_INVENTORY_EMPTY"), 7));
+            return;
         }
+        if (pieces.All(piece => piece.Id != _selectedModuleId)) _selectedModuleId = pieces[0].Id;
 
-        foreach (var module in state.GardenModules.Where(module => !module.Placed)
-                     .OrderBy(module => module.ShapeId, StringComparer.Ordinal))
-        {
-            list.AddChild(CreateStoredLandRow(module));
-        }
+        foreach (var piece in pieces) grid.AddChild(BuildLandSlot(piece));
+        for (var filler = pieces.Length; filler < LandSlotColumns * LandSlotRows; filler++)
+            grid.AddChild(PaperCard.EmptySlot(LandSlotSize));
+
+        BuildLandDetail(detail, pieces.First(piece => piece.Id == _selectedModuleId));
     }
 
-    private Control CreateLandRow(GardenModuleData module)
+    /// <summary>Training grounds first, then plain ground, then what is still in storage.</summary>
+    private IEnumerable<GardenModuleData> LandPieces()
+        => _session.State.GardenModules
+            .Where(module => module.Placed)
+            .OrderByDescending(module => module.StatId.Length > 0)
+            .ThenBy(module => module.HexR)
+            .ThenBy(module => module.HexQ)
+            .Concat(_session.State.GardenModules
+                .Where(module => !module.Placed)
+                .OrderBy(module => module.ShapeId, StringComparer.Ordinal));
+
+    private Button BuildLandSlot(GardenModuleData module)
     {
-        var row = UiFactory.CreatePanel(new Vector2(468, 42));
-        row.CustomMinimumSize = new Vector2(468, 42);
-
-        var controls = new HBoxContainer();
-        controls.AddThemeConstantOverride("separation", 5);
-        row.AddChild(controls);
-
         var trainingGround = module.StatId.Length > 0;
-        var rate = GameRules.GardenModuleRules.PointsPerMinuteForLevel(module.Level);
-        var assignedCount = _session.State.Voidlings.Count(creature =>
-            string.Equals(creature.PassiveTrainingModuleId, module.Id, StringComparison.Ordinal));
-        var label = UiFactory.CreateLabel(
-            trainingGround
-                ? $"{StatPresentationCatalog.NameFor(module.StatId).ToUpperInvariant()}  L{module.Level}  {rate:0.#}/min  •  {assignedCount} training"
-                : Tr("UI_LAND_PLAIN_GROUND"),
-            7);
-        label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        label.VerticalAlignment = VerticalAlignment.Center;
-        label.AddThemeColorOverride(
-            "font_color",
-            trainingGround ? StatPresentationCatalog.ColorFor(module.StatId) : Color.FromHtml("#6B8F5E"));
-        controls.AddChild(label);
+        var tint = LandShapePresentation.TintFor(module.StatId);
+        var button = UiFactory.CreateButton(string.Empty);
+        button.Name = "Land_" + module.Id;
+        button.ToggleMode = true;
+        button.ButtonPressed = module.Id == _selectedModuleId;
+        button.CustomMinimumSize = LandSlotSize;
+        button.TooltipText = trainingGround
+            ? StatPresentationCatalog.NameFor(module.StatId)
+            : Tr("UI_LAND_PLAIN_GROUND");
 
-        var location = UiFactory.CreateLabel($"({module.HexQ}, {module.HexR})", 6);
-        location.CustomMinimumSize = new Vector2(70, 30);
-        location.VerticalAlignment = VerticalAlignment.Center;
-        controls.AddChild(location);
+        var art = LandShapePresentation.CreateShapeArt(module.ShapeId, tint);
+        art.Position = (LandSlotSize - art.CustomMinimumSize) * 0.5f - new Vector2(0, 4);
+        // Ground still in storage is the same piece, dimmed, rather than a separate list.
+        art.Modulate = new Color(1, 1, 1, module.Placed ? 1.0f : 0.5f);
+        button.AddChild(art);
 
-        var capturedModuleId = module.Id;
-        var open = UiFactory.CreateButton(Tr(trainingGround ? "UI_LAND_MANAGE" : "UI_LAND_BUILD"));
-        open.CustomMinimumSize = new Vector2(96, 24);
-        UiFactory.ApplyPixelFont(open, 6);
-        open.Pressed += () =>
+        if (trainingGround)
         {
-            CloseModal();
-            ShowLandHexMenu(capturedModuleId);
-        };
-        controls.AddChild(open);
-        return row;
+            var level = UiFactory.CreateLabel("L" + module.Level, 6);
+            level.Position = new Vector2(2, 33);
+            level.Size = new Vector2(54, 12);
+            level.HorizontalAlignment = HorizontalAlignment.Right;
+            level.MouseFilter = Control.MouseFilterEnum.Ignore;
+            level.AddThemeColorOverride("font_color", PaperCard.Ink(StatPresentationCatalog.ColorFor(module.StatId)));
+            button.AddChild(level);
+        }
+
+        var capturedId = module.Id;
+        button.Pressed += () => { _selectedModuleId = capturedId; CallDeferred(nameof(ShowGardenModules)); };
+        return button;
     }
 
-    private Control CreateStoredLandRow(GardenModuleData module)
+    private void BuildLandDetail(VBoxContainer detail, GardenModuleData module)
     {
-        var row = UiFactory.CreatePanel(new Vector2(468, 42));
-        row.CustomMinimumSize = new Vector2(468, 42);
+        var trainingGround = module.StatId.Length > 0;
+        var tint = LandShapePresentation.TintFor(module.StatId);
 
-        var controls = new HBoxContainer();
-        controls.AddThemeConstantOverride("separation", 5);
-        row.AddChild(controls);
+        var artPanel = new PanelContainer { CustomMinimumSize = new Vector2(0, 54) };
+        artPanel.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = Color.FromHtml("#F7E5BD") });
+        var center = new CenterContainer();
+        center.AddChild(LandShapePresentation.CreateShapeArt(module.ShapeId, tint));
+        artPanel.AddChild(center);
+        detail.AddChild(artPanel);
 
-        var label = UiFactory.CreateLabel(
-            LandShapePresentation.DescribeStoredPiece(module.ShapeId, module.StatId, module.Level),
-            7);
-        label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        label.VerticalAlignment = VerticalAlignment.Center;
-        label.AddThemeColorOverride("font_color", LandShapePresentation.TintFor(module.StatId).Darkened(0.25f));
-        controls.AddChild(label);
+        var name = UiFactory.CreateLabel(
+            trainingGround ? StatPresentationCatalog.NameFor(module.StatId).ToUpperInvariant() : Tr("UI_LAND_PLAIN_GROUND"), 9);
+        name.Name = "LandName";
+        name.HorizontalAlignment = HorizontalAlignment.Center;
+        name.AddThemeColorOverride("font_color", PaperCard.Ink(
+            trainingGround ? StatPresentationCatalog.ColorFor(module.StatId) : Color.FromHtml("#6B8F5E")));
+        detail.AddChild(name);
 
-        var stored = UiFactory.CreateLabel(Tr("UI_LAND_STORED"), 6);
-        stored.CustomMinimumSize = new Vector2(70, 30);
-        stored.VerticalAlignment = VerticalAlignment.Center;
-        controls.AddChild(stored);
-
-        var capturedModuleId = module.Id;
-        var capturedShapeId = module.ShapeId;
-        var place = UiFactory.CreateButton(Tr("UI_INVENTORY_PLACE"));
-        place.CustomMinimumSize = new Vector2(96, 24);
-        UiFactory.ApplyPixelFont(place, 6);
-        place.Pressed += () =>
+        if (!module.Placed)
         {
-            CloseModal();
-            _garden.BeginLandPlacement(capturedModuleId, capturedShapeId);
-        };
-        controls.AddChild(place);
-        return row;
+            var stored = UiFactory.CreateLabel(Tr("UI_LAND_STORED"), 7);
+            stored.HorizontalAlignment = HorizontalAlignment.Center;
+            detail.AddChild(stored);
+            detail.AddChild(new Control { SizeFlagsVertical = Control.SizeFlags.ExpandFill });
+            var capturedId = module.Id;
+            var capturedShapeId = module.ShapeId;
+            var place = UiFactory.CreateButton(Tr("UI_INVENTORY_PLACE"));
+            place.Name = "LandAction";
+            place.CustomMinimumSize = new Vector2(152, 26);
+            UiFactory.ApplyPrimaryStyle(place);
+            place.Pressed += () => { CloseModal(); _garden.BeginLandPlacement(capturedId, capturedShapeId); };
+            detail.AddChild(place);
+            return;
+        }
+
+        if (trainingGround)
+        {
+            detail.AddChild(PaperCard.StarRating(module.Level, GameRules.GardenModuleRules.MaxLevel, 15.0f));
+            var rate = UiFactory.CreateLabel(
+                string.Format(Tr("UI_LAND_RATE"), GameRules.GardenModuleRules.PointsPerMinuteForLevel(module.Level).ToString("0.#")), 7);
+            rate.HorizontalAlignment = HorizontalAlignment.Center;
+            detail.AddChild(rate);
+
+            var residents = _session.State.Voidlings
+                .Where(creature => string.Equals(creature.PassiveTrainingModuleId, module.Id, StringComparison.Ordinal))
+                .Select(creature => creature.Name)
+                .ToList();
+            var occupancy = UiFactory.CreateLabel(
+                residents.Count > 0
+                    ? string.Format(Tr("UI_LAND_HEX_RESIDENT"), string.Join(", ", residents))
+                    : Tr("UI_LAND_HEX_VACANT"), 6);
+            occupancy.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            occupancy.HorizontalAlignment = HorizontalAlignment.Center;
+            detail.AddChild(occupancy);
+            detail.AddChild(new Control { SizeFlagsVertical = Control.SizeFlags.ExpandFill });
+
+            var upgradeCost = GameRules.GardenModuleRules.UpgradeCostForLevel(module.Level);
+            var capturedId = module.Id;
+            var upgrade = UiFactory.CreateButton(
+                upgradeCost < 0 ? Tr("UI_LAND_MAX_LEVEL") : string.Format(Tr("UI_LAND_UPGRADE"), upgradeCost));
+            upgrade.Name = "LandAction";
+            upgrade.CustomMinimumSize = new Vector2(152, 26);
+            UiFactory.ApplyPrimaryStyle(upgrade);
+            upgrade.Disabled = upgradeCost < 0 || _session.State.Coins < upgradeCost;
+            upgrade.Pressed += () =>
+            {
+                if (_session.UpgradeGardenModule(capturedId)) CallDeferred(nameof(ShowGardenModules));
+            };
+            detail.AddChild(upgrade);
+            return;
+        }
+
+        // Plain placed ground: the choice of which training ground to build is the card's content.
+        var cost = GameRules.GardenModuleRules.TrainingConversionCost;
+        var price = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        price.AddThemeConstantOverride("separation", 3);
+        price.AddChild(UiFactory.CreateLabel(Tr("UI_SHOP_PRICE_HEADER").ToUpperInvariant(), 7));
+        price.AddChild(new TextureRect
+        {
+            Texture = UiFactory.CreateSproutIcon(),
+            CustomMinimumSize = new Vector2(11, 11),
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            MouseFilter = Control.MouseFilterEnum.Ignore
+        });
+        price.AddChild(UiFactory.CreateLabel(cost.ToString(), 8));
+        detail.AddChild(price);
+        var choices = new VBoxContainer { Name = "LandAction" };
+        choices.AddThemeConstantOverride("separation", 3);
+        detail.AddChild(choices);
+        foreach (var statId in GameRules.StatIds)
+        {
+            var capturedStatId = statId;
+            var capturedId = module.Id;
+            var choice = UiFactory.CreateButton(StatPresentationCatalog.NameFor(statId).ToUpperInvariant());
+            choice.CustomMinimumSize = new Vector2(152, 24);
+            UiFactory.ApplyPixelFont(choice, 7);
+            choice.AddThemeColorOverride("font_color", PaperCard.Ink(StatPresentationCatalog.ColorFor(statId)));
+            choice.Disabled = _session.State.Coins < cost;
+            choice.Pressed += () =>
+            {
+                if (_session.ConvertHexToTrainingGround(capturedId, capturedStatId))
+                    CallDeferred(nameof(ShowGardenModules));
+            };
+            choices.AddChild(choice);
+        }
     }
 
     /// <summary>The selected hex uses the same non-blocking right inspector slot as a Voidling.</summary>
@@ -245,6 +318,68 @@ public partial class MainController
             };
             box.AddChild(upgrade);
         }
+
+        _landInspector = inspector;
+        _uiRoot.AddChild(inspector);
+    }
+
+    /// <summary>
+    /// A failed egg lying on the island, in the same non-blocking right inspector a hex uses. It is
+    /// worth nothing either way, so the only choice is whether to keep looking at it.
+    /// </summary>
+    private void ShowFailedEggMenu(string eggId)
+    {
+        var egg = _session.State.OwnedEggs.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, eggId, StringComparison.Ordinal) && candidate.State == EggState.Failed);
+        if (egg == null)
+            return;
+
+        CloseLandInspector();
+        _selectedId = string.Empty;
+        _garden.ClearSelection();
+        _garden.StopFollowing();
+        RebuildDetailsPanel();
+
+        var inspector = UiFactory.CreatePanel(new Vector2(162, 150));
+        inspector.Name = "FailedEggInspector";
+        inspector.Position = new Vector2(468, 82);
+        inspector.Size = new Vector2(162, 150);
+        inspector.ZIndex = 18;
+        var box = new VBoxContainer();
+        box.AddThemeConstantOverride("separation", 5);
+        inspector.AddChild(box);
+
+        var heading = new HBoxContainer();
+        var title = UiFactory.CreateLabel(Tr("UI_GARDEN_EGG_FAILED_TITLE"), 9);
+        title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        title.AddThemeColorOverride("font_color", Color.FromHtml("#9C514B"));
+        heading.AddChild(title);
+        var close = UiFactory.CreateButton("×");
+        close.Name = "CloseLandInspector";
+        close.CustomMinimumSize = new Vector2(20, 20);
+        close.Pressed += CloseLandInspector;
+        heading.AddChild(close);
+        box.AddChild(heading);
+
+        var detail = UiFactory.CreateLabel(Tr("UI_INVENTORY_EGG_FAILED"), 7);
+        detail.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        detail.CustomMinimumSize = new Vector2(138, 34);
+        box.AddChild(detail);
+
+        var stow = UiFactory.CreateButton(Tr("UI_INVENTORY_RETURN"));
+        stow.Name = "StowFailedEgg";
+        stow.CustomMinimumSize = new Vector2(138, 26);
+        UiFactory.ApplyPixelFont(stow, 7);
+        stow.Pressed += () => { if (_session.StowFailedEgg(eggId)) CloseLandInspector(); };
+        box.AddChild(stow);
+
+        var discard = UiFactory.CreateButton(Tr("UI_INVENTORY_DISCARD"));
+        discard.Name = "DiscardFailedEgg";
+        discard.CustomMinimumSize = new Vector2(138, 24);
+        UiFactory.ApplyPixelFont(discard, 7);
+        discard.AddThemeColorOverride("font_color", Color.FromHtml("#914E42"));
+        discard.Pressed += () => { _session.DiscardFailedEgg(eggId); CloseLandInspector(); };
+        box.AddChild(discard);
 
         _landInspector = inspector;
         _uiRoot.AddChild(inspector);

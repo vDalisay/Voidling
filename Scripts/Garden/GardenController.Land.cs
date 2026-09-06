@@ -96,6 +96,7 @@ public partial class GardenController
     /// </summary>
     private readonly List<Node2D> _treeProps = new();
     private readonly List<Vector2> _treeTrunks = new();
+    private readonly RandomNumberGenerator _landTargetRandom = new();
 
     /// <summary>Roughly the width of the drawn trunk: leaves are walk-through, wood is not.</summary>
     private const float TrunkRadius = 9.0f;
@@ -569,15 +570,19 @@ public partial class GardenController
     /// the nearest hex, and a step into a trunk is pushed back out to its edge, which reads as
     /// walking around the tree. Only the trunk is solid, so a Voidling can still stand in the leaves.
     /// </summary>
+    /// <summary>
+    /// Keeps a position on the island. A point over any placed hex is on land and is left where it
+    /// is, so a Voidling standing on plain ground walks the whole island rather than orbiting the
+    /// middle of whichever hex it happens to occupy. Only a point that has left the island is
+    /// pulled back, to the nearest land it can stand on. Training grounds are unaffected: a trainee
+    /// is held by its tile radius before this is ever consulted.
+    /// </summary>
     private Vector2 ClampToLand(Vector2 position)
     {
         var (q, r) = Hex.At(position.X, position.Y);
-        if (!TrainingUseCase.IsHexOccupied(_session.State, q, r))
-            return PushOutOfTrunks(NearestLandPoint(position));
-
-        var (centerX, centerY) = Hex.CenterOf(q, r);
-        var center = new Vector2(centerX, centerY);
-        return PushOutOfTrunks(center + (position - center).LimitLength(Hex.InnerRadius * 0.6f));
+        return PushOutOfTrunks(TrainingUseCase.IsHexOccupied(_session.State, q, r)
+            ? position
+            : NearestLandPoint(position));
     }
 
     private Vector2 PushOutOfTrunks(Vector2 position)
@@ -634,6 +639,7 @@ public partial class GardenController
                 continue;
 
             actor.LandClamp = ClampToLand;
+            actor.LandTarget = RandomLandTarget;
             actor.SetWanderArea(_landBounds, repath);
 
             if (creature.PassiveTrainingModuleId.Length > 0 &&
@@ -696,6 +702,24 @@ public partial class GardenController
                 ? Colors.White.Lerp(visual.BaseColor, 0.55f)
                 : Colors.White.Lerp(RefusedGround, 0.40f);
         }
+    }
+
+    /// <summary>
+    /// A random point on a random piece of placed ground. Every hex is equally likely, so a
+    /// free-roaming Voidling keeps choosing destinations across the whole island instead of
+    /// circling the one it happens to be standing on.
+    /// </summary>
+    private Vector2 RandomLandTarget()
+    {
+        var placed = _session.State.GardenModules.Where(module => module.Placed).ToList();
+        if (placed.Count == 0)
+            return new Vector2(Hex.OriginX, Hex.OriginY);
+
+        var hex = placed[_landTargetRandom.RandiRange(0, placed.Count - 1)];
+        var (x, y) = Hex.CenterOf(hex.HexQ, hex.HexR);
+        var offset = Vector2.Right.Rotated(_landTargetRandom.RandfRange(0.0f, Mathf.Tau)) *
+                     _landTargetRandom.RandfRange(0.0f, Hex.InnerRadius * 0.7f);
+        return ClampToLand(new Vector2(x, y) + offset);
     }
 
     /// <summary>Whether a placed hex has been built into training ground for a stat.</summary>

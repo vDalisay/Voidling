@@ -64,7 +64,9 @@ public partial class GardenController
                 actor = new VoidlingActor();
                 actor.Setup(data, _landBounds, position);
                 actor.LandClamp = ClampToLand;
+                actor.LandTarget = RandomLandTarget;
                 actor.Clicked += OnActorPressed;
+                actor.RunningStride += OnRunningStride;
                 _actorsRoot.AddChild(actor);
                 _actors[data.Id] = actor;
 

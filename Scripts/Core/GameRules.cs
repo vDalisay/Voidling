@@ -38,6 +38,7 @@ public static class GameRules
     public static int MaxStatLevel => _balance.Stats.MaxLevel;
     public static int GardenMaxPopulation => Math.Max(1, _balance.Garden.MaxPopulation);
     public static GardenModuleRules GardenModuleRules => _balance.GardenModules;
+    public static TrainingItemRules TrainingItemRules => _balance.TrainingItems;
     public static CareInteractionRules CareInteractionRules => _balance.CareInteractions;
     public static IReadOnlyList<int> DailyLoginCoinRewards => _balance.DailyLogin.CoinRewards;
     public static DailyMissionRules DailyMissionRules => _balance.DailyMissions;

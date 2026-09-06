@@ -44,6 +44,9 @@ public sealed record DailyMissionRules(
     int MissionsPerDay,
     IReadOnlyList<DailyMissionDefinition> Definitions);
 
+/// <summary>How much one training treat is worth, before any favorite-food bonus.</summary>
+public sealed record TrainingItemRules(int MinGain, int MaxGain);
+
 public sealed record GardenModuleRules(
     int PurchaseCost,
     IReadOnlyList<int> UpgradeCosts,
@@ -198,6 +201,7 @@ public sealed record GameBalanceRules(
     RaceRules Racing)
 {
     public GardenRules Garden { get; init; } = new(MaxPopulation: 8);
+    public TrainingItemRules TrainingItems { get; init; } = new(MinGain: 5, MaxGain: 9);
     public GardenModuleRules GardenModules { get; init; } = new(
         PurchaseCost: 40,
         UpgradeCosts: Array.AsReadOnly(new[] { 25, 50 }),

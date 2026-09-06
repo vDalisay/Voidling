@@ -80,15 +80,32 @@ public partial class MainController : Node
             give.Disabled = count <= 0;
             give.TooltipText = TrainingItemEffectPresentation.ProfileTooltip(StatPresentationCatalog.NameFor(stat.StatId), count);
             give.CustomMinimumSize = new Vector2(60, 22);
+            var capturedStatId = stat.StatId;
+            // The chooser deliberately stays open. Pressing again restarts the eating beat rather
+            // than queueing a second one, so the player can spam a hungry Voidling.
             give.Pressed += () =>
             {
-                _session.UseTrainingItem(creatureId, stat.StatId);
-                CloseModal();
+                _session.UseTrainingItem(creatureId, capturedStatId);
+                _garden.PlayTreatEating(creatureId, capturedStatId, spawnFood: true);
+                var remaining = _session.State.TrainingItems.TryGetValue(capturedStatId, out var left) ? left : 0;
+                label.Text = string.Format(Tr("UI_PROFILE_TREAT_STOCK"),
+                    StatPresentationCatalog.NameFor(capturedStatId), remaining);
+                give.Disabled = remaining <= 0;
             };
             row.AddChild(give);
             box.AddChild(row);
         }
     }
+
+    /// <summary>This egg's position among the ones it shares a source with, counting from one.</summary>
+    private static int NumberWithinSource(GameStateData state, EggData egg)
+        => state.OwnedEggs
+            .Where(candidate => candidate.Source == egg.Source)
+            .ToList()
+            .FindIndex(candidate => ReferenceEquals(candidate, egg)) + 1;
+
+    private static string EggNameKey(EggData egg)
+        => egg.Source == EggSource.Bred ? "UI_INVENTORY_BRED_EGG" : "UI_INVENTORY_SHOP_EGG";
 
     private void ShowInventory()
     {
@@ -96,17 +113,27 @@ public partial class MainController : Node
         var items = GameRules.StatIds
             .Select((statId, index) => new InventoryItemViewState(
                 string.Format(Tr("UI_INVENTORY_TREAT"), StatPresentationCatalog.NameFor(statId)),
+                string.Format(
+                    Tr("UI_INVENTORY_TREAT_EFFECT"),
+                    StatPresentationCatalog.NameFor(statId),
+                    GameRules.TrainingItemRules.MinGain,
+                    GameRules.TrainingItemRules.MaxGain),
+                statId,
                 state.TrainingItems.TryGetValue(statId, out var owned) ? owned : 0,
                 18 + index))
             .ToList();
-        items.Add(new InventoryItemViewState(Tr("UI_INVENTORY_EGGS"), state.OwnedEggs.Count, -1, UsesEggIcon: true));
-
+        // Each kind counts from one: a player with a single bred egg should read "Bred egg 1",
+        // not whatever position it happens to hold among the shop's.
         var storedEggs = state.OwnedEggs
             .Where(egg => egg.State == EggState.Stored)
-            .Select((egg, index) => new StoredEggViewState(
+            // What the player already knows about an unhatched egg: where it came from. Its genome
+            // stays hidden until it hatches.
+            .Select(egg => new StoredEggViewState(
                 egg.Id,
-                string.Format(Tr("UI_INVENTORY_STORED_EGG"), index + 1),
-                GameRules.TintColor(egg.TintHex)))
+                string.Format(Tr(EggNameKey(egg)), NumberWithinSource(state, egg)),
+                Tr(egg.Source == EggSource.Bred ? "UI_INVENTORY_EGG_BRED" : "UI_INVENTORY_EGG_COMMON"),
+                GameRules.TintColor(egg.TintHex),
+                egg.Source == EggSource.Bred))
             .ToList();
 
         var storedLand = state.GardenModules
@@ -123,18 +150,25 @@ public partial class MainController : Node
 
         var failedEggs = state.OwnedEggs
             .Where(egg => egg.State == EggState.Failed)
-            .Select((egg, index) => new FailedEggViewState(egg.Id, string.Format(Tr("UI_INVENTORY_FAILED_EGG"), index + 1)))
+            .Select((egg, index) => new FailedEggViewState(
+                egg.Id,
+                string.Format(Tr("UI_INVENTORY_FAILED_EGG"), index + 1),
+                egg.Source == EggSource.Bred))
             .ToList();
         var eggShells = state.EggShells
-            .Select((shell, index) => new EggShellViewState(shell.Id, $"Eggshell {index + 1}", GameRules.EggShellSalePrice))
+            .Select((shell, index) => new EggShellViewState(shell.Id, string.Format(Tr("UI_INVENTORY_SHELL"), index + 1), GameRules.EggShellSalePrice))
             .ToList();
         var incubationSkipCount = state.UtilityItems.TryGetValue(ShopItemIds.FullIncubationSkip, out var ownedSkips) ? Math.Max(0, ownedSkips) : 0;
         var incubatingEggs = state.OwnedEggs
             .Where(egg => egg.State == EggState.Incubating && egg.IncubationSeconds < egg.RequiredIncubationSeconds)
-            .Select((egg, index) => new IncubatingEggViewState(egg.Id, $"Egg {index + 1}", Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds))))
+            .Select(egg => new IncubatingEggViewState(
+                egg.Id,
+                string.Format(Tr(EggNameKey(egg)), NumberWithinSource(state, egg)),
+                Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds)),
+                egg.Source == EggSource.Bred))
             .ToList();
 
-        var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(380, 292));
+        var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(520, 292));
         var screen = new InventoryScreen();
         screen.Configure(new InventoryScreenState(items, failedEggs, eggShells, incubationSkipCount, incubatingEggs, storedEggs, storedLand));
         screen.PlaceStoredEggRequested += egg =>
@@ -147,9 +181,20 @@ public partial class MainController : Node
             CloseModal();
             _garden.BeginLandPlacement(land.ModuleId, land.ShapeId);
         };
+        screen.PlaceTreatRequested += statId =>
+        {
+            // A treat is only spent when something eats it, so the ground must never hold more of
+            // one than the satchel actually has. The session enforces that on the drop itself.
+            var owned = _session.State.TrainingItems.TryGetValue(statId, out var stock) ? stock : 0;
+            if (owned <= _session.DroppedTreatCount(statId))
+                return;
+            CloseModal();
+            _garden.BeginTreatPlacement(statId);
+        };
         screen.DiscardFailedEggRequested += eggId => { _session.DiscardFailedEgg(eggId); CallDeferred(nameof(ShowInventory)); };
         screen.SellEggShellRequested += shellId => { if (_session.SellEggShell(shellId)) CallDeferred(nameof(ShowInventory)); };
         screen.UseIncubationSkipRequested += eggId => { if (_session.UseFullIncubationSkip(eggId)) CallDeferred(nameof(ShowInventory)); };
         box.AddChild(screen);
+        screen.CallDeferred(InventoryScreen.MethodName.FocusSelection);
     }
 }

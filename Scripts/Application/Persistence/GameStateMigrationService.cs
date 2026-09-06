@@ -57,6 +57,7 @@ public sealed class GameStateMigrationService
         state.EggShells ??= new List<EggShellData>();
         state.TrainingItems ??= new Dictionary<string, int>(StringComparer.Ordinal);
         state.GardenModules ??= new List<GardenModuleData>();
+        state.DroppedTreats ??= new List<DroppedTreatData>();
         state.PendingTradeJournal ??= new List<PendingTradeJournalEntry>();
         state.AppliedTradeIds ??= new List<string>();
         state.AppliedMultiplayerRaceIds ??= new List<string>();
@@ -70,6 +71,7 @@ public sealed class GameStateMigrationService
         state.OwnedEggs.RemoveAll(static value => value is null);
         state.StoreEggs.RemoveAll(static value => value is null);
         state.EggShells.RemoveAll(static value => value is null);
+        state.DroppedTreats.RemoveAll(static value => value is null || value.StatId.Length == 0);
 
         if (previousVersion < 4)
         {

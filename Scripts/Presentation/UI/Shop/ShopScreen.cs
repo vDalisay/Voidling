@@ -137,7 +137,7 @@ public partial class ShopScreen : VBoxContainer
         Clear(_categories);
         AddCategory(TreatsCategory, Tr("UI_SHOP_CATEGORY_TREATS"), AtlasIconTexture(TreatTexture, new Rect2(16, 0, 16, 16)));
         AddCategory(EggsCategory, Tr("UI_SHOP_CATEGORY_EGGS"), EggTexture);
-        AddCategory(LandCategory, Tr("UI_SHOP_CATEGORY_LAND"), customIcon: BuildShapeSwatch(new[] { (0, 0) }, 18, 14));
+        AddCategory(LandCategory, Tr("UI_SHOP_CATEGORY_LAND"), customIcon: LandShapePresentation.CreateShapeArt("single", Color.FromHtml("#8FC57E"), 18, 14));
         if (_state!.RareOffer != null) AddCategory(SpecialCategory, Tr("UI_SHOP_CATEGORY_RARE"), UiFactory.CreateIcon(19));
         _categories.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
         var inventory = UiFactory.CreateButton(Tr("UI_SHOP_OPEN_INVENTORY"));
@@ -318,7 +318,7 @@ public partial class ShopScreen : VBoxContainer
             foreach (var piece in _state!.LandPieces)
                 yield return new Product("land:" + piece.ShapeId, piece.DisplayName,
                     string.Format(Tr("UI_SHOP_OWNED"), piece.Stored), piece.Price,
-                    () => BuildShapeSwatch(piece.Cells), () => LandPurchaseRequested?.Invoke(piece.ShapeId));
+                    () => LandShapePresentation.CreateShapeArt(piece.ShapeId, Color.FromHtml("#8FC57E"), 42, 28), () => LandPurchaseRequested?.Invoke(piece.ShapeId));
             yield break;
         }
         if (_state!.RareOffer is { } offer)
@@ -350,38 +350,5 @@ public partial class ShopScreen : VBoxContainer
         => new() { Texture = texture, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, MouseFilter = MouseFilterEnum.Ignore };
 
-    private static Control BuildShapeSwatch(IReadOnlyList<(int Q, int R)> cells, float width = 42, float height = 28)
-    {
-        const float ratio = 1.7f;
-        var units = cells.Select(cell => new Vector2(1.5f * cell.Q, cell.R + cell.Q * 0.5f)).ToArray();
-        var spanX = units.Max(point => point.X) - units.Min(point => point.X) + 2;
-        var spanY = units.Max(point => point.Y) - units.Min(point => point.Y) + 1;
-        var edge = Mathf.Min(width / spanX, height / (ratio * spanY));
-        var tileHeight = edge * ratio;
-        var centers = units.Select(point => new Vector2(point.X * edge, point.Y * tileHeight)).ToArray();
-        var middle = new Vector2((centers.Max(p => p.X) + centers.Min(p => p.X)) / 2, (centers.Max(p => p.Y) + centers.Min(p => p.Y)) / 2);
-        var origin = new Vector2(width / 2, height / 2) - middle;
-        var holder = new Control { CustomMinimumSize = new Vector2(width, height), MouseFilter = MouseFilterEnum.Ignore };
-        var tint = Color.FromHtml("#8FC57E");
-        foreach (var center in centers)
-        {
-            var polygon = HexShape.Corners(edge, tileHeight);
-            var outline = HexShape.Outline(edge, tileHeight);
-            for (var i = 0; i < polygon.Length; i++) polygon[i] += origin + center;
-            for (var i = 0; i < outline.Length; i++) outline[i] += origin + center;
-            holder.AddChild(new Polygon2D { Polygon = polygon, Color = tint });
-            holder.AddChild(new Line2D { Points = outline, DefaultColor = tint.Darkened(0.45f), Width = 1 });
-        }
-        return holder;
-    }
-
-    private static void Clear(Node node)
-    {
-        foreach (var child in node.GetChildren())
-        {
-            if (child is CanvasItem canvasItem) canvasItem.Visible = false;
-            if (child is Control control) control.MouseFilter = MouseFilterEnum.Ignore;
-            child.QueueFree();
-        }
-    }
+    private static void Clear(Node node) => PaperCard.Clear(node);
 }

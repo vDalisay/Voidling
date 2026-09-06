@@ -3,7 +3,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using Voidling.Domain.Racing;
+using Voidling.Presentation.UI.Breeding;
+using Voidling.Presentation.UI.Inventory;
 using Voidling.Presentation.UI.Racing;
+using Voidling.Presentation.UI.Settings;
 
 namespace VoidlingGame;
 
@@ -198,15 +201,27 @@ public partial class MainController
                     throw new InvalidOperationException("Simulation refresh replaced inspector or lost keyboard focus.");
             }
             _session.BuyTrainingItem(GameRules.StatIds[0]);
+            _session.BuyTrainingItem(GameRules.StatIds[0]);
             var stock = _session.State.TrainingItems[GameRules.StatIds[0]];
             giveTreat.EmitSignal(BaseButton.SignalName.Pressed);
             await SettleGardenUi();
             RequireOnScreen(ModalPanel());
             await CaptureGardenUi("treats");
-            FindGardenButton(_modalHost, "Give_" + GameRules.StatIds[0]).EmitSignal(BaseButton.SignalName.Pressed);
+            // The chooser stays open so the player can spam it; each press spends exactly one treat
+            // and restarts the eating beat rather than queueing a second one.
+            var give = FindGardenButton(_modalHost, "Give_" + GameRules.StatIds[0]);
+            give.EmitSignal(BaseButton.SignalName.Pressed);
             await SettleGardenUi();
-            if (_session.State.TrainingItems[GameRules.StatIds[0]] != stock - 1 || _modalHost.IsOpen)
-                throw new InvalidOperationException("Treat chooser did not consume one owned treat and return.");
+            if (_session.State.TrainingItems[GameRules.StatIds[0]] != stock - 1 || !_modalHost.IsOpen)
+                throw new InvalidOperationException("Treat chooser did not consume one owned treat and stay open.");
+            give.EmitSignal(BaseButton.SignalName.Pressed);
+            await SettleGardenUi();
+            var remaining = _session.State.TrainingItems[GameRules.StatIds[0]];
+            if (remaining != stock - 2 || give.Disabled != (remaining <= 0))
+                throw new InvalidOperationException("Spamming the treat chooser did not spend and track its stock.");
+            CloseModal();
+            await SettleGardenUi();
+            giveTreat.GrabFocus();
             if (!giveTreat.HasFocus()) throw new InvalidOperationException("Treat action lost focus on return.");
             ShowDetails();
             await SettleGardenUi();
@@ -241,6 +256,8 @@ public partial class MainController
                 RequireOnScreen(ModalPanel());
                 if (button.Name == "Shop") await VerifyShopUi(rail);
                 if (button.Name == "Races") await VerifyRaceEntryUi();
+                if (button.Name == "Inventory") await VerifyInventoryUi();
+                if (button.Name == "Breed") await VerifyBreedingUi();
                 await CaptureGardenUi($"menu-{button.Name}");
                 CloseModal();
                 await SettleGardenUi();
@@ -258,9 +275,7 @@ public partial class MainController
                 throw new InvalidOperationException("Escape did not cancel decoration placement before opening a menu.");
             ShowGardenBuild();
             await SettleGardenUi();
-            FindGardenButton(_modalHost, "Land").EmitSignal(BaseButton.SignalName.Pressed);
-            await SettleGardenUi();
-            RequireOnScreen(ModalPanel());
+            await VerifyBuildUi();
             CloseModal();
             ShowGardenActivities();
             await SettleGardenUi();
@@ -281,6 +296,9 @@ public partial class MainController
                     !modalControls.Contains(control.GetNode<Control>(control.FocusPrevious)))
                     throw new InvalidOperationException("Tab navigation escapes the modal.");
             }
+            await VerifyFreeRoaming();
+            await VerifyTreatDrop();
+            await VerifyEggCategories();
             await CaptureGardenUi("garden-menu");
             var age = _session.State.Voidlings.First().AdultAgeSeconds;
             await ToSignal(GetTree().CreateTimer(1.1), SceneTreeTimer.SignalName.Timeout);
@@ -289,6 +307,7 @@ public partial class MainController
             FindGardenButton(_modalHost, "Settings").EmitSignal(BaseButton.SignalName.Pressed);
             await SettleGardenUi();
             RequireOnScreen(ModalPanel());
+            await VerifySettingsUi();
             await CaptureGardenUi("settings");
             await PressGardenEscape();
             FindGardenButton(_modalHost, "Resume");
@@ -505,6 +524,286 @@ public partial class MainController
         await SettleGardenUi();
         if (FindRaceEntry().Step != RaceEntryStep.Course)
             throw new InvalidOperationException("Back did not return to course select.");
+    }
+
+    /// <summary>
+    /// The satchel's three bands: a category column reflecting the save, a grid that keeps its
+    /// shape, and one detail card that follows whichever slot is picked.
+    /// </summary>
+    private async Task VerifyInventoryUi()
+    {
+        var satchel = _modalHost.FindChildren("Satchel", string.Empty, true, false)
+            .OfType<InventoryScreen>().Single(screen => !screen.IsQueuedForDeletion());
+        var categories = satchel.GetNode<VBoxContainer>("Categories");
+        var slots = satchel.GetNode<PanelContainer>("Slots");
+        var detail = satchel.GetNode<PanelContainer>("ItemDetail");
+        RequireSeparate(categories, slots);
+        RequireSeparate(slots, detail);
+        RequireOnScreen(detail);
+
+        var filled = slots.FindChildren("Slot_*", "Button", true, false)
+            .OfType<Button>().Where(button => !button.IsQueuedForDeletion()).ToArray();
+        if (filled.Length == 0) throw new InvalidOperationException("Inventory showed no owned item.");
+        // Occupied plus drawn-empty slots always fill the grid, whatever the save holds.
+        const int inventorySlotCount = 12;
+        if (slots.FindChildren("*", "PanelContainer", true, false).Count + filled.Length < inventorySlotCount)
+            throw new InvalidOperationException("Inventory grid did not keep its shape.");
+        if (filled.Count(button => button.ButtonPressed) != 1)
+            throw new InvalidOperationException("Inventory did not hold exactly one selection.");
+
+        // The detail card has to follow the slot, not stay on whatever opened first.
+        var before = ((Label)detail.FindChild("DetailName", true, false)).Text;
+        var other = filled.FirstOrDefault(button => !button.ButtonPressed);
+        if (other != null)
+        {
+            await ClickGardenControl(other);
+            await SettleGardenUi();
+            var after = (Label)satchel.GetNode<PanelContainer>("ItemDetail").FindChild("DetailName", true, false);
+            if (after.Text == before) throw new InvalidOperationException("Inventory detail did not follow the slot.");
+        }
+
+        foreach (var category in categories.GetChildren().OfType<Button>())
+        {
+            await ClickGardenControl(category);
+            await SettleGardenUi();
+            RequireOnScreen(satchel.GetNode<PanelContainer>("ItemDetail"));
+        }
+        await CaptureGardenUi("inventory");
+    }
+
+    /// <summary>Two parents, marked A and B, and one verdict that follows the pair.</summary>
+    private async Task VerifyBreedingUi()
+    {
+        var nest = _modalHost.FindChildren("Nesting", string.Empty, true, false)
+            .OfType<BreedingScreen>().SingleOrDefault(screen => !screen.IsQueuedForDeletion());
+        if (nest == null) return;
+        var roster = nest.GetNode<PanelContainer>("RosterPanel");
+        var pair = nest.GetNode<PanelContainer>("PairCard");
+        RequireSeparate(roster, pair);
+        RequireOnScreen(pair);
+
+        var picked = roster.FindChildren("Racer_*", "Button", true, false)
+            .OfType<Button>().Where(button => !button.IsQueuedForDeletion() && button.ButtonPressed).ToArray();
+        if (picked.Length != 2) throw new InvalidOperationException("Breeding did not start with two parents.");
+        FindGardenButton(pair, "BreedAction");
+        if (pair.FindChild("PairVerdict", true, false) == null)
+            throw new InvalidOperationException("Breeding showed no pairing verdict.");
+        await CaptureGardenUi("breed");
+    }
+
+    /// <summary>Build reaches both land and decorations, each as a grid beside its own card.</summary>
+    private async Task VerifyBuildUi()
+    {
+        FindGardenButton(_modalHost, "Land").EmitSignal(BaseButton.SignalName.Pressed);
+        await SettleGardenUi();
+        RequireOnScreen(ModalPanel());
+        var landSlots = (Control)_modalHost.FindChild("LandSlots", true, false);
+        var landDetail = (Control)_modalHost.FindChild("LandDetail", true, false);
+        RequireSeparate(landSlots, landDetail);
+        await CaptureGardenUi("build-land");
+        CloseModal();
+
+        ShowGardenDecorations();
+        await SettleGardenUi();
+        RequireOnScreen(ModalPanel());
+        var decorationSlots = (Control)_modalHost.FindChild("DecorationSlots", true, false);
+        var decorationDetail = (Control)_modalHost.FindChild("DecorationDetail", true, false);
+        RequireSeparate(decorationSlots, decorationDetail);
+        FindGardenButton(decorationDetail, "DecorationAction");
+        await CaptureGardenUi("build-decorate");
+    }
+
+    /// <summary>Each switch's mark has to change with the switch, not only its pressed state.</summary>
+    private async Task VerifySettingsUi()
+    {
+        var settings = _modalHost.FindChildren("Settings", string.Empty, true, false)
+            .OfType<SettingsScreen>().Single(screen => !screen.IsQueuedForDeletion());
+        var edgePan = FindGardenButton(settings, "EdgePan");
+        var mark = edgePan.GetNode<TextureRect>("Mark");
+        var before = mark.Texture;
+        var edgePanning = _session.State.EdgePanning;
+        await ClickGardenControl(edgePan);
+        await SettleGardenUi();
+        if (_session.State.EdgePanning == edgePanning)
+            throw new InvalidOperationException("Edge panning switch did not reach the session.");
+        if (mark.Texture == before) throw new InvalidOperationException("Switch mark did not follow the switch.");
+        await ClickGardenControl(edgePan);
+        await SettleGardenUi();
+        if (_session.State.EdgePanning != edgePanning)
+            throw new InvalidOperationException("Edge panning switch did not toggle back.");
+    }
+
+    /// <summary>
+    /// Food on the ground: the nearest Voidling has to run for it, reach it, eat exactly one treat
+    /// from the satchel, and be roaming again afterwards.
+    /// </summary>
+    private async Task VerifyTreatDrop()
+    {
+        var statId = GameRules.StatIds[0];
+        _session.BuyTrainingItem(statId);
+        var stock = _session.State.TrainingItems[statId];
+        var creature = _session.State.Voidlings.First();
+
+        _garden.BeginTreatPlacement(statId);
+        if (!_garden.IsPlacingTreat) throw new InvalidOperationException("Treat placement did not arm.");
+        _garden.CancelTreatPlacement();
+        if (_garden.IsPlacingTreat || _session.State.TrainingItems[statId] != stock)
+            throw new InvalidOperationException("Cancelling treat placement still spent a treat.");
+
+        // Drop it right where a Voidling already stands, so the chase resolves in a few frames
+        // rather than depending on how far it happened to wander.
+        _garden.DropTreatForProbe(statId, _garden.ActorPositionForProbe(creature.Id));
+        if (_session.DroppedTreatCount(statId) != 1)
+            throw new InvalidOperationException("The treat did not land in the Garden.");
+        // A dropped treat is owned state and stays in the satchel until something eats it, which
+        // is also why it can be saved without costing the player anything.
+        if (_session.State.TrainingItems[statId] != stock)
+            throw new InvalidOperationException("Putting a treat down spent it before anything ate it.");
+        if (_session.State.DroppedTreats.Count != 1)
+            throw new InvalidOperationException("The treat on the ground was not recorded in the save state.");
+
+        // Wall-clock, not frames: headless runs the idle loop uncapped, so a frame budget says
+        // nothing about whether the three-second eating beat has finished.
+        var deadline = Time.GetTicksMsec() + (ulong)((GardenController.TreatEatingSeconds + 4.0f) * 1000.0f);
+        while (Time.GetTicksMsec() < deadline && _session.State.TrainingItems[statId] != stock - 1)
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+        if (_session.State.TrainingItems[statId] != stock - 1)
+            throw new InvalidOperationException(
+                $"Nobody ate the treat. dropped={_session.DroppedTreatCount(statId)} " +
+                $"chasing={_garden.ChasingCountForProbe()} eating={_garden.AnyVoidlingEatingForProbe()} " +
+                $"stock={_session.State.TrainingItems[statId]} expected={stock - 1}");
+        if (_session.DroppedTreatCount(statId) != 0)
+            throw new InvalidOperationException("The eaten treat stayed on the ground.");
+
+        // The treat is spent the moment it is claimed, so the beat is still running here; wait it
+        // out before checking that the Voidling goes back to roaming.
+        await ToSignal(
+            GetTree().CreateTimer(GardenController.TreatEatingSeconds + 1.0f),
+            SceneTreeTimer.SignalName.Timeout);
+        if (_garden.AnyVoidlingEatingForProbe())
+            throw new InvalidOperationException("A Voidling never finished eating.");
+    }
+
+    /// <summary>
+    /// Shop eggs and bred eggs are different things to the player, so the satchel keeps them in
+    /// their own categories and never mixes one into the other's grid.
+    /// </summary>
+    private async Task VerifyEggCategories()
+    {
+        _session.State.OwnedEggs.Add(new EggData
+        {
+            Id = "probe-shop-egg", Source = EggSource.Store, State = EggState.Stored, TintHex = "#F6F0C9"
+        });
+        _session.State.OwnedEggs.Add(new EggData
+        {
+            Id = "probe-bred-egg", Source = EggSource.Bred, State = EggState.Stored, TintHex = "#C9E0F6"
+        });
+
+        ShowInventory();
+        await SettleGardenUi();
+        var satchel = _modalHost.FindChildren("Satchel", string.Empty, true, false)
+            .OfType<InventoryScreen>().Single(screen => !screen.IsQueuedForDeletion());
+        var categories = satchel.GetNode<VBoxContainer>("Categories");
+        FindGardenButton(categories, "Category" + InventoryScreen.ShopEggsCategory);
+        FindGardenButton(categories, "Category" + InventoryScreen.BredEggsCategory);
+
+        // Neither category may ever list an egg belonging to the other.
+        foreach (var (category, mine, theirs) in new[]
+                 {
+                     (InventoryScreen.ShopEggsCategory, "Slot_egg_probe-shop-egg", "Slot_egg_probe-bred-egg"),
+                     (InventoryScreen.BredEggsCategory, "Slot_egg_probe-bred-egg", "Slot_egg_probe-shop-egg")
+                 })
+        {
+            await ClickGardenControl(FindGardenButton(categories, "Category" + category));
+            await SettleGardenUi();
+            var slots = satchel.GetNode<PanelContainer>("Slots")
+                .FindChildren("Slot_*", "Button", true, false)
+                .OfType<Button>().Where(button => !button.IsQueuedForDeletion())
+                .Select(button => button.Name.ToString()).ToArray();
+            if (!slots.Contains(mine))
+                throw new InvalidOperationException($"{category} did not list its own egg.");
+            if (slots.Contains(theirs))
+                throw new InvalidOperationException($"{category} listed an egg from the other source.");
+            RequireOnScreen(satchel.GetNode<PanelContainer>("ItemDetail"));
+        }
+
+        await CaptureGardenUi("inventory-eggs");
+        CloseModal();
+        await SettleGardenUi();
+        if (_modalHost.IsOpen)
+            throw new InvalidOperationException("The satchel stayed open after the egg category check.");
+        _session.State.OwnedEggs.RemoveAll(egg => egg.Id.StartsWith("probe-", StringComparison.Ordinal));
+        // This check runs inside the Garden menu sequence, so hand that menu back to it.
+        ShowGardenMenu();
+        await SettleGardenUi();
+    }
+
+    /// <summary>
+    /// A Voidling on plain ground owns the whole island. Plain ground has held one still in three
+    /// different ways, so this checks the clamp directly, then puts a Voidling down on plain ground
+    /// and requires it to walk off that hex by itself.
+    /// </summary>
+    private async Task VerifyFreeRoaming()
+    {
+        var innerRadius = _garden.HexInnerRadiusForProbe();
+        // The radius an earlier land clamp held every free-roaming Voidling inside.
+        var oldLimit = innerRadius * 0.6f;
+
+        foreach (var module in _session.State.GardenModules.Where(module => module.Placed))
+        {
+            var center = _garden.HexCenterForProbe((module.HexQ, module.HexR));
+            for (var step = 0; step < 6; step++)
+            {
+                var rim = center + Vector2.Right.Rotated(Mathf.Tau * step / 6.0f) * (innerRadius * 0.9f);
+                // Trees still push a Voidling aside, so the contract is that the rim stays reachable
+                // ground, not that the clamp is the identity function.
+                var clamped = _garden.ClampToLandForProbe(rim);
+                if (center.DistanceTo(clamped) <= oldLimit && _garden.HexUnderForProbe(rim) == (module.HexQ, module.HexR))
+                    throw new InvalidOperationException(
+                        $"Land clamp pulled ({rim.X:0},{rim.Y:0}) back into the centre of hex " +
+                        $"({module.HexQ},{module.HexR}); plain ground is confining Voidlings again.");
+            }
+        }
+
+        // Off the island is still off the island.
+        var faraway = _garden.ClampToLandForProbe(new Vector2(9000, 9000));
+        if (!_session.State.GardenModules.Any(module =>
+                module.Placed && _garden.HexUnderForProbe(faraway) == (module.HexQ, module.HexR)))
+            throw new InvalidOperationException("The land clamp let a position stay off the island.");
+
+        // Nothing on a Voidling may draw above its body's layer, or a tree that hides the body
+        // leaves its wings, crown or halo floating over the canopy.
+        foreach (var voidling in _session.State.Voidlings)
+        {
+            var (body, highest) = _garden.VoidlingLayersForProbe(voidling.Id);
+            if (highest > body)
+                throw new InvalidOperationException(
+                    $"A Voidling draws on layer {highest} above its body on {body}; trees cannot hide it.");
+        }
+
+        // The case the player reports: pick a Voidling up, put it down on plain ground, and watch.
+        var creature = _session.State.Voidlings.First(candidate => candidate.PassiveTrainingModuleId.Length == 0);
+        var plain = _session.State.GardenModules.First(module => module.Placed && module.StatId.Length == 0);
+        _garden.DropOnHexForProbe(creature.Id, plain.Id, _garden.HexCenterForProbe((plain.HexQ, plain.HexR)));
+        await SettleGardenUi();
+        if (_garden.IsOnTileForProbe(creature.Id) ||
+            _session.FindVoidling(creature.Id)!.PassiveTrainingModuleId.Length > 0)
+            throw new InvalidOperationException("Plain ground bound the Voidling that was dropped on it.");
+
+        // Measured at 5-15s across runs on the two-hex starter island; the budget is generous
+        // because roaming is deliberately leisurely, not because the outcome is in doubt.
+        var droppedHex = _garden.HexUnderForProbe(_garden.ActorPositionForProbe(creature.Id));
+        var deadline = Time.GetTicksMsec() + 45000;
+        while (Time.GetTicksMsec() < deadline &&
+               _garden.HexUnderForProbe(_garden.ActorPositionForProbe(creature.Id)) == droppedHex)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+
+        if (_garden.HexUnderForProbe(_garden.ActorPositionForProbe(creature.Id)) == droppedHex)
+            throw new InvalidOperationException(
+                $"A Voidling dropped on plain ground never walked off hex {droppedHex}.");
     }
 
     private RaceEntryScreen FindRaceEntry()

@@ -39,7 +39,9 @@ public partial class MutationAdornment2D : Node2D
         _visualTypeId = string.IsNullOrWhiteSpace(visualTypeId)
             ? VoidlingAppearanceData.DefaultVisualTypeId
             : visualTypeId;
-        ZIndex = target.ZIndex + 8;
+        // Share the body's layer so mutations y-sort against the trees exactly as the body does;
+        // being a later sibling still keeps them drawn over the Voidling itself.
+        ZIndex = target.ZIndex;
         Position = target.Position;
         QueueRedraw();
     }

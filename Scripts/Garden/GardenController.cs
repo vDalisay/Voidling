@@ -12,6 +12,9 @@ public partial class GardenController : Node2D
     private const float HoldToPickUpSeconds = 0.16f;
     private const float EggBaseScale = 1.45f;
 
+    /// <summary>Click target for a failed egg, generous enough to beat the ground beneath it.</summary>
+    private static readonly Vector2 EggHitboxSize = new(44, 48);
+
     private static readonly Texture2D EggTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
 
@@ -39,7 +42,11 @@ public partial class GardenController : Node2D
         public Node2D Holder { get; init; } = null!;
         public Sprite2D Sprite { get; init; } = null!;
         public Label Label { get; init; } = null!;
+        public Area2D Hitbox { get; init; } = null!;
     }
+
+    /// <summary>Raised when a failed egg in the Garden is clicked, so the host can offer its actions.</summary>
+    public event Action<string>? FailedEggSelected;
 
     public override void _Ready()
     {
@@ -70,6 +77,8 @@ public partial class GardenController : Node2D
     {
         UpdateEggPulse();
         UpdatePlacementGhost();
+        UpdateTreatGhost();
+        UpdateTreatDrops();
         UpdateLandGhost();
         UpdateLandHover();
 
@@ -129,6 +138,17 @@ public partial class GardenController : Node2D
                     TryCompleteEggPlacement(mouse.Position);
                 else
                     CancelEggPlacement();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            if (IsPlacingTreat && mouse.Pressed &&
+                mouse.ButtonIndex is MouseButton.Left or MouseButton.Right)
+            {
+                if (mouse.ButtonIndex == MouseButton.Left)
+                    TryCompleteTreatPlacement(mouse.Position);
+                else
+                    CancelTreatPlacement();
                 GetViewport().SetInputAsHandled();
                 return;
             }
@@ -282,6 +302,7 @@ public partial class GardenController : Node2D
         {
             StopFollowing();
             CancelEggPlacement();
+            CancelTreatPlacement();
             CancelLandPlacement();
         }
         else
@@ -414,7 +435,9 @@ public partial class GardenController : Node2D
             var actor = new VoidlingActor();
             actor.Setup(data, _landBounds, start);
             actor.LandClamp = ClampToLand;
+            actor.LandTarget = RandomLandTarget;
             actor.Clicked += OnActorPressed;
+            actor.RunningStride += OnRunningStride;
             _actorsRoot.AddChild(actor);
             _actors[data.Id] = actor;
 
@@ -424,12 +447,15 @@ public partial class GardenController : Node2D
 
         Select(_selectedId);
         RefreshEggs();
+        RefreshTreats();
         RefreshTileResidents(landChanged);
     }
 
     private void RefreshEggs()
     {
-        var placed = _session.State.OwnedEggs.Where(egg => egg.State != EggState.Stored).ToList();
+        var placed = _session.State.OwnedEggs
+            .Where(egg => egg.State != EggState.Stored && !egg.Stowed)
+            .ToList();
         var eggsById = placed.ToDictionary(e => e.Id, StringComparer.Ordinal);
 
         foreach (var staleId in _eggVisuals.Keys.Where(id => !eggsById.ContainsKey(id)).ToArray())
@@ -460,8 +486,34 @@ public partial class GardenController : Node2D
                 label.AddThemeColorOverride("font_color", Color.FromHtml("#4F5948"));
                 holder.AddChild(label);
 
+                // Only a failed egg is ever interactive; a healthy one is a timer, not a decision.
+                // The box is sized off the drawn egg rather than the atlas cell, with room around
+                // it, so the egg is as easy to hit as a Voidling instead of losing the click to
+                // the ground underneath.
+                var hitbox = new Area2D { InputPickable = false, Monitoring = false, Monitorable = false };
+                hitbox.AddChild(new CollisionShape2D
+                {
+                    Shape = new RectangleShape2D { Size = EggHitboxSize },
+                    Position = new Vector2(0, -EggHitboxSize.Y * 0.18f)
+                });
+                var capturedEggId = egg.Id;
+                var capturedSprite = sprite;
+                hitbox.InputEvent += (_, inputEvent, _) =>
+                {
+                    if (inputEvent is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+                        return;
+                    // The egg owns the click; without this the ground underneath opens its hex menu
+                    // in the same press.
+                    GetViewport().SetInputAsHandled();
+                    FailedEggSelected?.Invoke(capturedEggId);
+                };
+                // The same faint lift a Voidling and a hex get, so a failed egg reads as clickable.
+                hitbox.MouseEntered += () => SetFailedEggHovered(capturedSprite, true);
+                hitbox.MouseExited += () => SetFailedEggHovered(capturedSprite, false);
+                holder.AddChild(hitbox);
+
                 _eggsRoot.AddChild(holder);
-                visual = new EggVisual { Holder = holder, Sprite = sprite, Label = label };
+                visual = new EggVisual { Holder = holder, Sprite = sprite, Label = label, Hitbox = hitbox };
                 _eggVisuals[egg.Id] = visual;
 
                 if (_initialRefreshComplete)
@@ -479,7 +531,17 @@ public partial class GardenController : Node2D
                 : GameRules.TintColor(egg.TintHex);
             var remaining = Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds));
             visual.Label.Text = egg.State == EggState.Failed ? "X" : $"{remaining}s";
+            visual.Hitbox.InputPickable = egg.State == EggState.Failed;
         }
+    }
+
+    /// <summary>The pointer lift for a failed egg: brighter, and a touch larger.</summary>
+    private static void SetFailedEggHovered(Sprite2D sprite, bool hovered)
+    {
+        if (!GodotObject.IsInstanceValid(sprite))
+            return;
+        sprite.SelfModulate = hovered ? new Color(1.35f, 1.35f, 1.35f) : Colors.White;
+        sprite.Scale = Vector2.One * EggBaseScale * (hovered ? 1.10f : 1.0f);
     }
 
     private void UpdateEggPulse()
@@ -490,7 +552,10 @@ public partial class GardenController : Node2D
             if (!_eggVisuals.TryGetValue(egg.Id, out var visual))
                 continue;
 
-            if (egg.State == EggState.Failed || egg.RequiredIncubationSeconds <= 0.01f)
+            // A failed egg's scale belongs to its hover, not to the incubation pulse it no longer has.
+            if (egg.State == EggState.Failed)
+                continue;
+            if (egg.RequiredIncubationSeconds <= 0.01f)
             {
                 visual.Sprite.Scale = Vector2.One * EggBaseScale;
                 continue;

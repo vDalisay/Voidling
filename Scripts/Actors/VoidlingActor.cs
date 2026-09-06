@@ -95,6 +95,31 @@ public partial class VoidlingActor : Node2D
     /// Applies presentation-only roaming flavor from the Voidling's current effective stats.
     /// This never feeds back into authoritative training, persistence, or race simulation.
     /// </summary>
+    /// <summary>
+    /// Raised while training on running ground, so the Garden can kick up its dust at the feet.
+    /// Presentation only: the tile's training rate is unaffected by how often this fires.
+    /// </summary>
+    public event Action<VoidlingActor>? RunningStride;
+
+    private float _tileDustSeconds;
+
+    /// <summary>
+    /// A Voidling on running ground breaks into a visible stride now and then rather than looping
+    /// in place, so the ground reads as being used. Swim ground stays quiet.
+    /// </summary>
+    private void TickTileDust(float step)
+    {
+        if (!IsOnTile || _tileAnimation != "run" || _eating || _pickedUp || _interactionLocked)
+            return;
+
+        _tileDustSeconds -= step;
+        if (_tileDustSeconds > 0.0f)
+            return;
+
+        _tileDustSeconds = _rng.RandfRange(0.9f, 2.4f);
+        RunningStride?.Invoke(this);
+    }
+
     public void ApplyAmbientStats(float run, float stamina)
     {
         var behavior = VoidlingAmbientBehaviorResolver.Resolve(run, stamina);
@@ -113,6 +138,11 @@ public partial class VoidlingActor : Node2D
             return;
 
         var step = (float)delta;
+        // Food on the ground outranks both roaming and tile confinement.
+        if (ProcessTreatChase(step))
+            return;
+
+        TickTileDust(step);
         if (!IsOnTile && _restSeconds > 0.0f)
         {
             _restSeconds = Math.Max(0.0f, _restSeconds - step);
@@ -203,6 +233,14 @@ public partial class VoidlingActor : Node2D
     /// rectangle, so the box alone would let it stroll onto the water.
     /// </summary>
     public Func<Vector2, Vector2>? LandClamp { get; set; }
+
+    /// <summary>
+    /// Somewhere on the island worth walking to. The wander box is the island's bounding
+    /// rectangle, which on a small or oddly shaped island is mostly water; drawing from it and
+    /// clamping afterwards kept pulling destinations back to whichever hex the Voidling already
+    /// stood on. Asking for real ground instead is what lets it cross the island.
+    /// </summary>
+    public Func<Vector2>? LandTarget { get; set; }
 
     /// <summary>Widens the roaming area as the island grows.</summary>
     public void SetWanderArea(Rect2 bounds, bool repath = false)
@@ -368,10 +406,19 @@ public partial class VoidlingActor : Node2D
         _target = IsOnTile
             ? _tileCenter + Vector2.Right.Rotated(_rng.RandfRange(0.0f, Mathf.Tau)) *
               _rng.RandfRange(0.0f, _tileRadius)
-            : ClampToWanderArea(new Vector2(
-                _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
-                _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y)));
-        _nextTargetSeconds = _rng.RandfRange(1.5f, 4.0f);
+            : ClampToWanderArea(
+                TryPickShorelineTarget() ??
+                LandTarget?.Invoke() ??
+                new Vector2(
+                    _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
+                    _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y)));
+
+        // Long enough to actually arrive, plus some slack. A flat timer was shorter than the walk
+        // across a single hex, so a Voidling gave up on every destination that was not already
+        // next to it and never left the ground it stood on. This stays a give-up guard: arriving
+        // early simply starts a rest, and hitting the island edge repaths at once.
+        _nextTargetSeconds = Position.DistanceTo(_target) / Mathf.Max(1.0f, _walkSpeed) +
+                             _rng.RandfRange(1.0f, 3.0f);
     }
 
     /// <summary>

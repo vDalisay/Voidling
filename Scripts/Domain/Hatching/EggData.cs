@@ -45,4 +45,11 @@ public sealed class EggData
 
     public float WorldX { get; set; }
     public float WorldY { get; set; }
+
+    /// <summary>
+    /// A failed egg the player has picked up off the island. It still exists and still shows in the
+    /// satchel, it simply no longer sits in the Garden. Additive: saves written before this load as
+    /// false, leaving every existing failed egg exactly where it was.
+    /// </summary>
+    public bool Stowed { get; set; }
 }
