@@ -68,6 +68,13 @@ public static class RaceCoursePresentationCatalog
         yield return "UI_RACE_SECTION_TAKEOFF";
         yield return "UI_RACE_PICKER_COURSE";
         yield return "UI_RACE_RETURN";
+        yield return "UI_RACE_RESULT_WIN";
+        yield return "UI_RACE_RESULT_LAST";
+        yield return "UI_RACE_RESULT_COMPLETE";
+        yield return "UI_RACE_RESULT_PLACE";
+        yield return "UI_RACE_RESULT_EYEBROW";
+        yield return "UI_RACE_RESULT_REWARD";
+        yield return "UI_RACE_RESULT_NEW_RECORD";
         yield return "UI_RACE_PAUSED";
         yield return "UI_RACE_RESUME";
         yield return "UI_RACE_QUIT";

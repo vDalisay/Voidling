@@ -126,23 +126,29 @@ public partial class MainController
         AddChild(race);
     }
 
-    /// <summary>Files a finished standard race under the course and level it was entered at.</summary>
-    private void RecordCourseFinish(int finishedMilliseconds)
+    /// <summary>
+    /// Files a finished standard race under the course and level it was entered at. Returns true when
+    /// the run became the new record, which the results card surfaces.
+    /// </summary>
+    private bool RecordCourseFinish(int finishedMilliseconds)
     {
         if (string.IsNullOrEmpty(_activeRaceCourseId))
-            return;
+            return false;
 
-        if (_session.RecordCourseFinish(
+        if (!_session.RecordCourseFinish(
                 _activeRaceCourseId,
                 _activeRaceCourseVersion,
                 _activeRaceLevel,
                 finishedMilliseconds,
                 _activeRaceCreatureName))
         {
-            _gardenEventLog.Append(string.Format(
-                Tr("UI_GARDEN_LOG_COURSE_RECORD"),
-                _activeRaceCreatureName,
-                FormatRaceMilliseconds(finishedMilliseconds)));
+            return false;
         }
+
+        _gardenEventLog.Append(string.Format(
+            Tr("UI_GARDEN_LOG_COURSE_RECORD"),
+            _activeRaceCreatureName,
+            FormatRaceMilliseconds(finishedMilliseconds)));
+        return true;
     }
 }

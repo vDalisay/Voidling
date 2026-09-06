@@ -221,10 +221,5 @@ public partial class MainController
     }
 
     private static string FormatRaceMilliseconds(int milliseconds)
-    {
-        var span = TimeSpan.FromMilliseconds(Math.Max(0, milliseconds));
-        return span.TotalMinutes >= 1.0
-            ? $"{(int)span.TotalMinutes}:{span.Seconds:00}.{span.Milliseconds:000}"
-            : $"{span.Seconds}.{span.Milliseconds:000}s";
-    }
+        => RaceScreen.FormatMilliseconds(milliseconds);
 }

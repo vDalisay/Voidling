@@ -30,4 +30,16 @@ public partial class RaceScreen
             return false;
         }
     }
+
+    /// <summary>
+    /// The one spelling of a race time. The results card, the course-record card and the Garden log
+    /// all read it, so a recorded time and the time the player just saw cannot disagree.
+    /// </summary>
+    public static string FormatMilliseconds(int milliseconds)
+    {
+        var span = TimeSpan.FromMilliseconds(Math.Max(0, milliseconds));
+        return span.TotalMinutes >= 1.0
+            ? $"{(int)span.TotalMinutes}:{span.Seconds:00}.{span.Milliseconds:000}"
+            : $"{span.Seconds}.{span.Milliseconds:000}s";
+    }
 }
