@@ -150,8 +150,12 @@ public partial class VoidlingActor : Node2D
         if (toTarget.LengthSquared() > 1.0f)
         {
             var direction = toTarget.Normalized();
-            Position += direction * _walkSpeed * step;
-            Position = ClampToWanderArea(Position);
+            var nextPosition = Position + direction * _walkSpeed * step;
+            var clampedPosition = ClampToWanderArea(nextPosition);
+            var hitBoundary = clampedPosition.DistanceSquaredTo(nextPosition) > 0.01f;
+            Position = clampedPosition;
+            if (hitBoundary && !IsOnTile)
+                PickNewTarget();
             PlayForDirection(direction);
         }
     }
@@ -208,7 +212,7 @@ public partial class VoidlingActor : Node2D
 
         _wanderBounds = bounds;
         Position = ClampToWanderArea(Position);
-        if (repath && !IsOnTile)
+        if (repath)
             PickNewTarget();
     }
 

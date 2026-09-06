@@ -258,7 +258,7 @@ public partial class GardenController
                 "position",
                 new Vector2(x, y),
                 LandPlacementCameraSeconds)
-            .SetTrans(Tween.TransitionType.Sine)
+            .SetTrans(Tween.TransitionType.Back)
             .SetEase(Tween.EaseType.InOut);
         _landPlacementCameraTween.TweenCallback(Callable.From(() =>
         {
@@ -572,9 +572,12 @@ public partial class GardenController
     private Vector2 ClampToLand(Vector2 position)
     {
         var (q, r) = Hex.At(position.X, position.Y);
-        return TrainingUseCase.IsHexOccupied(_session.State, q, r)
-            ? PushOutOfTrunks(position)
-            : PushOutOfTrunks(NearestLandPoint(position));
+        if (!TrainingUseCase.IsHexOccupied(_session.State, q, r))
+            return PushOutOfTrunks(NearestLandPoint(position));
+
+        var (centerX, centerY) = Hex.CenterOf(q, r);
+        var center = new Vector2(centerX, centerY);
+        return PushOutOfTrunks(center + (position - center).LimitLength(Hex.InnerRadius * 0.6f));
     }
 
     private Vector2 PushOutOfTrunks(Vector2 position)

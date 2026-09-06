@@ -284,6 +284,12 @@ public partial class GardenController : Node2D
             CancelEggPlacement();
             CancelLandPlacement();
         }
+        else
+        {
+            // Rebuild every actor's target when the Garden becomes visible again. A target selected
+            // before a race/trade screen could otherwise keep walking into an old edge.
+            RefreshTileResidents(repath: true);
+        }
 
         Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
         _camera.Enabled = active;

@@ -58,21 +58,33 @@ public partial class MainController
             RequireOnScreen(_dayNightDial);
             RequireSeparate(_dayNightDial, _uiRoot.GetNode<Control>("GardenStatus"));
             var clockLabel = _dayNightDial.FindChildren("*", "Label", true, false).OfType<Label>().Single();
-            if (Mathf.Abs(clockLabel.GetGlobalRect().GetCenter().X - _dayNightDial.GetGlobalRect().GetCenter().X) > 1)
+            var art = clockLabel.GetParent<Control>();
+            var timeBoxCenter = art.GetGlobalTransformWithCanvas() * new Vector2(41, 70);
+            if (clockLabel.GetGlobalRect().GetCenter().DistanceTo(timeBoxCenter) > 1)
                 throw new InvalidOperationException("Garden clock time is not centered in its dial.");
-            var arrow = (TextureRect)(_dayNightDial.FindChild("DayNightArrow", true, false)
+            var arrow = (Node2D)(_dayNightDial.FindChild("DayNightArrow", true, false)
                 ?? throw new InvalidOperationException("Garden clock is missing its day/night arrow."));
-            foreach (var hour in new[] { 0, 5, 9, 18, 22 })
+            if (arrow.Position.DistanceTo(new Vector2(55, 32)) > 0.01f)
+                throw new InvalidOperationException("Garden clock pointer lost its fixed pivot.");
+            if (arrow.FindChild("ArrowArtwork", true, false) is not TextureRect arrowArtwork ||
+                arrowArtwork.Texture is not AtlasTexture arrowTexture ||
+                arrowTexture.Region != new Rect2(336, 32, 16, 16))
+                throw new InvalidOperationException("Garden clock is not using the weather arrow artwork.");
+            foreach (var (hour, expectedArrowAngle) in new[]
+                     { (Hour: 0, Angle: 45f), (Hour: 5, Angle: 45f), (Hour: 9, Angle: -45f),
+                       (Hour: 18, Angle: -45f), (Hour: 19, Angle: 0f), (Hour: 20, Angle: 45f), (Hour: 22, Angle: 45f) })
             {
                 var time = DateTime.Today.AddHours(hour);
                 _dayNightDial.ShowTime(time);
                 if (clockLabel.Text != time.ToShortTimeString())
                     throw new InvalidOperationException("Garden clock does not show the user's local time.");
+                if (Mathf.Abs(arrow.Rotation - Mathf.DegToRad(expectedArrowAngle)) > 0.001f)
+                    throw new InvalidOperationException("Garden clock pointer is not rotating around its fixed pivot.");
                 await CaptureGardenUi("garden-" + hour);
             }
-            var nightArrow = ((AtlasTexture)arrow.Texture).Region;
+            var nightArrow = arrow.Rotation;
             _dayNightDial.ShowTime(DateTime.Today.AddHours(12));
-            if (((AtlasTexture)arrow.Texture).Region == nightArrow)
+            if (Mathf.Abs(arrow.Rotation - nightArrow) < 0.001f)
                 throw new InvalidOperationException("Garden clock arrow did not react to day and night.");
             _dayNightDial.ShowTime(_garden.EnvironmentLocalTime);
             HandleRailResizeInput(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = true });
@@ -406,7 +418,7 @@ public partial class MainController
         await ToSignal(GetTree().CreateTimer(GardenController.LandPlacementAnimationSeconds + 0.1), SceneTreeTimer.SignalName.Timeout);
         if (_modalHost.IsOpen)
             throw new InvalidOperationException("Shop reopened without the post-animation delay.");
-        await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        await ToSignal(GetTree().CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
         if (!_modalHost.IsOpen)
             throw new InvalidOperationException("Shop did not reopen after the placement animation delay.");
     }

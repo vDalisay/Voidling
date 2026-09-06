@@ -142,7 +142,7 @@ public partial class MainController : Node
         if (placed)
         {
             await ToSignal(
-                GetTree().CreateTimer(GardenController.LandPlacementAnimationSeconds + 0.3),
+                GetTree().CreateTimer(GardenController.LandPlacementAnimationSeconds + 0.5),
                 SceneTreeTimer.SignalName.Timeout);
             if (!IsInsideTree())
                 return;
