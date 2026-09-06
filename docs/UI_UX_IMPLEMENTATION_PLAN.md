@@ -273,3 +273,22 @@ Verified with Debug and Release builds, 241 tests (four new ones cover the diffi
 record keeping), architecture/localization checks, `git diff --check`, Godot import and main-scene
 runtime, and the Garden UI, Voidling visual, race presentation, race completion, family tree and
 persistence recovery probes.
+
+### Race entry visual pass
+
+The first Chao-Garden build read as correct but sterile, so a second pass leans harder on the
+premium packs:
+
+- The step banner carries the premium trophy glyph.
+- Difficulty pills colour-code by tier from the round-button sheet — green, yellow, red — instead of
+  one flat blue, so difficulty reads before the number does.
+- The picked course and the picked racer are both marked with the premium wooden star, and the level
+  is shown as a filled/empty three-star rating on the record card and the confirmation.
+- Roster paging uses the premium play glyph, mirrored for the left arrow, rather than typed brackets.
+- The course list moved onto its own paper card so the screen reads as two cards rather than one
+  blank sheet, and the stat gauges gained an outline.
+- `CourseMinimap` now draws sky over unbroken ground with a start post and a checkered finish; a
+  climb rises out of the ground and a glide floats above it, so the miniature shows the shape of the
+  course instead of a row of coloured blocks.
+
+Nothing about course identity, difficulty tiers, records or the race itself changed in this pass.

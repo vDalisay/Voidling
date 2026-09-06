@@ -71,6 +71,11 @@ public partial class RaceEntryScreen : Control
 
     private static readonly Texture2D RoundButtons = GD.Load<Texture2D>(
         UiFactory.UiRoot + "buttons/round/medium colored round buttons.png");
+    private static readonly Texture2D WoodStars = GD.Load<Texture2D>(
+        UiFactory.UiRoot + "Icons/special icons/stars in wood.png");
+
+    // Difficulty reads as colour before it reads as a number: calm green, warm yellow, hot red.
+    private static readonly int[] LevelColorRows = { 7, 9, 11 };
 
     /// <summary>Creature ID, course ID, course version, difficulty level.</summary>
     public event Action<string, string, int, int>? RaceRequested;
@@ -127,9 +132,19 @@ public partial class RaceEntryScreen : Control
         bannerStyle.ContentMarginLeft = 12;
         bannerStyle.ContentMarginRight = 12;
         banner.AddThemeStyleboxOverride("panel", bannerStyle);
+        var bannerRow = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+        bannerRow.AddThemeConstantOverride("separation", 6);
+        bannerRow.AddChild(new TextureRect
+        {
+            Texture = UiFactory.CreateGardenIcon(13, 1),
+            CustomMinimumSize = new Vector2(16, 16),
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            MouseFilter = MouseFilterEnum.Ignore
+        });
         _stepTitle = UiFactory.CreateLabel(string.Empty, 10);
         _stepTitle.AddThemeColorOverride("font_color", Color.FromHtml("#4A3218"));
-        banner.AddChild(_stepTitle);
+        bannerRow.AddChild(_stepTitle);
+        banner.AddChild(bannerRow);
         column.AddChild(banner);
 
         var bodyHolder = new CenterContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
@@ -241,24 +256,28 @@ public partial class RaceEntryScreen : Control
 
     private Control BuildCourseStep()
     {
-        var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+        var row = new HBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkCenter };
         row.AddThemeConstantOverride("separation", 8);
 
-        var left = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+        var listPanel = PaperPanel(new Vector2(268, 0));
+        listPanel.Name = "CourseListPanel";
+        var left = new VBoxContainer();
         left.AddThemeConstantOverride("separation", 4);
+        listPanel.AddChild(left);
+
         var headers = new HBoxContainer();
-        headers.AddThemeConstantOverride("separation", 6);
-        headers.AddChild(Header(Tr("UI_RACE_PICKER_COURSE"), 168));
-        headers.AddChild(Header(Tr("UI_RACE_LEVEL"), 108));
+        headers.AddThemeConstantOverride("separation", 4);
+        headers.AddChild(Header(string.Empty, 14));
+        headers.AddChild(Header(Tr("UI_RACE_PICKER_COURSE"), 136));
+        headers.AddChild(Header(Tr("UI_RACE_LEVEL"), 100));
         left.AddChild(headers);
 
-        var list = new VBoxContainer { Name = "CourseList", SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        var list = new VBoxContainer { Name = "CourseList" };
         list.AddThemeConstantOverride("separation", 4);
         foreach (var course in _state!.Courses)
             list.AddChild(BuildCourseRow(course));
         left.AddChild(list);
-        left.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
-        row.AddChild(left);
+        row.AddChild(listPanel);
 
         row.AddChild(BuildRecordPanel());
         return row;
@@ -267,15 +286,30 @@ public partial class RaceEntryScreen : Control
     private Control BuildCourseRow(RacePickerCourseViewState course)
     {
         var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 6);
+        row.AddThemeConstantOverride("separation", 4);
 
         var selected = CourseKey(course) == CourseKey(_selectedCourseId, _selectedCourseVersion);
+
+        // A gold star marks the picked course, so the row the record card is describing is obvious
+        // without having to read the button states.
+        row.AddChild(new TextureRect
+        {
+            Texture = new AtlasTexture { Atlas = WoodStars, Region = new Rect2(0, 0, 32, 32) },
+            CustomMinimumSize = new Vector2(16, 16),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            SizeFlagsVertical = SizeFlags.ShrinkCenter,
+            Modulate = selected ? Colors.White : new Color(1, 1, 1, 0),
+            MouseFilter = MouseFilterEnum.Ignore
+        });
+
         var name = UiFactory.CreateButton(course.Name);
         name.Name = "Course_" + course.Id;
         name.ToggleMode = true;
         name.ButtonPressed = selected;
-        name.CustomMinimumSize = new Vector2(168, 28);
+        name.CustomMinimumSize = new Vector2(136, 30);
         name.Alignment = HorizontalAlignment.Left;
+        UiFactory.ApplyPixelFont(name, 8);
         name.Pressed += () =>
         {
             _selectedCourseId = course.Id;
@@ -315,7 +349,7 @@ public partial class RaceEntryScreen : Control
             CustomMinimumSize = new Vector2(32, 32),
             FocusMode = FocusModeEnum.All
         };
-        var colorRow = active ? 5 : 1;
+        var colorRow = active ? LevelColorRows[Mathf.Clamp(level, MinLevel, MaxLevel) - 1] : 1;
         foreach (var (state, column) in new[] { ("normal", 0), ("hover", 1), ("pressed", 2), ("hover_pressed", 2), ("focus", 1) })
         {
             button.AddThemeStyleboxOverride(state, new StyleBoxTexture
@@ -330,7 +364,7 @@ public partial class RaceEntryScreen : Control
             });
         }
         UiFactory.ApplyPixelFont(button, 8);
-        button.AddThemeColorOverride("font_color", Color.FromHtml(active ? "#F4F7FF" : "#5B4C40"));
+        button.AddThemeColorOverride("font_color", Color.FromHtml(active ? "#3A2C18" : "#7A6650"));
         button.AddThemeColorOverride("font_hover_color", Colors.White);
         button.AddThemeColorOverride("font_pressed_color", Colors.White);
         return button;
@@ -346,6 +380,10 @@ public partial class RaceEntryScreen : Control
         panel.AddChild(box);
 
         var course = SelectedCourse();
+        var title = UiFactory.CreateLabel(course.Name, 10);
+        title.HorizontalAlignment = HorizontalAlignment.Center;
+        box.AddChild(title);
+        box.AddChild(BuildStarRating(_level));
         box.AddChild(Header(Tr("UI_RACE_COURSE_RECORD"), 0));
         var record = Record(course, _level);
         var holder = UiFactory.CreateLabel(
@@ -358,7 +396,7 @@ public partial class RaceEntryScreen : Control
         time.HorizontalAlignment = HorizontalAlignment.Center;
         box.AddChild(time);
 
-        box.AddChild(BuildMinimap(course, new Vector2(230, 62)));
+        box.AddChild(BuildMinimap(course, new Vector2(230, 74)));
         var detail = UiFactory.CreateLabel(
             $"{string.Join(" · ", course.Sections)}   {course.LengthMeters} M", 6);
         detail.HorizontalAlignment = HorizontalAlignment.Center;
@@ -411,6 +449,18 @@ public partial class RaceEntryScreen : Control
             // Three rows have to fit above the footer, so the card keeps only the height its
             // portrait and name actually need.
             entry.CustomMinimumSize = new Vector2(84, 72);
+            if (creature.Id == _selectedId)
+            {
+                card.AddChild(new TextureRect
+                {
+                    Texture = new AtlasTexture { Atlas = WoodStars, Region = new Rect2(0, 0, 32, 32) },
+                    Position = new Vector2(60, 1),
+                    Size = new Vector2(17, 17),
+                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                    MouseFilter = MouseFilterEnum.Ignore
+                });
+            }
             grid.AddChild(entry);
         }
         // Empty slots stay drawn so the roster keeps a stable 3x3 shape however many Voidlings a
@@ -449,12 +499,20 @@ public partial class RaceEntryScreen : Control
 
     private Button BuildPageArrow(string name, int delta, int pages)
     {
-        var button = UiFactory.CreateButton(delta < 0 ? "<" : ">");
+        var button = UiFactory.CreateButton(string.Empty);
         button.Name = name;
-        button.CustomMinimumSize = new Vector2(22, 34);
+        button.CustomMinimumSize = new Vector2(24, 36);
         button.SizeFlagsVertical = SizeFlags.ShrinkCenter;
         button.Disabled = pages <= 1;
-        UiFactory.ApplyPixelFont(button, 9);
+        button.AddChild(new TextureRect
+        {
+            Texture = UiFactory.CreateGardenIcon(13, 3),
+            FlipH = delta < 0,
+            CustomMinimumSize = new Vector2(24, 36),
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            MouseFilter = MouseFilterEnum.Ignore,
+            Modulate = new Color(1, 1, 1, pages <= 1 ? 0.35f : 1.0f)
+        });
         button.Pressed += () =>
         {
             _racerPage = (_racerPage + delta + pages) % pages;
@@ -518,9 +576,14 @@ public partial class RaceEntryScreen : Control
             MaxValue = 1,
             Value = stat.Progress,
             ShowPercentage = false,
-            CustomMinimumSize = new Vector2(0, 5)
+            CustomMinimumSize = new Vector2(0, 7)
         };
-        var background = new StyleBoxFlat { BgColor = Color.FromHtml("#C5B798") };
+        var background = new StyleBoxFlat
+        {
+            BgColor = Color.FromHtml("#C5B798"),
+            BorderColor = Color.FromHtml("#8A7A5A")
+        };
+        background.SetBorderWidthAll(1);
         var fill = new StyleBoxFlat { BgColor = PaperInk(stat.Color) };
         background.SetCornerRadiusAll(1);
         fill.SetCornerRadiusAll(1);
@@ -552,7 +615,8 @@ public partial class RaceEntryScreen : Control
         var levelLine = UiFactory.CreateLabel(string.Format(Tr("UI_RACE_LEVEL_VALUE"), _level), 8);
         levelLine.HorizontalAlignment = HorizontalAlignment.Center;
         courseBox.AddChild(levelLine);
-        courseBox.AddChild(BuildMinimap(course, new Vector2(284, 76)));
+        courseBox.AddChild(BuildStarRating(_level));
+        courseBox.AddChild(BuildMinimap(course, new Vector2(284, 84)));
         var detail = UiFactory.CreateLabel(
             $"{string.Join(" · ", course.Sections)}   {course.LengthMeters} M", 6);
         detail.HorizontalAlignment = HorizontalAlignment.Center;
@@ -577,6 +641,28 @@ public partial class RaceEntryScreen : Control
         var map = new CourseMinimap { Name = "Minimap", CustomMinimumSize = size, MouseFilter = MouseFilterEnum.Ignore };
         map.SetCourse(course.StartX, course.EndX, course.Segments, course.Obstacles);
         return map;
+    }
+
+    /// <summary>
+    /// Difficulty as filled and empty wooden stars from the premium icon pack, so a level reads as
+    /// a rating rather than only a number.
+    /// </summary>
+    private static Control BuildStarRating(int level)
+    {
+        var row = new HBoxContainer { Name = "StarRating", Alignment = BoxContainer.AlignmentMode.Center, MouseFilter = MouseFilterEnum.Ignore };
+        row.AddThemeConstantOverride("separation", 1);
+        for (var star = MinLevel; star <= MaxLevel; star++)
+        {
+            row.AddChild(new TextureRect
+            {
+                Texture = new AtlasTexture { Atlas = WoodStars, Region = new Rect2(star <= level ? 0 : 32, 0, 32, 32) },
+                CustomMinimumSize = new Vector2(20, 20),
+                ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                MouseFilter = MouseFilterEnum.Ignore
+            });
+        }
+        return row;
     }
 
     /// <summary>The window's warm paper, one shade lighter, so a card reads as part of the same sheet.</summary>
