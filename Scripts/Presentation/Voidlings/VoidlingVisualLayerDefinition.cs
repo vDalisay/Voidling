@@ -57,6 +57,18 @@ public partial class VoidlingVisualLayerDefinition : Resource
     public float MaxVerticalLagAtScaleOne { get; set; } = 0.0f;
 
     /// <summary>
+    /// Frames in this layer's own looping animation. Zero keeps the layer locked to the body's
+    /// current frame, which is what a wing wants. A positive count gives the layer its own clock so
+    /// it keeps animating while the body stands still, and the layer atlas supplies that many
+    /// columns instead of the body's walk/run frame count.
+    /// </summary>
+    [Export(PropertyHint.Range, "0,64,1")]
+    public int SelfAnimatedFrameCount { get; set; }
+
+    [Export(PropertyHint.Range, "1,60,0.5")]
+    public float SelfAnimatedFps { get; set; } = 10.0f;
+
+    /// <summary>
     /// Optional palette slots specific to this layer. When empty and PaletteAffected=true, the body
     /// definition's source palette is reused. Pixels outside the listed colors are left untouched.
     /// </summary>

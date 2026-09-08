@@ -222,9 +222,13 @@ public static class VoidlingVisualFactory
         var baseAtlas = layer.BaseAtlas;
         if (baseAtlas == null)
             throw new InvalidOperationException($"Voidling layer '{layer.LayerId}' has no BaseAtlas.");
+        // A self-animated layer runs on its own clock, so its atlas columns are its animation frames
+        // rather than the body's walk/run frames.
+        int? frameCount = layer.SelfAnimatedFrameCount > 0 ? layer.SelfAnimatedFrameCount : null;
+        double? fps = layer.SelfAnimatedFrameCount > 0 ? layer.SelfAnimatedFps : null;
         return race
-            ? BuildRaceFrames(definition, baseAtlas, layer.SwimAtlas ?? baseAtlas)
-            : BuildWorldFrames(definition, baseAtlas);
+            ? BuildRaceFrames(definition, baseAtlas, layer.SwimAtlas ?? baseAtlas, frameCount, fps)
+            : BuildWorldFrames(definition, baseAtlas, frameCount, fps);
     }
 
     internal static void ApplyLayerPalette(
@@ -469,30 +473,40 @@ public static class VoidlingVisualFactory
         }
     }
 
-    private static SpriteFrames BuildWorldFrames(VoidlingVisualDefinition definition, Texture2D atlas)
+    private static SpriteFrames BuildWorldFrames(
+        VoidlingVisualDefinition definition,
+        Texture2D atlas,
+        int? frameCountOverride = null,
+        double? fpsOverride = null)
     {
         var frames = CreateEmptyFrames();
-        AddAnimation(frames, "walk_down", atlas, definition.WalkDownRow, definition.WorldFrameCount,
-            definition.WorldAnimationFps, definition.FrameWidth, definition.FrameHeight);
-        AddAnimation(frames, "walk_up", atlas, definition.WalkUpRow, definition.WorldFrameCount,
-            definition.WorldAnimationFps, definition.FrameWidth, definition.FrameHeight);
-        AddAnimation(frames, "walk_left", atlas, definition.WalkLeftRow, definition.WorldFrameCount,
-            definition.WorldAnimationFps, definition.FrameWidth, definition.FrameHeight);
-        AddAnimation(frames, "walk_right", atlas, definition.WalkRightRow, definition.WorldFrameCount,
-            definition.WorldAnimationFps, definition.FrameWidth, definition.FrameHeight);
+        var count = frameCountOverride ?? definition.WorldFrameCount;
+        var fps = fpsOverride ?? definition.WorldAnimationFps;
+        AddAnimation(frames, "walk_down", atlas, definition.WalkDownRow, count,
+            fps, definition.FrameWidth, definition.FrameHeight);
+        AddAnimation(frames, "walk_up", atlas, definition.WalkUpRow, count,
+            fps, definition.FrameWidth, definition.FrameHeight);
+        AddAnimation(frames, "walk_left", atlas, definition.WalkLeftRow, count,
+            fps, definition.FrameWidth, definition.FrameHeight);
+        AddAnimation(frames, "walk_right", atlas, definition.WalkRightRow, count,
+            fps, definition.FrameWidth, definition.FrameHeight);
         return frames;
     }
 
     private static SpriteFrames BuildRaceFrames(
         VoidlingVisualDefinition definition,
         Texture2D baseAtlas,
-        Texture2D swimAtlas)
+        Texture2D swimAtlas,
+        int? frameCountOverride = null,
+        double? fpsOverride = null)
     {
         var frames = CreateEmptyFrames();
-        AddAnimation(frames, "run", baseAtlas, definition.RaceRunRow, definition.RaceRunFrameCount,
-            definition.RaceRunFps, definition.FrameWidth, definition.FrameHeight);
-        AddAnimation(frames, "swim", swimAtlas, definition.RaceSwimRow, definition.RaceSwimFrameCount,
-            definition.RaceSwimFps, definition.FrameWidth, definition.FrameHeight);
+        AddAnimation(frames, "run", baseAtlas, definition.RaceRunRow,
+            frameCountOverride ?? definition.RaceRunFrameCount,
+            fpsOverride ?? definition.RaceRunFps, definition.FrameWidth, definition.FrameHeight);
+        AddAnimation(frames, "swim", swimAtlas, definition.RaceSwimRow,
+            frameCountOverride ?? definition.RaceSwimFrameCount,
+            fpsOverride ?? definition.RaceSwimFps, definition.FrameWidth, definition.FrameHeight);
         return frames;
     }
 
