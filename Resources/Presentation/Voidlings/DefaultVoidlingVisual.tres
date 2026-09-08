@@ -5,7 +5,7 @@
 [ext_resource type="Texture2D" path="res://Assets/Voidlings/Base/Normal/neutral_two_tone_voidling.png" id="3_base"]
 [ext_resource type="Texture2D" path="res://Assets/Voidlings/Layers/Wings/golden_back_wing.png" id="4_back_wing"]
 [ext_resource type="Texture2D" path="res://Assets/Voidlings/Layers/Wings/golden_front_wing.png" id="5_front_wing"]
-[ext_resource type="Texture2D" path="res://Assets/Voidlings/Layers/Crown/golden_crown.png" id="6_crown"]
+[ext_resource type="Texture2D" path="res://Assets/Voidlings/Layers/Crown/golden_crown_animated.png" id="6_crown"]
 
 [sub_resource type="Resource" id="Resource_back_wing"]
 script = ExtResource("2_layer")
@@ -42,6 +42,8 @@ ZIndexOffset = 2
 OffsetAtScaleOne = Vector2(0, 0)
 ScaleMultiplier = 1.0
 PaletteAffected = false
+SelfAnimatedFrameCount = 8
+SelfAnimatedFps = 10.0
 
 [resource]
 script = ExtResource("1_visual")

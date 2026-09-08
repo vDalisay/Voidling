@@ -213,9 +213,22 @@ public partial class VoidlingVisualLayerSync2D : Node2D
             }
 
             layer.Visible = _target.Visible;
-            layer.Animation = _target.Animation;
-            var count = layer.SpriteFrames.GetFrameCount(layer.Animation);
-            layer.Frame = count <= 0 ? 0 : Math.Clamp(_target.Frame, 0, count - 1);
+            if (runtime.Definition.SelfAnimatedFrameCount > 0)
+            {
+                // Own clock: only follow the body's facing/animation name, never its frame index,
+                // or the layer would freeze whenever the body stands still.
+                if (layer.Animation != _target.Animation)
+                    layer.Animation = _target.Animation;
+                if (!layer.IsPlaying())
+                    layer.Play();
+            }
+            else
+            {
+                layer.Animation = _target.Animation;
+                var count = layer.SpriteFrames.GetFrameCount(layer.Animation);
+                layer.Frame = count <= 0 ? 0 : Math.Clamp(_target.Frame, 0, count - 1);
+            }
+
             layer.FlipH = _target.FlipH;
             layer.FlipV = _target.FlipV;
         }
