@@ -43,7 +43,7 @@ OffsetAtScaleOne = Vector2(0, 0)
 ScaleMultiplier = 1.0
 PaletteAffected = false
 SelfAnimatedFrameCount = 8
-SelfAnimatedFps = 10.0
+SelfAnimatedFps = 5.0
 
 [resource]
 script = ExtResource("1_visual")
