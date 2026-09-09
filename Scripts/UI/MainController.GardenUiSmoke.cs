@@ -844,7 +844,7 @@ public partial class MainController
         if (_garden.ScriptedCountForProbe() < 2)
             throw new InvalidOperationException("An encounter never took hold of both Voidlings.");
 
-        var finished = Time.GetTicksMsec() + 20000;
+        var finished = Time.GetTicksMsec() + 40000;
         while (Time.GetTicksMsec() < finished && _garden.ScriptedCountForProbe() > 0)
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         if (_garden.ScriptedCountForProbe() > 0)

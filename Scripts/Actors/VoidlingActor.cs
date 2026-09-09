@@ -214,7 +214,13 @@ public partial class VoidlingActor : Node2D
             var hitBoundary = clampedPosition.DistanceSquaredTo(nextPosition) > 0.01f;
             Position = clampedPosition;
             if (hitBoundary && !IsOnTile)
+            {
+                // The island is a cluster of hexes, so a straight line to somewhere real can still
+                // run over water. Walking into the coast means this route does not work; give up on
+                // that destination rather than grinding along the edge towards it.
+                _hasRoamDestination = false;
                 PickNewTarget();
+            }
             PlayForDirection(direction);
         }
     }
@@ -279,8 +285,11 @@ public partial class VoidlingActor : Node2D
 
         _wanderBounds = bounds;
         Position = ClampToWanderArea(Position);
-        if (repath)
-            PickNewTarget();
+        if (!repath)
+            return;
+
+        _hasRoamDestination = false;
+        PickNewTarget();
     }
 
     private Vector2 ClampToWanderArea(Vector2 position)
@@ -423,6 +432,7 @@ public partial class VoidlingActor : Node2D
         // zoomies it was in; otherwise it would carry the sprint into its next situation.
         _restSeconds = 0.0f;
         _zoomieSeconds = 0.0f;
+        _hasRoamDestination = false;
         PickNewTarget();
         _sprite.Play(IsOnTile ? _tileAnimation : "walk_down");
     }
@@ -459,8 +469,8 @@ public partial class VoidlingActor : Node2D
     /// wider than a hex: a leg that cannot cross the ground a Voidling stands on leaves it milling
     /// about on one tile forever. Zoomies ignore the cap and cross the island.
     /// </summary>
-    private const float MinWalkLegLength = 60.0f;
-    private const float MaxWalkLegLength = 200.0f;
+    private const float MinWalkLegLength = 90.0f;
+    private const float MaxWalkLegLength = 220.0f;
 
     private void PickNewTarget()
     {
@@ -495,30 +505,49 @@ public partial class VoidlingActor : Node2D
         return _tileCenter + Vector2.Right.Rotated(angle) * _tileRadius * _rng.RandfRange(0.78f, 0.98f);
     }
 
+    private Vector2 _roamDestination;
+    private bool _hasRoamDestination;
+
     /// <summary>
-    /// A free-roaming Voidling walks a leg of a set length toward somewhere on the island and
-    /// pauses there instead of committing to one long uninterrupted crossing. Zoomies are the
-    /// exception: covering ground is the whole point of the fit.
+    /// A free-roaming Voidling walks a leg of a set length and pauses at the end of it instead of
+    /// committing to one long uninterrupted crossing. Somewhere further off takes several legs,
+    /// and it keeps heading for the same place across them: re-rolling a destination every time a
+    /// leg ran out left a Voidling shuffling back and forth on the ground it started on and never
+    /// getting anywhere. Zoomies skip the legs entirely - covering ground is the point of the fit.
     /// </summary>
     private Vector2 PickRoamTarget()
     {
-        var destination =
-            TryPickShorelineTarget() ??
-            LandTarget?.Invoke() ??
-            new Vector2(
-                _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
-                _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y));
-
         if (_zoomieSeconds > 0.0f)
-            return ClampToWanderArea(destination);
+        {
+            _hasRoamDestination = false;
+            return ClampToWanderArea(NextRoamDestination());
+        }
 
-        var toDestination = destination - Position;
+        if (!_hasRoamDestination)
+        {
+            _roamDestination = ClampToWanderArea(NextRoamDestination());
+            _hasRoamDestination = true;
+        }
+
+        var toDestination = _roamDestination - Position;
         var distance = toDestination.Length();
         var leg = _rng.RandfRange(MinWalkLegLength, MaxWalkLegLength);
-        if (distance > leg)
-            destination = Position + toDestination / distance * leg;
-        return ClampToWanderArea(destination);
+        if (distance <= leg)
+        {
+            _hasRoamDestination = false;
+            return _roamDestination;
+        }
+
+        return ClampToWanderArea(Position + toDestination / distance * leg);
     }
+
+    /// <summary>Somewhere on the island worth heading for, one whole walk from here.</summary>
+    private Vector2 NextRoamDestination()
+        => TryPickShorelineTarget() ??
+           LandTarget?.Invoke() ??
+           new Vector2(
+               _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
+               _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y));
 
     /// <summary>
     /// Any real sideways component decides which way a Voidling looks. The up and down animations
@@ -535,8 +564,7 @@ public partial class VoidlingActor : Node2D
         {
             if (Mathf.Abs(direction.X) > FacingDeadzone)
                 _sprite.FlipH = direction.X < 0.0f;
-            if (_sprite.Animation != _tileAnimation)
-                _sprite.Play(_tileAnimation);
+            PlayAnimation(_tileAnimation);
             return;
         }
 
@@ -546,7 +574,18 @@ public partial class VoidlingActor : Node2D
         else
             animation = direction.Y < 0.0f ? "walk_up" : "walk_down";
 
-        if (_sprite.Animation != animation)
+        PlayAnimation(animation);
+    }
+
+    /// <summary>
+    /// Starts an animation, and restarts a stopped one even when it is already the current
+    /// animation. Every pause in the Garden - a rest, a held pose, arriving somewhere - stops the
+    /// sprite, and moving off again usually resumes in the same direction: comparing names alone
+    /// left those Voidlings sliding along on a frozen frame.
+    /// </summary>
+    private void PlayAnimation(StringName animation)
+    {
+        if (_sprite.Animation != animation || !_sprite.IsPlaying())
             _sprite.Play(animation);
     }
 
