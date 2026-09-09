@@ -25,7 +25,7 @@ Items under **Product decisions required before implementation** are deliberate 
 ## Product decisions required before implementation
 
 - [ ] Lock the stat-driven morphology/evolution mapping (for example when/how `normal` changes toward water/fly/power forms).
-  - [x] Decision-neutral implementation seam added on `feature/remaining-systems-2026-09-09`: the authoritative visual catalog can map an already-resolved evolution specialization to a semantic visual type, while every mapping remains blank/inactive by default. This does not choose morphology rules, thresholds, or artwork.
+  - [x] Decision-neutral implementation seam added on `feature/remaining-systems-2026-09-09`: a pure resolver can translate an already-resolved evolution specialization through an explicitly supplied semantic visual mapping while blank mappings preserve the current visual type. The production Godot visual catalog remains unchanged until morphology rules and authored forms are approved.
 - [ ] Lock remaining appearance-inheritance probabilities, dominance, rare-trait depth and stacking rules.
 - [ ] Lock the final trophy/reincarnation transformation recipe.
 - [ ] Lock Cup entry-fee/refund/reward economy details. Cup scaffolding keeps these values/rules out until decided.
