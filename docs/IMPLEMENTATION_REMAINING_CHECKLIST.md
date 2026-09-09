@@ -30,7 +30,9 @@ Items under **Product decisions required before implementation** are deliberate 
   - [x] Rare-trait transmission depth is now authored balance (`GeneticsRules.RareTraitMaxTransmittedGenerations`, exported on `GameBalanceResource`) instead of a hardcoded `< 2` in `RareTraitInheritanceService`. The default keeps current behavior; probabilities, dominance and stacking remain undecided.
   - [ ] Stacking is still undefined: a child currently inherits the same founder trait once per carrying parent, with no cap and no dedupe. Do not change this until the stacking rule is locked.
 - [ ] Lock the final trophy/reincarnation transformation recipe.
+  - [x] Decision-neutral gate added: `TrophyTransformation` / `TrophyRequirements` answer whether an explicitly authored requirement set is met, and `TrophyRequirements.Undecided` (the default) never qualifies. Only the multi-lifecycle dimension named in the design context is represented; the confirmed trophy effects (immortal, retains appearance, cannot breed, can race, no hidden race power) stay unwired until the recipe is approved.
 - [ ] Lock Cup entry-fee/refund/reward economy details. Cup scaffolding keeps these values/rules out until decided.
+  - [x] Decision-neutral arithmetic added: `CupEconomy` / `CupEconomyRules` price entry per stable Cup ID and express refunds as a fraction per finishing placement, which covers both the winner-only and placement-based directions without choosing between them. `CupEconomyRules.Free` (the default) charges nothing and refunds nothing, and no Cup is priced. Prizes stay absent: the design direction is item/medal/trophy/unlock rather than currency.
 - [ ] Decide whether active-computer-use income should exist; do not implement activity monitoring until its privacy/platform/UX requirements are approved.
 
 ## Current stopping point
