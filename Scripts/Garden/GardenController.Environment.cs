@@ -11,6 +11,7 @@ public partial class GardenController
 
     private Timer? _gardenEnvironmentTimer;
     private Tween? _gardenEnvironmentTween;
+    private bool _gardenEnvironmentInstalled;
     public DateTime EnvironmentLocalTime { get; private set; } = DateTime.Now;
     public event Action<DateTime>? EnvironmentTimeChanged;
 
@@ -31,6 +32,23 @@ public partial class GardenController
         };
         _gardenEnvironmentTimer.Timeout += RefreshGardenEnvironmentFromSystemClock;
         AddChild(_gardenEnvironmentTimer);
+
+        // The player can switch the tint off in Settings, so the same signal that refreshes the
+        // rest of the Garden re-resolves it; the equality guard below keeps unrelated saves free.
+        _gardenEnvironmentInstalled = true;
+        _session.StateChanged += RefreshGardenEnvironmentFromSystemClock;
+        TreeExiting += DetachGardenEnvironmentPresentation;
+    }
+
+    private void DetachGardenEnvironmentPresentation()
+    {
+        if (!_gardenEnvironmentInstalled)
+            return;
+
+        _gardenEnvironmentInstalled = false;
+        if (GodotObject.IsInstanceValid(_session))
+            _session.StateChanged -= RefreshGardenEnvironmentFromSystemClock;
+        TreeExiting -= DetachGardenEnvironmentPresentation;
     }
 
     private void RefreshGardenEnvironmentFromSystemClock()
@@ -40,7 +58,7 @@ public partial class GardenController
     {
         EnvironmentLocalTime = localTime;
         EnvironmentTimeChanged?.Invoke(localTime);
-        var target = GardenEnvironmentPalette.Resolve(localTime);
+        var target = _session.State.GardenTint ? GardenEnvironmentPalette.Resolve(localTime) : Colors.White;
         if (ColorsApproximatelyEqual(Modulate, target))
             return;
 

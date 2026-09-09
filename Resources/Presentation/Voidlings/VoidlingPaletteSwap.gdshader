@@ -24,14 +24,18 @@ bool matches(vec3 pixel, vec3 source) {
 }
 
 void fragment() {
-    vec4 pixel = texture(TEXTURE, UV);
-    if (palette_size > 0 && matches(pixel.rgb, source_0.rgb)) pixel.rgb = target_0.rgb;
-    else if (palette_size > 1 && matches(pixel.rgb, source_1.rgb)) pixel.rgb = target_1.rgb;
-    else if (palette_size > 2 && matches(pixel.rgb, source_2.rgb)) pixel.rgb = target_2.rgb;
-    else if (palette_size > 3 && matches(pixel.rgb, source_3.rgb)) pixel.rgb = target_3.rgb;
-    else if (palette_size > 4 && matches(pixel.rgb, source_4.rgb)) pixel.rgb = target_4.rgb;
-    else if (palette_size > 5 && matches(pixel.rgb, source_5.rgb)) pixel.rgb = target_5.rgb;
-    else if (palette_size > 6 && matches(pixel.rgb, source_6.rgb)) pixel.rgb = target_6.rgb;
-    else if (palette_size > 7 && matches(pixel.rgb, source_7.rgb)) pixel.rgb = target_7.rgb;
-    COLOR = pixel * COLOR;
+    // COLOR already carries the sampled texel multiplied by this item's modulate, so the swap is
+    // applied as a per-pixel ratio. Writing `texel * COLOR` instead would multiply the sheet into
+    // itself, which is what made every Voidling render darker and more saturated than the artwork.
+    vec3 texel = texture(TEXTURE, UV).rgb;
+    vec3 swapped = texel;
+    if (palette_size > 0 && matches(texel, source_0.rgb)) swapped = target_0.rgb;
+    else if (palette_size > 1 && matches(texel, source_1.rgb)) swapped = target_1.rgb;
+    else if (palette_size > 2 && matches(texel, source_2.rgb)) swapped = target_2.rgb;
+    else if (palette_size > 3 && matches(texel, source_3.rgb)) swapped = target_3.rgb;
+    else if (palette_size > 4 && matches(texel, source_4.rgb)) swapped = target_4.rgb;
+    else if (palette_size > 5 && matches(texel, source_5.rgb)) swapped = target_5.rgb;
+    else if (palette_size > 6 && matches(texel, source_6.rgb)) swapped = target_6.rgb;
+    else if (palette_size > 7 && matches(texel, source_7.rgb)) swapped = target_7.rgb;
+    COLOR.rgb *= swapped / max(texel, vec3(1.0 / 255.0));
 }

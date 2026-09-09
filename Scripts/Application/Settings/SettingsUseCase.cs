@@ -36,6 +36,15 @@ public sealed class SettingsUseCase
         return true;
     }
 
+    public bool SetGardenTint(GameStateData state, bool enabled)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (state.GardenTint == enabled)
+            return false;
+        state.GardenTint = enabled;
+        return true;
+    }
+
     private static bool SetVolume(
         GameStateData state,
         float value,
