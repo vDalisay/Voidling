@@ -27,6 +27,8 @@ Items under **Product decisions required before implementation** are deliberate 
 - [ ] Lock the stat-driven morphology/evolution mapping (for example when/how `normal` changes toward water/fly/power forms).
   - [x] Decision-neutral implementation seam added on `feature/remaining-systems-2026-09-09`: a pure resolver can translate an already-resolved evolution specialization through an explicitly supplied semantic visual mapping while blank mappings preserve the current visual type. The production Godot visual catalog remains unchanged until morphology rules and authored forms are approved.
 - [ ] Lock remaining appearance-inheritance probabilities, dominance, rare-trait depth and stacking rules.
+  - [x] Rare-trait transmission depth is now authored balance (`GeneticsRules.RareTraitMaxTransmittedGenerations`, exported on `GameBalanceResource`) instead of a hardcoded `< 2` in `RareTraitInheritanceService`. The default keeps current behavior; probabilities, dominance and stacking remain undecided.
+  - [ ] Stacking is still undefined: a child currently inherits the same founder trait once per carrying parent, with no cap and no dedupe. Do not change this until the stacking rule is locked.
 - [ ] Lock the final trophy/reincarnation transformation recipe.
 - [ ] Lock Cup entry-fee/refund/reward economy details. Cup scaffolding keeps these values/rules out until decided.
 - [ ] Decide whether active-computer-use income should exist; do not implement activity monitoring until its privacy/platform/UX requirements are approved.

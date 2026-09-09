@@ -207,6 +207,36 @@ public sealed class GeneticsArchitectureTests
     }
 
     [Fact]
+    public void RareTraitTransmissionDepth_FollowsAuthoredRule()
+    {
+        Assert.Equal(2, Rules.Genetics.RareTraitMaxTransmittedGenerations);
+
+        var parent = CreateParent("founder", 2, 2);
+        parent.RareTraits.Add(new RareTraitData
+        {
+            TraitId = "Angel",
+            FounderCreatureId = parent.Id,
+            GenerationFromFounder = 0,
+            CanTransmit = true
+        });
+        var other = CreateParent("other", 2, 2);
+        var shallow = new RareTraitInheritanceService(Rules.Genetics with { RareTraitMaxTransmittedGenerations = 1 });
+
+        for (ulong seed = 1; seed <= 10_000; seed++)
+        {
+            var result = shallow.Inherit(parent, other, seed);
+            if (result.Count == 0)
+                continue;
+
+            Assert.Equal(1, result[0].GenerationFromFounder);
+            Assert.False(result[0].CanTransmit);
+            return;
+        }
+
+        throw new Xunit.Sdk.XunitException("Expected at least one deterministic transmission sample.");
+    }
+
+    [Fact]
     public void RelationshipService_DetectsSiblingAndAncestorRelationships()
     {
         var founderA = CreateParent("founder-a", 2, 2);

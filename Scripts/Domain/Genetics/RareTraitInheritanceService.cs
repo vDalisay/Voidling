@@ -58,7 +58,7 @@ public sealed class RareTraitInheritanceService
                 TraitId = trait.TraitId,
                 FounderCreatureId = trait.FounderCreatureId,
                 GenerationFromFounder = nextGeneration,
-                CanTransmit = nextGeneration < 2
+                CanTransmit = nextGeneration < _rules.RareTraitMaxTransmittedGenerations
             });
         }
     }
