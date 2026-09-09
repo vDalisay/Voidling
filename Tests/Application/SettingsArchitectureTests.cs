@@ -26,12 +26,14 @@ public sealed class SettingsArchitectureTests
         {
             MasterVolume = 0.5f,
             AutoFinishRaces = true,
-            EdgePanning = true
+            EdgePanning = true,
+            GardenTint = true
         };
 
         Assert.False(settings.SetMasterVolume(state, 0.5f));
         Assert.False(settings.SetAutoFinishRaces(state, true));
         Assert.False(settings.SetEdgePanning(state, true));
+        Assert.False(settings.SetGardenTint(state, true));
     }
 
     [Fact]
@@ -42,14 +44,22 @@ public sealed class SettingsArchitectureTests
         {
             MasterVolume = 0.4f,
             AutoFinishRaces = true,
-            EdgePanning = true
+            EdgePanning = true,
+            GardenTint = true
         };
 
         Assert.True(settings.SetAutoFinishRaces(state, false));
         Assert.True(settings.SetEdgePanning(state, false));
+        Assert.True(settings.SetGardenTint(state, false));
 
         Assert.False(state.AutoFinishRaces);
         Assert.False(state.EdgePanning);
+        Assert.False(state.GardenTint);
         Assert.Equal(0.4f, state.MasterVolume);
     }
+
+    /// <summary>A save written before the tint switch existed keeps the tint it already had.</summary>
+    [Fact]
+    public void GardenTint_DefaultsOnForSavesWithoutTheSetting()
+        => Assert.True(new GameStateData().GardenTint);
 }

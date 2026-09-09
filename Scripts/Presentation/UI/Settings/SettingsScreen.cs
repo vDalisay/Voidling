@@ -10,11 +10,12 @@ public readonly record struct SettingsScreenState(
     float SoundEffectVolume,
     float UiSoundVolume,
     bool EdgePanning,
-    bool AutoFinishRaces);
+    bool AutoFinishRaces,
+    bool GardenTint);
 
 /// <summary>
 /// Settings on the same paper card as the rest of the overhauled screens: audio in one section,
-/// the two switches in another, each switch reading as a premium check or cross rather than a
+/// the play switches in another, each switch reading as a premium check or cross rather than a
 /// button whose own label has to say what state it is in.
 /// </summary>
 public partial class SettingsScreen : VBoxContainer
@@ -24,6 +25,7 @@ public partial class SettingsScreen : VBoxContainer
     public event Action<float>? UiSoundVolumeChanged;
     public event Action<bool>? EdgePanningChanged;
     public event Action<bool>? AutoFinishRacesChanged;
+    public event Action<bool>? GardenTintChanged;
 
     private static readonly Texture2D CheckMark = GD.Load<Texture2D>(
         UiFactory.UiRoot + "Other UI sprites/Xs and check marks/1s/check mark.png");
@@ -62,6 +64,9 @@ public partial class SettingsScreen : VBoxContainer
         play.AddChild(BuildSwitch(
             "AutoFinish", Tr("UI_SETTINGS_AUTO_FINISH"), Tr("UI_SETTINGS_AUTO_FINISH_TOOLTIP"), _state.AutoFinishRaces,
             enabled => { _state = _state with { AutoFinishRaces = enabled }; AutoFinishRacesChanged?.Invoke(enabled); }));
+        play.AddChild(BuildSwitch(
+            "GardenTint", Tr("UI_SETTINGS_GARDEN_TINT"), Tr("UI_SETTINGS_GARDEN_TINT_TOOLTIP"), _state.GardenTint,
+            enabled => { _state = _state with { GardenTint = enabled }; GardenTintChanged?.Invoke(enabled); }));
     }
 
     /// <summary>A headed paper card; the heading is the only text on the screen that is not a control.</summary>

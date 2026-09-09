@@ -116,6 +116,10 @@ public sealed class GameStateData
     public bool AutoFinishRaces { get; set; } = true;
     public bool EdgePanning { get; set; } = true;
 
+    // Cosmetic only. Saves written before this setting existed deserialize to true, which is the
+    // behaviour they already had.
+    public bool GardenTint { get; set; } = true;
+
     public bool TutorialCompleted { get; set; }
 }
 

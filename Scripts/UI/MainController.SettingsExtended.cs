@@ -13,20 +13,22 @@ public partial class MainController
 
     private void ShowSettingsExtended(System.Action backRequested)
     {
-        var box = OpenModal(Tr("UI_SETTINGS_TITLE"), new Vector2(410, 318), backRequested);
+        var box = OpenModal(Tr("UI_SETTINGS_TITLE"), new Vector2(410, 348), backRequested);
         var screen = new SettingsScreen();
         screen.Configure(new SettingsScreenState(
             _session.State.MasterVolume,
             _session.State.SoundEffectVolume,
             _session.State.UiSoundVolume,
             _session.State.EdgePanning,
-            _session.State.AutoFinishRaces));
+            _session.State.AutoFinishRaces,
+            _session.State.GardenTint));
 
         screen.MasterVolumeChanged += _session.SetMasterVolume;
         screen.SoundEffectVolumeChanged += _session.SetSoundEffectVolume;
         screen.UiSoundVolumeChanged += _session.SetUiSoundVolume;
         screen.EdgePanningChanged += _session.SetEdgePanning;
         screen.AutoFinishRacesChanged += _session.SetAutoFinishRaces;
+        screen.GardenTintChanged += _session.SetGardenTint;
         box.AddChild(screen);
         var reset = UiFactory.CreateButton(Tr("UI_TOP_RESET"));
         reset.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd;
