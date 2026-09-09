@@ -297,6 +297,7 @@ public partial class MainController
                     throw new InvalidOperationException("Tab navigation escapes the modal.");
             }
             await VerifyFreeRoaming();
+            await VerifyGardenEncounter();
             await VerifyTreatDrop();
             await VerifyEggCategories();
             await CaptureGardenUi("garden-menu");
@@ -804,6 +805,50 @@ public partial class MainController
         if (_garden.HexUnderForProbe(_garden.ActorPositionForProbe(creature.Id)) == droppedHex)
             throw new InvalidOperationException(
                 $"A Voidling dropped on plain ground never walked off hex {droppedHex}.");
+    }
+
+    /// <summary>
+    /// Two Voidlings that wander into each other play a short scripted beat and are handed straight
+    /// back to their own roaming. The release matters more than the beat: an encounter that leaves
+    /// a creature scripted would freeze it in the Garden for good.
+    /// </summary>
+    private async Task VerifyGardenEncounter()
+    {
+        // Take two Voidlings off whatever ground they were on the same way the player would, so the
+        // pair is genuinely free-roaming rather than confined to a training tile.
+        var wanderers = _session.State.Voidlings.Take(2).ToList();
+        if (wanderers.Count < 2)
+            throw new InvalidOperationException("The Garden needs two Voidlings to test an encounter.");
+        var openGround = _session.State.GardenModules.First(module => module.Placed && module.StatId.Length == 0);
+        foreach (var wanderer in wanderers)
+        {
+            _garden.DropOnHexForProbe(
+                wanderer.Id, openGround.Id, _garden.HexCenterForProbe((openGround.HexQ, openGround.HexR)));
+            await SettleGardenUi();
+        }
+
+        // Availability is transient: a Voidling mid-hop, mid-zoomies or still finishing a treat is
+        // deliberately passed over, so the probe waits for the pair to settle rather than insisting
+        // they are free on the very frame they were put down.
+        var ready = Time.GetTicksMsec() + 8000;
+        while (Time.GetTicksMsec() < ready && !_garden.StartEncounterForProbe())
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (_garden.ScriptedCountForProbe() == 0 && !_garden.StartEncounterForProbe())
+            throw new InvalidOperationException("The Garden had no pair of free-roaming Voidlings to meet.");
+
+        // Wall-clock, not frames: headless runs the idle loop uncapped, so the seconds an encounter
+        // is authored in say nothing about how many frames pass.
+        var started = Time.GetTicksMsec() + 4000;
+        while (Time.GetTicksMsec() < started && _garden.ScriptedCountForProbe() < 2)
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (_garden.ScriptedCountForProbe() < 2)
+            throw new InvalidOperationException("An encounter never took hold of both Voidlings.");
+
+        var finished = Time.GetTicksMsec() + 20000;
+        while (Time.GetTicksMsec() < finished && _garden.ScriptedCountForProbe() > 0)
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (_garden.ScriptedCountForProbe() > 0)
+            throw new InvalidOperationException("An encounter never released the Voidlings it took.");
     }
 
     private RaceEntryScreen FindRaceEntry()

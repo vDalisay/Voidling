@@ -101,23 +101,50 @@ public partial class VoidlingActor : Node2D
     /// </summary>
     public event Action<VoidlingActor>? RunningStride;
 
-    private float _tileDustSeconds;
+    private float _dustSeconds;
+    private float _zoomieSeconds;
+
+    /// <summary>How much faster than a stroll a sustained dash across running ground is.</summary>
+    private const float DashSpeedMultiplier = 2.6f;
+
+    /// <summary>How much faster than a stroll a fit of zoomies is.</summary>
+    private const float ZoomieSpeedMultiplier = 2.2f;
+
+    /// <summary>Gap between puffs of a dash trail. Short enough to read as one continuous streak.</summary>
+    private const float DustIntervalSeconds = 0.09f;
+
+    /// <summary>Chance that a finished walk turns into a fit of zoomies instead of another stroll.</summary>
+    private const float ZoomieChance = 0.06f;
+
+    /// <summary>True while this Voidling is sprinting: a training dash, zoomies, or a scripted run.</summary>
+    private bool IsDashing => _zoomieSeconds > 0.0f || _scriptDust || (IsOnTile && _tileAnimation == "run");
 
     /// <summary>
-    /// A Voidling on running ground breaks into a visible stride now and then rather than looping
-    /// in place, so the ground reads as being used. Swim ground stays quiet.
+    /// A sprinting Voidling kicks up dust the whole way rather than once in a while, so a straight
+    /// dash leaves a visible line behind it. Walking and swim ground stay quiet.
     /// </summary>
-    private void TickTileDust(float step)
+    private void TickDustTrail(float step)
     {
-        if (!IsOnTile || _tileAnimation != "run" || _eating || _pickedUp || _interactionLocked)
+        if (!IsDashing || _restSeconds > 0.0f || _eating || _pickedUp || _interactionLocked)
             return;
 
-        _tileDustSeconds -= step;
-        if (_tileDustSeconds > 0.0f)
+        _dustSeconds -= step;
+        if (_dustSeconds > 0.0f)
             return;
 
-        _tileDustSeconds = _rng.RandfRange(0.9f, 2.4f);
+        _dustSeconds = DustIntervalSeconds;
         RunningStride?.Invoke(this);
+    }
+
+    /// <summary>Speed for this frame: a stroll, a dash across training ground, or zoomies.</summary>
+    private float CurrentSpeed
+    {
+        get
+        {
+            if (_zoomieSeconds > 0.0f)
+                return _walkSpeed * ZoomieSpeedMultiplier;
+            return IsOnTile && _tileAnimation == "run" ? _walkSpeed * DashSpeedMultiplier : _walkSpeed;
+        }
     }
 
     public void ApplyAmbientStats(float run, float stamina)
@@ -142,8 +169,16 @@ public partial class VoidlingActor : Node2D
         if (ProcessTreatChase(step))
             return;
 
-        TickTileDust(step);
-        if (!IsOnTile && _restSeconds > 0.0f)
+        // A Garden encounter drives this Voidling directly while it lasts.
+        if (ProcessScriptedMove(step))
+            return;
+
+        TickDustTrail(step);
+        _zoomieSeconds = Math.Max(0.0f, _zoomieSeconds - step);
+
+        // A Voidling pauses between the legs of a walk, and between dashes across training ground,
+        // rather than sliding from destination to destination without ever stopping.
+        if (_restSeconds > 0.0f)
         {
             _restSeconds = Math.Max(0.0f, _restSeconds - step);
             if (_restSeconds > 0.0f)
@@ -153,7 +188,7 @@ public partial class VoidlingActor : Node2D
             }
 
             PickNewTarget();
-            _sprite.Play("walk_down");
+            _sprite.Play(IsOnTile ? _tileAnimation : "walk_down");
         }
 
         _nextTargetSeconds -= step;
@@ -161,14 +196,8 @@ public partial class VoidlingActor : Node2D
 
         if (toTarget.LengthSquared() < 9.0f)
         {
-            if (!IsOnTile)
-            {
-                BeginRest();
-                return;
-            }
-
-            PickNewTarget();
-            toTarget = _target - Position;
+            BeginRest();
+            return;
         }
 
         if (_nextTargetSeconds <= 0.0f)
@@ -180,7 +209,7 @@ public partial class VoidlingActor : Node2D
         if (toTarget.LengthSquared() > 1.0f)
         {
             var direction = toTarget.Normalized();
-            var nextPosition = Position + direction * _walkSpeed * step;
+            var nextPosition = Position + direction * CurrentSpeed * step;
             var clampedPosition = ClampToWanderArea(nextPosition);
             var hitBoundary = clampedPosition.DistanceSquaredTo(nextPosition) > 0.01f;
             Position = clampedPosition;
@@ -390,35 +419,105 @@ public partial class VoidlingActor : Node2D
             return;
         }
 
+        // Picking a Voidling up, putting it on a tile or taking it off one all end whatever fit of
+        // zoomies it was in; otherwise it would carry the sprint into its next situation.
         _restSeconds = 0.0f;
+        _zoomieSeconds = 0.0f;
         PickNewTarget();
         _sprite.Play(IsOnTile ? _tileAnimation : "walk_down");
     }
 
+    /// <summary>
+    /// A finished leg of a walk. Off the tiles this is the short breather at a spot, and now and
+    /// then it becomes a fit of zoomies instead. On running ground it is the beat between two
+    /// sustained dashes. A Voidling already zooming does not stop until the fit runs out.
+    /// </summary>
     private void BeginRest()
     {
-        _restSeconds = _rng.RandfRange(_restSecondsMin, _restSecondsMax);
+        if (_zoomieSeconds > 0.0f)
+        {
+            PickNewTarget();
+            return;
+        }
+
+        if (!IsOnTile && _rng.Randf() < ZoomieChance)
+        {
+            _zoomieSeconds = _rng.RandfRange(3.0f, 6.0f);
+            PickNewTarget();
+            _sprite.Play("walk_down");
+            return;
+        }
+
+        _restSeconds = IsOnTile
+            ? _rng.RandfRange(0.5f, 1.3f)
+            : _rng.RandfRange(_restSecondsMin, _restSecondsMax);
         _sprite.Stop();
     }
 
+    /// <summary>
+    /// Longest single leg of an ordinary stroll, and the shortest. The long end is deliberately
+    /// wider than a hex: a leg that cannot cross the ground a Voidling stands on leaves it milling
+    /// about on one tile forever. Zoomies ignore the cap and cross the island.
+    /// </summary>
+    private const float MinWalkLegLength = 60.0f;
+    private const float MaxWalkLegLength = 200.0f;
+
     private void PickNewTarget()
     {
-        _target = IsOnTile
-            ? _tileCenter + Vector2.Right.Rotated(_rng.RandfRange(0.0f, Mathf.Tau)) *
-              _rng.RandfRange(0.0f, _tileRadius)
-            : ClampToWanderArea(
-                TryPickShorelineTarget() ??
-                LandTarget?.Invoke() ??
-                new Vector2(
-                    _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
-                    _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y)));
+        _target = IsOnTile ? PickTileTarget() : PickRoamTarget();
 
         // Long enough to actually arrive, plus some slack. A flat timer was shorter than the walk
         // across a single hex, so a Voidling gave up on every destination that was not already
         // next to it and never left the ground it stood on. This stays a give-up guard: arriving
         // early simply starts a rest, and hitting the island edge repaths at once.
-        _nextTargetSeconds = Position.DistanceTo(_target) / Mathf.Max(1.0f, _walkSpeed) +
+        _nextTargetSeconds = Position.DistanceTo(_target) / Mathf.Max(1.0f, CurrentSpeed) +
                              _rng.RandfRange(1.0f, 3.0f);
+    }
+
+    /// <summary>
+    /// On running ground the destination is the opposite rim rather than a point anywhere on the
+    /// tile, so training reads as a sustained dash along a straight line and its dust trail has
+    /// room to draw. Other activities keep browsing their own tile.
+    /// </summary>
+    private Vector2 PickTileTarget()
+    {
+        if (_tileAnimation != "run")
+        {
+            return _tileCenter + Vector2.Right.Rotated(_rng.RandfRange(0.0f, Mathf.Tau)) *
+                   _rng.RandfRange(0.0f, _tileRadius);
+        }
+
+        var fromCenter = Position - _tileCenter;
+        var awayAngle = fromCenter.LengthSquared() > 1.0f
+            ? fromCenter.Angle()
+            : _rng.RandfRange(0.0f, Mathf.Tau);
+        var angle = awayAngle + Mathf.Pi + _rng.RandfRange(-0.5f, 0.5f);
+        return _tileCenter + Vector2.Right.Rotated(angle) * _tileRadius * _rng.RandfRange(0.78f, 0.98f);
+    }
+
+    /// <summary>
+    /// A free-roaming Voidling walks a leg of a set length toward somewhere on the island and
+    /// pauses there instead of committing to one long uninterrupted crossing. Zoomies are the
+    /// exception: covering ground is the whole point of the fit.
+    /// </summary>
+    private Vector2 PickRoamTarget()
+    {
+        var destination =
+            TryPickShorelineTarget() ??
+            LandTarget?.Invoke() ??
+            new Vector2(
+                _rng.RandfRange(_wanderBounds.Position.X, _wanderBounds.End.X),
+                _rng.RandfRange(_wanderBounds.Position.Y, _wanderBounds.End.Y));
+
+        if (_zoomieSeconds > 0.0f)
+            return ClampToWanderArea(destination);
+
+        var toDestination = destination - Position;
+        var distance = toDestination.Length();
+        var leg = _rng.RandfRange(MinWalkLegLength, MaxWalkLegLength);
+        if (distance > leg)
+            destination = Position + toDestination / distance * leg;
+        return ClampToWanderArea(destination);
     }
 
     /// <summary>
