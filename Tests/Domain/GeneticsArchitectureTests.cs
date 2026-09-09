@@ -207,6 +207,72 @@ public sealed class GeneticsArchitectureTests
     }
 
     [Fact]
+    public void RareTraitInheritance_DeduplicatesTheSameTraitFromBothParents()
+    {
+        // Transmission is forced so both parents always pass the trait on.
+        var service = new RareTraitInheritanceService(
+            Rules.Genetics with { RareTraitTransmissionChance = 1.0 });
+        var parentA = CreateParent("parent-a", 2, 2);
+        var parentB = CreateParent("parent-b", 2, 2);
+        parentA.RareTraits.Add(new RareTraitData
+        {
+            TraitId = "Lustrous",
+            FounderCreatureId = "founder-late",
+            GenerationFromFounder = 1,
+            CanTransmit = true
+        });
+        parentB.RareTraits.Add(new RareTraitData
+        {
+            TraitId = "Lustrous",
+            FounderCreatureId = "founder-early",
+            GenerationFromFounder = 0,
+            CanTransmit = true
+        });
+
+        for (ulong seed = 1; seed <= 200; seed++)
+        {
+            foreach (var child in new[] { service.Inherit(parentA, parentB, seed), service.Inherit(parentB, parentA, seed) })
+            {
+                // One copy only, and it is the one closest to its founder regardless of parent order.
+                var kept = Assert.Single(child);
+                Assert.Equal("Lustrous", kept.TraitId);
+                Assert.Equal("founder-early", kept.FounderCreatureId);
+                Assert.Equal(1, kept.GenerationFromFounder);
+                Assert.True(kept.CanTransmit);
+            }
+        }
+    }
+
+    [Fact]
+    public void RareTraitInheritance_KeepsDistinctTraitsFromBothParents()
+    {
+        var service = new RareTraitInheritanceService(
+            Rules.Genetics with { RareTraitTransmissionChance = 1.0 });
+        var parentA = CreateParent("parent-a", 2, 2);
+        var parentB = CreateParent("parent-b", 2, 2);
+        parentA.RareTraits.Add(new RareTraitData
+        {
+            TraitId = "Lustrous",
+            FounderCreatureId = "founder-a",
+            GenerationFromFounder = 0,
+            CanTransmit = true
+        });
+        parentB.RareTraits.Add(new RareTraitData
+        {
+            TraitId = "Aurora",
+            FounderCreatureId = "founder-b",
+            GenerationFromFounder = 0,
+            CanTransmit = true
+        });
+
+        var child = service.Inherit(parentA, parentB, 4242UL);
+
+        Assert.Equal(2, child.Count);
+        Assert.Contains(child, trait => trait.TraitId == "Lustrous");
+        Assert.Contains(child, trait => trait.TraitId == "Aurora");
+    }
+
+    [Fact]
     public void RareTraitTransmissionDepth_FollowsAuthoredRule()
     {
         Assert.Equal(2, Rules.Genetics.RareTraitMaxTransmittedGenerations);

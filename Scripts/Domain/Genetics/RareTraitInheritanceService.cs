@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shared;
 using VoidlingGame;
@@ -34,10 +35,37 @@ public sealed class RareTraitInheritanceService
 
     public List<RareTraitData> Inherit(VoidlingData parentA, VoidlingData parentB, ulong seed)
     {
-        var result = new List<RareTraitData>();
-        TryInheritFrom(parentA, seed, "a", result);
-        TryInheritFrom(parentB, seed, "b", result);
-        return result;
+        var inherited = new List<RareTraitData>();
+        TryInheritFrom(parentA, seed, "a", inherited);
+        TryInheritFrom(parentB, seed, "b", inherited);
+        return Deduplicate(inherited);
+    }
+
+    /// <summary>
+    /// A child carries each rare trait once, even when both parents transmit it. The surviving copy
+    /// is the one closest to its founder so the child keeps the longest remaining transmission
+    /// depth; ties resolve on founder ID so the outcome does not depend on parent order.
+    /// </summary>
+    private static List<RareTraitData> Deduplicate(List<RareTraitData> traits)
+    {
+        var best = new Dictionary<string, RareTraitData>(StringComparer.OrdinalIgnoreCase);
+        foreach (var trait in traits)
+        {
+            if (!best.TryGetValue(trait.TraitId, out var current) || IsCloserToFounder(trait, current))
+                best[trait.TraitId] = trait;
+        }
+
+        return traits
+            .Where(trait => ReferenceEquals(best[trait.TraitId], trait))
+            .ToList();
+    }
+
+    private static bool IsCloserToFounder(RareTraitData candidate, RareTraitData current)
+    {
+        if (candidate.GenerationFromFounder != current.GenerationFromFounder)
+            return candidate.GenerationFromFounder < current.GenerationFromFounder;
+
+        return string.CompareOrdinal(candidate.FounderCreatureId, current.FounderCreatureId) < 0;
     }
 
     private void TryInheritFrom(VoidlingData parent, ulong seed, string side, ICollection<RareTraitData> result)
