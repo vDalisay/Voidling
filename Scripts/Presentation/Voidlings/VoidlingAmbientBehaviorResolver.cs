@@ -26,8 +26,10 @@ public static class VoidlingAmbientBehaviorResolver
         // Keep the effects intentionally modest: trained stats should be noticeable over time without
         // making low-stat Voidlings look broken or turning Garden roaming into another optimization layer.
         var speedMultiplier = Lerp(0.90f, 1.15f, runNormalized);
-        var restMin = Lerp(0.28f, 0.08f, staminaNormalized);
-        var restMax = Lerp(0.90f, 0.28f, staminaNormalized);
+        // Long enough that a Voidling visibly stops and stands at a spot between the legs of a walk
+        // rather than gliding from destination to destination.
+        var restMin = Lerp(1.20f, 0.45f, staminaNormalized);
+        var restMax = Lerp(3.00f, 1.20f, staminaNormalized);
 
         // A high Swim stat only biases an occasional free-roam destination toward the island's edge.
         // It does not change simulation, training, or race outcomes.

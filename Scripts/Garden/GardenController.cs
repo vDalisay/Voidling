@@ -81,6 +81,7 @@ public partial class GardenController : Node2D
         UpdateTreatDrops();
         UpdateLandGhost();
         UpdateLandHover();
+        UpdateEncounters((float)delta);
 
         var zoomBlend = 1.0f - Mathf.Exp(-12.0f * (float)delta);
         var zoom = Mathf.Lerp(_camera.Zoom.X, _zoomTarget, zoomBlend);
@@ -635,13 +636,20 @@ public partial class GardenController : Node2D
     }
 
     private void SpawnHeartParticle(VoidlingActor actor, float xOffset, double delay)
+        => SpawnHeart(actor, new Vector2(xOffset - 3, -29), xOffset, delay);
+
+    /// <summary>A heart rising from a spot in the world rather than from one Voidling's head.</summary>
+    private void SpawnHeartAt(Vector2 worldPosition, float xOffset, double delay)
+        => SpawnHeart(_actorsRoot, worldPosition + new Vector2(xOffset - 3, -24), xOffset, delay);
+
+    private void SpawnHeart(Node parent, Vector2 position, float xOffset, double delay)
     {
         var heart = UiFactory.CreateLabel("♥", 8);
-        heart.Position = new Vector2(xOffset - 3, -29);
+        heart.Position = position;
         heart.Modulate = new Color(1, 1, 1, 0);
         heart.AddThemeColorOverride("font_color", Color.FromHtml("#EB8996"));
         heart.ZIndex = 60;
-        actor.AddChild(heart);
+        parent.AddChild(heart);
 
         var tween = CreateTween().SetParallel(true);
         tween.TweenProperty(heart, "modulate:a", 1.0f, 0.08).SetDelay(delay);
