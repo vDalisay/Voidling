@@ -5,7 +5,7 @@ namespace Voidling.Presentation.Voidlings;
 
 /// <summary>
 /// Decision-neutral bridge between an already-resolved evolution specialization and presentation.
-/// The mapping itself is authored by the visual catalog. Blank entries deliberately preserve the
+/// The mapping is supplied explicitly by the caller/configuration layer. Blank entries preserve the
 /// creature's existing semantic visual type so unresolved morphology rules cannot leak into runtime
 /// behavior through fallback guesses.
 /// </summary>
