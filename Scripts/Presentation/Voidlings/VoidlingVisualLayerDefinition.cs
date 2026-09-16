@@ -72,6 +72,20 @@ public partial class VoidlingVisualLayerDefinition : Resource
     /// Optional palette slots specific to this layer. When empty and PaletteAffected=true, the body
     /// definition's source palette is reused. Pixels outside the listed colors are left untouched.
     /// </summary>
+    private Color[] _sourcePaletteColorValues = System.Array.Empty<Color>();
+
     [Export]
-    public Godot.Collections.Array<Color> SourcePaletteColors { get; set; } = new();
+    public Color[] SourcePaletteColorValues
+    {
+        get => _sourcePaletteColorValues;
+        set
+        {
+            _sourcePaletteColorValues = value ?? System.Array.Empty<Color>();
+            SourcePaletteColors.Clear();
+            foreach (var color in _sourcePaletteColorValues)
+                SourcePaletteColors.Add(color);
+        }
+    }
+
+    public Godot.Collections.Array<Color> SourcePaletteColors { get; } = new();
 }
