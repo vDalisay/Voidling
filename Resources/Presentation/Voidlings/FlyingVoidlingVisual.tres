@@ -1,0 +1,85 @@
+[gd_resource type="Resource" script_class="VoidlingVisualDefinition" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Presentation/Voidlings/VoidlingVisualDefinition.cs" id="1_visual"]
+[ext_resource type="Script" path="res://Scripts/Presentation/Voidlings/VoidlingVisualLayerDefinition.cs" id="2_layer"]
+[ext_resource type="Texture2D" path="res://Assets/Voidlings/Base/Flying/neutral_two_tone_flying_voidling_walk.png" id="3_base"]
+[ext_resource type="Texture2D" path="res://Assets/Voidlings/Layers/Wings/golden_back_wing.png" id="4_back_wing"]
+[ext_resource type="Texture2D" path="res://Assets/Voidlings/Layers/Wings/golden_front_wing.png" id="5_front_wing"]
+[ext_resource type="Texture2D" path="res://Assets/Voidlings/Layers/Crown/golden_crown_animated.png" id="6_crown"]
+
+[sub_resource type="Resource" id="Resource_back_wing"]
+script = ExtResource("2_layer")
+LayerId = "wings_golden_back"
+SlotId = "wings_back"
+BaseAtlas = ExtResource("4_back_wing")
+ZIndexOffset = -1
+OffsetAtScaleOne = Vector2(0, 0)
+ScaleMultiplier = 1.0
+PaletteAffected = false
+MotionGroupId = "wings"
+VerticalFollowLagSeconds = 0.11
+MaxVerticalLagAtScaleOne = 2.0
+
+[sub_resource type="Resource" id="Resource_front_wing"]
+script = ExtResource("2_layer")
+LayerId = "wings_golden_front"
+SlotId = "wings_front"
+BaseAtlas = ExtResource("5_front_wing")
+ZIndexOffset = 1
+OffsetAtScaleOne = Vector2(0, 0)
+ScaleMultiplier = 1.0
+PaletteAffected = false
+MotionGroupId = "wings"
+VerticalFollowLagSeconds = 0.11
+MaxVerticalLagAtScaleOne = 2.0
+
+[sub_resource type="Resource" id="Resource_crown"]
+script = ExtResource("2_layer")
+LayerId = "crown_golden"
+SlotId = "crown"
+BaseAtlas = ExtResource("6_crown")
+ZIndexOffset = 2
+OffsetAtScaleOne = Vector2(0, 0)
+ScaleMultiplier = 1.0
+PaletteAffected = false
+SelfAnimatedFrameCount = 8
+SelfAnimatedFps = 5.0
+
+[resource]
+script = ExtResource("1_visual")
+DefinitionId = "flying"
+BaseAtlas = ExtResource("3_base")
+SourcePaletteColors = Array[Color]([Color(0.52549, 0.356863, 0.580392, 1), Color(0.619608, 0.411765, 0.690196, 1), Color(0.678431, 0.478431, 0.745098, 1), Color(0.780392, 0.611765, 0.835294, 1)])
+PaletteMatchTolerance = 0.0125
+DefaultLayerIds = Array[String](["wings_golden_back", "wings_golden_front", "crown_golden"])
+Layers = Array[Resource]([SubResource("Resource_back_wing"), SubResource("Resource_front_wing"), SubResource("Resource_crown")])
+FrameWidth = 32
+FrameHeight = 48
+WorldFrameCount = 6
+WalkDownRow = 0
+WalkUpRow = 0
+WalkLeftRow = 0
+WalkRightRow = 0
+WorldAnimationFps = 8.0
+RaceRunRow = 0
+RaceRunFrameCount = 6
+RaceRunFps = 10.0
+RaceSwimRow = 0
+RaceSwimFrameCount = 6
+RaceSwimFps = 8.0
+PortraitColumn = 1
+PortraitRow = 0
+AdultWorldScale = 1.0
+ChildWorldScale = 0.5
+WorldSpriteCenterYOffsetAtScaleOne = -21.0
+AdultHitboxSize = Vector2(31, 43)
+ChildHitboxSize = Vector2(16, 22)
+HeldScaleMultiplier = 1.14
+HeldSpriteYOffset = -9.0
+AdultShadowRadii = Vector2(7, 2.2)
+ShadowCenterYOffsetAtScaleOne = 1.0
+RaceScale = 1.0
+MutationAdultCenterYOffset = -23.0
+MutationCompactCenterYOffset = -11.5
+MutationCompactScaleThreshold = 0.5
+PortraitMutationCompactPixelThreshold = 28.0
