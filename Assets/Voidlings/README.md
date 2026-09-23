@@ -93,6 +93,8 @@ The front and back wing layers both belong to motion group `wings`. The group ca
 
 The supplied body animation is authored facing right. `walk_right` therefore uses the pixels as authored and `walk_left` mirrors the complete assembled Voidling. `walk_up` and `walk_down` retain the most recent horizontal facing. This facing rule lives in the canonical layer/sprite synchronization path, preventing individual Garden/network consumers from accidentally making the Voidling walk backwards.
 
+The Water body keeps its supplied `water_voidling_walk_source.png` export. Its six tightly packed frames are padded, without resampling, into six 64x48 cells in `water_voidling_walk.png`. Each frame's torso aligns with its center. Water's wing and crystal atlases reuse the shared golden source pixels on the same 64x48 grid, with the wings following Water's authored walk bob.
+
 ## One appearance recipe everywhere
 
 `VoidlingVisualFactory` resolves the semantic body, palette and layer list once. Garden actors, remote Garden actors and race sprites use that recipe through `ApplyAppearance`. All UI creature representations use `VoidlingPortraitComposer`, which resolves the same definition and layer list.
