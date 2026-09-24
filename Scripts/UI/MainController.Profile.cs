@@ -138,14 +138,25 @@ public partial class MainController : Node
 
         var storedLand = state.GardenModules
             .Where(module => !module.Placed)
-            .OrderBy(module => module.StatId, StringComparer.Ordinal)
+            .OrderBy(module => module.BiomeId, StringComparer.Ordinal)
             .ThenBy(module => module.ShapeId, StringComparer.Ordinal)
             .ThenBy(module => module.Id, StringComparer.Ordinal)
             .Select(module => new StoredLandViewState(
                 module.Id,
-                LandShapePresentation.DescribeStoredPiece(module.ShapeId, module.StatId, module.Level),
+                LandShapePresentation.DescribeStoredPiece(module.ShapeId, module.BiomeId, module.Level),
                 module.ShapeId,
-                LandShapePresentation.TintFor(module.StatId)))
+                LandShapePresentation.TintForBiome(module.BiomeId)))
+            .ToList();
+        var biomeTiles = state.BiomeTiles
+            .Where(stack => stack.Count > 0)
+            .OrderBy(stack => stack.BiomeId, StringComparer.Ordinal)
+            .ThenBy(stack => stack.Stars)
+            .Select(stack => new StoredBiomeTileViewState(
+                stack.BiomeId,
+                stack.Stars,
+                stack.Count,
+                string.Format(Tr("UI_INVENTORY_BIOME_TILE"), BiomePresentationCatalog.NameFor(stack.BiomeId), stack.Stars),
+                BiomePresentationCatalog.ColorFor(stack.BiomeId)))
             .ToList();
 
         var failedEggs = state.OwnedEggs
@@ -170,7 +181,10 @@ public partial class MainController : Node
 
         var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(520, 292));
         var screen = new InventoryScreen();
-        screen.Configure(new InventoryScreenState(items, failedEggs, eggShells, incubationSkipCount, incubatingEggs, storedEggs, storedLand));
+        screen.Configure(new InventoryScreenState(items, failedEggs, eggShells, incubationSkipCount, incubatingEggs, storedEggs, storedLand)
+        {
+            BiomeTiles = biomeTiles
+        });
         screen.PlaceStoredEggRequested += egg =>
         {
             CloseModal();
@@ -180,6 +194,12 @@ public partial class MainController : Node
         {
             CloseModal();
             _garden.BeginLandPlacement(land.ModuleId, land.ShapeId);
+        };
+        // A tile goes onto a hex the player picks, so placing one opens the island's land list.
+        screen.PlaceBiomeTileRequested += _ =>
+        {
+            CloseModal();
+            ShowGardenModules();
         };
         screen.PlaceTreatRequested += statId =>
         {

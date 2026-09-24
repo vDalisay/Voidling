@@ -30,25 +30,25 @@ public static class LandShapePresentation
     /// <summary>How many hexes a piece covers, for labels that count capacity.</summary>
     public static int HexCountOf(string shapeId) => GardenTileShape.Find(shapeId)?.HexCount ?? 1;
 
-    /// <summary>Green for plain ground, the stat's own colour for ground that already trains.</summary>
-    public static Color TintFor(string statId)
-        => statId.Length == 0 ? PlainGroundColor : StatPresentationCatalog.ColorFor(statId);
+    /// <summary>Green for plain ground, the biome's own colour once it has a biome.</summary>
+    public static Color TintForBiome(string biomeId)
+        => biomeId.Length == 0 ? PlainGroundColor : BiomePresentationCatalog.ColorFor(biomeId);
 
     /// <summary>
-    /// What an inventory row says about a piece: its shape and size, plus the ground it carries, so
+    /// What an inventory row says about a piece: its shape and size, plus the biome it carries, so
     /// two stored pieces are never just two identical lines.
     /// </summary>
-    public static string DescribeStoredPiece(string shapeId, string statId, int level)
+    public static string DescribeStoredPiece(string shapeId, string biomeId, int level)
     {
         var shape = string.Format(
             TranslationServer.Translate("UI_INVENTORY_LAND_TILE"),
             NameFor(shapeId),
             HexCountOf(shapeId));
-        return statId.Length == 0
+        return biomeId.Length == 0
             ? string.Format(TranslationServer.Translate("UI_INVENTORY_LAND_PLAIN"), shape)
             : string.Format(
                 TranslationServer.Translate("UI_INVENTORY_LAND_TRAINED"),
-                StatPresentationCatalog.NameFor(statId).ToUpperInvariant(),
+                BiomePresentationCatalog.NameFor(biomeId).ToUpperInvariant(),
                 level,
                 shape);
     }

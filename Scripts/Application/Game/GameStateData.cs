@@ -21,6 +21,7 @@ public sealed class GameStateData
     private List<DroppedTreatData> _droppedTreats = new();
     private List<string> _completedCupIds = new();
     private List<RaceCourseRecordData> _courseRecords = new();
+    private List<BiomeTileStackData> _biomeTiles = new();
 
     public int SaveVersion { get; set; } = 20;
 
@@ -51,6 +52,16 @@ public sealed class GameStateData
     }
 
     public List<GardenModuleData> GardenModules { get; set; } = new();
+
+    /// <summary>
+    /// Biome tiles in the inventory, grouped by biome and stars. Additive and non-null: saves
+    /// written before biome tiles existed load with none.
+    /// </summary>
+    public List<BiomeTileStackData> BiomeTiles
+    {
+        get => _biomeTiles;
+        set => _biomeTiles = value ?? new List<BiomeTileStackData>();
+    }
 
     /// <summary>
     /// Cosmetic Garden objects are persisted independently from functional training modules.

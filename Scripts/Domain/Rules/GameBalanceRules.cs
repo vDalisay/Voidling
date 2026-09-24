@@ -56,9 +56,12 @@ public sealed record DailyMissionRules(
 /// <summary>How much one training treat is worth, before any favorite-food bonus.</summary>
 public sealed record TrainingItemRules(int MinGain, int MaxGain);
 
+/// <summary>
+/// Garden land and biome tiles. <see cref="BiomeTilePrice"/> buys a one-star biome tile; stars come
+/// from stacking matching tiles, and every star has its own passive training rate.
+/// </summary>
 public sealed record GardenModuleRules(
-    int PurchaseCost,
-    IReadOnlyList<int> UpgradeCosts,
+    int BiomeTilePrice,
     IReadOnlyList<float> PointsPerMinuteByLevel)
 {
     /// <summary>
@@ -81,10 +84,8 @@ public sealed record GardenModuleRules(
         OriginX: 416.0f,
         OriginY: 240.0f);
 
-    /// <summary>Coins to turn one placed empty hex into training ground for a stat.</summary>
-    public int TrainingConversionCost => Math.Max(0, PurchaseCost);
-
-    public int MaxLevel => Math.Max(1, Math.Min(PointsPerMinuteByLevel.Count, UpgradeCosts.Count + 1));
+    /// <summary>The highest star a biome tile can reach: one passive rate per star.</summary>
+    public int MaxLevel => Math.Max(1, PointsPerMinuteByLevel.Count);
 
     public float PointsPerMinuteForLevel(int level)
     {
@@ -92,17 +93,6 @@ public sealed record GardenModuleRules(
             return 0.0f;
         var index = Math.Clamp(level, 1, MaxLevel) - 1;
         return Math.Max(0.0f, PointsPerMinuteByLevel[index]);
-    }
-
-    public int UpgradeCostForLevel(int currentLevel)
-    {
-        var targetLevel = currentLevel + 1;
-        if (targetLevel > MaxLevel)
-            return -1;
-        var index = targetLevel - 2;
-        if (index < 0 || index >= UpgradeCosts.Count)
-            return -1;
-        return Math.Max(0, UpgradeCosts[index]);
     }
 }
 
@@ -220,9 +210,8 @@ public sealed record GameBalanceRules(
     public GardenRules Garden { get; init; } = new(MaxPopulation: 8);
     public TrainingItemRules TrainingItems { get; init; } = new(MinGain: 5, MaxGain: 9);
     public GardenModuleRules GardenModules { get; init; } = new(
-        PurchaseCost: 40,
-        UpgradeCosts: Array.AsReadOnly(new[] { 25, 50 }),
-        PointsPerMinuteByLevel: Array.AsReadOnly(new[] { 1.0f, 1.5f, 2.0f }));
+        BiomeTilePrice: 40,
+        PointsPerMinuteByLevel: Array.AsReadOnly(new[] { 1.0f, 1.5f, 2.0f, 3.0f }));
     public DailyLoginRules DailyLogin { get; init; } = new(Array.AsReadOnly(new[] { 5, 7, 9, 12, 15, 20, 30 }));
     public DailyMissionRules DailyMissions { get; init; } = new(
         MissionsPerDay: 3,

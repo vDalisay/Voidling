@@ -904,13 +904,13 @@ msgid "UI_LAND_MAX_LEVEL"
 msgstr "Max level"
 
 msgid "UI_LAND_HEX_TITLE"
-msgstr "Training ground"
+msgstr "Biome"
 
 msgid "UI_LAND_HEX_EMPTY_TITLE"
 msgstr "Plain ground"
 
 msgid "UI_LAND_BUILD_PROMPT"
-msgstr "Build training ground here for {0} sprouts. One Voidling trains per hex."
+msgstr "Put a biome here for {0} sprouts, or place a tile you own. One Voidling trains per hex."
 
 msgid "UI_LAND_HEX_RESIDENT"
 msgstr "Training here: {0}"
@@ -1231,3 +1231,99 @@ msgstr "{0} ADULT"
 
 msgid "LOG_GREW_INTO_FORM"
 msgstr "{0} grew into a {1} adult."
+
+msgid "BIOME_PLAINS"
+msgstr "Plains"
+
+msgid "BIOME_WATER"
+msgstr "Water"
+
+msgid "BIOME_MOUNTAIN"
+msgstr "Mountain"
+
+msgid "BIOME_DRY"
+msgstr "Dry"
+
+msgid "BIOME_GROVE"
+msgstr "Grove"
+
+msgid "BIOME_SWAMP"
+msgstr "Swamp"
+
+msgid "BIOME_VOLCANO"
+msgstr "Volcano"
+
+msgid "LOG_BIOME_TILE_BOUGHT"
+msgstr "Bought a {0} tile."
+
+msgid "LOG_BIOME_BUILT"
+msgstr "Put down a {0} tile."
+
+msgid "LOG_BIOME_STACKED"
+msgstr "Stacked a matching tile: {0} is now level {1}."
+
+msgid "LOG_BIOME_PICKED_UP"
+msgstr "Picked up a level {1} {0} tile."
+
+msgid "UI_BIOME_FAILURE_UNKNOWN"
+msgstr "That biome is unavailable."
+
+msgid "UI_BIOME_FAILURE_NO_HEX"
+msgstr "That hex is no longer part of the island."
+
+msgid "UI_BIOME_FAILURE_NOT_PLACED"
+msgstr "Put that land down on the island first."
+
+msgid "UI_BIOME_FAILURE_COINS"
+msgstr "Not enough sprouts."
+
+msgid "UI_BIOME_FAILURE_NO_TILE"
+msgstr "You don't have a tile like that."
+
+msgid "UI_BIOME_FAILURE_NO_MATCH"
+msgstr "Only a tile of the same biome and level stacks on this one."
+
+msgid "UI_BIOME_FAILURE_MAX_STARS"
+msgstr "That tile is already at the top level."
+
+msgid "UI_BIOME_FAILURE_PLAIN"
+msgstr "That hex is plain ground; there is no tile to pick up."
+
+msgid "UI_BIOME_FAILURE_PERMANENT"
+msgstr "A level 4 tile stays where it is."
+
+msgid "UI_LAND_BIOME_TRAINS"
+msgstr "Trains {0} · {1}/min"
+
+msgid "UI_LAND_BUILD_BIOME_TOOLTIP"
+msgstr "{0}: trains {1}. Buy a level 1 tile and put it here for {2} sprouts."
+
+msgid "UI_LAND_PLACE_TILE"
+msgstr "PLACE {0} L{1} (x{2})"
+
+msgid "UI_LAND_STACK_TILE"
+msgstr "STACK L{0} TILE (x{1})"
+
+msgid "UI_LAND_STACK_TOOLTIP"
+msgstr "Put a matching tile (same biome, same level) on top to raise this one a level. Level 4 Water becomes a Swamp, level 4 Dry a Volcano."
+
+msgid "UI_LAND_PICK_UP_TILE"
+msgstr "PICK UP TILE"
+
+msgid "UI_LAND_TOP_STAR"
+msgstr "Level 4: this tile is complete and stays put."
+
+msgid "UI_INVENTORY_BIOME_TILE"
+msgstr "{0} tile L{1}"
+
+msgid "UI_INVENTORY_BIOME_TILE_EFFECT"
+msgstr "Put it on plain ground, or on a matching tile to raise it a level."
+
+msgid "UI_SHOP_CATEGORY_BIOMES"
+msgstr "Biomes"
+
+msgid "UI_SHOP_BIOME_TILE"
+msgstr "{0} tile"
+
+msgid "UI_SHOP_BIOME_TRAINS"
+msgstr "Trains {0}."

@@ -84,19 +84,13 @@ public partial class GameBalanceResource : Resource
     public int GardenMaxPopulation { get; set; } = 8;
 
     [ExportGroup("Garden Modules")]
-    /// <summary>Coins to turn one placed empty hex into training ground.</summary>
+    /// <summary>Coins for a one-star biome tile in the shop.</summary>
     [Export(PropertyHint.Range, "0,10000,1")]
-    public int GardenModulePurchaseCost { get; set; } = 40;
+    public int BiomeTilePrice { get; set; } = 40;
 
     /// <summary>Coins per hex of plain ground; a three-hex piece costs three of these.</summary>
     [Export(PropertyHint.Range, "0,10000,1")]
     public int GardenModuleEmptyHexCost { get; set; } = 25;
-
-    [Export(PropertyHint.Range, "0,10000,1")]
-    public int GardenModuleLevel2UpgradeCost { get; set; } = 25;
-
-    [Export(PropertyHint.Range, "0,10000,1")]
-    public int GardenModuleLevel3UpgradeCost { get; set; } = 50;
 
     [Export(PropertyHint.Range, "0,60,0.1")]
     public float GardenModuleLevel1PointsPerMinute { get; set; } = 1.0f;
@@ -106,6 +100,10 @@ public partial class GameBalanceResource : Resource
 
     [Export(PropertyHint.Range, "0,60,0.1")]
     public float GardenModuleLevel3PointsPerMinute { get; set; } = 2.0f;
+
+    /// <summary>Four stars: the top tile, a special environment such as a Swamp, trains fastest.</summary>
+    [Export(PropertyHint.Range, "0,60,0.1")]
+    public float GardenModuleLevel4PointsPerMinute { get; set; } = 3.0f;
 
     [ExportGroup("Evolution")]
     /// <summary>Level the highest stat needs at adulthood for a typed form; below it the adult is Neutral.</summary>
@@ -304,17 +302,13 @@ public partial class GameBalanceResource : Resource
                 MaxPopulation = Math.Clamp(GardenMaxPopulation, 1, 64)
             },
             GardenModules = new GardenModuleRules(
-                PurchaseCost: Math.Max(0, GardenModulePurchaseCost),
-                UpgradeCosts: Array.AsReadOnly(new[]
-                {
-                    Math.Max(0, GardenModuleLevel2UpgradeCost),
-                    Math.Max(0, GardenModuleLevel3UpgradeCost)
-                }),
+                BiomeTilePrice: Math.Max(0, BiomeTilePrice),
                 PointsPerMinuteByLevel: Array.AsReadOnly(new[]
                 {
                     NonNegative(GardenModuleLevel1PointsPerMinute),
                     NonNegative(GardenModuleLevel2PointsPerMinute),
-                    NonNegative(GardenModuleLevel3PointsPerMinute)
+                    NonNegative(GardenModuleLevel3PointsPerMinute),
+                    NonNegative(GardenModuleLevel4PointsPerMinute)
                 }))
             {
                 EmptyHexCost = Math.Max(0, GardenModuleEmptyHexCost)

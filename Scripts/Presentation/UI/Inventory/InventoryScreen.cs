@@ -16,7 +16,12 @@ public readonly record struct IncubatingEggViewState(string EggId, string Displa
 public readonly record struct StoredEggViewState(string EggId, string DisplayName, string Description, Color TintColor, bool Bred);
 /// <summary>A piece of ground waiting in the inventory, named and shaped by what was bought.</summary>
 public readonly record struct StoredLandViewState(string ModuleId, string DisplayName, string ShapeId, Color Tint);
-public sealed record InventoryScreenState(IReadOnlyList<InventoryItemViewState> Items, IReadOnlyList<FailedEggViewState> FailedEggs, IReadOnlyList<EggShellViewState> EggShells, int IncubationSkipCount, IReadOnlyList<IncubatingEggViewState> IncubatingEggs, IReadOnlyList<StoredEggViewState> StoredEggs, IReadOnlyList<StoredLandViewState> StoredLand);
+/// <summary>Biome tiles of one biome and star waiting in the inventory.</summary>
+public readonly record struct StoredBiomeTileViewState(string BiomeId, int Stars, int Count, string DisplayName, Color Tint);
+public sealed record InventoryScreenState(IReadOnlyList<InventoryItemViewState> Items, IReadOnlyList<FailedEggViewState> FailedEggs, IReadOnlyList<EggShellViewState> EggShells, int IncubationSkipCount, IReadOnlyList<IncubatingEggViewState> IncubatingEggs, IReadOnlyList<StoredEggViewState> StoredEggs, IReadOnlyList<StoredLandViewState> StoredLand)
+{
+    public IReadOnlyList<StoredBiomeTileViewState> BiomeTiles { get; init; } = Array.Empty<StoredBiomeTileViewState>();
+}
 
 /// <summary>
 /// The satchel: category column, a grid of drawn slots, and one detail card carrying the single
@@ -40,6 +45,8 @@ public partial class InventoryScreen : HBoxContainer
     public event Action<string>? UseIncubationSkipRequested;
     public event Action<StoredEggViewState>? PlaceStoredEggRequested;
     public event Action<StoredLandViewState>? PlaceStoredLandRequested;
+    /// <summary>Choose a hex for a biome tile: plain ground, or a matching tile to stack on.</summary>
+    public event Action<StoredBiomeTileViewState>? PlaceBiomeTileRequested;
     /// <summary>Put a treat on the ground for whichever Voidling reaches it first.</summary>
     public event Action<string>? PlaceTreatRequested;
 
@@ -108,7 +115,7 @@ public partial class InventoryScreen : HBoxContainer
         if (_state!.Items.Any(item => !item.UsesEggIcon && item.Count > 0)) yield return TreatsCategory;
         if (HasEggs(bred: false)) yield return ShopEggsCategory;
         if (HasEggs(bred: true)) yield return BredEggsCategory;
-        if (_state.StoredLand.Count > 0) yield return LandCategory;
+        if (_state.StoredLand.Count > 0 || _state.BiomeTiles.Count > 0) yield return LandCategory;
         if (_state.EggShells.Count > 0) yield return ShellsCategory;
     }
 
@@ -304,6 +311,14 @@ public partial class InventoryScreen : HBoxContainer
                     string.Format(Tr("UI_INVENTORY_LAND_EFFECT"), LandShapePresentation.HexCountOf(land.ShapeId)), 1, land.Tint,
                     () => LandShapePresentation.CreateShapeArt(captured.ShapeId, captured.Tint), Tr("UI_INVENTORY_PLACE"),
                     () => PlaceStoredLandRequested?.Invoke(captured));
+            }
+            foreach (var tile in _state.BiomeTiles)
+            {
+                var captured = tile;
+                yield return new Slot($"tile:{tile.BiomeId}:{tile.Stars}", tile.DisplayName,
+                    Tr("UI_INVENTORY_BIOME_TILE_EFFECT"), tile.Count, tile.Tint,
+                    () => LandShapePresentation.CreateShapeArt("single", captured.Tint), Tr("UI_INVENTORY_PLACE"),
+                    () => PlaceBiomeTileRequested?.Invoke(captured));
             }
             yield break;
         }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Application.Garden;
+using Voidling.Domain.Garden;
 using Voidling.Presentation.UI.Common;
 
 namespace VoidlingGame;
@@ -18,9 +19,9 @@ public partial class MainController
 
     /// <summary>
     /// The island's ground: a grid of the pieces you own, each drawn as its own footprint, and one
-    /// card carrying the single thing that piece can do. Buying still happens in the Shop and
-    /// placing still happens in the Garden; a hex coordinate is never shown, because the shape is
-    /// what the player recognises.
+    /// card carrying what that piece can do. Buying still happens in the Shop and placing land still
+    /// happens in the Garden; a hex coordinate is never shown, because the shape is what the player
+    /// recognises.
     /// </summary>
     private void ShowGardenModules()
     {
@@ -64,11 +65,11 @@ public partial class MainController
         BuildLandDetail(detail, pieces.First(piece => piece.Id == _selectedModuleId));
     }
 
-    /// <summary>Training grounds first, then plain ground, then what is still in storage.</summary>
+    /// <summary>Biomes first, then plain ground, then what is still in storage.</summary>
     private IEnumerable<GardenModuleData> LandPieces()
         => _session.State.GardenModules
             .Where(module => module.Placed)
-            .OrderByDescending(module => module.StatId.Length > 0)
+            .OrderByDescending(module => module.BiomeId.Length > 0)
             .ThenBy(module => module.HexR)
             .ThenBy(module => module.HexQ)
             .Concat(_session.State.GardenModules
@@ -77,16 +78,14 @@ public partial class MainController
 
     private Button BuildLandSlot(GardenModuleData module)
     {
-        var trainingGround = module.StatId.Length > 0;
-        var tint = LandShapePresentation.TintFor(module.StatId);
+        var biome = module.BiomeId.Length > 0;
+        var tint = LandShapePresentation.TintForBiome(module.BiomeId);
         var button = UiFactory.CreateButton(string.Empty);
         button.Name = "Land_" + module.Id;
         button.ToggleMode = true;
         button.ButtonPressed = module.Id == _selectedModuleId;
         button.CustomMinimumSize = LandSlotSize;
-        button.TooltipText = trainingGround
-            ? StatPresentationCatalog.NameFor(module.StatId)
-            : Tr("UI_LAND_PLAIN_GROUND");
+        button.TooltipText = BiomePresentationCatalog.NameFor(module.BiomeId);
 
         var art = LandShapePresentation.CreateShapeArt(module.ShapeId, tint);
         art.Position = (LandSlotSize - art.CustomMinimumSize) * 0.5f - new Vector2(0, 4);
@@ -94,14 +93,14 @@ public partial class MainController
         art.Modulate = new Color(1, 1, 1, module.Placed ? 1.0f : 0.5f);
         button.AddChild(art);
 
-        if (trainingGround)
+        if (biome)
         {
             var level = UiFactory.CreateLabel("L" + module.Level, 6);
             level.Position = new Vector2(2, 33);
             level.Size = new Vector2(54, 12);
             level.HorizontalAlignment = HorizontalAlignment.Right;
             level.MouseFilter = Control.MouseFilterEnum.Ignore;
-            level.AddThemeColorOverride("font_color", PaperCard.Ink(StatPresentationCatalog.ColorFor(module.StatId)));
+            level.AddThemeColorOverride("font_color", PaperCard.Ink(BiomePresentationCatalog.ColorFor(module.BiomeId)));
             button.AddChild(level);
         }
 
@@ -112,8 +111,8 @@ public partial class MainController
 
     private void BuildLandDetail(VBoxContainer detail, GardenModuleData module)
     {
-        var trainingGround = module.StatId.Length > 0;
-        var tint = LandShapePresentation.TintFor(module.StatId);
+        var biome = module.BiomeId.Length > 0;
+        var tint = LandShapePresentation.TintForBiome(module.BiomeId);
 
         var artPanel = new PanelContainer { CustomMinimumSize = new Vector2(0, 54) };
         artPanel.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = Color.FromHtml("#F7E5BD") });
@@ -122,12 +121,10 @@ public partial class MainController
         artPanel.AddChild(center);
         detail.AddChild(artPanel);
 
-        var name = UiFactory.CreateLabel(
-            trainingGround ? StatPresentationCatalog.NameFor(module.StatId).ToUpperInvariant() : Tr("UI_LAND_PLAIN_GROUND"), 9);
+        var name = UiFactory.CreateLabel(BiomePresentationCatalog.NameFor(module.BiomeId).ToUpperInvariant(), 9);
         name.Name = "LandName";
         name.HorizontalAlignment = HorizontalAlignment.Center;
-        name.AddThemeColorOverride("font_color", PaperCard.Ink(
-            trainingGround ? StatPresentationCatalog.ColorFor(module.StatId) : Color.FromHtml("#6B8F5E")));
+        name.AddThemeColorOverride("font_color", PaperCard.Ink(biome ? BiomePresentationCatalog.ColorFor(module.BiomeId) : Color.FromHtml("#6B8F5E")));
         detail.AddChild(name);
 
         if (!module.Placed)
@@ -147,78 +144,20 @@ public partial class MainController
             return;
         }
 
-        if (trainingGround)
+        if (biome)
         {
-            detail.AddChild(PaperCard.StarRating(module.Level, GameRules.GardenModuleRules.MaxLevel, 15.0f));
+            detail.AddChild(PaperCard.StarRating(module.Level, _session.BiomeTileMaxStars, 15.0f));
             var rate = UiFactory.CreateLabel(
                 string.Format(Tr("UI_LAND_RATE"), GameRules.GardenModuleRules.PointsPerMinuteForLevel(module.Level).ToString("0.#")), 7);
             rate.HorizontalAlignment = HorizontalAlignment.Center;
             detail.AddChild(rate);
-
-            var residents = _session.State.Voidlings
-                .Where(creature => string.Equals(creature.PassiveTrainingModuleId, module.Id, StringComparison.Ordinal))
-                .Select(creature => creature.Name)
-                .ToList();
-            var occupancy = UiFactory.CreateLabel(
-                residents.Count > 0
-                    ? string.Format(Tr("UI_LAND_HEX_RESIDENT"), string.Join(", ", residents))
-                    : Tr("UI_LAND_HEX_VACANT"), 6);
-            occupancy.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-            occupancy.HorizontalAlignment = HorizontalAlignment.Center;
-            detail.AddChild(occupancy);
             detail.AddChild(new Control { SizeFlagsVertical = Control.SizeFlags.ExpandFill });
-
-            var upgradeCost = GameRules.GardenModuleRules.UpgradeCostForLevel(module.Level);
-            var capturedId = module.Id;
-            var upgrade = UiFactory.CreateButton(
-                upgradeCost < 0 ? Tr("UI_LAND_MAX_LEVEL") : string.Format(Tr("UI_LAND_UPGRADE"), upgradeCost));
-            upgrade.Name = "LandAction";
-            upgrade.CustomMinimumSize = new Vector2(152, 26);
-            UiFactory.ApplyPrimaryStyle(upgrade);
-            upgrade.Disabled = upgradeCost < 0 || _session.State.Coins < upgradeCost;
-            upgrade.Pressed += () =>
-            {
-                if (_session.UpgradeGardenModule(capturedId)) CallDeferred(nameof(ShowGardenModules));
-            };
-            detail.AddChild(upgrade);
-            return;
         }
 
-        // Plain placed ground: the choice of which training ground to build is the card's content.
-        var cost = GameRules.GardenModuleRules.TrainingConversionCost;
-        var price = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-        price.AddThemeConstantOverride("separation", 3);
-        price.AddChild(UiFactory.CreateLabel(Tr("UI_SHOP_PRICE_HEADER").ToUpperInvariant(), 7));
-        price.AddChild(new TextureRect
-        {
-            Texture = UiFactory.CreateSproutIcon(),
-            CustomMinimumSize = new Vector2(11, 11),
-            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        });
-        price.AddChild(UiFactory.CreateLabel(cost.ToString(), 8));
-        detail.AddChild(price);
-        var choices = new VBoxContainer { Name = "LandAction" };
-        choices.AddThemeConstantOverride("separation", 3);
-        detail.AddChild(choices);
-        foreach (var statId in GameRules.StatIds)
-        {
-            var capturedStatId = statId;
-            var capturedId = module.Id;
-            var choice = UiFactory.CreateButton(StatPresentationCatalog.NameFor(statId).ToUpperInvariant());
-            choice.CustomMinimumSize = new Vector2(152, 24);
-            UiFactory.ApplyPixelFont(choice, 7);
-            choice.AddThemeColorOverride("font_color", PaperCard.Ink(StatPresentationCatalog.ColorFor(statId)));
-            choice.Disabled = _session.State.Coins < cost;
-            choice.Pressed += () =>
-            {
-                if (_session.ConvertHexToTrainingGround(capturedId, capturedStatId))
-                    CallDeferred(nameof(ShowGardenModules));
-            };
-            choices.AddChild(choice);
-        }
+        var actions = new VBoxContainer { Name = "LandAction" };
+        actions.AddThemeConstantOverride("separation", 3);
+        detail.AddChild(actions);
+        AddBiomeTileActions(actions, module, 152, () => CallDeferred(nameof(ShowGardenModules)));
     }
 
     /// <summary>The selected hex uses the same non-blocking right inspector slot as a Voidling.</summary>
@@ -235,19 +174,23 @@ public partial class MainController
         _garden.StopFollowing();
         RebuildDetailsPanel();
 
-        var trainingGround = module.StatId.Length > 0;
-        var inspector = UiFactory.CreatePanel(new Vector2(162, 210));
+        var biome = module.BiomeId.Length > 0;
+        var inspector = UiFactory.CreatePanel(new Vector2(162, 230));
         inspector.Name = "LandInspector";
         inspector.Position = new Vector2(468, 82);
-        inspector.Size = new Vector2(162, 210);
+        inspector.Size = new Vector2(162, 230);
         inspector.ZIndex = 18;
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 5);
         inspector.AddChild(box);
 
         var heading = new HBoxContainer();
-        var title = UiFactory.CreateLabel(Tr(trainingGround ? "UI_LAND_HEX_TITLE" : "UI_LAND_HEX_EMPTY_TITLE"), 9);
+        var title = UiFactory.CreateLabel(biome
+            ? BiomePresentationCatalog.NameFor(module.BiomeId)
+            : Tr("UI_LAND_HEX_EMPTY_TITLE"), 9);
         title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        if (biome)
+            title.AddThemeColorOverride("font_color", BiomePresentationCatalog.ColorFor(module.BiomeId).Darkened(0.35f));
         heading.AddChild(title);
         var close = UiFactory.CreateButton("×");
         close.Name = "CloseLandInspector";
@@ -256,46 +199,24 @@ public partial class MainController
         heading.AddChild(close);
         box.AddChild(heading);
 
-        if (!trainingGround)
+        if (!biome)
         {
-            var cost = GameRules.GardenModuleRules.TrainingConversionCost;
-            var intro = UiFactory.CreateLabel(string.Format(Tr("UI_LAND_BUILD_PROMPT"), cost), 7);
+            var intro = UiFactory.CreateLabel(string.Format(Tr("UI_LAND_BUILD_PROMPT"), GameRules.GardenModuleRules.BiomeTilePrice), 7);
             intro.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             intro.CustomMinimumSize = new Vector2(138, 42);
             box.AddChild(intro);
-
-            var grid = new GridContainer { Columns = 2 };
-            grid.AddThemeConstantOverride("h_separation", 4);
-            grid.AddThemeConstantOverride("v_separation", 4);
-            box.AddChild(grid);
-
-            foreach (var statId in GameRules.StatIds)
-            {
-                var capturedStatId = statId;
-                var button = UiFactory.CreateButton(StatPresentationCatalog.NameFor(statId).ToUpperInvariant());
-                button.CustomMinimumSize = new Vector2(67, 28);
-                UiFactory.ApplyPixelFont(button, 7);
-                button.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(statId).Darkened(0.4f));
-                button.Disabled = _session.State.Coins < cost;
-                button.Pressed += () =>
-                {
-                    if (_session.ConvertHexToTrainingGround(moduleId, capturedStatId))
-                        CallDeferred(nameof(ShowLandHexMenu), moduleId);
-                };
-                grid.AddChild(button);
-            }
         }
         else
         {
+            box.AddChild(PaperCard.StarRating(module.Level, _session.BiomeTileMaxStars, 13.0f));
             var rate = GameRules.GardenModuleRules.PointsPerMinuteForLevel(module.Level);
             var residents = _session.State.Voidlings
                 .Where(creature => string.Equals(creature.PassiveTrainingModuleId, moduleId, StringComparison.Ordinal))
                 .Select(creature => creature.Name)
                 .ToList();
             var detail = UiFactory.CreateLabel(
-                $"{StatPresentationCatalog.NameFor(module.StatId).ToUpperInvariant()}  •  L{module.Level}\n{rate:0.#}/min",
-                8);
-            detail.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(module.StatId));
+                string.Format(Tr("UI_LAND_BIOME_TRAINS"), StatPresentationCatalog.NameFor(module.StatId), rate.ToString("0.#")), 7);
+            detail.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(module.StatId).Darkened(0.4f));
             box.AddChild(detail);
             var occupancy = UiFactory.CreateLabel(
                 residents.Count > 0
@@ -303,24 +224,90 @@ public partial class MainController
                     : Tr("UI_LAND_HEX_VACANT"),
                 7);
             occupancy.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-            occupancy.CustomMinimumSize = new Vector2(138, 42);
+            occupancy.CustomMinimumSize = new Vector2(138, 30);
             box.AddChild(occupancy);
-            var upgradeCost = GameRules.GardenModuleRules.UpgradeCostForLevel(module.Level);
-            var upgrade = UiFactory.CreateButton(
-                upgradeCost < 0 ? Tr("UI_LAND_MAX_LEVEL") : string.Format(Tr("UI_LAND_UPGRADE"), upgradeCost));
-            upgrade.CustomMinimumSize = new Vector2(138, 28);
-            UiFactory.ApplyPixelFont(upgrade, 7);
-            upgrade.Disabled = upgradeCost < 0 || _session.State.Coins < upgradeCost;
-            upgrade.Pressed += () =>
-            {
-                if (_session.UpgradeGardenModule(moduleId))
-                    CallDeferred(nameof(ShowLandHexMenu), moduleId);
-            };
-            box.AddChild(upgrade);
         }
 
+        AddBiomeTileActions(box, module, 138, () => CallDeferred(nameof(ShowLandHexMenu), moduleId));
         _landInspector = inspector;
         _uiRoot.AddChild(inspector);
+    }
+
+    /// <summary>
+    /// What a hex can do with biome tiles. Plain ground: build any biome for the tile price, or put
+    /// down a tile you own. A biome: stack a matching tile on top for the next star, or pick the tile
+    /// back up (four-star tiles stay put).
+    /// </summary>
+    private void AddBiomeTileActions(VBoxContainer box, GardenModuleData module, float width, Action refresh)
+    {
+        var moduleId = module.Id;
+        if (module.BiomeId.Length == 0)
+        {
+            var price = GameRules.GardenModuleRules.BiomeTilePrice;
+            var grid = new GridContainer { Columns = 2, Name = "BuildBiome" };
+            grid.AddThemeConstantOverride("h_separation", 4);
+            grid.AddThemeConstantOverride("v_separation", 3);
+            box.AddChild(grid);
+            foreach (var definition in BiomeCatalog.Biomes)
+            {
+                var biomeId = definition.Id;
+                var build = UiFactory.CreateButton(BiomePresentationCatalog.NameFor(biomeId).ToUpperInvariant());
+                build.Name = "Build_" + biomeId;
+                build.TooltipText = string.Format(Tr("UI_LAND_BUILD_BIOME_TOOLTIP"),
+                    BiomePresentationCatalog.NameFor(biomeId), StatPresentationCatalog.NameFor(definition.StatId), price);
+                build.CustomMinimumSize = new Vector2((width - 4) / 2, 24);
+                UiFactory.ApplyPixelFont(build, 6);
+                build.AddThemeColorOverride("font_color", BiomePresentationCatalog.ColorFor(biomeId).Darkened(0.45f));
+                build.Disabled = _session.State.Coins < price;
+                build.Pressed += () => { if (_session.BuildBiome(moduleId, biomeId)) refresh(); };
+                grid.AddChild(build);
+            }
+
+            foreach (var stack in _session.State.BiomeTiles.Where(stack => stack.Count > 0)
+                         .OrderBy(stack => stack.BiomeId, StringComparer.Ordinal).ThenBy(stack => stack.Stars).Take(3))
+            {
+                var biomeId = stack.BiomeId;
+                var stars = stack.Stars;
+                var place = UiFactory.CreateButton(string.Format(Tr("UI_LAND_PLACE_TILE"),
+                    BiomePresentationCatalog.NameFor(biomeId).ToUpperInvariant(), stars, stack.Count));
+                place.Name = $"PlaceTile_{biomeId}_{stars}";
+                place.CustomMinimumSize = new Vector2(width, 22);
+                UiFactory.ApplyPixelFont(place, 6);
+                place.Pressed += () => { if (_session.PlaceBiomeTile(moduleId, biomeId, stars)) refresh(); };
+                box.AddChild(place);
+            }
+            return;
+        }
+
+        var baseBiome = BiomeCatalog.BaseOf(module.BiomeId);
+        var maxStars = _session.BiomeTileMaxStars;
+        if (module.Level < maxStars)
+        {
+            var owned = BiomeTileUseCase.OwnedCount(_session.State, baseBiome, module.Level);
+            var stack = UiFactory.CreateButton(string.Format(Tr("UI_LAND_STACK_TILE"), module.Level, owned));
+            stack.Name = "StackTile";
+            stack.TooltipText = Tr("UI_LAND_STACK_TOOLTIP");
+            stack.CustomMinimumSize = new Vector2(width, 26);
+            UiFactory.ApplyPrimaryStyle(stack);
+            stack.Disabled = owned <= 0;
+            var stars = module.Level;
+            stack.Pressed += () => { if (_session.PlaceBiomeTile(moduleId, baseBiome, stars)) refresh(); };
+            box.AddChild(stack);
+
+            var pickUp = UiFactory.CreateButton(Tr("UI_LAND_PICK_UP_TILE"));
+            pickUp.Name = "PickUpTile";
+            pickUp.CustomMinimumSize = new Vector2(width, 22);
+            UiFactory.ApplyPixelFont(pickUp, 6);
+            pickUp.Pressed += () => { if (_session.PickUpBiomeTile(moduleId)) refresh(); };
+            box.AddChild(pickUp);
+        }
+        else
+        {
+            var top = UiFactory.CreateLabel(Tr("UI_LAND_TOP_STAR"), 6);
+            top.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            top.CustomMinimumSize = new Vector2(width, 20);
+            box.AddChild(top);
+        }
     }
 
     /// <summary>

@@ -106,27 +106,29 @@ public sealed class GardenLandTests
     }
 
     [Fact]
-    public void PlainGroundTrainsNobodyUntilTrainingGroundIsBuiltOnIt()
+    public void PlainGroundTrainsNobodyUntilABiomeIsBuiltOnIt()
     {
         var (training, state, creature) = CreateGarden(coins: 500);
+        var tiles = new BiomeTileUseCase(Rules);
 
         var refused = training.SetPassiveTrainingLand(state, creature.Id, TrainingUseCase.StarterHexId);
         Assert.Equal(PassiveTrainingFailure.LandNotTrainingGround, refused.Failure);
 
-        var built = training.ConvertHexToTrainingGround(state, TrainingUseCase.StarterHexId, "swim");
+        var built = tiles.BuildBiome(state, TrainingUseCase.StarterHexId, BiomeCatalog.Water);
         Assert.True(built.Succeeded);
-        Assert.Equal(500 - Rules.GardenModules.TrainingConversionCost, state.Coins);
+        Assert.Equal(500 - Rules.GardenModules.BiomeTilePrice, state.Coins);
         Assert.Equal(
-            GardenModuleFailure.AlreadyTrainingGround,
-            training.ConvertHexToTrainingGround(state, TrainingUseCase.StarterHexId, "run").Failure);
+            BiomeTileFailure.TileDoesNotMatch,
+            tiles.BuildBiome(state, TrainingUseCase.StarterHexId, BiomeCatalog.Plains).Failure);
 
         var assignment = training.SetPassiveTrainingLand(state, creature.Id, TrainingUseCase.StarterHexId);
         Assert.True(assignment.Succeeded);
         Assert.Equal("swim", creature.PassiveTrainingStatId);
         Assert.Equal(Rules.GardenModules.PointsPerMinuteForLevel(1), creature.PassiveTrainingPointsPerMinute);
 
-        // Upgrading the ground the creature trains on speeds it up without re-dropping it.
-        Assert.True(training.UpgradeGardenModule(state, TrainingUseCase.StarterHexId).Succeeded);
+        // Stacking a matching tile on the ground the creature trains on speeds it up without re-dropping it.
+        Assert.True(tiles.BuyBiomeTile(state, BiomeCatalog.Water).Succeeded);
+        Assert.True(tiles.PlaceBiomeTile(state, TrainingUseCase.StarterHexId, BiomeCatalog.Water, 1).Stacked);
         Assert.Equal(Rules.GardenModules.PointsPerMinuteForLevel(2), creature.PassiveTrainingPointsPerMinute);
 
         Assert.True(training.StopPassiveTraining(state, creature.Id).Changed);
@@ -135,13 +137,13 @@ public sealed class GardenLandTests
     }
 
     [Fact]
-    public void PlainGroundCannotBeUpgraded()
+    public void PlainGroundHasNoTileToPickUp()
     {
-        var (training, state, _) = CreateGarden(coins: 500);
+        var (_, state, _) = CreateGarden(coins: 500);
 
         Assert.Equal(
-            GardenModuleFailure.NotTrainingGround,
-            training.UpgradeGardenModule(state, TrainingUseCase.StarterHexId).Failure);
+            BiomeTileFailure.NotBiome,
+            new BiomeTileUseCase(Rules).PickUpBiomeTile(state, TrainingUseCase.StarterHexId).Failure);
         Assert.Equal(500, state.Coins);
     }
 
@@ -151,7 +153,7 @@ public sealed class GardenLandTests
         var (training, state, first) = CreateGarden(coins: 500);
         var second = CreateAdult("second", 9UL);
         state.Voidlings.Add(second);
-        training.ConvertHexToTrainingGround(state, TrainingUseCase.StarterHexId, "run");
+        new BiomeTileUseCase(Rules).BuildBiome(state, TrainingUseCase.StarterHexId, BiomeCatalog.Plains);
 
         Assert.True(training.SetPassiveTrainingLand(state, first.Id, TrainingUseCase.StarterHexId).Succeeded);
         Assert.False(training.HasRoomFor(state, TrainingUseCase.StarterHexId, second.Id));

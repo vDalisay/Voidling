@@ -243,9 +243,11 @@ public sealed class GameStateMigrationService
             module.Id = module.Id.Trim();
             if (!ids.Add(module.Id)) continue;
             module.StatId ??= string.Empty;
+            module.BiomeId ??= string.Empty;
             // Blank is plain ground now; anything that is neither blank nor a real stat is junk.
             if (module.StatId.Length > 0 && !_rules.Genetics.StatIds.Contains(module.StatId)) continue;
             module.Level = Math.Clamp(module.Level, 1, maxLevel);
+            NormalizeBiome(module);
             module.SlotIndex = -1;
             if (GardenTileShape.Find(module.ShapeId ?? string.Empty) == null)
                 module.ShapeId = GardenTileShape.Single.Id;
@@ -266,6 +268,49 @@ public sealed class GameStateMigrationService
         }
         state.GardenModules = normalized;
         TrainingUseCase.EnsureStarterHex(state);
+        NormalizeBiomeTiles(state, maxLevel);
+    }
+
+    /// <summary>
+    /// Version 23 names every training hex by biome. Older hexes carry only a stat, so the biome that
+    /// trains it is derived (run → plains, swim → water, …); the stat stays cached from the biome.
+    /// </summary>
+    private static void NormalizeBiome(GardenModuleData module)
+    {
+        var baseBiome = BiomeCatalog.IsKnown(module.BiomeId)
+            ? BiomeCatalog.BaseOf(module.BiomeId)
+            : BiomeCatalog.BiomeForStat(module.StatId);
+        if (baseBiome.Length == 0)
+        {
+            module.BiomeId = string.Empty;
+            module.StatId = string.Empty;
+            module.Level = 1;
+            module.SpecialVariantHatched = false;
+            return;
+        }
+
+        module.BiomeId = BiomeCatalog.IdAtStars(baseBiome, module.Level);
+        module.StatId = BiomeCatalog.StatOf(baseBiome);
+        if (string.Equals(module.BiomeId, baseBiome, StringComparison.Ordinal))
+            module.SpecialVariantHatched = false;
+    }
+
+    /// <summary>Inventory tile stacks: known biomes, real star counts, one stack per biome and star.</summary>
+    private static void NormalizeBiomeTiles(GameStateData state, int maxLevel)
+    {
+        state.BiomeTiles = state.BiomeTiles
+            .Where(stack => stack != null && BiomeCatalog.FindBase(stack.BiomeId) != null &&
+                            stack.Stars >= 1 && stack.Stars <= maxLevel && stack.Count > 0)
+            .GroupBy(stack => (stack.BiomeId, stack.Stars))
+            .Select(group => new BiomeTileStackData
+            {
+                BiomeId = group.Key.BiomeId,
+                Stars = group.Key.Stars,
+                Count = (int)Math.Min(int.MaxValue, group.Sum(stack => (long)stack.Count))
+            })
+            .OrderBy(stack => stack.BiomeId, StringComparer.Ordinal)
+            .ThenBy(stack => stack.Stars)
+            .ToList();
     }
 
     private void NormalizePassiveModuleAssignment(GameStateData state, VoidlingData creature)

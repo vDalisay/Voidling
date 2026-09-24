@@ -62,12 +62,27 @@ public partial class MainController : Node
                 Price: GameRules.GardenModuleRules.EmptyHexCost * shape.HexCount))
             .ToArray();
 
+        var biomeTiles = BiomeCatalog.Biomes
+            .Select(biome => new ShopBiomeTileViewState(
+                BiomeId: biome.Id,
+                DisplayName: string.Format(Tr("UI_SHOP_BIOME_TILE"), BiomePresentationCatalog.NameFor(biome.Id)),
+                TrainsText: string.Format(Tr("UI_SHOP_BIOME_TRAINS"), StatPresentationCatalog.NameFor(biome.StatId)),
+                Tint: BiomePresentationCatalog.ColorFor(biome.Id),
+                Owned: state.BiomeTiles
+                    .Where(stack => string.Equals(stack.BiomeId, biome.Id, StringComparison.Ordinal) && stack.Stars == 1)
+                    .Sum(stack => stack.Count),
+                Price: GameRules.GardenModuleRules.BiomeTilePrice))
+            .ToArray();
+
         var box = OpenRailModal(Tr("UI_SHOP_TITLE"), new Vector2(520, 344),
             panelTint: new Color(232f / 220f, 207f / 224f, 166f / 210f));
         box.AddThemeConstantOverride("separation", 4);
 
         var screen = new ShopScreen();
-        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rareOffer, landPieces), _shopCategory, _shopSelection);
+        screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rareOffer, landPieces)
+        {
+            BiomeTiles = biomeTiles
+        }, _shopCategory, _shopSelection);
         screen.SelectionChanged += (category, selection) =>
         {
             _shopCategory = category;
@@ -94,6 +109,11 @@ public partial class MainController : Node
                     Tr("UI_SHOP_EGG_BOUGHT"));
             }
 
+            RenderShop();
+        };
+        screen.BiomeTilePurchaseRequested += biomeId =>
+        {
+            _session.BuyBiomeTile(biomeId);
             RenderShop();
         };
         screen.RareOfferPurchaseRequested += itemId =>

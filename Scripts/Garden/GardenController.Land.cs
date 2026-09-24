@@ -277,7 +277,7 @@ public partial class GardenController
         var signature = string.Join(
             "|",
             placed.OrderBy(module => module.Id, StringComparer.Ordinal)
-                .Select(module => $"{module.Id}:{module.HexQ},{module.HexR}:{module.StatId}:{module.Level}"));
+                .Select(module => $"{module.Id}:{module.HexQ},{module.HexR}:{module.BiomeId}:{module.Level}"));
         if (signature == _landSignature && _landVisuals.Count > 0)
             return false;
 
@@ -321,14 +321,14 @@ public partial class GardenController
 
     private LandVisual BuildHexVisual(GardenModuleData module)
     {
-        var trainingGround = module.StatId.Length > 0;
-        var identity = trainingGround ? StatPresentationCatalog.ColorFor(module.StatId) : GrassEdge;
+        var trainingGround = module.BiomeId.Length > 0;
+        var identity = trainingGround ? BiomePresentationCatalog.ColorFor(module.BiomeId) : GrassEdge;
         var (x, y) = Hex.CenterOf(module.HexQ, module.HexR);
         var holder = new Node2D { Position = new Vector2(x, y), ZIndex = -4 };
 
-        // Training ground wears its stat as a wash over the grass so it reads at a glance. The wash
-        // is a modulate on the ground itself, never a polygon over the hex: an overlay would also
-        // paint every Voidling standing on it.
+        // A biome wears its colour as a wash over the grass so it reads at a glance, until biome
+        // ground art replaces it. The wash is a modulate on the ground itself, never a polygon over
+        // the hex: an overlay would also paint every Voidling standing on it.
         var idleTint = trainingGround ? Colors.White.Lerp(identity, 0.30f) : Colors.White;
         var ground = new Node2D { Modulate = idleTint };
         ground.AddChild(CreateGroundFill(new Vector2(x, y)));
@@ -523,10 +523,10 @@ public partial class GardenController
         _treeTrunks.Add(trunk);
     }
 
-    /// <summary>A premium signboard names what the ground trains, and its level once upgraded.</summary>
+    /// <summary>A premium signboard names the biome, and its stars once stacked.</summary>
     private static void AddTrainingSign(Node2D holder, GardenModuleData module)
     {
-        var color = StatPresentationCatalog.ColorFor(module.StatId);
+        var color = BiomePresentationCatalog.ColorFor(module.BiomeId);
         var sign = new Sprite2D
         {
             Texture = SignTexture,
@@ -536,9 +536,8 @@ public partial class GardenController
         };
         holder.AddChild(sign);
 
-        var caption = module.Level > 1
-            ? $"{StatPresentationCatalog.NameFor(module.StatId).ToUpperInvariant()} L{module.Level}"
-            : StatPresentationCatalog.NameFor(module.StatId).ToUpperInvariant();
+        var name = BiomePresentationCatalog.NameFor(module.BiomeId).ToUpperInvariant();
+        var caption = module.Level > 1 ? $"{name} L{module.Level}" : name;
         var label = UiFactory.CreateLabel(caption, 6);
         label.Position = new Vector2(-46.0f, sign.Position.Y - 6.0f);
         label.CustomMinimumSize = new Vector2(92.0f, 12.0f);

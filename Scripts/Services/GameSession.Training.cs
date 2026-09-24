@@ -155,35 +155,6 @@ public partial class GameSession
         return true;
     }
 
-    /// <summary>Builds training ground for one stat on a placed empty hex.</summary>
-    public bool ConvertHexToTrainingGround(string moduleId, string statId)
-    {
-        var result = _training!.ConvertHexToTrainingGround(State, moduleId, statId);
-        if (!result.Succeeded)
-        {
-            ToastRequested?.Invoke(PlayerActionFailureText.ForGardenModule(result.Failure));
-            return false;
-        }
-
-        var message = $"Built {DisplayStatId(statId)} training ground.";
-        SaveAndNotify(message);
-        RaiseGardenEvent(message);
-        return true;
-    }
-
-    public bool UpgradeGardenModule(string moduleId)
-    {
-        var result = _training!.UpgradeGardenModule(State, moduleId);
-        if (!result.Succeeded)
-        {
-            ToastRequested?.Invoke(PlayerActionFailureText.ForGardenModule(result.Failure));
-            return false;
-        }
-
-        var module = State.GardenModules.Find(candidate => candidate.Id == moduleId);
-        SaveAndNotify($"Upgraded {DisplayStatId(module?.StatId ?? string.Empty)} module to level {module?.Level ?? 1}.");
-        return true;
-    }
 
     /// <summary>Drops a Voidling onto a placed land tile so it trains that tile's stat.</summary>
     public bool SetPassiveTrainingLand(string creatureId, string moduleId)
