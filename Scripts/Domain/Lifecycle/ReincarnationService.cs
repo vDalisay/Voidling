@@ -1,8 +1,8 @@
 using System;
-using System.Linq;
 using Voidling.Domain.Care;
 using Voidling.Domain.Evolution;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Stats;
 using VoidlingGame;
 
 namespace Voidling.Domain.Lifecycle;
@@ -24,6 +24,8 @@ public readonly record struct LifecycleEndDecision(
 /// </summary>
 public sealed class ReincarnationService
 {
+    private readonly StatProgressionService _stats = new();
+
     public LifecycleEndDecision Decide(VoidlingData creature, ReincarnationRules rules)
     {
         ArgumentNullException.ThrowIfNull(creature);
@@ -35,17 +37,17 @@ public sealed class ReincarnationService
             happiness);
     }
 
-    public void ApplyReincarnation(VoidlingData creature, ReincarnationRules rules)
+    /// <summary>
+    /// Starts a new life: a baby again, every stat back to level 1 keeping a share of its points
+    /// (Chao Garden), and hidden care state reset.
+    /// </summary>
+    public void ApplyReincarnation(VoidlingData creature, ReincarnationRules rules, StatGrowthRules statRules)
     {
         ArgumentNullException.ThrowIfNull(creature);
         ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(statRules);
 
-        var retainedFraction = Math.Clamp(rules.RetainedTrainingFraction, 0.0f, 1.0f);
-        foreach (var statId in creature.TrainingPoints.Keys.ToArray())
-        {
-            var current = Math.Max(0, creature.TrainingPoints[statId]);
-            creature.TrainingPoints[statId] = (int)Math.Floor(current * retainedFraction);
-        }
+        _stats.ApplyReincarnation(creature, rules.RetainedPointFraction, statRules);
 
         creature.Stage = LifeStage.Child;
         creature.AgeSeconds = 0.0f;
@@ -57,6 +59,9 @@ public sealed class ReincarnationService
         creature.RunPowerInfluence = 0.0f;
         creature.EvolutionSpecialization = EvolutionSpecialization.None;
         creature.EvolutionMagnitude = 0.0f;
+        // A baby again: the adult form is chosen afresh at the next adulthood.
+        creature.Appearance ??= new VoidlingAppearanceData();
+        creature.Appearance.VisualTypeId = EvolutionService.BabyVisualTypeId;
         creature.Needs = new CreatureNeedsState();
     }
 }

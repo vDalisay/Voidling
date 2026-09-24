@@ -23,6 +23,11 @@ public static class VoidlingVisualFactory
     private static readonly VoidlingVisualCatalog Catalog = LoadCatalog();
     private static readonly IReadOnlyDictionary<string, VoidlingVisualDefinition> Definitions =
         BuildDefinitionMap(Catalog);
+    private static readonly HashSet<string> AuthoredColorTypes = new(
+        (Catalog.AuthoredColorVisualTypeIds ?? Array.Empty<string>())
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim()),
+        StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<string, SpriteFrames> WorldFrames = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, SpriteFrames> RaceFrames = new(StringComparer.Ordinal);
     private static readonly Shader PaletteShader = GD.Load<Shader>(PaletteShaderPath)
@@ -42,6 +47,13 @@ public static class VoidlingVisualFactory
     public static float MutationCompactCenterYOffset => DefaultDefinition.MutationCompactCenterYOffset;
     public static float MutationCompactScaleThreshold => DefaultDefinition.MutationCompactScaleThreshold;
     public static float PortraitMutationCompactPixelThreshold => DefaultDefinition.PortraitMutationCompactPixelThreshold;
+
+    /// <summary>
+    /// True for visual types drawn in the artist's own colors (Neutral adults, special variants).
+    /// Color DNA still travels with those Voidlings; it is only not shown.
+    /// </summary>
+    public static bool UsesAuthoredColors(string? visualTypeId)
+        => !string.IsNullOrWhiteSpace(visualTypeId) && AuthoredColorTypes.Contains(visualTypeId.Trim());
 
     public static VoidlingVisualDefinition ResolveDefinition(string? visualTypeId)
     {
@@ -169,6 +181,7 @@ public static class VoidlingVisualFactory
         bool race)
     {
         ArgumentNullException.ThrowIfNull(sprite);
+        appearance = ForRendering(appearance);
         var definition = ResolveDefinition(appearance.VisualTypeId);
         sprite.SpriteFrames = race ? GetRaceFrames(definition.DefinitionId) : GetWorldFrames(definition.DefinitionId);
         ApplyPaletteOrFallback(
@@ -237,6 +250,7 @@ public static class VoidlingVisualFactory
         VoidlingVisualLayerDefinition layer,
         VoidlingVisualAppearance appearance)
     {
+        appearance = ForRendering(appearance);
         if (!layer.PaletteAffected)
         {
             item.Material = null;
@@ -254,6 +268,16 @@ public static class VoidlingVisualFactory
             definition.PaletteMatchTolerance,
             appearance.FallbackTintHex);
     }
+
+    /// <summary>Authored-color types render the sheet exactly as drawn: no palette swap, no tint.</summary>
+    private static VoidlingVisualAppearance ForRendering(VoidlingVisualAppearance appearance)
+        => UsesAuthoredColors(appearance.VisualTypeId)
+            ? appearance with
+            {
+                PaletteHue = VoidlingAppearanceData.LegacyUninitializedPaletteHue,
+                FallbackTintHex = "#FFFFFF"
+            }
+            : appearance;
 
     private static VoidlingVisualCatalog LoadCatalog()
     {

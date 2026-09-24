@@ -97,22 +97,20 @@ public sealed record GardenModuleRules(
     }
 }
 
-public sealed record RankTrainingCaps(int E, int D, int C, int B, int A, int S)
+/// <summary>
+/// Chao Garden stat growth. Every stat levels 0..<see cref="MaxLevel"/> whatever its rank; training
+/// fills <see cref="ProgressPerLevel"/> steps per level, and a level-up adds
+/// <c>PointsPerLevelPerRank × rank + PointsPerLevelBase + random(1..PointsPerLevelRandomMax)</c>
+/// stat points, capped at <see cref="PointCap"/>. Races read the points.
+/// </summary>
+public sealed record StatGrowthRules(int ProgressPerLevel, int MaxLevel, int PointCap)
 {
-    public int ForRank(int rank) => rank switch
-    {
-        <= 0 => E,
-        1 => D,
-        2 => C,
-        3 => B,
-        4 => A,
-        _ => S
-    };
-}
+    public int PointsPerLevelBase { get; init; } = 11;
+    public int PointsPerLevelPerRank { get; init; } = 3;
+    public int PointsPerLevelRandomMax { get; init; } = 5;
 
-public sealed record StatGrowthRules(int TrainingPointsPerLevel, int MaxLevel, int MaxTrainingPoints)
-{
-    public RankTrainingCaps RankCaps { get; init; } = new(E: 20, D: 40, C: 60, B: 80, A: 100, S: 120);
+    /// <summary>The level every stat returns to on reincarnation (Chao Garden: 1, not 0).</summary>
+    public int ReincarnationLevel { get; init; } = 1;
 }
 
 public sealed record PassiveTrainingRules(float PointsPerMinute);
@@ -125,7 +123,8 @@ public sealed record ReincarnationRules(
     float AdultLifespanSeconds,
     // Hidden happiness is the only reincarnation condition: at or above this a Voidling reincarnates.
     float MinimumHappiness,
-    float RetainedTrainingFraction)
+    // Share of each stat's points a Voidling keeps when it reincarnates.
+    float RetainedPointFraction)
 {
     /// <summary>
     /// Below this the Garden log warns once that a Voidling needs care. Kept apart from
@@ -159,7 +158,8 @@ public sealed record NeedsRules(
     float TreatNourishmentGain,
     float TreatHappinessGain);
 
-public sealed record EvolutionRules(float SpecializationThreshold);
+/// <summary>The level the highest stat must reach at adulthood to give a typed form instead of Neutral.</summary>
+public sealed record EvolutionRules(int MinimumFormLevel);
 
 /// <summary>
 /// Current race constants. Presentation animation never owns authoritative race results.
@@ -228,11 +228,11 @@ public sealed record GameBalanceRules(
         }));
     public PassiveTrainingRules PassiveTraining { get; init; } = new(PointsPerMinute: 1.0f);
     public FavoriteFoodRules FavoriteFood { get; init; } = new(BonusTrainingPoints: 1);
-    public EvolutionRules Evolution { get; init; } = new(SpecializationThreshold: 0.50f);
+    public EvolutionRules Evolution { get; init; } = new(MinimumFormLevel: 10);
     public ReincarnationRules Reincarnation { get; init; } = new(
         AdultLifespanSeconds: 28800.0f,
         MinimumHappiness: 70.0f,
-        RetainedTrainingFraction: 0.10f);
+        RetainedPointFraction: 0.10f);
     public EconomyRules Economy { get; init; } = new(GardenCoinsPerMinute: 1.0f);
     public NeedsRules Needs { get; init; } = new(
         HungerGainPerMinute: 0.75f,
@@ -273,7 +273,7 @@ public sealed record GameBalanceRules(
             CooldownSeconds: 8.0f,
             HatchFailurePercentByBurden: Array.AsReadOnly(new[] { 0, 20, 50, 80, 100 })),
         Hatching: new HatchingRules(IncubationSeconds: 22.0f),
-        Stats: new StatGrowthRules(TrainingPointsPerLevel: 12, MaxLevel: 99, MaxTrainingPoints: 120),
+        Stats: new StatGrowthRules(ProgressPerLevel: 10, MaxLevel: 99, PointCap: 3266),
         Lifecycle: new LifecycleRules(ChildToAdultSeconds: 5400.0f),
         Shop: new ShopRules(StoreEggPrice: 30, TrainingItemPrice: 8, EggShellSalePrice: 5),
         Racing: new RaceRules(

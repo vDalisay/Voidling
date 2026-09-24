@@ -1,9 +1,16 @@
 using System;
+using System.Collections.Generic;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Shared;
+using Voidling.Domain.Stats;
 using VoidlingGame;
 
 namespace Voidling.Domain.Evolution;
 
+/// <summary>
+/// The adult form a baby grows into. <see cref="Generalist"/> is the Neutral form; the name is kept
+/// because the value is persisted.
+/// </summary>
 public enum EvolutionSpecialization
 {
     None,
@@ -18,86 +25,87 @@ public readonly record struct EvolutionResult(
     EvolutionSpecialization Specialization,
     string PromotedStatId,
     int PreviousRank,
-    int NewRank)
+    int NewRank,
+    string DecidingStatId = "",
+    int DecidingLevel = 0)
 {
     public bool Promoted => NewRank > PreviousRank;
 }
 
 /// <summary>
-/// Pure deterministic first-evolution rules. Child training changes hidden raising influence while
-/// inherited ability ranks remain untouched until the Child -> Adult transition explicitly
-/// promotes the currently expressed allele. Presentation art is deliberately not part of this
-/// service so production evolution sprites can be added later through the visual pipeline.
+/// Pure deterministic adulthood rule. At the baby → adult transition the stat with the highest
+/// level decides the form, provided it reached the minimum level; stamina on top, or no stat at the
+/// minimum, makes a Neutral adult. Stats tied for highest are an equal random pick, seeded by the
+/// creature and life so it is reproducible. The winning stat's expressed allele is promoted one rank
+/// (Neutral promotes stamina) and the form sets the semantic visual type.
 /// </summary>
 public static class EvolutionService
 {
-    public static void ApplyTrainingInfluence(
-        VoidlingData creature,
-        string statId,
-        int appliedTrainingPoints,
-        StatGrowthRules statRules)
-    {
-        ArgumentNullException.ThrowIfNull(creature);
-        ArgumentNullException.ThrowIfNull(statRules);
-        if (creature.Stage != LifeStage.Child || appliedTrainingPoints <= 0)
-            return;
+    public const string BabyVisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId;
+    public const string NeutralVisualTypeId = "neutral";
 
-        var delta = appliedTrainingPoints / (float)Math.Max(1, statRules.MaxTrainingPoints);
-        switch (statId)
-        {
-            case "swim":
-                creature.SwimFlyInfluence = Math.Clamp(creature.SwimFlyInfluence - delta, -1.0f, 1.0f);
-                break;
-            case "fly":
-                creature.SwimFlyInfluence = Math.Clamp(creature.SwimFlyInfluence + delta, -1.0f, 1.0f);
-                break;
-            case "run":
-                creature.RunPowerInfluence = Math.Clamp(creature.RunPowerInfluence - delta, -1.0f, 1.0f);
-                break;
-            case "power":
-                creature.RunPowerInfluence = Math.Clamp(creature.RunPowerInfluence + delta, -1.0f, 1.0f);
-                break;
-        }
-    }
+    private static readonly (string StatId, EvolutionSpecialization Form)[] FormStats =
+    {
+        ("run", EvolutionSpecialization.Run),
+        ("swim", EvolutionSpecialization.Swim),
+        ("fly", EvolutionSpecialization.Fly),
+        ("power", EvolutionSpecialization.Power),
+        ("stamina", EvolutionSpecialization.Generalist)
+    };
 
     public static EvolutionResult ResolveFirstEvolution(VoidlingData creature, GameBalanceRules rules)
     {
         ArgumentNullException.ThrowIfNull(creature);
         ArgumentNullException.ThrowIfNull(rules);
 
-        // Existing/loaded adults may already have a resolved semantic form. Never promote twice.
+        // Existing/loaded adults may already have a resolved form. Never promote twice.
         if (creature.EvolutionSpecialization != EvolutionSpecialization.None)
             return new EvolutionResult(creature.EvolutionSpecialization, string.Empty, 0, 0);
 
-        var candidates = new[]
+        var stats = new StatCalculator(rules.Stats);
+        var topLevel = -1;
+        var tied = new List<(string StatId, EvolutionSpecialization Form)>();
+        foreach (var candidate in FormStats)
         {
-            (Specialization: EvolutionSpecialization.Run, StatId: "run", Magnitude: Math.Max(0.0f, -creature.RunPowerInfluence)),
-            (Specialization: EvolutionSpecialization.Swim, StatId: "swim", Magnitude: Math.Max(0.0f, -creature.SwimFlyInfluence)),
-            (Specialization: EvolutionSpecialization.Fly, StatId: "fly", Magnitude: Math.Max(0.0f, creature.SwimFlyInfluence)),
-            (Specialization: EvolutionSpecialization.Power, StatId: "power", Magnitude: Math.Max(0.0f, creature.RunPowerInfluence))
-        };
+            var level = stats.GetLevel(creature, candidate.StatId);
+            if (level > topLevel)
+            {
+                topLevel = level;
+                tied.Clear();
+            }
 
-        var selected = candidates[0];
-        for (var i = 1; i < candidates.Length; i++)
-        {
-            // Strictly greater keeps the array order as a stable deterministic tie-break.
-            if (candidates[i].Magnitude > selected.Magnitude)
-                selected = candidates[i];
+            if (level == topLevel)
+                tied.Add(candidate);
         }
 
-        var threshold = Math.Clamp(rules.Evolution.SpecializationThreshold, 0.0f, 1.0f);
-        var specialization = selected.Magnitude >= threshold
-            ? selected.Specialization
+        var chosen = tied.Count == 1
+            ? tied[0]
+            : tied[StableRandom
+                .Create(0UL, $"adult-form:{creature.Id}:{Math.Max(0, creature.ReincarnationCount)}")
+                .Next(tied.Count)];
+        var specialization = topLevel >= rules.Evolution.MinimumFormLevel
+            ? chosen.Form
             : EvolutionSpecialization.Generalist;
-        var promotedStatId = specialization == EvolutionSpecialization.Generalist
-            ? "stamina"
-            : selected.StatId;
+        var promotedStatId = specialization == EvolutionSpecialization.Generalist ? "stamina" : chosen.StatId;
 
         creature.EvolutionSpecialization = specialization;
-        creature.EvolutionMagnitude = selected.Magnitude;
+        creature.Appearance ??= new VoidlingAppearanceData();
+        creature.Appearance.VisualTypeId = VisualTypeFor(specialization);
 
-        return PromoteExpressedAllele(creature, promotedStatId, rules, specialization);
+        var promotion = PromoteExpressedAllele(creature, promotedStatId, rules, specialization);
+        return promotion with { DecidingStatId = chosen.StatId, DecidingLevel = Math.Max(0, topLevel) };
     }
+
+    /// <summary>The semantic visual type of a form; the art catalog decides what it looks like.</summary>
+    public static string VisualTypeFor(EvolutionSpecialization specialization) => specialization switch
+    {
+        EvolutionSpecialization.Run => "run",
+        EvolutionSpecialization.Swim => "water",
+        EvolutionSpecialization.Fly => "fly",
+        EvolutionSpecialization.Power => "power",
+        EvolutionSpecialization.Generalist => NeutralVisualTypeId,
+        _ => BabyVisualTypeId
+    };
 
     private static EvolutionResult PromoteExpressedAllele(
         VoidlingData creature,

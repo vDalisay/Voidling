@@ -16,7 +16,7 @@ public partial class MainController : Node
         var profile = _session.CreateCreatureProfileProjection(creature.Id)
             ?? throw new InvalidOperationException($"Could not project race-picker data for '{creature.Id}'.");
         var statSummary = string.Join("   ", profile.Stats.Select(stat =>
-            $"{StatPresentationCatalog.NameFor(stat.StatId)} {stat.InheritedRank} {stat.EffectiveValue}"));
+            $"{StatPresentationCatalog.NameFor(stat.StatId)} {stat.InheritedRank} {stat.Points}"));
         var stats = profile.Stats
             .Select(stat => new RacePickerStatViewState(
                 stat.StatId,
@@ -25,7 +25,7 @@ public partial class MainController : Node
                 stat.InheritedRank,
                 stat.TrainingLevel,
                 (float)stat.TrainingProgress,
-                (int)stat.EffectiveValue))
+                stat.Points))
             .ToArray();
 
         return new RacePickerVoidlingViewState(
@@ -50,7 +50,7 @@ public partial class MainController : Node
                 StatPresentationCatalog.ColorFor(stat.StatId),
                 stat.InheritedRank,
                 stat.TrainingLevel,
-                stat.EffectiveValue,
+                stat.Points,
                 stat.TrainingProgress,
                 stat.Dna1Rank,
                 stat.Dna2Rank))

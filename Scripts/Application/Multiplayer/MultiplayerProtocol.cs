@@ -9,7 +9,9 @@ public static class MultiplayerProtocol
     // v2 adds persisted/networked semantic Voidling appearance (body family, palette hue and layer
     // selections). Reject v1 peers at the envelope boundary so an older client cannot deserialize a
     // traded Voidling and silently discard its new appearance state.
-    public const int CurrentVersion = 2;
+    // v3 moves stats to the Chao Garden model (levels 0-99, stat points). Race inputs and traded
+    // Voidlings changed shape, so a v2 peer would race and trade by the old rules.
+    public const int CurrentVersion = 3;
     public const int MaxPacketBytes = 64 * 1024;
 
     public const string HelloMessageType = "hello";

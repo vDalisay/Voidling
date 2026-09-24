@@ -10,8 +10,11 @@ using Voidling.Application.Settings;
 using Voidling.Application.Shop;
 using Voidling.Application.Simulation;
 using Voidling.Application.Training;
+using Voidling.Domain.Evolution;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shop;
+using Voidling.Domain.Stats;
+using Voidling.Presentation.UI.Common;
 
 namespace VoidlingGame;
 
@@ -93,7 +96,8 @@ public partial class GameSession : Node
             switch (simulationEvent)
             {
                 case CreatureBecameAdultEvent adult:
-                    Announce($"{adult.Name} grew into an adult.", true); break;
+                    Announce(string.Format(Tr("LOG_GREW_INTO_FORM"), adult.Name,
+                        VoidlingFormPresentationCatalog.NameFor(EvolutionService.VisualTypeFor(adult.Specialization))), true); break;
                 case CreatureEnteredCocoonEvent cocoon:
                     RaiseGardenEvent(cocoon.WillReincarnate ? $"{cocoon.Name} entered a bright cocoon." : $"{cocoon.Name} entered a fading cocoon.");
                     LifecycleCocoonRequested?.Invoke(cocoon.CreatureId, cocoon.WillReincarnate); break;
@@ -104,7 +108,7 @@ public partial class GameSession : Node
                 case CreatureCareRiskEvent risk:
                     RaiseGardenEvent($"{risk.Name} seems unsettled and needs more care before the end of this life."); break;
                 case CreaturePassiveTrainingCappedEvent capped:
-                    RaiseGardenEvent($"{capped.Name} finished passive {DisplayStatId(capped.StatId)} training at their current DNA cap."); break;
+                    RaiseGardenEvent($"{capped.Name} reached level 99 in {DisplayStatId(capped.StatId)}."); break;
                 case CreatureHatchedEvent hatched:
                     RecordDailyMissionEvent(DailyMissionEventKind.HatchEgg);
                     Announce($"An egg hatched and {hatched.Name} was born!", true); break;
@@ -232,8 +236,11 @@ public partial class GameSession : Node
         return new VoidlingData
         {
             Id = id, Name = name, Genome = genome, Stage = LifeStage.Adult, AgeSeconds = GameRules.ChildToAdultSeconds,
+            // Starters arrive grown up, as Neutral adults.
+            EvolutionSpecialization = EvolutionSpecialization.Generalist,
+            Appearance = new VoidlingAppearanceData { VisualTypeId = EvolutionService.NeutralVisualTypeId },
             TintHex = tint, RareTraits = GeneticsService.RollFounderTraits(seed, id),
-            TrainingPoints = GameRules.StatIds.ToDictionary(stat => stat, _ => 0), WorldX = position.X, WorldY = position.Y
+            Stats = StatProgressionService.CreateNewborn(GameRules.StatIds), WorldX = position.X, WorldY = position.Y
         };
     }
 

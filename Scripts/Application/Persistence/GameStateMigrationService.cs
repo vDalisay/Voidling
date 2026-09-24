@@ -10,6 +10,7 @@ using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Care;
+using Voidling.Domain.Evolution;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Preferences;
 using Voidling.Domain.Rules;
@@ -25,7 +26,7 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 22;
+    public const int CurrentSaveVersion = 23;
 
     /// <summary>Longest island name the header can show without truncating.</summary>
     public const int GardenNameMaxLength = 22;
@@ -34,13 +35,11 @@ public sealed class GameStateMigrationService
     private readonly LineageArchiveService _lineage = new();
     private readonly CreatureNeedsService _needs = new();
     private readonly FavoriteFoodPreferenceService _favoriteFood = new();
-    private readonly StatCalculator _stats;
     private readonly ColorPhenotypeResolver _colors;
 
     public GameStateMigrationService(GameBalanceRules rules)
     {
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
-        _stats = new StatCalculator(_rules.Stats);
         _colors = new ColorPhenotypeResolver(_rules.Appearance);
     }
 
@@ -105,7 +104,7 @@ public sealed class GameStateMigrationService
         }
 
         NormalizeGardenModules(state, previousVersion);
-        foreach (var creature in state.Voidlings.Concat(state.DepartedVoidlings)) NormalizeCreature(state, creature);
+        foreach (var creature in state.Voidlings.Concat(state.DepartedVoidlings)) NormalizeCreature(state, creature, previousVersion);
 
         foreach (var egg in state.OwnedEggs.Concat(state.StoreEggs))
         {
@@ -153,21 +152,30 @@ public sealed class GameStateMigrationService
         state.SaveVersion = CurrentSaveVersion;
     }
 
-    private void NormalizeCreature(GameStateData state, VoidlingData creature)
+    private void NormalizeCreature(GameStateData state, VoidlingData creature, int previousVersion)
     {
         creature.Id ??= string.Empty;
         creature.Name = string.IsNullOrWhiteSpace(creature.Name) ? "Voidling" : creature.Name;
         creature.Genome ??= new GenomeData();
         NormalizeGenome(creature.Genome);
-        creature.TrainingPoints ??= new Dictionary<string, int>(StringComparer.Ordinal);
-        foreach (var statId in _rules.Genetics.StatIds)
-        {
-            if (!creature.TrainingPoints.ContainsKey(statId)) creature.TrainingPoints[statId] = 0;
-            creature.TrainingPoints[statId] = Math.Clamp(creature.TrainingPoints[statId], 0, _stats.GetTrainingPointCap(creature, statId));
-        }
+
+        // Version 23 moved stats to the Chao Garden model (levels 0-99, stat points). The old
+        // rank-capped training points do not translate, so every Voidling keeps its genes, lineage
+        // and everything else but starts its stats again at level 0.
+        if (previousVersion < 23)
+            creature.Stats = StatProgressionService.CreateNewborn(_rules.Genetics.StatIds);
+        StatProgressionService.EnsureStats(creature, _rules.Genetics.StatIds, _rules.Stats);
 
         creature.RareTraits ??= new List<RareTraitData>();
         creature.Appearance = NormalizeAppearance(creature.Genome, creature.Appearance);
+
+        // Adults from before adult forms existed are Neutral: bigger than babies, and the artist's
+        // colors. Babies keep the baby look and pick a form when they grow up.
+        if (previousVersion < 23 && creature.Stage == LifeStage.Adult)
+        {
+            creature.EvolutionSpecialization = EvolutionSpecialization.Generalist;
+            creature.Appearance.VisualTypeId = EvolutionService.NeutralVisualTypeId;
+        }
         creature.Needs ??= new CreatureNeedsState();
         _needs.Normalize(creature.Needs);
         _favoriteFood.Normalize(creature, _rules.Genetics.StatIds);

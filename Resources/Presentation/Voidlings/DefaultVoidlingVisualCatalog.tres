@@ -7,3 +7,4 @@
 script = ExtResource("1_catalog")
 DefaultVisualTypeId = "normal"
 Definitions = Array[Resource]([ExtResource("2_normal")])
+AuthoredColorVisualTypeIds = PackedStringArray("neutral", "swamp-variant")

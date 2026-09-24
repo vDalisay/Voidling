@@ -167,7 +167,8 @@ public partial class GardenInspector : PanelContainer
         }
         if (!_name.HasFocus()) _name.Text = profile.Name;
         _stage.Text = string.Format(Tr(profile.IsAdult ? "UI_PROFILE_ADULT_PERSONALITY" : "UI_PROFILE_CHILD_PERSONALITY"),
-            PersonalityPresentationCatalog.LabelFor(profile.Personality));
+            PersonalityPresentationCatalog.LabelFor(profile.Personality),
+            VoidlingFormPresentationCatalog.NameFor(profile.VisualTypeId));
         _stage.TooltipText = PersonalityPresentationCatalog.FlavorFor(profile.Personality);
         _care.Text = Tr(profile.CareDemeanor == CreatureCareDemeanor.Settled ? "UI_PROFILE_CONTENT" : "UI_PROFILE_RESTLESS");
         _favorite.Visible = !string.IsNullOrEmpty(profile.DiscoveredFavoriteFoodId);

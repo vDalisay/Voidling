@@ -51,7 +51,7 @@ public sealed class DailyFriendRaceServiceTests
         Assert.Equal(4, started.Entry!.Entrants.Count);
         var frozen = started.Attempt.SelectedEntrant.Participant;
 
-        first.TrainingPoints["run"] = Rules.Stats.MaxTrainingPoints;
+        first.Stats["run"] = new StatProgressData { Level = Rules.Stats.MaxLevel, Points = Rules.Stats.PointCap };
         var repeated = service.Begin(state, second.Id, now);
 
         Assert.True(repeated.AlreadyStarted);
@@ -137,7 +137,7 @@ public sealed class DailyFriendRaceServiceTests
             TintHex = "#ABCDEF"
         };
         foreach (var statId in Rules.Genetics.StatIds)
-            creature.TrainingPoints[statId] = 0;
+            creature.Stats[statId] = new StatProgressData();
         return creature;
     }
 }

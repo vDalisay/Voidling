@@ -36,7 +36,7 @@ public static class PlayerActionFailureText
             TrainingFailure.CreatureNotFound => MissingVoidling,
             TrainingFailure.NotEnoughCurrency => "Not enough sprouts.",
             TrainingFailure.NoItemOwned => $"Buy a {statLabel} treat first.",
-            TrainingFailure.StatAtCap => $"That Voidling's {statLabel} training is capped by its current DNA rank.",
+            TrainingFailure.StatAtCap => $"That Voidling's {statLabel} is already at level 99.",
             _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)
         };
 

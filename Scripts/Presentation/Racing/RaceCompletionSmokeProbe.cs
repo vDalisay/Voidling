@@ -5,6 +5,7 @@ using Voidling.Application.Racing;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Racing;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Stats;
 using VoidlingGame;
 
 namespace Voidling.Presentation.Racing;
@@ -49,6 +50,11 @@ public partial class RaceCompletionSmokeProbe : Node
                 Stage = LifeStage.Adult,
                 Genome = new GenomeFactory(rules.Genetics).CreateRandom(4242UL)
             };
+            // A raised racer, not a fresh hatchling: an untrained Chao-style stat has no points, and
+            // the HUD checks below need a stamina bar long enough to carry several chunk marks.
+            var progression = new StatProgressionService();
+            foreach (var statId in rules.Genetics.StatIds)
+                progression.TrainToLevel(racer, statId, 50, rules.Stats);
 
             var entry = new RaceEntryFactory(rules).Create(racer, 4242UL, RaceCourseCatalog.Demo);
             var completedPlacement = 0;

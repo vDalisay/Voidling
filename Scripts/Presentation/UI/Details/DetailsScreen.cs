@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
@@ -11,7 +12,7 @@ public readonly record struct DetailsStatViewState(
     Color IdentityColor,
     string Rank,
     int Level,
-    int EffectiveValue,
+    int Points,
     double Progress,
     string AlleleA,
     string AlleleB);
@@ -127,7 +128,9 @@ public partial class DetailsScreen : VBoxContainer
         header.AddChild(CreatePortrait(state, new Vector2(58, 58)));
         var summary = new VBoxContainer();
         summary.AddThemeConstantOverride("separation", 2);
-        summary.AddChild(UiFactory.CreateLabel(state.IsAdult ? Tr("UI_DETAILS_ADULT") : Tr("UI_DETAILS_CHILD"), 8));
+        summary.AddChild(UiFactory.CreateLabel(state.IsAdult
+            ? string.Format(Tr("UI_DETAILS_ADULT_FORM"), VoidlingFormPresentationCatalog.NameFor(state.Appearance.VisualTypeId).ToUpperInvariant())
+            : Tr("UI_DETAILS_CHILD"), 8));
         summary.AddChild(UiFactory.CreateLabel(Tr("UI_DETAILS_STATS_HINT"), 6));
         header.AddChild(summary);
         _body.AddChild(header);
@@ -237,7 +240,7 @@ public partial class DetailsScreen : VBoxContainer
         row.AddChild(name);
 
         var values = UiFactory.CreateLabel(
-            $"RANK {stat.Rank}   LV {stat.Level:00}   STAT {stat.EffectiveValue:00}", 7);
+            $"RANK {stat.Rank}   LV {stat.Level:00}   STAT {stat.Points:0000}", 7);
         values.CustomMinimumSize = new Vector2(205, 19);
         row.AddChild(values);
 

@@ -5,6 +5,7 @@ using System.Text.Json;
 using Voidling.Application.Breeding;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Stats;
 using VoidlingGame;
 
 namespace Voidling.Application.Multiplayer.Trading;
@@ -383,12 +384,7 @@ public sealed class TradeTransferService
 
     private void NormalizeIncomingCreature(VoidlingData creature)
     {
-        creature.TrainingPoints ??= new Dictionary<string, int>(StringComparer.Ordinal);
-        foreach (var statId in _rules.Genetics.StatIds)
-        {
-            if (!creature.TrainingPoints.ContainsKey(statId))
-                creature.TrainingPoints[statId] = 0;
-        }
+        StatProgressionService.EnsureStats(creature, _rules.Genetics.StatIds, _rules.Stats);
         creature.RareTraits ??= new List<RareTraitData>();
         creature.Appearance ??= new VoidlingAppearanceData();
         creature.Appearance.Normalize();

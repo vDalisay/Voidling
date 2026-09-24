@@ -70,8 +70,8 @@ public sealed class GeneticsArchitectureTests
         var parentB = CreateParent("b", 0, 0);
         foreach (var statId in Rules.Genetics.StatIds)
         {
-            parentA.TrainingPoints[statId] = 10_000;
-            parentB.TrainingPoints[statId] = 10_000;
+            parentA.Stats[statId] = new StatProgressData { Level = 99, Points = 3266 };
+            parentB.Stats[statId] = new StatProgressData { Level = 99, Points = 3266 };
         }
 
         var inheritance = new GenomeInheritanceService(

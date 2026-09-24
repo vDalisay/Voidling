@@ -7,7 +7,8 @@ namespace VoidlingGame;
 public partial class MainController
 {
     private const string DemoCourseLeaderboardId = "demo";
-    private const int DemoCourseLeaderboardRulesVersion = 1;
+    // 2: Chao Garden stats; earlier times were set under the rank-capped stat rules.
+    private const int DemoCourseLeaderboardRulesVersion = 2;
 
     private FriendsLeaderboardPanel? _friendsLeaderboardPanel;
     private int _friendsLeaderboardRequestVersion;

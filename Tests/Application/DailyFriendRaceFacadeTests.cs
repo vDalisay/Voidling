@@ -68,7 +68,7 @@ public sealed class DailyFriendRaceFacadeTests
         Assert.Equal(2, repository.SaveCalls);
         Assert.Equal(2, changed);
         var upload = Assert.Single(leaderboards.Uploads);
-        Assert.Equal("voidling_daily_2026-08-25_v1", upload.Definition.Name);
+        Assert.Equal("voidling_daily_2026-08-25_v2", upload.Definition.Name);
         Assert.Equal(41_250, upload.Score);
         Assert.True(tomorrowStatus.CanStart);
     }
@@ -126,7 +126,7 @@ public sealed class DailyFriendRaceFacadeTests
             TintHex = "#ABCDEF"
         };
         foreach (var statId in Rules.Genetics.StatIds)
-            creature.TrainingPoints[statId] = 0;
+            creature.Stats[statId] = new StatProgressData();
         return creature;
     }
 

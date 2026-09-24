@@ -76,7 +76,7 @@ public partial class GameSession
         if (failure != TrainingFailure.None)
         {
             var failureMessage = failure == TrainingFailure.StatAtCap
-                ? $"{creature.Name}'s {DisplayStatId(statId)} training is capped by its current DNA rank."
+                ? $"{creature.Name}'s {DisplayStatId(statId)} is already at level 99."
                 : PlayerActionFailureText.ForTraining(failure, DisplayStatId(statId));
             ToastRequested?.Invoke(failureMessage);
             return;

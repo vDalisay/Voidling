@@ -39,32 +39,25 @@ public partial class GameBalanceResource : Resource
     public float EggIncubationSeconds { get; set; } = 22.0f;
 
     [ExportGroup("Growth")]
+    /// <summary>Training steps that fill one level's bar (Chao Garden stat growth).</summary>
     [Export(PropertyHint.Range, "1,100,1")]
-    public int TrainingPointsPerLevel { get; set; } = 12;
+    public int StatProgressPerLevel { get; set; } = 10;
 
     [Export(PropertyHint.Range, "1,999,1")]
     public int MaxStatLevel { get; set; } = 99;
 
-    [Export(PropertyHint.Range, "1,10000,1")]
-    public int MaxTrainingPoints { get; set; } = 120;
+    [Export(PropertyHint.Range, "1,99999,1")]
+    public int StatPointCap { get; set; } = 3266;
 
-    [Export(PropertyHint.Range, "0,10000,1")]
-    public int RankETrainingCap { get; set; } = 20;
+    /// <summary>A level-up adds PerRank × rank + Base + random(1..RandomMax) stat points.</summary>
+    [Export(PropertyHint.Range, "0,100,1")]
+    public int StatPointsPerLevelBase { get; set; } = 11;
 
-    [Export(PropertyHint.Range, "0,10000,1")]
-    public int RankDTrainingCap { get; set; } = 40;
+    [Export(PropertyHint.Range, "0,100,1")]
+    public int StatPointsPerLevelPerRank { get; set; } = 3;
 
-    [Export(PropertyHint.Range, "0,10000,1")]
-    public int RankCTrainingCap { get; set; } = 60;
-
-    [Export(PropertyHint.Range, "0,10000,1")]
-    public int RankBTrainingCap { get; set; } = 80;
-
-    [Export(PropertyHint.Range, "0,10000,1")]
-    public int RankATrainingCap { get; set; } = 100;
-
-    [Export(PropertyHint.Range, "0,10000,1")]
-    public int RankSTrainingCap { get; set; } = 120;
+    [Export(PropertyHint.Range, "1,100,1")]
+    public int StatPointsPerLevelRandomMax { get; set; } = 5;
 
     [Export(PropertyHint.Range, "0,60,0.1")]
     public float PassiveTrainingPointsPerMinute { get; set; } = 1.0f;
@@ -105,8 +98,9 @@ public partial class GameBalanceResource : Resource
     public float GardenModuleLevel3PointsPerMinute { get; set; } = 2.0f;
 
     [ExportGroup("Evolution")]
-    [Export(PropertyHint.Range, "0,1,0.01")]
-    public float EvolutionSpecializationThreshold { get; set; } = 0.50f;
+    /// <summary>Level the highest stat needs at adulthood for a typed form; below it the adult is Neutral.</summary>
+    [Export(PropertyHint.Range, "0,99,1")]
+    public int EvolutionMinimumFormLevel { get; set; } = 10;
 
     [ExportGroup("Lifecycle / Reincarnation")]
     [Export(PropertyHint.Range, "30,172800,1")]
@@ -120,7 +114,7 @@ public partial class GameBalanceResource : Resource
     public float CareRiskHappiness { get; set; } = 30.0f;
 
     [Export(PropertyHint.Range, "0,1,0.01")]
-    public float ReincarnationRetainedTrainingFraction { get; set; } = 0.10f;
+    public float ReincarnationRetainedPointFraction { get; set; } = 0.10f;
 
     [ExportGroup("Care / Needs")]
     [Export(PropertyHint.Range, "0,10,0.05")]
@@ -252,7 +246,6 @@ public partial class GameBalanceResource : Resource
     public GameBalanceRules ToDomainRules()
     {
         var defaults = GameBalanceRules.DemoDefaults;
-        var maxTrainingPoints = Math.Max(1, MaxTrainingPoints);
 
         return defaults with
         {
@@ -278,10 +271,12 @@ public partial class GameBalanceResource : Resource
             },
             Stats = defaults.Stats with
             {
-                TrainingPointsPerLevel = Math.Max(1, TrainingPointsPerLevel),
+                ProgressPerLevel = Math.Max(1, StatProgressPerLevel),
                 MaxLevel = Math.Max(1, MaxStatLevel),
-                MaxTrainingPoints = maxTrainingPoints,
-                RankCaps = BuildRankCaps(maxTrainingPoints)
+                PointCap = Math.Max(1, StatPointCap),
+                PointsPerLevelBase = Math.Max(0, StatPointsPerLevelBase),
+                PointsPerLevelPerRank = Math.Max(0, StatPointsPerLevelPerRank),
+                PointsPerLevelRandomMax = Math.Max(1, StatPointsPerLevelRandomMax)
             },
             PassiveTraining = defaults.PassiveTraining with
             {
@@ -317,13 +312,13 @@ public partial class GameBalanceResource : Resource
             },
             Evolution = defaults.Evolution with
             {
-                SpecializationThreshold = ClampFinite(EvolutionSpecializationThreshold, 0.0f, 1.0f, 0.50f)
+                MinimumFormLevel = Math.Clamp(EvolutionMinimumFormLevel, 0, 99)
             },
             Reincarnation = defaults.Reincarnation with
             {
                 AdultLifespanSeconds = Positive(AdultLifespanSeconds, 1.0f),
                 MinimumHappiness = ClampFinite(ReincarnationMinimumHappiness, 0.0f, 100.0f, 70.0f),
-                RetainedTrainingFraction = ClampFinite(ReincarnationRetainedTrainingFraction, 0.0f, 1.0f, 0.10f),
+                RetainedPointFraction = ClampFinite(ReincarnationRetainedPointFraction, 0.0f, 1.0f, 0.10f),
                 CareRiskHappiness = ClampFinite(CareRiskHappiness, 0.0f, 100.0f, 30.0f)
             },
             Needs = defaults.Needs with
@@ -385,17 +380,6 @@ public partial class GameBalanceResource : Resource
                 FullIncubationSkipPrice = Math.Max(0, FullIncubationSkipPrice)
             }
         };
-    }
-
-    private RankTrainingCaps BuildRankCaps(int maxTrainingPoints)
-    {
-        var e = Math.Clamp(RankETrainingCap, 0, maxTrainingPoints);
-        var d = Math.Clamp(Math.Max(e, RankDTrainingCap), 0, maxTrainingPoints);
-        var c = Math.Clamp(Math.Max(d, RankCTrainingCap), 0, maxTrainingPoints);
-        var b = Math.Clamp(Math.Max(c, RankBTrainingCap), 0, maxTrainingPoints);
-        var a = Math.Clamp(Math.Max(b, RankATrainingCap), 0, maxTrainingPoints);
-        var s = Math.Clamp(Math.Max(a, RankSTrainingCap), 0, maxTrainingPoints);
-        return new RankTrainingCaps(e, d, c, b, a, s);
     }
 
     private static double Probability(float value)

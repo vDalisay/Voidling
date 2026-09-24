@@ -26,7 +26,12 @@ public sealed class VoidlingData
     public string Id { get; set; } = "";
     public string Name { get; set; } = "Voidling";
     public GenomeData Genome { get; set; } = new();
-    public Dictionary<string, int> TrainingPoints { get; set; } = new();
+
+    /// <summary>
+    /// Chao-style progress per stat ID: level 0-99, bar progress and stat points. Replaced the
+    /// rank-capped training points in save version 23; older saves start again at level 0.
+    /// </summary>
+    public Dictionary<string, StatProgressData> Stats { get; set; } = new();
     public LifeStage Stage { get; set; } = LifeStage.Child;
     public float AgeSeconds { get; set; }
     public float AdultAgeSeconds { get; set; }
@@ -59,8 +64,12 @@ public sealed class VoidlingData
     public float PassiveTrainingPointsPerMinute { get; set; }
     public double PassiveTrainingPointRemainder { get; set; }
 
+    // Retired hidden raising influence from the first evolution rule. Kept so older saves load;
+    // adulthood now reads stat levels instead.
     public float SwimFlyInfluence { get; set; }
     public float RunPowerInfluence { get; set; }
+
+    /// <summary>The adult form chosen at adulthood; None while a baby, Generalist for Neutral.</summary>
     public EvolutionSpecialization EvolutionSpecialization { get; set; } = EvolutionSpecialization.None;
     public float EvolutionMagnitude { get; set; }
 

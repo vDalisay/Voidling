@@ -6,6 +6,7 @@ using Voidling.Domain.Hatching;
 using Voidling.Domain.Lifecycle;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shop;
+using Voidling.Domain.Stats;
 using Voidling.Domain.Training;
 using VoidlingGame;
 
@@ -133,7 +134,7 @@ public sealed class AdvanceSimulationUseCase
             events.Add(new CreatureEnteredCocoonEvent(creature.Id, creature.Name, willReincarnate));
             if (willReincarnate)
             {
-                _reincarnation.ApplyReincarnation(creature, _rules.Reincarnation);
+                _reincarnation.ApplyReincarnation(creature, _rules.Reincarnation, _rules.Stats);
                 events.Add(new CreatureReincarnatedEvent(creature.Id, creature.Name, creature.ReincarnationCount));
                 changed = true; continue;
             }
@@ -219,7 +220,7 @@ public sealed class AdvanceSimulationUseCase
             TintHex = egg.TintHex, Appearance = appearance, RareTraits = egg.RareTraits,
             Needs = new CreatureNeedsState(), WorldX = egg.WorldX, WorldY = egg.WorldY
         };
-        foreach (var statId in _rules.Genetics.StatIds) creature.TrainingPoints[statId] = 0;
+        creature.Stats = StatProgressionService.CreateNewborn(_rules.Genetics.StatIds);
         state.Voidlings.Add(creature);
         state.EggShells.Add(new EggShellData { Id = egg.Id, Source = egg.Source, TintHex = egg.TintHex });
         state.OwnedEggs.Remove(egg);

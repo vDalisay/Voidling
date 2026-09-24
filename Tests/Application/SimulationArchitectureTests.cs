@@ -137,7 +137,11 @@ public sealed class SimulationArchitectureTests
         Assert.Same(genome, creature.Genome);
         Assert.Equal("a", creature.ParentAId);
         Assert.Equal("b", creature.ParentBId);
-        Assert.All(Rules.Genetics.StatIds, statId => Assert.Equal(0, creature.TrainingPoints[statId]));
+        Assert.All(Rules.Genetics.StatIds, statId =>
+        {
+            Assert.Equal(0, creature.Stats[statId].Level);
+            Assert.Equal(0, creature.Stats[statId].Points);
+        });
         Assert.IsType<CreatureHatchedEvent>(Assert.Single(result.Events));
     }
 

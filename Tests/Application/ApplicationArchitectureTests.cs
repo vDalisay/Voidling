@@ -21,7 +21,7 @@ public sealed class ApplicationArchitectureTests
         {
             Id = "legacy",
             Genome = genome,
-            TrainingPoints = new Dictionary<string, int> { ["run"] = 7 },
+            Stats = new Dictionary<string, StatProgressData> { ["run"] = new() { Level = 7, Points = 90 } },
             RareTraits = null!
         };
         var state = new GameStateData
@@ -42,7 +42,9 @@ public sealed class ApplicationArchitectureTests
         Assert.Equal(1.0f, state.MasterVolume);
         Assert.True(state.AutoFinishRaces);
         Assert.Same(genome, creature.Genome);
-        Assert.Equal(7, creature.TrainingPoints["run"]);
+        // Saves before version 23 keep their Voidlings and genes but restart stats at level 0.
+        Assert.Equal(0, creature.Stats["run"].Level);
+        Assert.Equal(0, creature.Stats["run"].Points);
         Assert.NotNull(creature.RareTraits);
         Assert.Empty(state.DepartedVoidlings);
         Assert.Empty(state.OwnedEggs);
@@ -51,8 +53,27 @@ public sealed class ApplicationArchitectureTests
         foreach (var statId in Rules.Genetics.StatIds)
         {
             Assert.True(state.TrainingItems.ContainsKey(statId));
-            Assert.True(creature.TrainingPoints.ContainsKey(statId));
+            Assert.True(creature.Stats.ContainsKey(statId));
         }
+    }
+
+    [Fact]
+    public void Migration_CurrentSaveKeepsChaoStats()
+    {
+        var creature = new VoidlingData
+        {
+            Id = "current",
+            Stats = new Dictionary<string, StatProgressData> { ["swim"] = new() { Level = 12, Progress = 4, Points = 250 } }
+        };
+        var state = new GameStateData { SaveVersion = GameStateMigrationService.CurrentSaveVersion };
+        state.Voidlings.Add(creature);
+
+        new GameStateMigrationService(Rules).Normalize(state);
+
+        Assert.Equal(12, creature.Stats["swim"].Level);
+        Assert.Equal(4, creature.Stats["swim"].Progress);
+        Assert.Equal(250, creature.Stats["swim"].Points);
+        Assert.Equal(0, creature.Stats["run"].Level);
     }
 
     [Fact]
@@ -78,13 +99,15 @@ public sealed class ApplicationArchitectureTests
         var state = new GameStateData { Coins = 0 };
         state.Voidlings.Add(creature);
         state.TrainingItems["run"] = 0;
-        creature.TrainingPoints["run"] = 11;
+        creature.Stats["run"] = new StatProgressData { Level = 11, Progress = 3, Points = 150 };
 
         var result = new TrainingUseCase(Rules).ApplyTrainingItem(state, creature.Id, "run", 999UL);
 
         Assert.Equal(TrainingFailure.NoItemOwned, result.Failure);
         Assert.Equal(0, state.TrainingItems["run"]);
-        Assert.Equal(11, creature.TrainingPoints["run"]);
+        Assert.Equal(11, creature.Stats["run"].Level);
+        Assert.Equal(3, creature.Stats["run"].Progress);
+        Assert.Equal(150, creature.Stats["run"].Points);
     }
 
     [Fact]
@@ -99,7 +122,9 @@ public sealed class ApplicationArchitectureTests
 
         Assert.True(firstResult.Succeeded);
         Assert.Equal(firstResult.Gain, secondResult.Gain);
-        Assert.Equal(first.Voidlings[0].TrainingPoints["run"], second.Voidlings[0].TrainingPoints["run"]);
+        var firstRun = first.Voidlings[0].Stats["run"];
+        var secondRun = second.Voidlings[0].Stats["run"];
+        Assert.Equal((firstRun.Level, firstRun.Progress, firstRun.Points), (secondRun.Level, secondRun.Progress, secondRun.Points));
     }
 
     [Fact]
@@ -159,7 +184,7 @@ public sealed class ApplicationArchitectureTests
         };
 
         foreach (var statId in Rules.Genetics.StatIds)
-            data.TrainingPoints[statId] = 0;
+            data.Stats[statId] = new StatProgressData();
 
         return data;
     }

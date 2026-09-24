@@ -229,7 +229,7 @@ public sealed class GardenLandTests
             Genome = new GenomeFactory(Rules.Genetics).CreateRandom(seed)
         };
         foreach (var statId in Rules.Genetics.StatIds)
-            creature.TrainingPoints[statId] = 0;
+            creature.Stats[statId] = new StatProgressData();
         return creature;
     }
 }

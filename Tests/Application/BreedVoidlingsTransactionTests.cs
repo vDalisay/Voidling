@@ -147,7 +147,7 @@ public sealed class BreedVoidlingsTransactionTests
         };
 
         foreach (var statId in Rules.Genetics.StatIds)
-            data.TrainingPoints[statId] = 0;
+            data.Stats[statId] = new StatProgressData();
         return data;
     }
 

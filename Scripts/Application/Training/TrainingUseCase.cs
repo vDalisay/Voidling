@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using Voidling.Application.Garden;
 using Voidling.Domain.Care;
-using Voidling.Domain.Evolution;
 using Voidling.Domain.Garden;
 using Voidling.Domain.Preferences;
 using Voidling.Domain.Rules;
@@ -19,6 +18,7 @@ public enum TrainingFailure
     CreatureNotFound,
     NotEnoughCurrency,
     NoItemOwned,
+    /// <summary>The stat already sits at the level cap (99); rank no longer caps training.</summary>
     StatAtCap
 }
 
@@ -88,6 +88,7 @@ public sealed class TrainingUseCase
     private readonly StatCalculator _stats;
     private readonly CreatureNeedsService _needs = new();
     private readonly FavoriteFoodPreferenceService _favoriteFood = new();
+    private readonly StatProgressionService _progression = new();
 
     public TrainingUseCase(GameBalanceRules rules)
     {
@@ -119,7 +120,7 @@ public sealed class TrainingUseCase
         var creature = state.Voidlings.FirstOrDefault(v => v.Id == creatureId);
         if (creature == null)
             return TrainingFailure.CreatureNotFound;
-        if (_stats.GetTrainingPoints(creature, statId) >= _stats.GetTrainingPointCap(creature, statId))
+        if (_stats.IsAtMaxLevel(creature, statId))
             return TrainingFailure.StatAtCap;
 
         state.TrainingItems.TryGetValue(statId, out var count);
@@ -145,13 +146,8 @@ public sealed class TrainingUseCase
         var rolledGain = StableRandom.Create(seed, $"training:{creatureId}:{statId}")
             .Next(gainRules.MinGain, gainRules.MaxGain + 1);
         var favoriteBonus = wasFavoriteFood ? Math.Max(0, _rules.FavoriteFood.BonusTrainingPoints) : 0;
-        var current = _stats.GetTrainingPoints(creature, statId);
-        var cap = _stats.GetTrainingPointCap(creature, statId);
-        var updated = Math.Min(cap, current + rolledGain + favoriteBonus);
-        var appliedGain = Math.Max(0, updated - current);
-        creature.TrainingPoints[statId] = updated;
+        var appliedGain = _progression.AddProgress(creature, statId, rolledGain + favoriteBonus, _rules.Stats).ProgressApplied;
 
-        EvolutionService.ApplyTrainingInfluence(creature, statId, appliedGain, _rules.Stats);
         _needs.ApplyTrainingTreat(creature.Needs, _rules.Needs);
         return new TrainingApplicationResult(
             TrainingFailure.None,

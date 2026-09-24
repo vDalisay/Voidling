@@ -34,7 +34,6 @@ public static class GameRules
     public static double RareFounderTraitChance => _balance.Genetics.RareFounderTraitChance;
     public static double RareTraitTransmissionChance => _balance.Genetics.RareTraitTransmissionChance;
     public static int RelatedAncestorDepth => _balance.Genetics.RelatedAncestorDepth;
-    public static int TrainingPointsPerLevel => _balance.Stats.TrainingPointsPerLevel;
     public static int MaxStatLevel => _balance.Stats.MaxLevel;
     public static int GardenMaxPopulation => Math.Max(1, _balance.Garden.MaxPopulation);
     public static GardenModuleRules GardenModuleRules => _balance.GardenModules;
@@ -73,7 +72,6 @@ public static class GameRules
         return values[Math.Clamp(burdenLevel, 0, values.Count - 1)];
     }
 
-    public static int GetTrainingPoints(VoidlingData data, string statId) => _stats.GetTrainingPoints(data, statId);
     public static int StatLevel(VoidlingData data, string statId) => _stats.GetLevel(data, statId);
     public static float StatLevelProgress(VoidlingData data, string statId) => _stats.GetLevelProgress(data, statId);
     public static GenePairData GetGene(VoidlingData data, string statId) => StatCalculator.GetGene(data, statId);

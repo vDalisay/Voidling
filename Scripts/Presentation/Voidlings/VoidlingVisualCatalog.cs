@@ -14,4 +14,12 @@ public partial class VoidlingVisualCatalog : Resource
 
     [Export]
     public Godot.Collections.Array<VoidlingVisualDefinition> Definitions { get; set; } = new();
+
+    /// <summary>
+    /// Semantic visual types drawn in the artist's own colors: color DNA is not applied to them.
+    /// Neutral adults and special variants look the way they were drawn; babies and typed adults
+    /// show their color DNA.
+    /// </summary>
+    [Export]
+    public string[] AuthoredColorVisualTypeIds { get; set; } = System.Array.Empty<string>();
 }

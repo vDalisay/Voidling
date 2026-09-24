@@ -4,6 +4,7 @@ using System.Linq;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Racing;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Stats;
 using VoidlingGame;
 
 namespace Voidling.Application.Racing;
@@ -26,7 +27,7 @@ public sealed record RaceEntry(
 
 /// <summary>
 /// Fixed CPU difficulty tiers for an authored course, like a beginner/intermediate/expert race.
-/// A tier is a share of the training-point cap the generated opponents are given, so it does not
+/// A tier is a share of the stat level cap the generated opponents are trained to, so it does not
 /// rubber-band to the player and a recorded time stays comparable between attempts.
 /// </summary>
 public static class RaceDifficulty
@@ -54,6 +55,7 @@ public sealed class RaceEntryFactory
     private readonly RaceParticipantSnapshotFactory _snapshotFactory;
     private readonly GenomeFactory _genomeFactory;
     private readonly ColorPhenotypeResolver _colorResolver;
+    private readonly StatProgressionService _progression = new();
 
     public RaceEntryFactory(GameBalanceRules rules)
     {
@@ -111,7 +113,7 @@ public sealed class RaceEntryFactory
             selected
         };
         var level = RaceDifficulty.Clamp(difficultyLevel);
-        var cpuTrainingPoints = (int)MathF.Round(_rules.Stats.MaxTrainingPoints * RaceDifficulty.TrainedShare(level));
+        var cpuLevel = (int)MathF.Round(_rules.Stats.MaxLevel * RaceDifficulty.TrainedShare(level));
 
         for (var cpuIndex = 0; cpuIndex < 3; cpuIndex++)
         {
@@ -129,9 +131,12 @@ public sealed class RaceEntryFactory
                 {
                     VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
                     PaletteHue = paletteHue
-                },
-                TrainingPoints = _rules.Genetics.StatIds.ToDictionary(id => id, _ => cpuTrainingPoints)
+                }
             };
+            // Opponents grow by the same Chao rule a player's Voidling does, so a trained CPU's
+            // points follow its ranks exactly like the player's would.
+            foreach (var statId in _rules.Genetics.StatIds)
+                _progression.TrainToLevel(cpu, statId, cpuLevel, _rules.Stats);
             entrants.Add(new RaceEntrant(_snapshotFactory.Create(cpu), false, 0));
         }
 

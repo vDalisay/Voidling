@@ -4,6 +4,10 @@ using VoidlingGame;
 
 namespace Voidling.Domain.Stats;
 
+/// <summary>
+/// Read-only view over a creature's Chao-style stat progress. Levels run 0-99 for every rank;
+/// stat points (capped) are what races read, turned into a 0-100 race value.
+/// </summary>
 public sealed class StatCalculator
 {
     private readonly StatGrowthRules _rules;
@@ -13,39 +17,28 @@ public sealed class StatCalculator
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
     }
 
-    public int GetTrainingPoints(VoidlingData data, string statId)
-    {
-        ArgumentNullException.ThrowIfNull(data);
-        return data.TrainingPoints != null && data.TrainingPoints.TryGetValue(statId, out var points) ? points : 0;
-    }
-
-    public int GetTrainingPointCap(VoidlingData data, string statId)
-    {
-        var rank = GetGene(data, statId).ExpressedValue;
-        return Math.Clamp(_rules.RankCaps.ForRank(rank), 0, _rules.MaxTrainingPoints);
-    }
-
-    public int GetEffectiveTrainingPoints(VoidlingData data, string statId)
-        => Math.Clamp(GetTrainingPoints(data, statId), 0, GetTrainingPointCap(data, statId));
-
     public int GetLevel(VoidlingData data, string statId)
-        => Math.Clamp(1 + GetEffectiveTrainingPoints(data, statId) / _rules.TrainingPointsPerLevel, 1, _rules.MaxLevel);
+        => Math.Clamp(Find(data, statId)?.Level ?? 0, 0, _rules.MaxLevel);
 
+    public int GetPoints(VoidlingData data, string statId)
+        => Math.Clamp(Find(data, statId)?.Points ?? 0, 0, _rules.PointCap);
+
+    public bool IsAtMaxLevel(VoidlingData data, string statId)
+        => GetLevel(data, statId) >= _rules.MaxLevel;
+
+    /// <summary>How full the bar toward the next level is, 0..1; a maxed stat reads as full.</summary>
     public float GetLevelProgress(VoidlingData data, string statId)
     {
-        if (GetLevel(data, statId) >= _rules.MaxLevel)
+        if (IsAtMaxLevel(data, statId))
             return 1.0f;
 
-        return (GetEffectiveTrainingPoints(data, statId) % _rules.TrainingPointsPerLevel)
-               / (float)_rules.TrainingPointsPerLevel;
+        var progress = Math.Clamp(Find(data, statId)?.Progress ?? 0, 0, _rules.ProgressPerLevel - 1);
+        return progress / (float)_rules.ProgressPerLevel;
     }
 
+    /// <summary>The 0-100 value the race simulation reads: stat points against the point cap.</summary>
     public float GetEffectiveStat(VoidlingData data, string statId)
-    {
-        var grade = GetGene(data, statId).ExpressedValue;
-        var training = GetEffectiveTrainingPoints(data, statId);
-        return Math.Clamp(12.0f + grade * 13.0f + training * 0.55f, 0.0f, 100.0f);
-    }
+        => Math.Clamp(GetPoints(data, statId) * 100.0f / Math.Max(1, _rules.PointCap), 0.0f, 100.0f);
 
     public static GenePairData GetGene(VoidlingData data, string statId)
     {
@@ -58,5 +51,11 @@ public sealed class StatCalculator
         }
 
         return new GenePairData();
+    }
+
+    private static StatProgressData? Find(VoidlingData data, string statId)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        return data.Stats != null && data.Stats.TryGetValue(statId, out var progress) ? progress : null;
     }
 }

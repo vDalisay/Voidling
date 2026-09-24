@@ -313,7 +313,7 @@ msgid "UI_DETAILS_ADULT"
 msgstr "ADULT"
 
 msgid "UI_DETAILS_CHILD"
-msgstr "CHILD"
+msgstr "BABY"
 
 msgid "UI_DETAILS_STATS_HINT"
 msgstr "Rank controls potential; level/progress reflects training."
@@ -1033,10 +1033,10 @@ msgid "UI_PROFILE_EXP_PER_SECOND"
 msgstr "+{0:0.##} EXP/s"
 
 msgid "UI_PROFILE_ADULT_PERSONALITY"
-msgstr "Adult · {0}"
+msgstr "{1} adult · {0}"
 
 msgid "UI_PROFILE_CHILD_PERSONALITY"
-msgstr "Child · {0}"
+msgstr "Baby · {0}"
 
 msgid "UI_PROFILE_CONTENT"
 msgstr "Seems content and at ease."
@@ -1204,3 +1204,30 @@ msgstr "Shop egg {0}"
 
 msgid "UI_INVENTORY_BRED_EGG"
 msgstr "Bred egg {0}"
+
+msgid "FORM_BABY"
+msgstr "Baby"
+
+msgid "FORM_NEUTRAL"
+msgstr "Neutral"
+
+msgid "FORM_RUN"
+msgstr "Run"
+
+msgid "FORM_SWIM"
+msgstr "Swim"
+
+msgid "FORM_FLY"
+msgstr "Fly"
+
+msgid "FORM_POWER"
+msgstr "Power"
+
+msgid "FORM_SWAMP_VARIANT"
+msgstr "Swamp guy"
+
+msgid "UI_DETAILS_ADULT_FORM"
+msgstr "{0} ADULT"
+
+msgid "LOG_GREW_INTO_FORM"
+msgstr "{0} grew into a {1} adult."
