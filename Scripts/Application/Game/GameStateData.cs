@@ -24,6 +24,7 @@ public sealed class GameStateData
     private List<RaceCourseRecordData> _courseRecords = new();
     private List<BiomeTileStackData> _biomeTiles = new();
     private List<SpecialVariantStateData> _specialVariants = new();
+    private List<EncyclopediaDiscoveryData> _encyclopedia = new();
 
     public int SaveVersion { get; set; } = 20;
 
@@ -70,6 +71,13 @@ public sealed class GameStateData
     {
         get => _specialVariants;
         set => _specialVariants = value ?? new List<SpecialVariantStateData>();
+    }
+
+    /// <summary>Journal entries discovered in this save, first discovery only. Additive and non-null.</summary>
+    public List<EncyclopediaDiscoveryData> Encyclopedia
+    {
+        get => _encyclopedia;
+        set => _encyclopedia = value ?? new List<EncyclopediaDiscoveryData>();
     }
 
     /// <summary>

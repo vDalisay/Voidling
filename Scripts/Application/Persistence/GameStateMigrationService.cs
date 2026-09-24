@@ -10,6 +10,7 @@ using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Care;
+using Voidling.Domain.Collection;
 using Voidling.Domain.Creatures;
 using Voidling.Domain.Evolution;
 using Voidling.Domain.Genetics;
@@ -121,6 +122,14 @@ public sealed class GameStateMigrationService
         }
 
         _lineage.EnsureCurrentEntries(state);
+
+        state.Encyclopedia = state.Encyclopedia
+            .Where(record => record != null && EncyclopediaCatalog.Find(record.EntryId) != null)
+            .GroupBy(record => record.EntryId, StringComparer.Ordinal)
+            .Select(group => group.OrderBy(record => record.Order).First())
+            .ToList();
+        foreach (var record in state.Encyclopedia)
+            record.CreatureName ??= string.Empty;
 
         state.SpecialVariants = state.SpecialVariants
             .Where(entry => entry != null && SpecialVariantCatalog.Find(entry.VariantId) != null)

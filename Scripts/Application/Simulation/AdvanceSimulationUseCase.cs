@@ -26,6 +26,8 @@ public sealed record CreatureHatchedEvent(string EggId, string CreatureId, strin
     public string SpecialVariantId { get; init; } = "";
 }
 public sealed record EggFailedEvent(string EggId) : GameSimulationEvent;
+/// <summary>A journal entry was discovered for the first time by this Voidling hatching or growing up.</summary>
+public sealed record EncyclopediaEntryDiscoveredEvent(string EntryId, string CreatureName) : GameSimulationEvent;
 public sealed record EggWaitingForGardenSpaceEvent(string EggId) : GameSimulationEvent;
 public sealed record SimulationStepResult(bool Changed, IReadOnlyList<GameSimulationEvent> Events);
 
@@ -96,7 +98,33 @@ public sealed class AdvanceSimulationUseCase
             var creature = Hatch(state, egg); changed = true;
             events.Add(new CreatureHatchedEvent(egg.Id, creature.Id, creature.Name) { SpecialVariantId = creature.SpecialVariantId });
         }
+        changed |= RecordDiscoveries(state, events);
         return new SimulationStepResult(changed, events);
+    }
+
+    /// <summary>Hatching and growing up fill the journal the first time each look appears.</summary>
+    private static bool RecordDiscoveries(GameStateData state, List<GameSimulationEvent> events)
+    {
+        var discoveries = new List<GameSimulationEvent>();
+        foreach (var simulationEvent in events)
+        {
+            var creatureId = simulationEvent switch
+            {
+                CreatureHatchedEvent hatched => hatched.CreatureId,
+                CreatureBecameAdultEvent adult => adult.CreatureId,
+                _ => null
+            };
+            if (creatureId == null)
+                continue;
+
+            var creature = state.Voidlings.Find(candidate => candidate.Id == creatureId)
+                           ?? state.DepartedVoidlings.Find(candidate => candidate.Id == creatureId);
+            if (creature != null && EncyclopediaRecorder.Discover(state, creature) is { } entryId)
+                discoveries.Add(new EncyclopediaEntryDiscoveredEvent(entryId, creature.Name));
+        }
+
+        events.AddRange(discoveries);
+        return discoveries.Count > 0;
     }
 
     private bool AdvanceCreature(VoidlingData creature, float elapsedSeconds, List<GameSimulationEvent> events, out bool died)

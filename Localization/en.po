@@ -1345,3 +1345,66 @@ msgstr "{0} egg"
 
 msgid "UI_SHOP_SPECIAL_EGG_HINT"
 msgstr "Hatches only on a {0} that has never hatched one."
+
+msgid "UI_TOP_JOURNAL"
+msgstr "Journal"
+
+msgid "UI_JOURNAL_TITLE"
+msgstr "Journal"
+
+msgid "UI_JOURNAL_COUNT"
+msgstr "Discovered {0} / {1}"
+
+msgid "UI_JOURNAL_UNKNOWN"
+msgstr "???"
+
+msgid "UI_JOURNAL_UNKNOWN_HINT"
+msgstr "Not discovered yet. Keep hatching, raising and breeding."
+
+msgid "UI_JOURNAL_FOUND_BY"
+msgstr "Discovery #{0}, first found with {1}."
+
+msgid "JOURNAL_NAME_BABY"
+msgstr "Baby"
+
+msgid "JOURNAL_NAME_NEUTRAL"
+msgstr "Neutral adult"
+
+msgid "JOURNAL_NAME_RUN"
+msgstr "Run adult"
+
+msgid "JOURNAL_NAME_SWIM"
+msgstr "Swim adult"
+
+msgid "JOURNAL_NAME_FLY"
+msgstr "Fly adult"
+
+msgid "JOURNAL_NAME_POWER"
+msgstr "Power adult"
+
+msgid "JOURNAL_NAME_SWAMP_GUY"
+msgstr "Swamp guy"
+
+msgid "JOURNAL_HOW_BABY"
+msgstr "Hatches from any egg."
+
+msgid "JOURNAL_HOW_NEUTRAL"
+msgstr "A baby grows into a Neutral adult when Stamina is its highest stat, or when no stat reached level 10."
+
+msgid "JOURNAL_HOW_RUN"
+msgstr "A baby grows into a Run adult when Run is its highest stat at level 10 or more. Plains train Run."
+
+msgid "JOURNAL_HOW_SWIM"
+msgstr "A baby grows into a Swim adult when Swim is its highest stat at level 10 or more. Water trains Swim."
+
+msgid "JOURNAL_HOW_FLY"
+msgstr "A baby grows into a Fly adult when Fly is its highest stat at level 10 or more. Mountains train Fly."
+
+msgid "JOURNAL_HOW_POWER"
+msgstr "A baby grows into a Power adult when Power is its highest stat at level 10 or more. Dry land trains Power."
+
+msgid "JOURNAL_HOW_SWAMP_GUY"
+msgstr "Breed two Swim adults while you own a Swamp: their egg hatches him on a Swamp that never hatched one. Level 4 Water becomes a Swamp."
+
+msgid "LOG_JOURNAL_NEW"
+msgstr "New journal entry: {0}, found with {1}!"

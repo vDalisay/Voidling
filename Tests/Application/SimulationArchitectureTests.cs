@@ -30,8 +30,7 @@ public sealed class SimulationArchitectureTests
         Assert.True(result.Changed);
         Assert.Equal(LifeStage.Adult, child.Stage);
         Assert.Equal(0.0f, child.BreedCooldownSeconds);
-        var transition = Assert.Single(result.Events);
-        var adult = Assert.IsType<CreatureBecameAdultEvent>(transition);
+        var adult = Assert.Single(result.Events.OfType<CreatureBecameAdultEvent>());
         Assert.Equal("child", adult.CreatureId);
     }
 
@@ -142,7 +141,7 @@ public sealed class SimulationArchitectureTests
             Assert.Equal(0, creature.Stats[statId].Level);
             Assert.Equal(0, creature.Stats[statId].Points);
         });
-        Assert.IsType<CreatureHatchedEvent>(Assert.Single(result.Events));
+        Assert.Single(result.Events.OfType<CreatureHatchedEvent>());
     }
 
     [Fact]

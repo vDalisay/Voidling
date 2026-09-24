@@ -119,6 +119,9 @@ public partial class GameSession : Node
                         : $"An egg hatched and {hatched.Name} was born!", true); break;
                 case EggFailedEvent:
                     Announce("An egg failed to hatch.", true); break;
+                case EncyclopediaEntryDiscoveredEvent discovered:
+                    RaiseGardenEvent(string.Format(Tr("LOG_JOURNAL_NEW"),
+                        Tr("JOURNAL_NAME_" + discovered.EntryId.Replace('-', '_').ToUpperInvariant()), discovered.CreatureName)); break;
                 case EggWaitingForGardenSpaceEvent:
                     Announce("The Garden is full. Say goodbye to a Voidling before this egg can hatch.", true); break;
             }

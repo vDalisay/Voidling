@@ -55,6 +55,20 @@ public partial class MainController
             if (!_modalHost.IsOpen) throw new InvalidOperationException("Rail settings button did not open Settings.");
             await ClickGardenPosition(new Vector2(4, 4));
             if (_modalHost.IsOpen) throw new InvalidOperationException("Clicking outside a submenu did not return to the Garden.");
+            // The journal lists every form and special variant, with undiscovered ones as "???".
+            await ClickGardenControl(FindGardenButton(actions, "Journal"));
+            if (!_modalHost.IsOpen) throw new InvalidOperationException("Rail journal button did not open the Journal.");
+            foreach (var part in new[] { "JournalCount", "JournalEntries", "JournalDetail", "JournalEntryName" })
+            {
+                if (_modalHost.FindChild(part, true, false) is not Control journalPart)
+                    throw new InvalidOperationException($"Journal is missing '{part}'.");
+                RequireOnScreen(journalPart);
+            }
+            var journalEntries = ((Control)_modalHost.FindChild("JournalEntries", true, false)!).FindChildren("Entry_*", "Button", true, false);
+            if (journalEntries.Count != Voidling.Domain.Collection.EncyclopediaCatalog.All.Count)
+                throw new InvalidOperationException("Journal does not show one slot per entry.");
+            CloseModal();
+            await SettleGardenUi();
             RequireSeparate(rail, _gardenEventLog);
             await CaptureGardenUi("garden");
 

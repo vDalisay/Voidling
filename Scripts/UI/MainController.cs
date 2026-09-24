@@ -196,6 +196,7 @@ public partial class MainController : Node
             ("Breed", "UI_TOP_BREED", ShowBreeding, new(12, 4)),
             ("Races", "UI_TOP_RACE", ShowRacePickerWithCourses, new(13, 1)),
             ("Build", "UI_GARDEN_BUILD", ShowGardenBuild, new(15, 1)),
+            ("Journal", "UI_TOP_JOURNAL", ShowEncyclopedia, new(13, 0)),
             ("Online", "UI_TOP_ONLINE", ShowConnectedZone, new(12, 2))
         };
         foreach (var destination in destinations)
