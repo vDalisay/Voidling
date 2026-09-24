@@ -23,7 +23,14 @@ public partial class RaceScreen : Node2D
 
     /// <summary>True once the results overlay has been built. Read by the CI completion probe.</summary>
     internal bool ResultsShown => _resultsShown;
-    internal bool ResultsPending => _resultsPending;
+
+    /// <summary>
+    /// True when the results overlay was built after the post-finish reveal delay rather than straight
+    /// away. Read by the CI completion probe: it fast-forwards the race, and at that speed the whole
+    /// delay can pass inside a single frame, so it cannot rely on catching the pending state between
+    /// frames.
+    /// </summary>
+    internal bool ResultsShownAfterDelay => _resultsShownAfterDelay;
 
     private const float ScreenWidth = 640.0f;
     private const float ScreenHeight = 360.0f;
@@ -116,6 +123,7 @@ public partial class RaceScreen : Node2D
     private bool _pausedRunning;
     private bool _resultsShown;
     private bool _resultsPending;
+    private bool _resultsShownAfterDelay;
     private bool _completionReported;
     private int _resultPlace;
     private Control? _resultRewardRow;
@@ -1241,6 +1249,7 @@ public partial class RaceScreen : Node2D
         if (_entry == null || (_simulation == null && multiplayerFinishOrder == null))
             return;
 
+        _resultsShownAfterDelay = _resultsPending;
         _resultsPending = false;
         _resultsShown = true;
         var finishOrder = multiplayerFinishOrder ?? _simulation!.FinishOrder;
