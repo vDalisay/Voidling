@@ -110,6 +110,7 @@ public sealed class BreedVoidlingsUseCase
         var related = _relationships.AreRelated(first, second, _lineage.GetEffectiveLineage(state));
         var childBurden = _burden.ComputeChildBurden(first, second, related);
         var genome = _genomeInheritance.CreateChild(first, second, eggSeed);
+        var rareTraits = _rareTraits.Inherit(first, second, eggSeed);
         var tint = _colors.ResolveTint(genome);
         var egg = new EggData
         {
@@ -124,7 +125,7 @@ public sealed class BreedVoidlingsUseCase
             InbreedingHistoryFlag = related || first.InbreedingHistoryFlag || second.InbreedingHistoryFlag,
             IsViable = _viability.RollViability(eggSeed, childBurden),
             FailureResolved = true,
-            RequiredIncubationSeconds = _rules.Hatching.IncubationSeconds,
+            RequiredIncubationSeconds = IncubationPolicy.RequiredSeconds(genome, rareTraits, isSpecialVariant: false, _rules.Hatching),
             TintHex = tint,
             Appearance = new VoidlingAppearanceData
             {
@@ -134,7 +135,7 @@ public sealed class BreedVoidlingsUseCase
                 VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
                 PaletteHue = _colors.ResolvePaletteHue(genome)
             },
-            RareTraits = _rareTraits.Inherit(first, second, eggSeed),
+            RareTraits = rareTraits,
             WorldX = worldX,
             WorldY = worldY
         };

@@ -31,20 +31,21 @@ public sealed class StoreEggFactory
             throw new ArgumentException("A store egg requires a stable ID.", nameof(eggId));
 
         var genome = _genomes.CreateRandom(eggSeed);
+        var rareTraits = _rareTraits.RollFounderTraits(eggSeed, eggId);
         return new EggData
         {
             Id = eggId,
             Source = EggSource.Store,
             Seed = eggSeed,
             Genome = genome,
-            RequiredIncubationSeconds = _rules.Hatching.IncubationSeconds,
+            RequiredIncubationSeconds = IncubationPolicy.RequiredSeconds(genome, rareTraits, isSpecialVariant: false, _rules.Hatching),
             TintHex = _colors.ResolveTint(genome),
             Appearance = new VoidlingAppearanceData
             {
                 VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
                 PaletteHue = _colors.ResolvePaletteHue(genome)
             },
-            RareTraits = _rareTraits.RollFounderTraits(eggSeed, eggId),
+            RareTraits = rareTraits,
             IsViable = true,
             FailureResolved = true
         };

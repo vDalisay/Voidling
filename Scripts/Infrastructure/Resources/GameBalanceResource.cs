@@ -35,8 +35,18 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "0,300,0.5")]
     public float BreedCooldownSeconds { get; set; } = 8.0f;
 
+    /// <summary>Base incubation; S-rank stats, rare traits and special variants add to it.</summary>
     [Export(PropertyHint.Range, "1,600,0.5")]
     public float EggIncubationSeconds { get; set; } = 22.0f;
+
+    [Export(PropertyHint.Range, "0,3600,1")]
+    public float EggSecondsPerSRankStat { get; set; } = 45.0f;
+
+    [Export(PropertyHint.Range, "0,3600,1")]
+    public float EggSecondsPerRareTrait { get; set; } = 120.0f;
+
+    [Export(PropertyHint.Range, "0,7200,1")]
+    public float EggSpecialVariantSeconds { get; set; } = 300.0f;
 
     [ExportGroup("Growth")]
     /// <summary>Training steps that fill one level's bar (Chao Garden stat growth).</summary>
@@ -267,7 +277,10 @@ public partial class GameBalanceResource : Resource
             },
             Hatching = defaults.Hatching with
             {
-                IncubationSeconds = Positive(EggIncubationSeconds, 0.1f)
+                IncubationSeconds = Positive(EggIncubationSeconds, 0.1f),
+                SecondsPerSRankStat = NonNegative(EggSecondsPerSRankStat),
+                SecondsPerRareTrait = NonNegative(EggSecondsPerRareTrait),
+                SpecialVariantSeconds = NonNegative(EggSpecialVariantSeconds)
             },
             Stats = defaults.Stats with
             {

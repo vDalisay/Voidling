@@ -531,7 +531,9 @@ public partial class GardenController : Node2D
                 ? new Color(0.55f, 0.55f, 0.55f, 1.0f)
                 : GameRules.TintColor(egg.TintHex);
             var remaining = Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds));
-            visual.Label.Text = egg.State == EggState.Failed ? "X" : $"{remaining}s";
+            // Strong and rare eggs take minutes now, so long waits read as m:ss.
+            visual.Label.Text = egg.State == EggState.Failed ? "X"
+                : remaining >= 60 ? $"{remaining / 60}:{remaining % 60:00}" : $"{remaining}s";
             visual.Hitbox.InputPickable = egg.State == EggState.Failed;
         }
     }

@@ -20,7 +20,16 @@ public sealed record AppearanceRules(
     double PaletteBlendInfluence);
 
 public sealed record BreedingRules(float CooldownSeconds, IReadOnlyList<int> HatchFailurePercentByBurden);
-public sealed record HatchingRules(float IncubationSeconds);
+/// <summary>
+/// Incubation: a base time plus extra time for every S-rank stat, every rare trait and a special
+/// variant. Worked out when an egg is created and then fixed.
+/// </summary>
+public sealed record HatchingRules(float IncubationSeconds)
+{
+    public float SecondsPerSRankStat { get; init; } = 45.0f;
+    public float SecondsPerRareTrait { get; init; } = 120.0f;
+    public float SpecialVariantSeconds { get; init; } = 300.0f;
+}
 public sealed record GardenRules(int MaxPopulation);
 public sealed record DailyLoginRules(IReadOnlyList<int> CoinRewards);
 
