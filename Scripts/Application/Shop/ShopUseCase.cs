@@ -93,6 +93,23 @@ public sealed class ShopUseCase
         return ShopFailure.None;
     }
 
+    /// <summary>
+    /// Moves an egg that is already in the Garden, the way a Voidling is carried. Incubation keeps
+    /// running; where the egg sits matters for eggs that only hatch on a particular biome.
+    /// </summary>
+    public ShopFailure MovePlacedEgg(GameStateData state, string eggId, float worldX, float worldY)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var egg = state.OwnedEggs.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, eggId, StringComparison.Ordinal) &&
+            candidate.State != EggState.Stored &&
+            !candidate.Stowed);
+        if (egg == null || !float.IsFinite(worldX) || !float.IsFinite(worldY)) return ShopFailure.EggNotFound;
+        egg.WorldX = worldX;
+        egg.WorldY = worldY;
+        return ShopFailure.None;
+    }
+
     public ShopFailure BuyRareOffer(GameStateData state, string itemId)
     {
         ArgumentNullException.ThrowIfNull(state);

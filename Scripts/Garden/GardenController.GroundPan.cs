@@ -58,7 +58,8 @@ public partial class GardenController
 
         if (mouse.Pressed)
         {
-            if (_draggedId.Length > 0 || _pendingGrabId.Length > 0 || IsPlacingDecoration)
+            if (_draggedId.Length > 0 || _pendingGrabId.Length > 0 || IsPlacingDecoration ||
+                _draggedEggId.Length > 0 || _pendingEggId.Length > 0)
                 return;
 
             _cameraDragging = true;

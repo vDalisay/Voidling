@@ -45,6 +45,21 @@ public partial class GameSession
         return true;
     }
 
+    /// <summary>Puts a carried egg down somewhere else in the Garden.</summary>
+    public bool MoveEgg(string eggId, Vector2 worldPosition)
+    {
+        var failure = _shop!.MovePlacedEgg(State, eggId, worldPosition.X, worldPosition.Y);
+        if (failure != ShopFailure.None)
+        {
+            ToastRequested?.Invoke(PlayerActionFailureText.ForShop(failure));
+            return false;
+        }
+
+        Save();
+        StateChanged?.Invoke();
+        return true;
+    }
+
     public bool BuyRareShopOffer(string itemId)
     {
         var failure = _shop!.BuyRareOffer(State, itemId);
