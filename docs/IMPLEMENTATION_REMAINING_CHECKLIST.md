@@ -22,11 +22,15 @@ Items under **Product decisions required before implementation** are deliberate 
   - [x] Latest authored Normal-body outline palette revision is integrated on `main` (`9f971202` / merge `71b4c3a3`) and keeps the centralized palette/resource path intact.
   - [ ] Ingest the next authored body/wing/crown/form revision when artwork is supplied; do not synthesize new production art or fork the visual pipeline.
 
+## Lifecycle, biomes & encyclopedia (September 2026 design meetings)
+
+New work packages WP-A to WP-J are planned in `docs/LIFECYCLE_BIOMES_ENCYCLOPEDIA_IMPLEMENTATION_PLAN.md`, together with the decisions (Q1–Q23) that block some of them. Track that work there.
+
 ## Product decisions required before implementation
 
-- [ ] Lock the stat-driven morphology/evolution mapping (for example when/how `normal` changes toward water/fly/power forms).
-- [ ] Lock remaining appearance-inheritance probabilities, dominance, rare-trait depth and stacking rules.
-- [ ] Lock the final trophy/reincarnation transformation recipe.
+- [ ] Lock the stat-driven morphology/evolution mapping (for example when/how `normal` changes toward water/fly/power forms). Direction set: the highest stat decides the adult form (lifecycle plan §4.2); the minimum and tie rule are still open (Q2, Q3).
+- [ ] Lock remaining appearance-inheritance probabilities, dominance, rare-trait depth and stacking rules. The neutral color and special variants add questions (lifecycle plan Q7–Q9).
+- [ ] Lock the final trophy/reincarnation transformation recipe. Reincarnation threshold set to happiness ≥ 70 (lifecycle plan §4.3); the trophy form is still open.
 - [ ] Lock Cup entry-fee/refund/reward economy details. Cup scaffolding keeps these values/rules out until decided.
 - [ ] Decide whether active-computer-use income should exist; do not implement activity monitoring until its privacy/platform/UX requirements are approved.
 

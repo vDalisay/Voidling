@@ -7,6 +7,8 @@
 
 > This document is the source of truth for player-facing intent established during the design interview. The technical implementation plan remains the source of truth for architecture where it does not conflict with these requirements.
 
+> **September 2026 update:** two design meetings set direction for life stages, adult forms, the reincarnation threshold, biomes, special variants, hatching time and an encyclopedia. See Part A of `docs/LIFECYCLE_BIOMES_ENCYCLOPEDIA_IMPLEMENTATION_PLAN.md`. Where it marks a rule **Decided**, that rule replaces the matching unresolved item in this document. Its **To confirm** items stay unresolved.
+
 ---
 
 ## Interview progress
