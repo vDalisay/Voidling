@@ -27,6 +27,9 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "1,8,1")]
     public int RelatedAncestorDepth { get; set; } = 3;
 
+    [Export(PropertyHint.Range, "0,8,1")]
+    public int RareTraitMaxTransmittedGenerations { get; set; } = 2;
+
     [ExportGroup("Appearance Genetics")]
     [Export(PropertyHint.Range, "0,0.49,0.01")]
     public float PaletteBlendInfluence { get; set; } = 0.18f;
@@ -261,7 +264,8 @@ public partial class GameBalanceResource : Resource
                 AbilityRankBreakthroughChance = Probability(AbilityRankBreakthroughChance),
                 RareFounderTraitChance = Probability(RareFounderTraitChance),
                 RareTraitTransmissionChance = Probability(RareTraitTransmissionChance),
-                RelatedAncestorDepth = Math.Max(1, RelatedAncestorDepth)
+                RelatedAncestorDepth = Math.Max(1, RelatedAncestorDepth),
+                RareTraitMaxTransmittedGenerations = Math.Max(0, RareTraitMaxTransmittedGenerations)
             },
             Appearance = defaults.Appearance with
             {

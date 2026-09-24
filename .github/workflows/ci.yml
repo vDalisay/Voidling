@@ -108,11 +108,13 @@ jobs:
             exit 1
           fi
 
+      # The probe waits in real time for Voidlings to roam, meet and eat, with its own budgets of up
+      # to about two minutes in total, so give it room to report its own failure instead of a kill.
       - name: Garden UI interaction and layout smoke test
         shell: bash
         run: |
           set -o pipefail
-          timeout 20s godot --headless --path . -- --voidling-garden-ui-smoke --voidling-dev-profile=ci_garden_ui 2>&1 | tee garden-ui-smoke.log
+          timeout 150s godot --headless --path . -- --voidling-garden-ui-smoke --voidling-dev-profile=ci_garden_ui 2>&1 | tee garden-ui-smoke.log
           grep -q 'GARDEN_UI_SMOKE_SUCCESS' garden-ui-smoke.log
           if grep -E '^(ERROR|SCRIPT ERROR):' garden-ui-smoke.log; then
             exit 1
