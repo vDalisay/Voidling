@@ -24,12 +24,12 @@ Items under **Product decisions required before implementation** are deliberate 
 
 ## Lifecycle, biomes & encyclopedia (September 2026 design meetings)
 
-New work packages are planned in `docs/LIFECYCLE_BIOMES_ENCYCLOPEDIA_IMPLEMENTATION_PLAN.md`, together with the few decisions still open (its §11). Track that work there.
+New work packages are planned in `docs/LIFECYCLE_BIOMES_ENCYCLOPEDIA_IMPLEMENTATION_PLAN.md`; its §11 records every decision. Track that work there.
 
 ## Product decisions required before implementation
 
-- [ ] Lock the stat-driven morphology/evolution mapping (for example when/how `normal` changes toward water/fly/power forms). Direction set: the highest stat decides the adult form (lifecycle plan §4.3); minimum level 10 on Chao-style 0–99 stat levels (WP-K), ties picked at random.
-- [ ] Lock remaining appearance-inheritance probabilities, dominance, rare-trait depth and stacking rules. Neutral color decided as the artist colors; its inheritance and per-form color ranges are still open (lifecycle plan Q7a, Q8a).
+- [ ] Lock the stat-driven morphology/evolution mapping (for example when/how `normal` changes toward water/fly/power forms). Direction set: the highest stat decides the adult form (lifecycle plan §4.3); minimum level 10 on Chao-style 0–99 stat levels, ties picked at random.
+- [ ] Lock remaining appearance-inheritance probabilities, dominance, rare-trait depth and stacking rules. Neutral is a type whose adults show the artist colors (lifecycle plan §5.2); per-type hue ranges are still open.
 - [ ] Lock the final trophy/reincarnation transformation recipe. Reincarnation threshold set to happiness ≥ 70 (lifecycle plan §4.4); the trophy form is still open.
 - [ ] Lock Cup entry-fee/refund/reward economy details. Cup scaffolding keeps these values/rules out until decided.
 - [ ] Decide whether active-computer-use income should exist; do not implement activity monitoring until its privacy/platform/UX requirements are approved.
