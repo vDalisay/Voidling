@@ -1,6 +1,6 @@
 # Lifecycle, biomes & encyclopedia implementation plan
 
-**Status:** Decided and in implementation. The direction comes from two design meetings in September 2026 and three follow-up question rounds. Only the items in §11 "Later" are still open.  
+**Status:** Implemented on branch `claude/voidling-gameplay-plan-d0605e` (see §17). The direction comes from two design meetings in September 2026 and three follow-up question rounds. Only the items in §11 "Later" are still open.  
 **Baseline:** `main` at `5a09bcd` (2026-09-09)  
 **Prepared:** 2026-09-24  
 **Source:** design meeting notes and answers to this plan's questions. Appendix A keeps the original Dutch notes.
@@ -259,6 +259,21 @@ Network: the multiplayer protocol version goes up because race inputs change. Tr
 ## 16. Docs to update
 
 `GAMEPLAY_DESIGN_REFINEMENT_CONTEXT.md`, `PRODUCTION_VOIDLING_APPEARANCE_RULES.md`, `IMPLEMENTATION_REMAINING_CHECKLIST.md` and `Assets/Voidlings/README.md` as the packages land.
+
+## 17. Implementation notes
+
+All packages are implemented; WP-J continues as art arrives. Details that were settled while building:
+
+- **WP-K and WP-B** landed in one commit, because adult forms read the new levels. **WP-D** (hatch biome) was dropped (Q21).
+- **Starting numbers** (all data in `demo_balance.tres`): baby 1.5 h and adult 8 h of open-game time; reincarnation at happiness ≥ 70; care warning below 30; 10 training steps per level; level-up `3 × rank + 11 + 1..5` points, capped at 3266; race value `points ÷ 3266 × 100`; reincarnation to level 1 keeping 10% of points; incubation 22 s + 45 s per S-rank stat + 120 s per rare trait + 300 s for a special variant; biome tile 40 sprouts; passive 1 / 1.5 / 2 / 3 steps per minute for levels 1–4; Swamp guy respawn egg 250 sprouts.
+- **Opponents** are trained by the same rule to level 0, 40 or 79 for the three difficulties.
+- **Starters** arrive as Neutral adults.
+- **Bred eggs** still appear next to their parents; the player carries them where they like (Q13). A respawn egg goes to the inventory like a shop egg.
+- **The Swamp guy** renders as the normal body tinted green until a `swamp-variant` definition is registered.
+- **Tiles**: the hex menu and Build screen show biome buttons (buy and place a level 1 tile), owned tiles to place, and stack / pick-up actions. Level 4 tiles cannot be picked up.
+- **Versions**: save 23; multiplayer protocol 3; daily race and demo leaderboard rules 2.
+- **Tests**: 321 Domain/Application tests; the Garden UI smoke opens the journal and buys a biome tile.
+- **Known, not caused by this work**: on the development PC some Godot smoke runs crash with a .NET finalizer error at shutdown after reporting success; unchanged `main` does the same.
 
 ---
 

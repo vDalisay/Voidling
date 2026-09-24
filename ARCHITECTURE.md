@@ -48,6 +48,7 @@ Scripts/
 ├─ Bootstrap/
 │  └─ GameBootstrap.cs
 ├─ Domain/
+│  ├─ Collection/
 │  ├─ Creatures/
 │  ├─ Genetics/
 │  ├─ Breeding/
@@ -59,6 +60,8 @@ Scripts/
 ├─ Application/
 │  ├─ Game/
 │  ├─ Breeding/
+│  ├─ Collection/
+│  ├─ Garden/
 │  ├─ Persistence/
 │  ├─ Racing/
 │  ├─ Roster/
