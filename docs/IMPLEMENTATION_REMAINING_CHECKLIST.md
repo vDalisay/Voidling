@@ -12,6 +12,7 @@ Items under **Product decisions required before implementation** are deliberate 
 - [x] Fix the race-completion smoke shutdown regression.
 - [x] Verify the complete GitHub Actions suite is green after the Garden/ambient integration work.
 - [x] Stabilize the command-line LAN trade smoke so a completed durable exchange is not reported as failed by the Godot 4.6 Mono ENet teardown crash.
+- [x] Restore the GitHub Actions suite, red on `main` since 2026-09-06. Godot processes no longer crash on exit when an undisposed collection wrapper is finalized during engine teardown (the same fix covers ordinary player exits), the Garden UI smoke's step timeout now covers its real-time roaming/encounter waits, and its synthetic inspector check no longer races the half-second simulation refresh.
 
 ## Confirmed implementation-ready feature work
 
