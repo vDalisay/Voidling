@@ -38,12 +38,12 @@ end of life: happiness ≥ 70 reincarnates (baby again, new form possible), othe
 
 | Area | Today on `main` | Meeting direction | Status |
 |---|---|---|---|
-| Life stages | Child → adult after 45 s; the adult lives 6 h of open-game time | Baby → adult after hours; the adult lives days or weeks | Shape decided; durations **to confirm** |
-| Adult form | Hidden Swim/Fly and Run/Power influence picks a specialization; the look stays `normal` | Highest stat picks the form; stamina highest or below the minimum → neutral | Decided; minimum **to confirm** |
+| Life stages | Child → adult after 45 s; the adult lives 6 h of open-game time | Baby → adult → end of life, measured in hours of open-game time | Decided; exact hours are tuning |
+| Adult form | Hidden Swim/Fly and Run/Power influence picks a specialization; the look stays `normal` | Highest stat level picks the form; minimum level 10 on a 0–99 scale; stamina highest or below the minimum → neutral | Decided; needs the stat-level rework (WP-K) |
 | Reincarnation | Happiness ≥ 10 and stress ≤ 70 | Happiness ≥ 70 out of 100 | 70 decided; stress gate **to confirm** |
 | Stat breeding | Two alleles per stat, Chao Garden style | Same | No change |
 | Color | Continuous hue color DNA on every Voidling | A set of colors plus **neutral**; only neutral Voidlings can become special variants | Details **to confirm** |
-| Garden hexes | Training ground per stat; levels 1–3 bought with coins | Biomes (mountain = Fly, water = Swim, plains = Run, dry = Power); 1–4★ upgrades; 4★ = special environment | Shape decided; upgrade mechanic **to confirm** |
+| Garden hexes | Training ground per stat; levels 1–3 bought with coins | Biomes (mountain = Fly, water = Swim, plains = Run, dry = Power); merging duplicate tiles raises the star, up to 4★; 4★ = special environment | Decided; what happens to the used-up tile **to confirm** |
 | Special variant | None | Swamp guy: one-time spawn, guaranteed S/S Swim, respawn item after death | Shape decided; details **to confirm** |
 | Hatching | Every egg incubates 22 s | Hatch time depends on rarity and stats | **To confirm** |
 | Encyclopedia | None | Journal tab; "???" and a silhouette until discovered; shows how you got each one | Shape decided; entry granularity **to confirm** |
@@ -61,28 +61,30 @@ end of life: happiness ≥ 70 reincarnates (baby again, new form possible), othe
 
 ### 4.1 Stages and durations
 
-**Decided.** A Voidling hatches as a **baby**. After a number of hours it becomes an **adult**. After a number of days or weeks its life ends, and it either reincarnates or dies.
+**Decided.** A Voidling hatches as a **baby**. After a number of hours it becomes an **adult**. Later its life ends, and it either reincarnates or dies.
 
 The game already runs this loop: `LifeStage.Child` → `LifeStage.Adult` → cocoon → reincarnate or die, in `AdvanceSimulationUseCase`. Two things change:
 
 - player-facing text says "baby". The saved enum stays `Child` for save compatibility.
-- the durations move from demo values (45 s as a child, 6 h as an adult) to hours and days or weeks.
+- the durations move from demo values (45 s as a child, 6 h as an adult) to hours.
 
-**To confirm (Q1): which clock.** Today all progress, lifecycle included, counts **open-game time only** (gameplay context §1.3 and §5.7). Days or weeks of open-game time is long. A player who keeps the game open 3 hours a day needs 21 open-game hours to get through one real week. The durations are data (`ChildToAdultSeconds` and `AdultLifespanSeconds` in `Resources/Balance/demo_balance.tres`), so only the clock is a product question. A test already requires an adult to live at least six open-game hours (`Tests/Application/SimulationArchitectureTests.cs`).
+**Decided (Q1): open-game time only.** Voidling is an idle game that runs while the PC is on, so life stages count only time with the game open, as all progress already does (gameplay context §1.3 and §5.7). Durations are hours of open-game time, not weeks. They are data (`ChildToAdultSeconds` and `AdultLifespanSeconds` in `Resources/Balance/demo_balance.tres`). A test already requires an adult to live at least six open-game hours (`Tests/Application/SimulationArchitectureTests.cs`).
 
 ### 4.2 Adult form from the highest stat
 
 **Decided.**
 
 - At the baby → adult transition, the stat with the **highest level** decides the adult form.
-- That stat must be at or above a minimum. The meeting suggested "level 10?".
+- That stat must be at least **level 10**, on a 0–99 level scale.
 - If **stamina** is the highest stat, or **no stat reaches the minimum**, the Voidling becomes a **neutral adult**.
 
 The forms are Run, Swim (water), Fly, Power and Neutral. The rule is checked once, at the moment of the transition, and uses no randomness. It replaces the hidden influence rule in `EvolutionService.ResolveFirstEvolution`. It is also the first time adulthood changes the look: the form sets `Appearance.VisualTypeId`.
 
-**The minimum needs rescaling (Q2).** Stat levels today run from 1 to 11, not 1 to 99:
+**Decided (Q2): the Chao Garden level model.** Every stat levels from 0 to 99 whatever its rank. The rank decides how much the stat value is worth at each level, so an S-rank stat at level 99 is far stronger than a C-rank stat at level 99. Level 10 is therefore reachable by every rank.
 
-| Rank | Training-point cap | Highest reachable level |
+**`main` does not work this way yet.** Today the rank caps the *level* instead of the value per level:
+
+| Rank | Training-point cap | Highest reachable level today |
 |---|---|---|
 | E | 20 | 2 |
 | D | 40 | 4 |
@@ -91,9 +93,7 @@ The forms are Run, Swim (water), Fly, Power and Neutral. The rule is checked onc
 | A | 100 | 9 |
 | S | 120 | 11 |
 
-Level = 1 + training points ÷ 12, capped by the stat's expressed rank. The values come from `demo_balance.tres`.
-
-Only an S-rank stat can reach a literal level 10, and about 1 in 10 store-bought Voidlings has an S-rank Run, Swim, Fly or Power stat at all. Almost every Voidling would end up neutral. "Level 10" reads like Chao Garden's 0–99 scale, where it is a low bar of about 10%. The matching low bar today is level 2 (12 training points), which every rank can reach.
+`StatCalculator.GetLevel` computes level = 1 + training points ÷ 12, and `GetTrainingPointCap` stops training at the rank's cap (`RankTrainingCaps` in `demo_balance.tres`). `MaxLevel` is set to 99, but no stat can get past level 11. The race value is `12 + 13 × rank + 0.55 × training points`, capped at 100. Under this model only an S-rank stat could reach level 10. WP-K reworks stats to the decided model before WP-B relies on level 10.
 
 **Kept unless changed (Q4).** Today adulthood also raises the expressed allele of the winning stat by one rank, and a neutral adult raises stamina. The meetings did not mention this. It is the adulthood rank promotion that gameplay context §8.3 describes.
 
@@ -153,7 +153,9 @@ Two open points. The notes give stamina no biome (Q10). "Plains" also clashes wi
 
 Levels 1–3 already exist, bought with coins (25, then 50). The Build screen already draws the level as a star row (`PaperCard.StarRating`). The new parts are the fourth star, the change into a special environment, and the upgrade mechanic.
 
-**To confirm (Q11): the upgrade mechanic.** "Like Cow Evolution or Clash Royale" means using up duplicates. But a hex is also land, and removing one could split the island, which the placement rules forbid (`GardenHexLayout.CanPlaceShape`). The recommended version: merging a same-biome, same-star hex into another raises the target by one star and turns the donor back into plain ground, so the land stays. Copies per star and any coin cost are data.
+**Decided (Q11): merging.** Merging duplicate tiles evolves the tile to the next star, up to 4★.
+
+**To confirm (Q11a): what happens to the used-up tile.** A hex is also land, and removing one could split the island, which the placement rules forbid (`GardenHexLayout.CanPlaceShape`). Recommended: the used-up tile turns back into plain ground, so the land stays. Also to confirm: whether a duplicate means same biome *and* same star, and whether merging costs coins as well.
 
 A special environment trains its stat faster than a 3★ hex ("more stat boost"), and it is where special-variant rules hook in (§7).
 
@@ -206,8 +208,10 @@ Each item has a recommended default. To accept one, mark it **Decided** in this 
 
 ### Lifecycle
 
-- **Q1 — Clock for life stages.** Open-game time (today's rule) or real time? *Recommended:* open-game time, with durations chosen in open-game hours. *Blocks:* WP-A tuning only.
-- **Q2 — Adult-form minimum.** (a) a low bar, about level 2 today, which is the Chao-style reading of "level 10"; (b) a literal level 10, which only S can reach; (c) rescale levels to 1–99, then use level 10. *Recommended:* (a) now, stored as data; (c) can come later as a tuning and presentation change. *Blocks:* the final value in WP-B. The code can land with the data field.
+- **Q1 — Clock for life stages.** **Decided:** open-game time only; durations in hours.
+- **Q2 — Adult-form minimum.** **Decided:** level 10 on a 0–99 scale that every rank can climb; the rank sets the value per level (WP-K).
+- **Q2a — Rank value curve.** How much is one level worth at each rank, and what does a level-99 stat look like per rank? *Recommended:* keep the current race-value range (0–100) and spread it over 99 levels per rank, tuned in a balance pass. *Blocks:* WP-K numbers.
+- **Q2b — Existing training.** How existing training points convert to the new levels. *Recommended:* keep each Voidling's current race value as close as possible, so old saves don't suddenly race better or worse.
 - **Q3 — Ties for the highest stat.** *Recommended:* compare exact training points, and treat an exact tie as neutral.
 - **Q4 — Rank promotion at adulthood.** Keep the +1 rank for the winning stat, with neutral promoting stamina? *Recommended:* keep it.
 - **Q5 — Adults that already exist.** Give them the form that matches their stored specialization, or keep them `normal` until their next life? *Recommended:* give them the form. The migration is deterministic and rerolls nothing.
@@ -222,7 +226,8 @@ Each item has a recommended default. To accept one, mark it **Decided** in this 
 ### Biomes
 
 - **Q10 — Stamina hex.** Keep a stamina biome (name and art to decide) or retire it? Existing saves already have stamina training ground. *Recommended:* keep it.
-- **Q11 — Upgrade mechanic.** Coins (today), merging duplicates (Cow Evolution), or copies plus coins (Clash Royale)? Must merged hexes be adjacent? *Recommended:* merge a same-biome, same-star hex into the target; the donor turns back into plain ground; no adjacency needed; copies and coins per star as data. Existing levels stay.
+- **Q11 — Upgrade mechanic.** **Decided:** merging duplicate tiles evolves the tile to the next star, up to 4★.
+- **Q11a — Merge details.** The used-up tile turns back into plain ground (recommended); a duplicate is same biome and same star (recommended); tiles don't need to touch (recommended); no coin cost (recommended). Existing coin-bought levels stay.
 - **Q12 — Other 4★ environments.** Names for Mountain 4★ and Plains 4★, and whether Volcano gets a special variant now. *Recommended:* build it generically and ship the Swamp first.
 
 ### Swamp guy
@@ -292,15 +297,28 @@ Each package is one or two PRs and lists what it depends on and which decisions 
 
 1. Set `ReincarnationMinimumHappiness` to 70, and set stress according to Q6.
 2. Give the Garden care-risk warning its own threshold (a new rule value) so it does not fire on every dip below 70.
-3. Once Q1 is answered, set `ChildToAdultSeconds` and `AdultLifespanSeconds`. Keep the six-hour floor test, or update it on purpose.
+3. Set `ChildToAdultSeconds` and `AdultLifespanSeconds` to hours of open-game time (Q1). Keep the six-hour floor test, or update it on purpose.
 4. Use "baby" in player-facing text.
 5. Add a headless balance test: a scripted care routine over a full life ends at 70 or more, and a neglected Voidling does not.
 
 **Acceptance:** the thresholds come from data; the care warning no longer uses the reincarnation threshold; tests pin the boundary (69.9 dies, 70 reincarnates).
 
+### WP-K — Chao-style stat levels
+
+**Depends on:** nothing. **Decisions:** Q2a, Q2b. Must land before WP-B uses level 10.
+
+1. Characterization tests first: current levels, caps and race values for each rank.
+2. Change `StatCalculator` so every stat levels 0–99 regardless of rank, and the rank sets the value gained per level. Remove the rank training cap (`RankTrainingCaps`) as a level limit.
+3. Race values (`GetEffectiveStat`, `RacePerformanceModel` inputs) come from level + rank. Multiplayer races keep using one shared calculation.
+4. Update passive and active training so they stop at level 99, not at a rank cap. The "training capped" log event fires at level 99.
+5. Migration per Q2b, with a save round-trip test. Race balance tests are updated deliberately, not silently.
+6. UI: stat cards show level 0–99 plus the rank letter.
+
+**Acceptance:** an E-rank and an S-rank stat can both reach level 99; at equal levels the S-rank stat has the higher race value; existing saves load without unintended race changes.
+
 ### WP-B — Adult form from the highest stat
 
-**Depends on:** nothing. **Decisions:** Q2–Q5.
+**Depends on:** WP-K. **Decisions:** Q3–Q5.
 
 1. Write tests for the new rule first: the highest stat wins; stamina highest → neutral; nothing at the minimum → neutral; the tie rule; +1 promotion capped at S; promotion never runs twice.
 2. Replace the selection in `EvolutionService.ResolveFirstEvolution` with the level rule. Add `EvolutionRules` fields for the minimum and the tie rule, and retire `SpecializationThreshold` from the resource without breaking older `.tres` files.
@@ -337,10 +355,10 @@ Each package is one or two PRs and lists what it depends on and which decisions 
 
 **Depends on:** WP-C. **Decisions:** Q11, Q12.
 
-1. Add a Domain upgrade rule per star, as data: copies used up, coin cost and whether adjacency is required. The maximum is 4★. `GameBalanceResource` has fixed level-2 and level-3 fields today, so add level 4 (or switch to a list).
+1. Add a Domain merge rule, as data: what counts as a duplicate, and any cost (Q11a). The maximum is 4★. `GameBalanceResource` has fixed level-2 and level-3 fields today, so add level 4 (or switch to a list).
 2. Application merge: the target gains one star; the donor becomes plain ground (biome and stat cleared, level 1); Voidlings assigned to the donor are unassigned and keep their points.
 3. At 4★ the biome turns into its special environment (`water` → `swamp`), with its own passive rate.
-4. Existing coin-bought levels stay. Q11 decides whether the coin upgrade button stays.
+4. Existing coin-bought levels stay. The coin upgrade button is replaced by merging.
 5. Presentation: a merge flow in Build and the hex menu, a four-star row, and special environment art through the biome catalog.
 
 **Acceptance:** the island stays connected after any merge; no hex goes past 4★; tests cover each star step and the donor.
@@ -405,22 +423,23 @@ Needed:
 
 | Package | Needs first | Blocked by |
 |---|---|---|
-| WP-A | nothing | Q1 (durations only), Q6 |
-| WP-B | nothing | Q2–Q5 |
+| WP-A | nothing | Q6 |
+| WP-K | nothing | Q2a, Q2b |
+| WP-B | WP-K | Q3–Q5 |
 | WP-C | nothing | Q10 |
 | WP-D | WP-C | Q21 |
-| WP-E | WP-C | Q11, Q12 |
+| WP-E | WP-C | Q11a, Q12 |
 | WP-F | nothing | Q7–Q9 (hard stop) |
 | WP-G | WP-B, WP-E; WP-F if Q9 ties variants to neutral | Q13–Q19 |
 | WP-H | nothing | Q20 (hard stop) |
 | WP-I | WP-B; WP-D and WP-G add their records when they land | Q22, Q23 |
 | WP-J | nothing | art being supplied |
 
-Suggested order: WP-A, WP-B and WP-C in parallel; then WP-D; then the first version of the journal (WP-I) with forms and hatch records; then WP-E and WP-G, which add special entries to the journal. WP-F and WP-H start once their decisions are made. WP-J runs throughout.
+Suggested order: WP-A, WP-K and WP-C in parallel; then WP-B and WP-D; then the first version of the journal (WP-I) with forms and hatch records; then WP-E and WP-G, which add special entries to the journal. WP-F and WP-H start once their decisions are made. WP-J runs throughout.
 
 Suggested branches:
 
-1. `feature/lifecycle-happiness-gate` (WP-A)
+1. `feature/lifecycle-happiness-gate` (WP-A) and `feature/chao-stat-levels` (WP-K)
 2. `feature/adult-form-highest-stat` (WP-B)
 3. `feature/garden-biomes`: Domain and save first, presentation second (WP-C)
 4. `feature/hatch-biome` (WP-D)
