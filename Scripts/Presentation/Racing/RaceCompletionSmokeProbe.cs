@@ -84,21 +84,17 @@ public partial class RaceCompletionSmokeProbe : Node
 
             Engine.TimeScale = TimeScale;
             var startedMsec = Time.GetTicksMsec();
-            while (!race.ResultsPending && !race.ResultsShown &&
-                   (Time.GetTicksMsec() - startedMsec) < BudgetSeconds * 1000.0)
-            {
-                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-            }
-
-            if (!race.ResultsPending || race.ResultsShown)
-                throw new InvalidOperationException("The results card did not pause after the finish.");
-
             while (!race.ResultsShown && (Time.GetTicksMsec() - startedMsec) < BudgetSeconds * 1000.0)
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             Engine.TimeScale = 1.0;
 
             if (!race.ResultsShown)
                 throw new InvalidOperationException($"Race never reached its results screen within {BudgetSeconds}s.");
+
+            // Ask the screen instead of watching for the pause: at this speed the one-second reveal
+            // delay can pass inside a single slow frame, between two of the probe's checks.
+            if (!race.ResultsShownAfterDelay)
+                throw new InvalidOperationException("The results card did not pause after the finish.");
 
             if (completedPlacement <= 0)
                 throw new InvalidOperationException("Race completion never reported a placement to its owner.");
