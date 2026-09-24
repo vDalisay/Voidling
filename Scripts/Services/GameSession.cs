@@ -10,8 +10,12 @@ using Voidling.Application.Settings;
 using Voidling.Application.Shop;
 using Voidling.Application.Simulation;
 using Voidling.Application.Training;
+using Voidling.Domain.Creatures;
+using Voidling.Domain.Evolution;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shop;
+using Voidling.Domain.Stats;
+using Voidling.Presentation.UI.Common;
 
 namespace VoidlingGame;
 
@@ -93,23 +97,31 @@ public partial class GameSession : Node
             switch (simulationEvent)
             {
                 case CreatureBecameAdultEvent adult:
-                    Announce($"{adult.Name} grew into an adult.", true); break;
+                    Announce(string.Format(Tr("LOG_GREW_INTO_FORM"), adult.Name,
+                        VoidlingFormPresentationCatalog.NameFor(EvolutionService.VisualTypeFor(adult.Specialization))), true); break;
                 case CreatureEnteredCocoonEvent cocoon:
                     RaiseGardenEvent(cocoon.WillReincarnate ? $"{cocoon.Name} entered a bright cocoon." : $"{cocoon.Name} entered a fading cocoon.");
                     LifecycleCocoonRequested?.Invoke(cocoon.CreatureId, cocoon.WillReincarnate); break;
                 case CreatureReincarnatedEvent reincarnated:
                     Announce($"{reincarnated.Name} reincarnated and began a new life.", true); break;
                 case CreatureDiedEvent died:
-                    Announce($"{died.Name} reached the end of their life.", true); break;
+                    Announce($"{died.Name} reached the end of their life.", true);
+                    AnnounceSpecialVariantDeparture(died.CreatureId); break;
                 case CreatureCareRiskEvent risk:
                     RaiseGardenEvent($"{risk.Name} seems unsettled and needs more care before the end of this life."); break;
                 case CreaturePassiveTrainingCappedEvent capped:
-                    RaiseGardenEvent($"{capped.Name} finished passive {DisplayStatId(capped.StatId)} training at their current DNA cap."); break;
+                    RaiseGardenEvent($"{capped.Name} reached level 99 in {DisplayStatId(capped.StatId)}."); break;
                 case CreatureHatchedEvent hatched:
                     RecordDailyMissionEvent(DailyMissionEventKind.HatchEgg);
-                    Announce($"An egg hatched and {hatched.Name} was born!", true); break;
+                    Announce(hatched.SpecialVariantId.Length > 0
+                        ? string.Format(Tr("LOG_SPECIAL_HATCHED"), hatched.Name,
+                            VoidlingFormPresentationCatalog.NameFor(SpecialVariantCatalog.Find(hatched.SpecialVariantId)?.VisualTypeId))
+                        : $"An egg hatched and {hatched.Name} was born!", true); break;
                 case EggFailedEvent:
                     Announce("An egg failed to hatch.", true); break;
+                case EncyclopediaEntryDiscoveredEvent discovered:
+                    RaiseGardenEvent(string.Format(Tr("LOG_JOURNAL_NEW"),
+                        Tr("JOURNAL_NAME_" + discovered.EntryId.Replace('-', '_').ToUpperInvariant()), discovered.CreatureName)); break;
                 case EggWaitingForGardenSpaceEvent:
                     Announce("The Garden is full. Say goodbye to a Voidling before this egg can hatch.", true); break;
             }
@@ -117,6 +129,17 @@ public partial class GameSession : Node
         if (!result.Changed) return;
         Save();
         StateChanged?.Invoke();
+    }
+
+    /// <summary>When a special variant leaves, say that its respawn egg is now in the shop.</summary>
+    private void AnnounceSpecialVariantDeparture(string creatureId)
+    {
+        var departed = State.DepartedVoidlings.Find(creature => creature.Id == creatureId);
+        if (SpecialVariantCatalog.Find(departed?.SpecialVariantId) is not { } variant)
+            return;
+
+        RaiseGardenEvent(string.Format(Tr("LOG_SPECIAL_RESPAWN_AVAILABLE"),
+            VoidlingFormPresentationCatalog.NameFor(variant.VisualTypeId), BiomePresentationCatalog.NameFor(variant.Environment)));
     }
 
     private void Announce(string message, bool toast)
@@ -232,8 +255,11 @@ public partial class GameSession : Node
         return new VoidlingData
         {
             Id = id, Name = name, Genome = genome, Stage = LifeStage.Adult, AgeSeconds = GameRules.ChildToAdultSeconds,
+            // Starters arrive grown up, as Neutral adults.
+            EvolutionSpecialization = EvolutionSpecialization.Generalist,
+            Appearance = new VoidlingAppearanceData { VisualTypeId = EvolutionService.NeutralVisualTypeId },
             TintHex = tint, RareTraits = GeneticsService.RollFounderTraits(seed, id),
-            TrainingPoints = GameRules.StatIds.ToDictionary(stat => stat, _ => 0), WorldX = position.X, WorldY = position.Y
+            Stats = StatProgressionService.CreateNewborn(GameRules.StatIds), WorldX = position.X, WorldY = position.Y
         };
     }
 

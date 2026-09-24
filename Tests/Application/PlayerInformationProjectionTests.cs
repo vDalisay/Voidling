@@ -24,7 +24,7 @@ public sealed class PlayerInformationProjectionTests
             AlleleB = 4,
             ExpressedAlleleIndex = 1
         };
-        creature.TrainingPoints["run"] = 29;
+        creature.Stats["run"] = new StatProgressData { Level = 3, Progress = 4, Points = 81 };
         state.Voidlings.Add(creature);
 
         var projection = new CreatureProfileProjectionService(Rules).Create(state, creature.Id);
@@ -34,17 +34,18 @@ public sealed class PlayerInformationProjectionTests
         Assert.Equal("C", run.Dna1Rank);
         Assert.Equal("A", run.Dna2Rank);
         Assert.Equal(3, run.TrainingLevel);
-        Assert.Equal(80, run.EffectiveValue);
-        Assert.InRange(run.TrainingProgress, 0.416, 0.417);
+        Assert.Equal(81, run.Points);
+        Assert.Equal(2, run.EffectiveValue);
+        Assert.Equal(0.4, run.TrainingProgress, 3);
         Assert.Equal(LineageRiskBand.Moderate, projection.LineageRisk);
 
         creature.Genome.AbilityGenes["run"].AlleleB = 0;
-        creature.TrainingPoints["run"] = 0;
+        creature.Stats["run"] = new StatProgressData();
         creature.InbreedingBurdenLevel = 0;
 
         Assert.Equal("A", run.InheritedRank);
         Assert.Equal(3, run.TrainingLevel);
-        Assert.Equal(80, run.EffectiveValue);
+        Assert.Equal(81, run.Points);
         Assert.Equal(LineageRiskBand.Moderate, projection.LineageRisk);
     }
 
@@ -53,7 +54,7 @@ public sealed class PlayerInformationProjectionTests
     {
         var state = new GameStateData();
         var creature = CreateCreature("training");
-        creature.TrainingPoints["run"] = 5;
+        creature.Stats["run"] = new StatProgressData { Level = 2, Progress = 5 };
         creature.PassiveTrainingStatId = "run";
         creature.PassiveTrainingPointsPerMinute = 3;
         creature.PassiveTrainingModuleId = "run-ground";
@@ -63,7 +64,7 @@ public sealed class PlayerInformationProjectionTests
         var run = new CreatureProfileProjectionService(Rules).Create(state, creature.Id)!.Stats
             .Single(stat => stat.StatId == "run");
 
-        Assert.InRange(run.TrainingProgress, 5.49 / 12.0, 5.51 / 12.0);
+        Assert.InRange(run.TrainingProgress, 5.49 / 10.0, 5.51 / 10.0);
         Assert.Equal(0.05, run.TrainingPointsPerSecond, 3);
     }
 
@@ -114,7 +115,7 @@ public sealed class PlayerInformationProjectionTests
                 AlleleB = 1,
                 ExpressedAlleleIndex = 0
             };
-            creature.TrainingPoints[statId] = 0;
+            creature.Stats[statId] = new StatProgressData();
         }
         return creature;
     }

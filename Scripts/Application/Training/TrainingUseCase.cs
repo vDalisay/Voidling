@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using Voidling.Application.Garden;
 using Voidling.Domain.Care;
-using Voidling.Domain.Evolution;
 using Voidling.Domain.Garden;
 using Voidling.Domain.Preferences;
 using Voidling.Domain.Rules;
@@ -19,6 +18,7 @@ public enum TrainingFailure
     CreatureNotFound,
     NotEnoughCurrency,
     NoItemOwned,
+    /// <summary>The stat already sits at the level cap (99); rank no longer caps training.</summary>
     StatAtCap
 }
 
@@ -88,6 +88,7 @@ public sealed class TrainingUseCase
     private readonly StatCalculator _stats;
     private readonly CreatureNeedsService _needs = new();
     private readonly FavoriteFoodPreferenceService _favoriteFood = new();
+    private readonly StatProgressionService _progression = new();
 
     public TrainingUseCase(GameBalanceRules rules)
     {
@@ -119,7 +120,7 @@ public sealed class TrainingUseCase
         var creature = state.Voidlings.FirstOrDefault(v => v.Id == creatureId);
         if (creature == null)
             return TrainingFailure.CreatureNotFound;
-        if (_stats.GetTrainingPoints(creature, statId) >= _stats.GetTrainingPointCap(creature, statId))
+        if (_stats.IsAtMaxLevel(creature, statId))
             return TrainingFailure.StatAtCap;
 
         state.TrainingItems.TryGetValue(statId, out var count);
@@ -145,13 +146,8 @@ public sealed class TrainingUseCase
         var rolledGain = StableRandom.Create(seed, $"training:{creatureId}:{statId}")
             .Next(gainRules.MinGain, gainRules.MaxGain + 1);
         var favoriteBonus = wasFavoriteFood ? Math.Max(0, _rules.FavoriteFood.BonusTrainingPoints) : 0;
-        var current = _stats.GetTrainingPoints(creature, statId);
-        var cap = _stats.GetTrainingPointCap(creature, statId);
-        var updated = Math.Min(cap, current + rolledGain + favoriteBonus);
-        var appliedGain = Math.Max(0, updated - current);
-        creature.TrainingPoints[statId] = updated;
+        var appliedGain = _progression.AddProgress(creature, statId, rolledGain + favoriteBonus, _rules.Stats).ProgressApplied;
 
-        EvolutionService.ApplyTrainingInfluence(creature, statId, appliedGain, _rules.Stats);
         _needs.ApplyTrainingTreat(creature.Needs, _rules.Needs);
         return new TrainingApplicationResult(
             TrainingFailure.None,
@@ -259,33 +255,8 @@ public sealed class TrainingUseCase
             });
         }
 
-        RefreshAssignedCreatureRates(state, module);
+        GardenTrainingRates.RefreshAssignedCreatures(state, module, _rules.GardenModules);
         return new GardenModuleMutationResult(GardenModuleFailure.None, true);
-    }
-
-    /// <summary>Turns one placed empty hex into training ground for a stat, for coins.</summary>
-    public GardenModuleMutationResult ConvertHexToTrainingGround(GameStateData state, string moduleId, string statId)
-    {
-        ArgumentNullException.ThrowIfNull(state);
-        if (!_rules.Genetics.StatIds.Contains(statId))
-            return new GardenModuleMutationResult(GardenModuleFailure.UnknownStat, false);
-
-        var module = state.GardenModules.FirstOrDefault(candidate => candidate.Id == moduleId);
-        if (module == null)
-            return new GardenModuleMutationResult(GardenModuleFailure.ModuleNotFound, false);
-        if (!module.Placed)
-            return new GardenModuleMutationResult(GardenModuleFailure.NotPlaced, false);
-        if (module.StatId.Length > 0)
-            return new GardenModuleMutationResult(GardenModuleFailure.AlreadyTrainingGround, false);
-
-        var cost = _rules.GardenModules.TrainingConversionCost;
-        if (state.Coins < cost)
-            return new GardenModuleMutationResult(GardenModuleFailure.NotEnoughCurrency, false);
-
-        state.Coins -= cost;
-        module.StatId = statId;
-        module.Level = 1;
-        return new GardenModuleMutationResult(GardenModuleFailure.None, true, cost);
     }
 
     /// <summary>
@@ -327,27 +298,6 @@ public sealed class TrainingUseCase
         return state.GardenModules.Any(module => module.Placed && module.HexQ == hexQ && module.HexR == hexR);
     }
 
-    public GardenModuleMutationResult UpgradeGardenModule(GameStateData state, string moduleId)
-    {
-        ArgumentNullException.ThrowIfNull(state);
-        var module = state.GardenModules.FirstOrDefault(candidate => candidate.Id == moduleId);
-        if (module == null)
-            return new GardenModuleMutationResult(GardenModuleFailure.ModuleNotFound, false);
-        if (module.StatId.Length == 0)
-            return new GardenModuleMutationResult(GardenModuleFailure.NotTrainingGround, false);
-
-        var cost = _rules.GardenModules.UpgradeCostForLevel(module.Level);
-        if (cost < 0)
-            return new GardenModuleMutationResult(GardenModuleFailure.MaxLevel, false);
-        if (state.Coins < cost)
-            return new GardenModuleMutationResult(GardenModuleFailure.NotEnoughCurrency, false);
-
-        state.Coins -= cost;
-        module.Level = Math.Min(_rules.GardenModules.MaxLevel, module.Level + 1);
-        RefreshAssignedCreatureRates(state, module);
-        return new GardenModuleMutationResult(GardenModuleFailure.None, true, cost);
-    }
-
     /// <summary>
     /// Assigns passive training by dropping a Voidling onto a placed land tile. The tile is the
     /// source of truth for the stat and rate; the creature is free to wander off it afterwards.
@@ -370,7 +320,7 @@ public sealed class TrainingUseCase
         if (!HasRoomFor(state, module.Id, creatureId))
             return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.LandFull, module.StatId, false);
 
-        var rate = RateFor(module);
+        var rate = GardenTrainingRates.RateFor(module, _rules.GardenModules);
         var changed = !string.Equals(creature.PassiveTrainingStatId, module.StatId, StringComparison.Ordinal) ||
                       !string.Equals(creature.PassiveTrainingModuleId, module.Id, StringComparison.Ordinal) ||
                       creature.PassiveTrainingPointRemainder != 0.0 ||
@@ -424,24 +374,4 @@ public sealed class TrainingUseCase
 
         return new PassiveTrainingAssignmentResult(PassiveTrainingFailure.None, string.Empty, changed);
     }
-
-    private void RefreshAssignedCreatureRates(GameStateData state, GardenModuleData module)
-    {
-        var rate = RateFor(module);
-        foreach (var creature in state.Voidlings)
-        {
-            if (!string.Equals(creature.PassiveTrainingModuleId, module.Id, StringComparison.Ordinal))
-                continue;
-
-            creature.PassiveTrainingStatId = module.StatId;
-            creature.PassiveTrainingPointsPerMinute = rate;
-            if (rate <= 0.0f)
-                creature.PassiveTrainingPointRemainder = 0.0;
-        }
-    }
-
-    private float RateFor(GardenModuleData module)
-        => module.Placed && module.StatId.Length > 0
-            ? _rules.GardenModules.PointsPerMinuteForLevel(module.Level)
-            : 0.0f;
 }

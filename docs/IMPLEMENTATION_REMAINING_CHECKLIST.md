@@ -23,15 +23,28 @@ Items under **Product decisions required before implementation** are deliberate 
   - [x] Latest authored Normal-body outline palette revision is integrated on `main` (`9f971202` / merge `71b4c3a3`) and keeps the centralized palette/resource path intact.
   - [ ] Ingest the next authored body/wing/crown/form revision when artwork is supplied; do not synthesize new production art or fork the visual pipeline.
 
+## Lifecycle, biomes & encyclopedia (September 2026 design meetings)
+
+Planned in `docs/LIFECYCLE_BIOMES_ENCYCLOPEDIA_IMPLEMENTATION_PLAN.md`; its §11 records every decision and §17 the implementation notes.
+
+- [x] WP-A: life stages in open-game hours; happiness ≥ 70 is the only reincarnation condition.
+- [x] WP-K: Chao Garden stats (levels 0–99, stat points, reincarnation to level 1 with 10%).
+- [x] WP-B: adult form from the highest stat; Neutral adults show the artist's colors.
+- [x] WP-H: incubation grows with S ranks and rarity.
+- [x] WP-C / WP-E: biomes, biome tiles, stacking to level 4 (Swamp, Volcano), picking tiles up.
+- [x] WP-L: eggs can be picked up and moved in the Garden.
+- [x] WP-G: the Swamp guy (one-time spawn, Swamp-only hatching, respawn egg, untradable).
+- [x] WP-I: the Journal.
+- [ ] WP-J: register art for `neutral`, `run`, `water`, `fly`, `power` and `swamp-variant`, and biome ground art, as it arrives.
+
 ## Product decisions required before implementation
 
-- [ ] Lock the stat-driven morphology/evolution mapping (for example when/how `normal` changes toward water/fly/power forms).
-  - [ ] Blocked on authored art rather than on the rule: the mapping stays empty until the body/wing/crown forms are supplied.
-  - [x] Decision-neutral implementation seam added on `feature/remaining-systems-2026-09-09`: a pure resolver can translate an already-resolved evolution specialization through an explicitly supplied semantic visual mapping while blank mappings preserve the current visual type. The production Godot visual catalog remains unchanged until morphology rules and authored forms are approved.
-- [ ] Lock remaining appearance-inheritance probabilities, dominance, rare-trait depth and stacking rules.
+- [x] Lock the stat-driven morphology/evolution mapping: the highest stat at level 10+ decides the adult form (lifecycle plan §4.3). Implemented: `EvolutionService` writes the adult's visual type (`neutral`, `run`, `water`, `fly`, `power`), and the visual catalog shows the base art for any type whose art is not registered yet (WP-J above).
+  - [x] Decision-neutral implementation seam added on `feature/remaining-systems-2026-09-09`: a pure resolver can translate an already-resolved evolution specialization through an explicitly supplied semantic visual mapping while blank mappings preserve the current visual type. Superseded by the lifecycle work, which decides the visual type in the domain; `VoidlingMorphologyVisualResolver` is unused.
+- [ ] Lock remaining appearance-inheritance probabilities, dominance, rare-trait depth and stacking rules. Neutral is a type whose adults show the artist colors (lifecycle plan §5.2); per-type hue ranges are still open.
   - [x] Rare-trait transmission depth is now authored balance (`GeneticsRules.RareTraitMaxTransmittedGenerations`, exported on `GameBalanceResource`) instead of a hardcoded `< 2` in `RareTraitInheritanceService`. The default keeps current behavior; probabilities, dominance and stacking remain undecided.
   - [x] Stacking is locked: a child carries each rare trait once. When both parents transmit the same trait the copy closest to its founder survives, so the child keeps the longest remaining transmission depth. Traits with different IDs still stack. This only applies at inheritance time; creatures already saved with duplicate traits are left untouched rather than rewritten.
-- [ ] Lock the final trophy/reincarnation transformation recipe.
+- [ ] Lock the final trophy transformation recipe. Reincarnation is decided and implemented (happiness ≥ 70, lifecycle plan §4.4); the trophy form is still open.
   - [x] Decision-neutral gate added: `TrophyTransformation` / `TrophyRequirements` answer whether an explicitly authored requirement set is met, and `TrophyRequirements.Undecided` (the default) never qualifies. Only the multi-lifecycle dimension named in the design context is represented; the confirmed trophy effects (immortal, retains appearance, cannot breed, can race, no hidden race power) stay unwired until the recipe is approved.
 - [ ] Lock Cup entry-fee/refund/reward economy details. Deliberately parked: Cups stay free so test runs are not gated by currency, and the numbers are revisited during the balancing pass.
   - [x] Decision-neutral arithmetic added: `CupEconomy` / `CupEconomyRules` price entry per stable Cup ID and express refunds as a fraction per finishing placement, which covers both the winner-only and placement-based directions without choosing between them. `CupEconomyRules.Free` (the default) charges nothing and refunds nothing, and no Cup is priced. Prizes stay absent: the design direction is item/medal/trophy/unlock rather than currency.

@@ -107,7 +107,7 @@ public sealed class DailyFriendRaceCoordinatorTests
         Assert.Equal(1, repository.SaveCalls);
         Assert.True(projected.Success, projected.Error);
         var upload = Assert.Single(leaderboards.Uploads);
-        Assert.Equal("voidling_daily_2026-08-25_v1", upload.Definition.Name);
+        Assert.Equal("voidling_daily_2026-08-25_v2", upload.Definition.Name);
         Assert.Equal(42_500, upload.Score);
         Assert.True(upload.KeepBest);
     }
@@ -159,7 +159,7 @@ public sealed class DailyFriendRaceCoordinatorTests
             TintHex = "#ABCDEF"
         };
         foreach (var statId in Rules.Genetics.StatIds)
-            creature.TrainingPoints[statId] = 0;
+            creature.Stats[statId] = new StatProgressData();
         return creature;
     }
 

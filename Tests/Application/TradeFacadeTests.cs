@@ -168,7 +168,7 @@ public sealed class TradeFacadeTests
             TintHex = "#ABCDEF"
         };
         foreach (var statId in Rules.Genetics.StatIds)
-            creature.TrainingPoints[statId] = 0;
+            creature.Stats[statId] = new StatProgressData();
         return creature;
     }
 

@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using Voidling.Application.Collection;
 using Voidling.Domain.Care;
 using Voidling.Domain.Evolution;
 using Voidling.Domain.Hatching;
 using Voidling.Domain.Lifecycle;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shop;
+using Voidling.Domain.Stats;
 using Voidling.Domain.Training;
 using VoidlingGame;
 
@@ -18,8 +20,14 @@ public sealed record CreatureReincarnatedEvent(string CreatureId, string Name, i
 public sealed record CreatureDiedEvent(string CreatureId, string Name) : GameSimulationEvent;
 public sealed record CreatureCareRiskEvent(string CreatureId, string Name) : GameSimulationEvent;
 public sealed record CreaturePassiveTrainingCappedEvent(string CreatureId, string Name, string StatId) : GameSimulationEvent;
-public sealed record CreatureHatchedEvent(string EggId, string CreatureId, string Name) : GameSimulationEvent;
+public sealed record CreatureHatchedEvent(string EggId, string CreatureId, string Name) : GameSimulationEvent
+{
+    /// <summary>Set when the hatchling is a special variant (the Swamp guy).</summary>
+    public string SpecialVariantId { get; init; } = "";
+}
 public sealed record EggFailedEvent(string EggId) : GameSimulationEvent;
+/// <summary>A journal entry was discovered for the first time by this Voidling hatching or growing up.</summary>
+public sealed record EncyclopediaEntryDiscoveredEvent(string EntryId, string CreatureName) : GameSimulationEvent;
 public sealed record EggWaitingForGardenSpaceEvent(string EggId) : GameSimulationEvent;
 public sealed record SimulationStepResult(bool Changed, IReadOnlyList<GameSimulationEvent> Events);
 
@@ -59,11 +67,15 @@ public sealed class AdvanceSimulationUseCase
         {
             if (!state.Voidlings.Remove(creature)) continue;
             if (!state.DepartedVoidlings.Contains(creature)) state.DepartedVoidlings.Add(creature);
+            SpecialVariantTracker.RecordDeparture(state, creature);
         }
 
         var hatchQueue = new List<EggData>();
         foreach (var egg in state.OwnedEggs)
         {
+            // A special variant's egg only incubates, and only hatches, on an unused hex of its
+            // environment: the Swamp guy's egg sits still anywhere but a Swamp that never hatched one.
+            if (!SpecialVariantTracker.CanIncubate(state, egg, _rules.GardenModules.Hex)) continue;
             if (egg.State == EggState.WaitingForSpace) { hatchQueue.Add(egg); continue; }
             if (egg.State != EggState.Incubating) continue;
             egg.IncubationSeconds += elapsedSeconds;
@@ -84,9 +96,35 @@ public sealed class AdvanceSimulationUseCase
                 continue;
             }
             var creature = Hatch(state, egg); changed = true;
-            events.Add(new CreatureHatchedEvent(egg.Id, creature.Id, creature.Name));
+            events.Add(new CreatureHatchedEvent(egg.Id, creature.Id, creature.Name) { SpecialVariantId = creature.SpecialVariantId });
         }
+        changed |= RecordDiscoveries(state, events);
         return new SimulationStepResult(changed, events);
+    }
+
+    /// <summary>Hatching and growing up fill the journal the first time each look appears.</summary>
+    private static bool RecordDiscoveries(GameStateData state, List<GameSimulationEvent> events)
+    {
+        var discoveries = new List<GameSimulationEvent>();
+        foreach (var simulationEvent in events)
+        {
+            var creatureId = simulationEvent switch
+            {
+                CreatureHatchedEvent hatched => hatched.CreatureId,
+                CreatureBecameAdultEvent adult => adult.CreatureId,
+                _ => null
+            };
+            if (creatureId == null)
+                continue;
+
+            var creature = state.Voidlings.Find(candidate => candidate.Id == creatureId)
+                           ?? state.DepartedVoidlings.Find(candidate => candidate.Id == creatureId);
+            if (creature != null && EncyclopediaRecorder.Discover(state, creature) is { } entryId)
+                discoveries.Add(new EncyclopediaEntryDiscoveredEvent(entryId, creature.Name));
+        }
+
+        events.AddRange(discoveries);
+        return discoveries.Count > 0;
     }
 
     private bool AdvanceCreature(VoidlingData creature, float elapsedSeconds, List<GameSimulationEvent> events, out bool died)
@@ -133,7 +171,7 @@ public sealed class AdvanceSimulationUseCase
             events.Add(new CreatureEnteredCocoonEvent(creature.Id, creature.Name, willReincarnate));
             if (willReincarnate)
             {
-                _reincarnation.ApplyReincarnation(creature, _rules.Reincarnation);
+                _reincarnation.ApplyReincarnation(creature, _rules.Reincarnation, _rules.Stats);
                 events.Add(new CreatureReincarnatedEvent(creature.Id, creature.Name, creature.ReincarnationCount));
                 changed = true; continue;
             }
@@ -162,7 +200,7 @@ public sealed class AdvanceSimulationUseCase
     }
 
     private bool IsCareLifecycleSafe(VoidlingData creature)
-        => creature.Needs.Happiness >= _rules.Reincarnation.MinimumHappiness && creature.Needs.Stress <= _rules.Reincarnation.MaximumStress;
+        => creature.Needs.Happiness >= _rules.Reincarnation.CareRiskHappiness;
 
     private bool AdvanceGardenIncome(GameStateData state, float elapsedSeconds)
     {
@@ -217,9 +255,11 @@ public sealed class AdvanceSimulationUseCase
             ParentAId = egg.ParentAId, ParentBId = egg.ParentBId, FamilyGeneration = egg.FamilyGeneration,
             InbreedingBurdenLevel = egg.InbreedingBurdenLevel, InbreedingHistoryFlag = egg.InbreedingHistoryFlag,
             TintHex = egg.TintHex, Appearance = appearance, RareTraits = egg.RareTraits,
+            SpecialVariantId = egg.SpecialVariantId ?? string.Empty,
             Needs = new CreatureNeedsState(), WorldX = egg.WorldX, WorldY = egg.WorldY
         };
-        foreach (var statId in _rules.Genetics.StatIds) creature.TrainingPoints[statId] = 0;
+        SpecialVariantTracker.RecordHatch(state, egg, creature, _rules.GardenModules.Hex);
+        creature.Stats = StatProgressionService.CreateNewborn(_rules.Genetics.StatIds);
         state.Voidlings.Add(creature);
         state.EggShells.Add(new EggShellData { Id = egg.Id, Source = egg.Source, TintHex = egg.TintHex });
         state.OwnedEggs.Remove(egg);

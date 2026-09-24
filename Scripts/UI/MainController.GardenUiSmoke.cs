@@ -55,6 +55,21 @@ public partial class MainController
             if (!_modalHost.IsOpen) throw new InvalidOperationException("Rail settings button did not open Settings.");
             await ClickGardenPosition(new Vector2(4, 4));
             if (_modalHost.IsOpen) throw new InvalidOperationException("Clicking outside a submenu did not return to the Garden.");
+            // The journal lists every form and special variant, with undiscovered ones as "???".
+            await ClickGardenControl(FindGardenButton(actions, "Journal"));
+            if (!_modalHost.IsOpen) throw new InvalidOperationException("Rail journal button did not open the Journal.");
+            foreach (var part in new[] { "JournalCount", "JournalEntries", "JournalDetail", "JournalEntryName" })
+            {
+                if (_modalHost.FindChild(part, true, false) is not Control journalPart)
+                    throw new InvalidOperationException($"Journal is missing '{part}'.");
+                RequireOnScreen(journalPart);
+            }
+            var journalEntries = ((Control)_modalHost.FindChild("JournalEntries", true, false)!).FindChildren("Entry_*", "Button", true, false);
+            if (journalEntries.Count != Voidling.Domain.Collection.EncyclopediaCatalog.All.Count)
+                throw new InvalidOperationException("Journal does not show one slot per entry.");
+            await CaptureGardenUi("journal");
+            CloseModal();
+            await SettleGardenUi();
             RequireSeparate(rail, _gardenEventLog);
             await CaptureGardenUi("garden");
 
@@ -341,14 +356,14 @@ public partial class MainController
         if (_session.State.StoreEggs.Count == 0) _session.RefillStoreEggs();
         _session.State.Coins = Math.Max(
             _session.State.Coins,
-            GameRules.TrainingItemPrice + GameRules.StoreEggPrice +
+            GameRules.TrainingItemPrice + GameRules.StoreEggPrice + GameRules.GardenModuleRules.BiomeTilePrice +
             GameRules.GardenModuleRules.EmptyHexCost * 2 + 10);
         RenderShop();
         await SettleGardenUi();
         RequireSeparate(rail, ModalPanel());
         var ledger = _modalHost.FindChildren("ShopLedger", string.Empty, true, false).OfType<Voidling.Presentation.UI.Shop.ShopScreen>().Single();
         RequireOnScreen(ledger);
-        foreach (var category in new[] { "Treats", "Eggs", "Land" })
+        foreach (var category in new[] { "Treats", "Eggs", "Land", "Biomes" })
             FindGardenButton(ledger, "Category" + category);
         if (ledger.FindChild("Categories", true, false) == null || ledger.FindChild("Catalogue", true, false) == null ||
             ledger.FindChild("Receipt", true, false) == null)
@@ -380,6 +395,18 @@ public partial class MainController
         ledger = _modalHost.FindChildren("ShopLedger", string.Empty, true, false).OfType<Voidling.Presentation.UI.Shop.ShopScreen>().Single();
         if (!FindGardenButton(ledger, "CategoryEggs").ButtonPressed)
             throw new InvalidOperationException("Shop category was not preserved after egg purchase.");
+
+        // Biome tiles: a level 1 tile goes to the inventory, ready to put on a hex or stack.
+        var tilesBefore = _session.State.BiomeTiles.Sum(stack => stack.Count);
+        var tileCoins = _session.State.Coins;
+        await ClickGardenControl(FindGardenButton(ledger, "CategoryBiomes"));
+        await CaptureGardenUi("shop-biomes");
+        await ClickGardenControl(FindShopBuy(ledger));
+        await SettleGardenUi();
+        if (_session.State.BiomeTiles.Sum(stack => stack.Count) != tilesBefore + 1 ||
+            _session.State.Coins != tileCoins - GameRules.GardenModuleRules.BiomeTilePrice)
+            throw new InvalidOperationException("Buying a biome tile did not put one in the inventory for its price.");
+        ledger = _modalHost.FindChildren("ShopLedger", string.Empty, true, false).OfType<Voidling.Presentation.UI.Shop.ShopScreen>().Single();
         await ClickGardenControl(FindGardenButton(ledger, "CategoryLand"));
         await ToSignal(GetTree().CreateTimer(1.6), SceneTreeTimer.SignalName.Timeout);
         await CaptureGardenUi("shop-land");

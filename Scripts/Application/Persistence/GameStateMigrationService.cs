@@ -10,6 +10,9 @@ using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Care;
+using Voidling.Domain.Collection;
+using Voidling.Domain.Creatures;
+using Voidling.Domain.Evolution;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Preferences;
 using Voidling.Domain.Rules;
@@ -25,7 +28,7 @@ namespace Voidling.Application.Persistence;
 /// </summary>
 public sealed class GameStateMigrationService
 {
-    public const int CurrentSaveVersion = 22;
+    public const int CurrentSaveVersion = 23;
 
     /// <summary>Longest island name the header can show without truncating.</summary>
     public const int GardenNameMaxLength = 22;
@@ -34,13 +37,11 @@ public sealed class GameStateMigrationService
     private readonly LineageArchiveService _lineage = new();
     private readonly CreatureNeedsService _needs = new();
     private readonly FavoriteFoodPreferenceService _favoriteFood = new();
-    private readonly StatCalculator _stats;
     private readonly ColorPhenotypeResolver _colors;
 
     public GameStateMigrationService(GameBalanceRules rules)
     {
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
-        _stats = new StatCalculator(_rules.Stats);
         _colors = new ColorPhenotypeResolver(_rules.Appearance);
     }
 
@@ -105,13 +106,14 @@ public sealed class GameStateMigrationService
         }
 
         NormalizeGardenModules(state, previousVersion);
-        foreach (var creature in state.Voidlings.Concat(state.DepartedVoidlings)) NormalizeCreature(state, creature);
+        foreach (var creature in state.Voidlings.Concat(state.DepartedVoidlings)) NormalizeCreature(state, creature, previousVersion);
 
         foreach (var egg in state.OwnedEggs.Concat(state.StoreEggs))
         {
             egg.Genome ??= new GenomeData();
             NormalizeGenome(egg.Genome);
             egg.RareTraits ??= new List<RareTraitData>();
+            egg.SpecialVariantId = SpecialVariantCatalog.Find(egg.SpecialVariantId)?.Id ?? string.Empty;
             egg.Appearance = NormalizeAppearance(egg.Genome, egg.Appearance);
             egg.IncubationSeconds = NonNegativeFinite(egg.IncubationSeconds);
             egg.RequiredIncubationSeconds = NonNegativeFinite(egg.RequiredIncubationSeconds);
@@ -120,6 +122,22 @@ public sealed class GameStateMigrationService
         }
 
         _lineage.EnsureCurrentEntries(state);
+
+        state.Encyclopedia = state.Encyclopedia
+            .Where(record => record != null && EncyclopediaCatalog.Find(record.EntryId) != null)
+            .GroupBy(record => record.EntryId, StringComparer.Ordinal)
+            .Select(group => group.OrderBy(record => record.Order).First())
+            .ToList();
+        foreach (var record in state.Encyclopedia)
+            record.CreatureName ??= string.Empty;
+
+        state.SpecialVariants = state.SpecialVariants
+            .Where(entry => entry != null && SpecialVariantCatalog.Find(entry.VariantId) != null)
+            .GroupBy(entry => entry.VariantId, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .ToList();
+        foreach (var entry in state.SpecialVariants)
+            entry.CreatureId ??= string.Empty;
 
         state.PendingTradeJournal.RemoveAll(entry => entry == null || string.IsNullOrWhiteSpace(entry.TradeId));
         state.AppliedTradeIds = state.AppliedTradeIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToList();
@@ -153,21 +171,31 @@ public sealed class GameStateMigrationService
         state.SaveVersion = CurrentSaveVersion;
     }
 
-    private void NormalizeCreature(GameStateData state, VoidlingData creature)
+    private void NormalizeCreature(GameStateData state, VoidlingData creature, int previousVersion)
     {
         creature.Id ??= string.Empty;
         creature.Name = string.IsNullOrWhiteSpace(creature.Name) ? "Voidling" : creature.Name;
         creature.Genome ??= new GenomeData();
         NormalizeGenome(creature.Genome);
-        creature.TrainingPoints ??= new Dictionary<string, int>(StringComparer.Ordinal);
-        foreach (var statId in _rules.Genetics.StatIds)
-        {
-            if (!creature.TrainingPoints.ContainsKey(statId)) creature.TrainingPoints[statId] = 0;
-            creature.TrainingPoints[statId] = Math.Clamp(creature.TrainingPoints[statId], 0, _stats.GetTrainingPointCap(creature, statId));
-        }
+
+        // Version 23 moved stats to the Chao Garden model (levels 0-99, stat points). The old
+        // rank-capped training points do not translate, so every Voidling keeps its genes, lineage
+        // and everything else but starts its stats again at level 0.
+        if (previousVersion < 23)
+            creature.Stats = StatProgressionService.CreateNewborn(_rules.Genetics.StatIds);
+        StatProgressionService.EnsureStats(creature, _rules.Genetics.StatIds, _rules.Stats);
 
         creature.RareTraits ??= new List<RareTraitData>();
+        creature.SpecialVariantId = SpecialVariantCatalog.Find(creature.SpecialVariantId)?.Id ?? string.Empty;
         creature.Appearance = NormalizeAppearance(creature.Genome, creature.Appearance);
+
+        // Adults from before adult forms existed are Neutral: bigger than babies, and the artist's
+        // colors. Babies keep the baby look and pick a form when they grow up.
+        if (previousVersion < 23 && creature.Stage == LifeStage.Adult)
+        {
+            creature.EvolutionSpecialization = EvolutionSpecialization.Generalist;
+            creature.Appearance.VisualTypeId = EvolutionService.NeutralVisualTypeId;
+        }
         creature.Needs ??= new CreatureNeedsState();
         _needs.Normalize(creature.Needs);
         _favoriteFood.Normalize(creature, _rules.Genetics.StatIds);
@@ -235,9 +263,11 @@ public sealed class GameStateMigrationService
             module.Id = module.Id.Trim();
             if (!ids.Add(module.Id)) continue;
             module.StatId ??= string.Empty;
+            module.BiomeId ??= string.Empty;
             // Blank is plain ground now; anything that is neither blank nor a real stat is junk.
             if (module.StatId.Length > 0 && !_rules.Genetics.StatIds.Contains(module.StatId)) continue;
             module.Level = Math.Clamp(module.Level, 1, maxLevel);
+            NormalizeBiome(module);
             module.SlotIndex = -1;
             if (GardenTileShape.Find(module.ShapeId ?? string.Empty) == null)
                 module.ShapeId = GardenTileShape.Single.Id;
@@ -258,6 +288,49 @@ public sealed class GameStateMigrationService
         }
         state.GardenModules = normalized;
         TrainingUseCase.EnsureStarterHex(state);
+        NormalizeBiomeTiles(state, maxLevel);
+    }
+
+    /// <summary>
+    /// Version 23 names every training hex by biome. Older hexes carry only a stat, so the biome that
+    /// trains it is derived (run → plains, swim → water, …); the stat stays cached from the biome.
+    /// </summary>
+    private static void NormalizeBiome(GardenModuleData module)
+    {
+        var baseBiome = BiomeCatalog.IsKnown(module.BiomeId)
+            ? BiomeCatalog.BaseOf(module.BiomeId)
+            : BiomeCatalog.BiomeForStat(module.StatId);
+        if (baseBiome.Length == 0)
+        {
+            module.BiomeId = string.Empty;
+            module.StatId = string.Empty;
+            module.Level = 1;
+            module.SpecialVariantHatched = false;
+            return;
+        }
+
+        module.BiomeId = BiomeCatalog.IdAtStars(baseBiome, module.Level);
+        module.StatId = BiomeCatalog.StatOf(baseBiome);
+        if (string.Equals(module.BiomeId, baseBiome, StringComparison.Ordinal))
+            module.SpecialVariantHatched = false;
+    }
+
+    /// <summary>Inventory tile stacks: known biomes, real star counts, one stack per biome and star.</summary>
+    private static void NormalizeBiomeTiles(GameStateData state, int maxLevel)
+    {
+        state.BiomeTiles = state.BiomeTiles
+            .Where(stack => stack != null && BiomeCatalog.FindBase(stack.BiomeId) != null &&
+                            stack.Stars >= 1 && stack.Stars <= maxLevel && stack.Count > 0)
+            .GroupBy(stack => (stack.BiomeId, stack.Stars))
+            .Select(group => new BiomeTileStackData
+            {
+                BiomeId = group.Key.BiomeId,
+                Stars = group.Key.Stars,
+                Count = (int)Math.Min(int.MaxValue, group.Sum(stack => (long)stack.Count))
+            })
+            .OrderBy(stack => stack.BiomeId, StringComparer.Ordinal)
+            .ThenBy(stack => stack.Stars)
+            .ToList();
     }
 
     private void NormalizePassiveModuleAssignment(GameStateData state, VoidlingData creature)

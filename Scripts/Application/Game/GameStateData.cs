@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Voidling.Application.Collection;
 using Voidling.Application.Daily;
 using Voidling.Application.Garden;
 using Voidling.Application.Multiplayer.Leaderboards;
@@ -21,6 +22,9 @@ public sealed class GameStateData
     private List<DroppedTreatData> _droppedTreats = new();
     private List<string> _completedCupIds = new();
     private List<RaceCourseRecordData> _courseRecords = new();
+    private List<BiomeTileStackData> _biomeTiles = new();
+    private List<SpecialVariantStateData> _specialVariants = new();
+    private List<EncyclopediaDiscoveryData> _encyclopedia = new();
 
     public int SaveVersion { get; set; } = 20;
 
@@ -51,6 +55,30 @@ public sealed class GameStateData
     }
 
     public List<GardenModuleData> GardenModules { get; set; } = new();
+
+    /// <summary>
+    /// Biome tiles in the inventory, grouped by biome and stars. Additive and non-null: saves
+    /// written before biome tiles existed load with none.
+    /// </summary>
+    public List<BiomeTileStackData> BiomeTiles
+    {
+        get => _biomeTiles;
+        set => _biomeTiles = value ?? new List<BiomeTileStackData>();
+    }
+
+    /// <summary>Each special variant's life cycle in this save. Additive and non-null.</summary>
+    public List<SpecialVariantStateData> SpecialVariants
+    {
+        get => _specialVariants;
+        set => _specialVariants = value ?? new List<SpecialVariantStateData>();
+    }
+
+    /// <summary>Journal entries discovered in this save, first discovery only. Additive and non-null.</summary>
+    public List<EncyclopediaDiscoveryData> Encyclopedia
+    {
+        get => _encyclopedia;
+        set => _encyclopedia = value ?? new List<EncyclopediaDiscoveryData>();
+    }
 
     /// <summary>
     /// Cosmetic Garden objects are persisted independently from functional training modules.

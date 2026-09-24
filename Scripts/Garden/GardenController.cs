@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Common;
 
 namespace VoidlingGame;
 
@@ -94,6 +95,9 @@ public partial class GardenController : Node2D
 
         if (_followId.Length > 0 && _actors.TryGetValue(_followId, out var followed) && !_cameraDragging)
             _camera.Position = followed.Position;
+
+        if (UpdateEggDrag((float)delta))
+            return;
 
         if (_draggedId.Length > 0)
         {
@@ -295,6 +299,7 @@ public partial class GardenController : Node2D
         _inputEnabled = active;
         _cameraDragging = false;
         ClearPendingGrab();
+        CancelEggDrag();
 
         if (_draggedId.Length > 0)
             DropGrabbedVoidling();
@@ -487,11 +492,11 @@ public partial class GardenController : Node2D
                 label.AddThemeColorOverride("font_color", Color.FromHtml("#4F5948"));
                 holder.AddChild(label);
 
-                // Only a failed egg is ever interactive; a healthy one is a timer, not a decision.
-                // The box is sized off the drawn egg rather than the atlas cell, with room around
-                // it, so the egg is as easy to hit as a Voidling instead of losing the click to
-                // the ground underneath.
-                var hitbox = new Area2D { InputPickable = false, Monitoring = false, Monitorable = false };
+                // Every egg in the Garden can be picked up and moved; a short click on a failed egg
+                // opens its menu. The box is sized off the drawn egg rather than the atlas cell, with
+                // room around it, so the egg is as easy to hit as a Voidling instead of losing the
+                // click to the ground underneath.
+                var hitbox = new Area2D { InputPickable = true, Monitoring = false, Monitorable = false };
                 hitbox.AddChild(new CollisionShape2D
                 {
                     Shape = new RectangleShape2D { Size = EggHitboxSize },
@@ -503,12 +508,12 @@ public partial class GardenController : Node2D
                 {
                     if (inputEvent is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
                         return;
-                    // The egg owns the click; without this the ground underneath opens its hex menu
-                    // in the same press.
+                    // The egg owns the press; without this the ground underneath pans or opens its hex
+                    // menu in the same press.
                     GetViewport().SetInputAsHandled();
-                    FailedEggSelected?.Invoke(capturedEggId);
+                    BeginEggPointerInteraction(capturedEggId);
                 };
-                // The same faint lift a Voidling and a hex get, so a failed egg reads as clickable.
+                // The same faint lift a Voidling and a hex get, so an egg reads as something to pick up.
                 hitbox.MouseEntered += () => SetFailedEggHovered(capturedSprite, true);
                 hitbox.MouseExited += () => SetFailedEggHovered(capturedSprite, false);
                 holder.AddChild(hitbox);
@@ -526,13 +531,22 @@ public partial class GardenController : Node2D
                 }
             }
 
-            visual.Holder.Position = new Vector2(egg.WorldX, egg.WorldY);
+            // An egg in the hand follows the pointer, not its saved spot, until it is put down.
+            if (!string.Equals(egg.Id, _draggedEggId, StringComparison.Ordinal))
+                visual.Holder.Position = new Vector2(egg.WorldX, egg.WorldY);
             visual.Sprite.Modulate = egg.State == EggState.Failed
                 ? new Color(0.55f, 0.55f, 0.55f, 1.0f)
-                : GameRules.TintColor(egg.TintHex);
+                : egg.SpecialVariantId.Length > 0
+                    ? VoidlingFormPresentationCatalog.SpecialEggTint(egg.SpecialVariantId)
+                    : GameRules.TintColor(egg.TintHex);
             var remaining = Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds));
-            visual.Label.Text = egg.State == EggState.Failed ? "X" : $"{remaining}s";
-            visual.Hitbox.InputPickable = egg.State == EggState.Failed;
+            // A Swamp guy egg names where it has to go until it sits there; strong and rare eggs
+            // take minutes, so long waits read as m:ss.
+            var waitingFor = _session.EnvironmentEggIsWaitingFor(egg);
+            visual.Label.Text = egg.State == EggState.Failed ? "X"
+                : waitingFor.Length > 0 ? BiomePresentationCatalog.NameFor(waitingFor).ToUpperInvariant()
+                : remaining >= 60 ? $"{remaining / 60}:{remaining % 60:00}" : $"{remaining}s";
+            visual.Hitbox.InputPickable = true;
         }
     }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Voidling.Application.Collection;
 using VoidlingGame;
 
 namespace Voidling.Application.Roster;
@@ -122,6 +123,8 @@ public sealed class VoidlingRosterUseCase
 
         state.Voidlings.Remove(creature);
         state.DepartedVoidlings.Add(creature);
+        // Goodbye ends a special variant's life just like death does, opening its respawn egg.
+        SpecialVariantTracker.RecordDeparture(state, creature);
         return new GoodbyeResult(true, creature.Name);
     }
 }

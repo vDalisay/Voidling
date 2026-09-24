@@ -15,17 +15,25 @@ public enum CreatureCareDemeanor
     NeedsCare
 }
 
+/// <summary>
+/// One stat as Chao Garden shows it: level 0-99, the bar toward the next level and the stat
+/// points races read. The rank letter is the inherited potential that sets points per level.
+/// </summary>
 public sealed record CreatureProfileStatProjection(
     string StatId,
     string InheritedRank,
     int TrainingLevel,
-    int EffectiveValue,
+    int Points,
     double TrainingProgress,
     string Dna1Rank,
     string Dna2Rank)
 {
-    public int TrainingPoints { get; init; }
-    public int TrainingPointCap { get; init; }
+    public bool IsAtMaxLevel { get; init; }
+
+    /// <summary>The 0-100 value races read from the stat points.</summary>
+    public int EffectiveValue { get; init; }
+
+    /// <summary>Passive training progress per second on this stat; zero when not training it.</summary>
     public double TrainingPointsPerSecond { get; init; }
 }
 
@@ -98,28 +106,28 @@ public sealed class CreatureProfileProjectionService
         {
             var gene = StatCalculator.GetGene(creature, statId);
             var progress = _stats.GetLevelProgress(creature, statId);
+            var atMaxLevel = _stats.IsAtMaxLevel(creature, statId);
             var pointsPerSecond = 0.0;
-            if (string.Equals(creature.PassiveTrainingStatId, statId, StringComparison.Ordinal) &&
-                _stats.GetLevel(creature, statId) < _rules.Stats.MaxLevel)
+            if (string.Equals(creature.PassiveTrainingStatId, statId, StringComparison.Ordinal) && !atMaxLevel)
             {
                 var pointsPerMinute = string.IsNullOrEmpty(creature.PassiveTrainingModuleId)
                     ? _rules.PassiveTraining.PointsPerMinute
                     : creature.PassiveTrainingPointsPerMinute;
                 pointsPerSecond = Math.Max(0.0, pointsPerMinute / 60.0);
                 progress = (float)Math.Min(1.0, progress + creature.PassiveTrainingPointRemainder /
-                    _rules.Stats.TrainingPointsPerLevel);
+                    _rules.Stats.ProgressPerLevel);
             }
             return new CreatureProfileStatProjection(
                 statId,
                 GradeName(gene.ExpressedValue),
                 _stats.GetLevel(creature, statId),
-                Math.Clamp((int)MathF.Round(_stats.GetEffectiveStat(creature, statId)), 0, 100),
+                _stats.GetPoints(creature, statId),
                 progress,
                 GradeName(gene.AlleleA),
                 GradeName(gene.AlleleB))
             {
-                TrainingPoints = _stats.GetTrainingPoints(creature, statId),
-                TrainingPointCap = _stats.GetTrainingPointCap(creature, statId),
+                IsAtMaxLevel = atMaxLevel,
+                EffectiveValue = Math.Clamp((int)MathF.Round(_stats.GetEffectiveStat(creature, statId)), 0, 100),
                 TrainingPointsPerSecond = pointsPerSecond
             };
         }).ToArray();
@@ -160,8 +168,7 @@ public sealed class CreatureProfileProjectionService
             Array.AsReadOnly(stats),
             Array.AsReadOnly(rareTraits))
         {
-            CareDemeanor = creature.Needs.Happiness >= _rules.Reincarnation.MinimumHappiness &&
-                           creature.Needs.Stress <= _rules.Reincarnation.MaximumStress
+            CareDemeanor = creature.Needs.Happiness >= _rules.Reincarnation.MinimumHappiness
                 ? CreatureCareDemeanor.Settled
                 : CreatureCareDemeanor.NeedsCare,
             DiscoveredFavoriteFoodId = creature.FavoriteFoodDiscovered &&

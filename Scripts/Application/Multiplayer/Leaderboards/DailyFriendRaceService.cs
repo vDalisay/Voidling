@@ -68,7 +68,8 @@ public sealed record DailyRaceCompletionResult(
 /// </summary>
 public sealed class DailyFriendRaceService
 {
-    public const int CurrentRulesVersion = 1;
+    // 2: Chao Garden stats changed what a race entrant is worth, so times are not comparable with 1.
+    public const int CurrentRulesVersion = 2;
     public const int MaxAttemptHistory = 32;
 
     private readonly RaceEntryFactory _entries;

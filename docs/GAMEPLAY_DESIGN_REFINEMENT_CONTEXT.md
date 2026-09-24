@@ -7,6 +7,8 @@
 
 > This document is the source of truth for player-facing intent established during the design interview. The technical implementation plan remains the source of truth for architecture where it does not conflict with these requirements.
 
+> **September 2026 update:** two design meetings and three question rounds decided life stages in open-game hours, Chao Garden stat levels, adult forms from the highest stat, reincarnation at happiness ≥ 70, biomes with stackable tiles, the Swamp guy special variant, hatch time from S ranks and rarity, and a journal (encyclopedia). All are implemented. See `docs/LIFECYCLE_BIOMES_ENCYCLOPEDIA_IMPLEMENTATION_PLAN.md`; where it is specific, it replaces the matching unresolved items below (for example stat caps, adulthood rank rules, the reincarnation threshold, Garden module design and collection behavior).
+
 ---
 
 ## Interview progress

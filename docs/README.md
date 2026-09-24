@@ -6,7 +6,8 @@ For implementation work, start here:
 2. `AGENT_HANDOFF_IMPLEMENTATION_PLAN.md` — **current contextualized execution plan and agent handoff contract** against the merged `main` baseline.
 3. `GAMEPLAY_DESIGN_REFINEMENT_CONTEXT.md` — source of truth for current player-facing intent and explicitly unresolved product decisions.
 4. `PRODUCTION_VOIDLING_APPEARANCE_RULES.md` — confirmed production supplement for semantic body types, color-DNA palette inheritance and layered sprite composition.
-5. `architecture/VOIDLING_VISUAL_ASSET_PIPELINE.md` — centralized implementation pipeline for all incoming/replacement Voidling art.
+5. `LIFECYCLE_BIOMES_ENCYCLOPEDIA_IMPLEMENTATION_PLAN.md` — direction from the September 2026 design meetings (life stages, adult forms, reincarnation, biomes, special variants, hatching time, encyclopedia) and the plan to build it. Its **To confirm** items are stop conditions.
+6. `architecture/VOIDLING_VISUAL_ASSET_PIPELINE.md` — centralized implementation pipeline for all incoming/replacement Voidling art.
 
 The older `GENETICS_BREEDING_HATCHING_RACING_IMPLEMENTATION_PLAN.md` and `MULTIPLAYER_IMPLEMENTATION_PLAN.md` remain useful technical/research references, but they were written across earlier implementation states. Do not treat them as greenfield instructions and do not use them to override current `main`, `ARCHITECTURE.md`, the gameplay context, its confirmed production appearance supplement, or the contextualized handoff plan.
 

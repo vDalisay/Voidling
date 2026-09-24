@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Voidling.Application.Breeding;
+using Voidling.Application.Collection;
 using Voidling.Application.Roster;
 
 namespace VoidlingGame;
@@ -23,6 +24,10 @@ public partial class GameSession
 
     public CreatureProfileProjection? CreateCreatureProfileProjection(string creatureId)
         => _lineageTreeProjection!.CreateCreatureProfile(State, creatureId);
+
+    /// <summary>The journal: every entry, whether it is discovered, and who found it first.</summary>
+    public EncyclopediaProjection CreateEncyclopediaProjection()
+        => EncyclopediaRecorder.Project(State);
 
     /// <summary>Takes a failed egg off the island; it stays in the satchel until discarded.</summary>
     public bool StowFailedEgg(string eggId)
@@ -50,6 +55,7 @@ public partial class GameSession
 
         SaveAndNotify($"{result.Name} left the farm forever. Their family record remains.");
         RaiseGardenEvent($"{result.Name} left the garden. Their family record remains.");
+        AnnounceSpecialVariantDeparture(creatureId);
         return true;
     }
 

@@ -11,6 +11,7 @@ This file is the repository map for coding agents. Keep it short. Detailed archi
 - Architecture research/restructuring plan: `docs/architecture/RESTRUCTURING_PLAN.md`
 - Architecture decisions: `docs/architecture/decisions/`
 - Player-facing design context: `docs/GAMEPLAY_DESIGN_REFINEMENT_CONTEXT.md`
+- Lifecycle, biomes & encyclopedia plan (September 2026 design meetings): `docs/LIFECYCLE_BIOMES_ENCYCLOPEDIA_IMPLEMENTATION_PLAN.md`
 - Detailed genetics/breeding/racing research: `docs/GENETICS_BREEDING_HATCHING_RACING_IMPLEMENTATION_PLAN.md`
 - Demo behavior: `docs/DEMO_MVP.md`
 

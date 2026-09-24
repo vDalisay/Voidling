@@ -32,6 +32,19 @@ For each production body family:
 
 Pixels not represented by source palette slots remain unchanged.
 
+## Visual types to register
+
+Gameplay already assigns these semantic types; until a type has its own definition it renders with the `normal` art:
+
+| Type ID | Who | Colors |
+|---|---|---|
+| `normal` | every baby | color DNA |
+| `neutral` | Neutral adults | artist's colors |
+| `run`, `water`, `fly`, `power` | typed adults | color DNA |
+| `swamp-variant` | the Swamp guy | artist's colors |
+
+`AuthoredColorVisualTypeIds` in the catalog lists the types drawn in the artist's colors (no palette swap). `PlaceholderHueVisualTypeIds` / `PlaceholderHues` give an unregistered special variant a stand-in hue on the fallback body; the Swamp guy uses green (0.3) until his sheet is added. Registering a definition with that ID replaces the placeholder automatically.
+
 ## Palette and outline requirements
 
 Color DNA uses palette-slot replacement rather than whole-sprite tinting. The production renderer does **not** generate, expand, or redraw a Voidling outline.

@@ -5,6 +5,7 @@ using System.Text.Json;
 using Voidling.Application.Breeding;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Stats;
 using VoidlingGame;
 
 namespace Voidling.Application.Multiplayer.Trading;
@@ -368,6 +369,19 @@ public sealed class TradeTransferService
                 return false;
             }
 
+            // Special variants (the Swamp guy) and their eggs are one per save and never traded.
+            var special = asset.Kind switch
+            {
+                TradeAssetKind.Voidling => state.Voidlings.Any(v => v.Id == asset.AssetId && !string.IsNullOrEmpty(v.SpecialVariantId)),
+                TradeAssetKind.Egg => state.OwnedEggs.Any(e => e.Id == asset.AssetId && !string.IsNullOrEmpty(e.SpecialVariantId)),
+                _ => false
+            };
+            if (special)
+            {
+                error = $"Trade asset '{asset.AssetId}' is a special variant and cannot be traded.";
+                return false;
+            }
+
             var lockedElsewhere = state.PendingTradeJournal.Any(entry =>
                 !string.Equals(entry.TradeId, ignoredTradeId, StringComparison.Ordinal) &&
                 entry.OutgoingAssets.Any(reference => reference == asset));
@@ -383,12 +397,7 @@ public sealed class TradeTransferService
 
     private void NormalizeIncomingCreature(VoidlingData creature)
     {
-        creature.TrainingPoints ??= new Dictionary<string, int>(StringComparer.Ordinal);
-        foreach (var statId in _rules.Genetics.StatIds)
-        {
-            if (!creature.TrainingPoints.ContainsKey(statId))
-                creature.TrainingPoints[statId] = 0;
-        }
+        StatProgressionService.EnsureStats(creature, _rules.Genetics.StatIds, _rules.Stats);
         creature.RareTraits ??= new List<RareTraitData>();
         creature.Appearance ??= new VoidlingAppearanceData();
         creature.Appearance.Normalize();
@@ -403,6 +412,7 @@ public sealed class TradeTransferService
 
     private static bool IsValidIncomingCreature(VoidlingData? creature)
         => creature != null &&
+           string.IsNullOrEmpty(creature.SpecialVariantId) &&
            !string.IsNullOrWhiteSpace(creature.Id) &&
            creature.Id.Length <= 128 &&
            creature.Genome != null &&
@@ -412,6 +422,7 @@ public sealed class TradeTransferService
 
     private static bool IsValidIncomingEgg(EggData? egg)
         => egg != null &&
+           string.IsNullOrEmpty(egg.SpecialVariantId) &&
            !string.IsNullOrWhiteSpace(egg.Id) &&
            egg.Id.Length <= 128 &&
            egg.Genome != null &&

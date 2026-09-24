@@ -18,7 +18,7 @@ public sealed class RaceDifficultyAndRecordTests
         Name = "Pip",
         Stage = LifeStage.Adult,
         Genome = new GenomeFactory(Rules.Genetics).CreateRandom(seed),
-        TrainingPoints = Rules.Genetics.StatIds.ToDictionary(id => id, _ => 0)
+        Stats = Rules.Genetics.StatIds.ToDictionary(id => id, _ => new StatProgressData())
     };
 
     private static float CpuStrength(int level)

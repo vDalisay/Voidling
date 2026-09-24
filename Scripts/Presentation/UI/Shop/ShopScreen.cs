@@ -11,7 +11,15 @@ public readonly record struct ShopTrainingItemViewState(string StatId, string Di
 public readonly record struct ShopEggViewState(string EggId, Color TintColor, int Number, int Price);
 public readonly record struct ShopRareOfferViewState(string ItemId, string DisplayName, string Tooltip, int Price);
 public readonly record struct ShopLandPieceViewState(string ShapeId, string DisplayName, IReadOnlyList<(int Q, int R)> Cells, int Stored, int Price);
-public sealed record ShopScreenState(int Coins, IReadOnlyList<ShopTrainingItemViewState> TrainingItems, IReadOnlyList<ShopEggViewState> Eggs, ShopRareOfferViewState? RareOffer, IReadOnlyList<ShopLandPieceViewState> LandPieces);
+/// <summary>A departed special variant's respawn egg (the Swamp guy's), sold only while he is gone.</summary>
+public readonly record struct ShopSpecialEggViewState(string VariantId, string DisplayName, string Description, Color Tint, int Price);
+/// <summary>A one-star biome tile: stack matching tiles on the island to raise their stars.</summary>
+public readonly record struct ShopBiomeTileViewState(string BiomeId, string DisplayName, string TrainsText, Color Tint, int Owned, int Price);
+public sealed record ShopScreenState(int Coins, IReadOnlyList<ShopTrainingItemViewState> TrainingItems, IReadOnlyList<ShopEggViewState> Eggs, ShopRareOfferViewState? RareOffer, IReadOnlyList<ShopLandPieceViewState> LandPieces)
+{
+    public IReadOnlyList<ShopBiomeTileViewState> BiomeTiles { get; init; } = Array.Empty<ShopBiomeTileViewState>();
+    public IReadOnlyList<ShopSpecialEggViewState> SpecialEggs { get; init; } = Array.Empty<ShopSpecialEggViewState>();
+}
 
 /// <summary>Keeper's ledger: categories, readable catalogue rows, and one stable purchase receipt.</summary>
 public partial class ShopScreen : VBoxContainer
@@ -19,6 +27,7 @@ public partial class ShopScreen : VBoxContainer
     public const string TreatsCategory = "Treats";
     public const string EggsCategory = "Eggs";
     public const string LandCategory = "Land";
+    public const string BiomesCategory = "Biomes";
     public const string SpecialCategory = "Special";
 
     private static readonly Texture2D TreatTexture = GD.Load<Texture2D>(
@@ -30,6 +39,8 @@ public partial class ShopScreen : VBoxContainer
     public event Action<string>? EggPurchaseRequested;
     public event Action<string>? RareOfferPurchaseRequested;
     public event Action<string>? LandPurchaseRequested;
+    public event Action<string>? BiomeTilePurchaseRequested;
+    public event Action<string>? SpecialEggPurchaseRequested;
     public event Action? InventoryRequested;
     public event Action<string, string>? SelectionChanged;
 
@@ -138,7 +149,9 @@ public partial class ShopScreen : VBoxContainer
         AddCategory(TreatsCategory, Tr("UI_SHOP_CATEGORY_TREATS"), AtlasIconTexture(TreatTexture, new Rect2(16, 0, 16, 16)));
         AddCategory(EggsCategory, Tr("UI_SHOP_CATEGORY_EGGS"), EggTexture);
         AddCategory(LandCategory, Tr("UI_SHOP_CATEGORY_LAND"), customIcon: LandShapePresentation.CreateShapeArt("single", Color.FromHtml("#8FC57E"), 18, 14));
-        if (_state!.RareOffer != null) AddCategory(SpecialCategory, Tr("UI_SHOP_CATEGORY_RARE"), UiFactory.CreateIcon(19));
+        if (_state!.BiomeTiles.Count > 0)
+            AddCategory(BiomesCategory, Tr("UI_SHOP_CATEGORY_BIOMES"), customIcon: LandShapePresentation.CreateShapeArt("single", Color.FromHtml("#6FB3E3"), 18, 14));
+        if (_state!.RareOffer != null || _state.SpecialEggs.Count > 0) AddCategory(SpecialCategory, Tr("UI_SHOP_CATEGORY_RARE"), UiFactory.CreateIcon(19));
         _categories.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
         var inventory = UiFactory.CreateButton(Tr("UI_SHOP_OPEN_INVENTORY"));
         inventory.Name = "OpenInventory";
@@ -321,7 +334,19 @@ public partial class ShopScreen : VBoxContainer
                     () => LandShapePresentation.CreateShapeArt(piece.ShapeId, Color.FromHtml("#8FC57E"), 42, 28), () => LandPurchaseRequested?.Invoke(piece.ShapeId));
             yield break;
         }
-        if (_state!.RareOffer is { } offer)
+        if (_category == BiomesCategory)
+        {
+            foreach (var tile in _state!.BiomeTiles)
+                yield return new Product("biome:" + tile.BiomeId, tile.DisplayName,
+                    tile.TrainsText + "  " + string.Format(Tr("UI_SHOP_OWNED"), tile.Owned), tile.Price,
+                    () => LandShapePresentation.CreateShapeArt("single", tile.Tint, 30, 24),
+                    () => BiomeTilePurchaseRequested?.Invoke(tile.BiomeId));
+            yield break;
+        }
+        foreach (var egg in _state!.SpecialEggs)
+            yield return new Product("special-egg:" + egg.VariantId, egg.DisplayName, egg.Description, egg.Price,
+                () => EggIcon(egg.Tint), () => SpecialEggPurchaseRequested?.Invoke(egg.VariantId));
+        if (_state.RareOffer is { } offer)
             yield return new Product("special:" + offer.ItemId, offer.DisplayName, Tr("UI_SHOP_IN_STOCK"), offer.Price,
                 () => Icon(UiFactory.CreateIcon(19)), () => RareOfferPurchaseRequested?.Invoke(offer.ItemId));
     }

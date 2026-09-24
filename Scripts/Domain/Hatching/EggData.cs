@@ -43,6 +43,12 @@ public sealed class EggData
 
     public List<RareTraitData> RareTraits { get; set; } = new();
 
+    /// <summary>
+    /// Blank for an ordinary egg; a special variant's ID otherwise. Such an egg only incubates on an
+    /// unused hex of the variant's environment (a Swamp that has never hatched one).
+    /// </summary>
+    public string SpecialVariantId { get; set; } = "";
+
     public float WorldX { get; set; }
     public float WorldY { get; set; }
 

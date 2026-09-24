@@ -23,6 +23,12 @@ public static class VoidlingVisualFactory
     private static readonly VoidlingVisualCatalog Catalog = LoadCatalog();
     private static readonly IReadOnlyDictionary<string, VoidlingVisualDefinition> Definitions =
         BuildDefinitionMap(Catalog);
+    private static readonly IReadOnlyDictionary<string, float> PlaceholderHues = BuildPlaceholderHues(Catalog);
+    private static readonly HashSet<string> AuthoredColorTypes = new(
+        (Catalog.AuthoredColorVisualTypeIds ?? Array.Empty<string>())
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim()),
+        StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<string, SpriteFrames> WorldFrames = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, SpriteFrames> RaceFrames = new(StringComparer.Ordinal);
     private static readonly Shader PaletteShader = GD.Load<Shader>(PaletteShaderPath)
@@ -42,6 +48,13 @@ public static class VoidlingVisualFactory
     public static float MutationCompactCenterYOffset => DefaultDefinition.MutationCompactCenterYOffset;
     public static float MutationCompactScaleThreshold => DefaultDefinition.MutationCompactScaleThreshold;
     public static float PortraitMutationCompactPixelThreshold => DefaultDefinition.PortraitMutationCompactPixelThreshold;
+
+    /// <summary>
+    /// True for visual types drawn in the artist's own colors (Neutral adults, special variants).
+    /// Color DNA still travels with those Voidlings; it is only not shown.
+    /// </summary>
+    public static bool UsesAuthoredColors(string? visualTypeId)
+        => !string.IsNullOrWhiteSpace(visualTypeId) && AuthoredColorTypes.Contains(visualTypeId.Trim());
 
     public static VoidlingVisualDefinition ResolveDefinition(string? visualTypeId)
     {
@@ -169,6 +182,7 @@ public static class VoidlingVisualFactory
         bool race)
     {
         ArgumentNullException.ThrowIfNull(sprite);
+        appearance = ForRendering(appearance);
         var definition = ResolveDefinition(appearance.VisualTypeId);
         sprite.SpriteFrames = race ? GetRaceFrames(definition.DefinitionId) : GetWorldFrames(definition.DefinitionId);
         ApplyPaletteOrFallback(
@@ -237,6 +251,7 @@ public static class VoidlingVisualFactory
         VoidlingVisualLayerDefinition layer,
         VoidlingVisualAppearance appearance)
     {
+        appearance = ForRendering(appearance);
         if (!layer.PaletteAffected)
         {
             item.Material = null;
@@ -253,6 +268,40 @@ public static class VoidlingVisualFactory
             appearance.PaletteHue,
             definition.PaletteMatchTolerance,
             appearance.FallbackTintHex);
+    }
+
+    /// <summary>
+    /// Authored-color types render the sheet exactly as drawn: no palette swap, no tint. One whose
+    /// own art is not registered yet borrows the default body at its placeholder hue instead.
+    /// </summary>
+    private static VoidlingVisualAppearance ForRendering(VoidlingVisualAppearance appearance)
+    {
+        if (!UsesAuthoredColors(appearance.VisualTypeId))
+            return appearance;
+
+        var typeId = appearance.VisualTypeId.Trim().ToLowerInvariant();
+        if (!Definitions.ContainsKey(typeId) && PlaceholderHues.TryGetValue(typeId, out var hue))
+            return appearance with { PaletteHue = hue };
+
+        return appearance with
+        {
+            PaletteHue = VoidlingAppearanceData.LegacyUninitializedPaletteHue,
+            FallbackTintHex = "#FFFFFF"
+        };
+    }
+
+    private static IReadOnlyDictionary<string, float> BuildPlaceholderHues(VoidlingVisualCatalog catalog)
+    {
+        var hues = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+        var ids = catalog.PlaceholderHueVisualTypeIds ?? Array.Empty<string>();
+        var values = catalog.PlaceholderHues ?? Array.Empty<float>();
+        for (var i = 0; i < Math.Min(ids.Length, values.Length); i++)
+        {
+            if (!string.IsNullOrWhiteSpace(ids[i]) && VoidlingAppearanceData.IsValidHue(values[i]))
+                hues[ids[i].Trim()] = values[i];
+        }
+
+        return hues;
     }
 
     private static VoidlingVisualCatalog LoadCatalog()

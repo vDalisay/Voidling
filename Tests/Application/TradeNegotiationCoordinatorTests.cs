@@ -190,7 +190,7 @@ public sealed class TradeNegotiationCoordinatorTests
             TintHex = seed % 2 == 0 ? "#A4C8E8" : "#E8B7C5"
         };
         foreach (var statId in Rules.Genetics.StatIds)
-            creature.TrainingPoints[statId] = 0;
+            creature.Stats[statId] = new StatProgressData();
         return creature;
     }
 

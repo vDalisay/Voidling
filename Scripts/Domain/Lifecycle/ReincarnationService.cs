@@ -1,8 +1,8 @@
 using System;
-using System.Linq;
 using Voidling.Domain.Care;
 using Voidling.Domain.Evolution;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Stats;
 using VoidlingGame;
 
 namespace Voidling.Domain.Lifecycle;
@@ -15,42 +15,39 @@ public enum LifecycleEndOutcome
 
 public readonly record struct LifecycleEndDecision(
     LifecycleEndOutcome Outcome,
-    float Happiness,
-    float Stress);
+    float Happiness);
 
 /// <summary>
-/// Pure lifecycle-end policy and reincarnation mutation. Eligibility is based on the confirmed
-/// hidden-care inputs; the exact threshold and retention percentage are authorable prototype
-/// balance. Reincarnation deliberately does not promote a DNA rank yet because the exact
-/// reincarnation rank-promotion rule remains a separate unresolved product decision.
+/// Pure lifecycle-end policy and reincarnation mutation. Hidden happiness is the only condition:
+/// at or above the authored threshold a Voidling reincarnates, below it the Voidling dies.
+/// Reincarnation deliberately does not promote a DNA rank; that remains a separate product rule.
 /// </summary>
 public sealed class ReincarnationService
 {
+    private readonly StatProgressionService _stats = new();
+
     public LifecycleEndDecision Decide(VoidlingData creature, ReincarnationRules rules)
     {
         ArgumentNullException.ThrowIfNull(creature);
         ArgumentNullException.ThrowIfNull(rules);
 
         var happiness = Math.Clamp(creature.Needs?.Happiness ?? 0.0f, 0.0f, 100.0f);
-        var stress = Math.Clamp(creature.Needs?.Stress ?? 0.0f, 0.0f, 100.0f);
-        var eligible = happiness >= rules.MinimumHappiness && stress <= rules.MaximumStress;
         return new LifecycleEndDecision(
-            eligible ? LifecycleEndOutcome.Reincarnate : LifecycleEndOutcome.Die,
-            happiness,
-            stress);
+            happiness >= rules.MinimumHappiness ? LifecycleEndOutcome.Reincarnate : LifecycleEndOutcome.Die,
+            happiness);
     }
 
-    public void ApplyReincarnation(VoidlingData creature, ReincarnationRules rules)
+    /// <summary>
+    /// Starts a new life: a baby again, every stat back to level 1 keeping a share of its points
+    /// (Chao Garden), and hidden care state reset.
+    /// </summary>
+    public void ApplyReincarnation(VoidlingData creature, ReincarnationRules rules, StatGrowthRules statRules)
     {
         ArgumentNullException.ThrowIfNull(creature);
         ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(statRules);
 
-        var retainedFraction = Math.Clamp(rules.RetainedTrainingFraction, 0.0f, 1.0f);
-        foreach (var statId in creature.TrainingPoints.Keys.ToArray())
-        {
-            var current = Math.Max(0, creature.TrainingPoints[statId]);
-            creature.TrainingPoints[statId] = (int)Math.Floor(current * retainedFraction);
-        }
+        _stats.ApplyReincarnation(creature, rules.RetainedPointFraction, statRules);
 
         creature.Stage = LifeStage.Child;
         creature.AgeSeconds = 0.0f;
@@ -62,6 +59,11 @@ public sealed class ReincarnationService
         creature.RunPowerInfluence = 0.0f;
         creature.EvolutionSpecialization = EvolutionSpecialization.None;
         creature.EvolutionMagnitude = 0.0f;
+        // A baby again: the adult form is chosen afresh at the next adulthood. A special variant
+        // keeps its own look through every life.
+        creature.Appearance ??= new VoidlingAppearanceData();
+        if (string.IsNullOrEmpty(creature.SpecialVariantId))
+            creature.Appearance.VisualTypeId = EvolutionService.BabyVisualTypeId;
         creature.Needs = new CreatureNeedsState();
     }
 }

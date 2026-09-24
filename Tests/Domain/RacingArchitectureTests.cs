@@ -21,7 +21,7 @@ public sealed class RacingArchitectureTests
         var snapshot = factory.Create(creature);
         var originalRun = snapshot.Run;
 
-        creature.TrainingPoints["run"] = 120;
+        creature.Stats["run"] = new StatProgressData { Level = 50, Points = 1200 };
 
         Assert.Equal(originalRun, snapshot.Run);
         Assert.True(factory.Create(creature).Run > originalRun);
@@ -141,7 +141,7 @@ public sealed class RacingArchitectureTests
         };
 
         foreach (var statId in Rules.Genetics.StatIds)
-            creature.TrainingPoints[statId] = 0;
+            creature.Stats[statId] = new StatProgressData();
 
         return creature;
     }

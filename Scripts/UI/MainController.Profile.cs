@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Domain.Creatures;
 using Voidling.Domain.Shop;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Inventory;
@@ -131,21 +132,37 @@ public partial class MainController : Node
             .Select(egg => new StoredEggViewState(
                 egg.Id,
                 string.Format(Tr(EggNameKey(egg)), NumberWithinSource(state, egg)),
-                Tr(egg.Source == EggSource.Bred ? "UI_INVENTORY_EGG_BRED" : "UI_INVENTORY_EGG_COMMON"),
-                GameRules.TintColor(egg.TintHex),
+                // A special variant's egg says where it has to go to hatch.
+                SpecialVariantCatalog.Find(egg.SpecialVariantId) is { } variant
+                    ? string.Format(Tr("UI_SHOP_SPECIAL_EGG_HINT"), BiomePresentationCatalog.NameFor(variant.Environment))
+                    : Tr(egg.Source == EggSource.Bred ? "UI_INVENTORY_EGG_BRED" : "UI_INVENTORY_EGG_COMMON"),
+                egg.SpecialVariantId.Length > 0
+                    ? VoidlingFormPresentationCatalog.SpecialEggTint(egg.SpecialVariantId)
+                    : GameRules.TintColor(egg.TintHex),
                 egg.Source == EggSource.Bred))
             .ToList();
 
         var storedLand = state.GardenModules
             .Where(module => !module.Placed)
-            .OrderBy(module => module.StatId, StringComparer.Ordinal)
+            .OrderBy(module => module.BiomeId, StringComparer.Ordinal)
             .ThenBy(module => module.ShapeId, StringComparer.Ordinal)
             .ThenBy(module => module.Id, StringComparer.Ordinal)
             .Select(module => new StoredLandViewState(
                 module.Id,
-                LandShapePresentation.DescribeStoredPiece(module.ShapeId, module.StatId, module.Level),
+                LandShapePresentation.DescribeStoredPiece(module.ShapeId, module.BiomeId, module.Level),
                 module.ShapeId,
-                LandShapePresentation.TintFor(module.StatId)))
+                LandShapePresentation.TintForBiome(module.BiomeId)))
+            .ToList();
+        var biomeTiles = state.BiomeTiles
+            .Where(stack => stack.Count > 0)
+            .OrderBy(stack => stack.BiomeId, StringComparer.Ordinal)
+            .ThenBy(stack => stack.Stars)
+            .Select(stack => new StoredBiomeTileViewState(
+                stack.BiomeId,
+                stack.Stars,
+                stack.Count,
+                string.Format(Tr("UI_INVENTORY_BIOME_TILE"), BiomePresentationCatalog.NameFor(stack.BiomeId), stack.Stars),
+                BiomePresentationCatalog.ColorFor(stack.BiomeId)))
             .ToList();
 
         var failedEggs = state.OwnedEggs
@@ -170,7 +187,10 @@ public partial class MainController : Node
 
         var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(520, 292));
         var screen = new InventoryScreen();
-        screen.Configure(new InventoryScreenState(items, failedEggs, eggShells, incubationSkipCount, incubatingEggs, storedEggs, storedLand));
+        screen.Configure(new InventoryScreenState(items, failedEggs, eggShells, incubationSkipCount, incubatingEggs, storedEggs, storedLand)
+        {
+            BiomeTiles = biomeTiles
+        });
         screen.PlaceStoredEggRequested += egg =>
         {
             CloseModal();
@@ -180,6 +200,12 @@ public partial class MainController : Node
         {
             CloseModal();
             _garden.BeginLandPlacement(land.ModuleId, land.ShapeId);
+        };
+        // A tile goes onto a hex the player picks, so placing one opens the island's land list.
+        screen.PlaceBiomeTileRequested += _ =>
+        {
+            CloseModal();
+            ShowGardenModules();
         };
         screen.PlaceTreatRequested += statId =>
         {

@@ -21,7 +21,16 @@ public sealed record AppearanceRules(
     double PaletteBlendInfluence);
 
 public sealed record BreedingRules(float CooldownSeconds, IReadOnlyList<int> HatchFailurePercentByBurden);
-public sealed record HatchingRules(float IncubationSeconds);
+/// <summary>
+/// Incubation: a base time plus extra time for every S-rank stat, every rare trait and a special
+/// variant. Worked out when an egg is created and then fixed.
+/// </summary>
+public sealed record HatchingRules(float IncubationSeconds)
+{
+    public float SecondsPerSRankStat { get; init; } = 45.0f;
+    public float SecondsPerRareTrait { get; init; } = 120.0f;
+    public float SpecialVariantSeconds { get; init; } = 300.0f;
+}
 public sealed record GardenRules(int MaxPopulation);
 public sealed record DailyLoginRules(IReadOnlyList<int> CoinRewards);
 
@@ -48,9 +57,12 @@ public sealed record DailyMissionRules(
 /// <summary>How much one training treat is worth, before any favorite-food bonus.</summary>
 public sealed record TrainingItemRules(int MinGain, int MaxGain);
 
+/// <summary>
+/// Garden land and biome tiles. <see cref="BiomeTilePrice"/> buys a one-star biome tile; stars come
+/// from stacking matching tiles, and every star has its own passive training rate.
+/// </summary>
 public sealed record GardenModuleRules(
-    int PurchaseCost,
-    IReadOnlyList<int> UpgradeCosts,
+    int BiomeTilePrice,
     IReadOnlyList<float> PointsPerMinuteByLevel)
 {
     /// <summary>
@@ -73,10 +85,8 @@ public sealed record GardenModuleRules(
         OriginX: 416.0f,
         OriginY: 240.0f);
 
-    /// <summary>Coins to turn one placed empty hex into training ground for a stat.</summary>
-    public int TrainingConversionCost => Math.Max(0, PurchaseCost);
-
-    public int MaxLevel => Math.Max(1, Math.Min(PointsPerMinuteByLevel.Count, UpgradeCosts.Count + 1));
+    /// <summary>The highest star a biome tile can reach: one passive rate per star.</summary>
+    public int MaxLevel => Math.Max(1, PointsPerMinuteByLevel.Count);
 
     public float PointsPerMinuteForLevel(int level)
     {
@@ -85,47 +95,43 @@ public sealed record GardenModuleRules(
         var index = Math.Clamp(level, 1, MaxLevel) - 1;
         return Math.Max(0.0f, PointsPerMinuteByLevel[index]);
     }
-
-    public int UpgradeCostForLevel(int currentLevel)
-    {
-        var targetLevel = currentLevel + 1;
-        if (targetLevel > MaxLevel)
-            return -1;
-        var index = targetLevel - 2;
-        if (index < 0 || index >= UpgradeCosts.Count)
-            return -1;
-        return Math.Max(0, UpgradeCosts[index]);
-    }
 }
 
-public sealed record RankTrainingCaps(int E, int D, int C, int B, int A, int S)
+/// <summary>
+/// Chao Garden stat growth. Every stat levels 0..<see cref="MaxLevel"/> whatever its rank; training
+/// fills <see cref="ProgressPerLevel"/> steps per level, and a level-up adds
+/// <c>PointsPerLevelPerRank × rank + PointsPerLevelBase + random(1..PointsPerLevelRandomMax)</c>
+/// stat points, capped at <see cref="PointCap"/>. Races read the points.
+/// </summary>
+public sealed record StatGrowthRules(int ProgressPerLevel, int MaxLevel, int PointCap)
 {
-    public int ForRank(int rank) => rank switch
-    {
-        <= 0 => E,
-        1 => D,
-        2 => C,
-        3 => B,
-        4 => A,
-        _ => S
-    };
-}
+    public int PointsPerLevelBase { get; init; } = 11;
+    public int PointsPerLevelPerRank { get; init; } = 3;
+    public int PointsPerLevelRandomMax { get; init; } = 5;
 
-public sealed record StatGrowthRules(int TrainingPointsPerLevel, int MaxLevel, int MaxTrainingPoints)
-{
-    public RankTrainingCaps RankCaps { get; init; } = new(E: 20, D: 40, C: 60, B: 80, A: 100, S: 120);
+    /// <summary>The level every stat returns to on reincarnation (Chao Garden: 1, not 0).</summary>
+    public int ReincarnationLevel { get; init; } = 1;
 }
 
 public sealed record PassiveTrainingRules(float PointsPerMinute);
 public sealed record FavoriteFoodRules(int BonusTrainingPoints);
+/// <summary>Baby stage length in seconds of open-game time; hours, not weeks, for an idle game.</summary>
 public sealed record LifecycleRules(float ChildToAdultSeconds);
 public sealed record ReincarnationRules(
     // Adult lifetime in seconds of open-game time. The simulation only advances while the game is
     // running, so this is playtime rather than wall-clock age.
     float AdultLifespanSeconds,
+    // Hidden happiness is the only reincarnation condition: at or above this a Voidling reincarnates.
     float MinimumHappiness,
-    float MaximumStress,
-    float RetainedTrainingFraction);
+    // Share of each stat's points a Voidling keeps when it reincarnates.
+    float RetainedPointFraction)
+{
+    /// <summary>
+    /// Below this the Garden log warns once that a Voidling needs care. Kept apart from
+    /// <see cref="MinimumHappiness"/>, which is high enough that every small dip would warn.
+    /// </summary>
+    public float CareRiskHappiness { get; init; } = 30.0f;
+}
 
 public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice, int EggShellSalePrice)
 {
@@ -133,6 +139,9 @@ public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice, int Egg
     public int StoreEggSlotCount { get; init; } = 3;
     public double RareOfferAppearanceChance { get; init; } = 0.20;
     public int FullIncubationSkipPrice { get; init; } = 45;
+
+    /// <summary>A special variant's respawn egg, sold only after that variant has departed.</summary>
+    public int SpecialVariantEggPrice { get; init; } = 250;
 }
 
 public sealed record EconomyRules(float GardenCoinsPerMinute);
@@ -152,7 +161,8 @@ public sealed record NeedsRules(
     float TreatNourishmentGain,
     float TreatHappinessGain);
 
-public sealed record EvolutionRules(float SpecializationThreshold);
+/// <summary>The level the highest stat must reach at adulthood to give a typed form instead of Neutral.</summary>
+public sealed record EvolutionRules(int MinimumFormLevel);
 
 /// <summary>
 /// Current race constants. Presentation animation never owns authoritative race results.
@@ -204,9 +214,8 @@ public sealed record GameBalanceRules(
     public GardenRules Garden { get; init; } = new(MaxPopulation: 8);
     public TrainingItemRules TrainingItems { get; init; } = new(MinGain: 5, MaxGain: 9);
     public GardenModuleRules GardenModules { get; init; } = new(
-        PurchaseCost: 40,
-        UpgradeCosts: Array.AsReadOnly(new[] { 25, 50 }),
-        PointsPerMinuteByLevel: Array.AsReadOnly(new[] { 1.0f, 1.5f, 2.0f }));
+        BiomeTilePrice: 40,
+        PointsPerMinuteByLevel: Array.AsReadOnly(new[] { 1.0f, 1.5f, 2.0f, 3.0f }));
     public DailyLoginRules DailyLogin { get; init; } = new(Array.AsReadOnly(new[] { 5, 7, 9, 12, 15, 20, 30 }));
     public DailyMissionRules DailyMissions { get; init; } = new(
         MissionsPerDay: 3,
@@ -221,12 +230,11 @@ public sealed record GameBalanceRules(
         }));
     public PassiveTrainingRules PassiveTraining { get; init; } = new(PointsPerMinute: 1.0f);
     public FavoriteFoodRules FavoriteFood { get; init; } = new(BonusTrainingPoints: 1);
-    public EvolutionRules Evolution { get; init; } = new(SpecializationThreshold: 0.50f);
+    public EvolutionRules Evolution { get; init; } = new(MinimumFormLevel: 10);
     public ReincarnationRules Reincarnation { get; init; } = new(
-        AdultLifespanSeconds: 21600.0f,
-        MinimumHappiness: 10.0f,
-        MaximumStress: 70.0f,
-        RetainedTrainingFraction: 0.10f);
+        AdultLifespanSeconds: 28800.0f,
+        MinimumHappiness: 70.0f,
+        RetainedPointFraction: 0.10f);
     public EconomyRules Economy { get; init; } = new(GardenCoinsPerMinute: 1.0f);
     public NeedsRules Needs { get; init; } = new(
         HungerGainPerMinute: 0.75f,
@@ -268,8 +276,8 @@ public sealed record GameBalanceRules(
             CooldownSeconds: 8.0f,
             HatchFailurePercentByBurden: Array.AsReadOnly(new[] { 0, 20, 50, 80, 100 })),
         Hatching: new HatchingRules(IncubationSeconds: 22.0f),
-        Stats: new StatGrowthRules(TrainingPointsPerLevel: 12, MaxLevel: 99, MaxTrainingPoints: 120),
-        Lifecycle: new LifecycleRules(ChildToAdultSeconds: 45.0f),
+        Stats: new StatGrowthRules(ProgressPerLevel: 10, MaxLevel: 99, PointCap: 3266),
+        Lifecycle: new LifecycleRules(ChildToAdultSeconds: 5400.0f),
         Shop: new ShopRules(StoreEggPrice: 30, TrainingItemPrice: 8, EggShellSalePrice: 5),
         Racing: new RaceRules(
             BaseStamina: 72.0f,

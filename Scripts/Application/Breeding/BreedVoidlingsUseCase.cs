@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
+using Voidling.Application.Collection;
 using Voidling.Application.Ports;
 using Voidling.Domain.Breeding;
+using Voidling.Domain.Creatures;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Hatching;
 using Voidling.Domain.Rules;
@@ -40,6 +42,9 @@ public sealed record BreedingResult(
     int HatchFailurePercent)
 {
     public bool Succeeded => Failure == BreedingFailure.None && Egg != null;
+
+    /// <summary>Set when this egg is a special variant's (the Swamp guy's) one-time egg.</summary>
+    public string SpecialVariantId { get; init; } = "";
 }
 
 /// <summary>
@@ -110,6 +115,12 @@ public sealed class BreedVoidlingsUseCase
         var related = _relationships.AreRelated(first, second, _lineage.GetEffectiveLineage(state));
         var childBurden = _burden.ComputeChildBurden(first, second, related);
         var genome = _genomeInheritance.CreateChild(first, second, eggSeed);
+        // The first breeding of two Water adults while an unused Swamp exists lays the Swamp guy's
+        // egg: a condition, not a roll, fixed here with the rest of the egg.
+        var special = SpecialVariantTracker.BreedingSpawnFor(state, first, second);
+        if (special != null)
+            SpecialVariantCatalog.ForceGenes(special, genome);
+        var rareTraits = _rareTraits.Inherit(first, second, eggSeed);
         var tint = _colors.ResolveTint(genome);
         var egg = new EggData
         {
@@ -122,24 +133,27 @@ public sealed class BreedVoidlingsUseCase
             FamilyGeneration = Math.Max(first.FamilyGeneration, second.FamilyGeneration) + 1,
             InbreedingBurdenLevel = childBurden,
             InbreedingHistoryFlag = related || first.InbreedingHistoryFlag || second.InbreedingHistoryFlag,
-            IsViable = _viability.RollViability(eggSeed, childBurden),
+            IsViable = special != null || _viability.RollViability(eggSeed, childBurden),
             FailureResolved = true,
-            RequiredIncubationSeconds = _rules.Hatching.IncubationSeconds,
+            RequiredIncubationSeconds = IncubationPolicy.RequiredSeconds(genome, rareTraits, special != null, _rules.Hatching),
             TintHex = tint,
             Appearance = new VoidlingAppearanceData
             {
                 // Newly hatched Voidlings currently begin from the neutral morphology. The visual
                 // catalog already supports later semantic type changes; the exact stat/evolution
                 // policy that changes normal -> water/fly/power is intentionally not invented here.
-                VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+                VisualTypeId = special?.VisualTypeId ?? VoidlingAppearanceData.DefaultVisualTypeId,
                 PaletteHue = _colors.ResolvePaletteHue(genome)
             },
-            RareTraits = _rareTraits.Inherit(first, second, eggSeed),
+            RareTraits = rareTraits,
             WorldX = worldX,
             WorldY = worldY
         };
 
+        egg.SpecialVariantId = special?.Id ?? string.Empty;
         state.OwnedEggs.Add(egg);
+        if (special != null)
+            SpecialVariantTracker.RecordEgg(state, special, egg.Id, fromBreeding: true);
         first.BreedCooldownSeconds = _rules.Breeding.CooldownSeconds;
         second.BreedCooldownSeconds = _rules.Breeding.CooldownSeconds;
 
@@ -148,7 +162,10 @@ public sealed class BreedVoidlingsUseCase
             egg,
             related,
             childBurden,
-            _viability.FailurePercent(childBurden));
+            _viability.FailurePercent(childBurden))
+        {
+            SpecialVariantId = egg.SpecialVariantId
+        };
     }
 
     public BreedingResult ExecuteAndPersist(
@@ -169,6 +186,15 @@ public sealed class BreedVoidlingsUseCase
         var firstCooldown = first?.BreedCooldownSeconds ?? 0.0f;
         var secondCooldown = second?.BreedCooldownSeconds ?? 0.0f;
         var lineageBefore = state.LineageArchive?.ToList() ?? new();
+        var variantsBefore = state.SpecialVariants
+            .Select(entry => new SpecialVariantStateData
+            {
+                VariantId = entry.VariantId,
+                BreedingSpawnUsed = entry.BreedingSpawnUsed,
+                Status = entry.Status,
+                CreatureId = entry.CreatureId
+            })
+            .ToList();
 
         var result = Execute(state, parentAId, parentBId, eggSeed, eggId, worldX, worldY);
         if (!result.Succeeded || result.Egg == null)
@@ -187,6 +213,7 @@ public sealed class BreedVoidlingsUseCase
             if (second != null)
                 second.BreedCooldownSeconds = secondCooldown;
             state.LineageArchive = lineageBefore;
+            state.SpecialVariants = variantsBefore;
 
             return new BreedingResult(
                 BreedingFailure.PersistenceFailed,

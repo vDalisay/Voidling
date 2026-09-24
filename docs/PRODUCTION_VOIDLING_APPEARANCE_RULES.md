@@ -6,16 +6,19 @@ This document records appearance decisions confirmed after the original appearan
 
 ## 1. Semantic base Voidling types
 
-Production Voidlings can have different semantic base body families such as:
+Production Voidlings can have different semantic base body families. The confirmed visual types are:
 
-- `normal`;
-- `water`;
-- `power`;
+- `normal` — every baby;
+- `neutral` — a Neutral adult;
+- `run`, `water` (Swim), `fly`, `power` — the typed adult forms;
+- `swamp-variant` — the Swamp guy, a special variant;
 - future confirmed types.
 
 Each type has a developer-authored base sprite definition. Persistent/network state stores only the stable semantic type ID. It must never store a texture path, Godot Resource path, atlas coordinate, or display name as the art identity.
 
-The exact gameplay/evolution rule that changes or inherits a Voidling type is **not yet defined here**. New children currently default to `normal` until that product rule is confirmed.
+The adult form comes from the highest stat at adulthood (level 10 or more; stamina or nothing at 10 gives Neutral), and reincarnation makes a Voidling a `normal` baby again. A special variant keeps its type for life. Type is not inherited at breeding. See `LIFECYCLE_BIOMES_ENCYCLOPEDIA_IMPLEMENTATION_PLAN.md` §4.3 and §7.
+
+**Who shows color DNA:** babies and typed adults show their color DNA. Neutral adults and special variants show the artist's colors: the catalog's `AuthoredColorVisualTypeIds` lists them and the renderer skips the palette swap. Their color DNA is still inherited normally. A type without registered art falls back to the `normal` body; a special variant may also name a placeholder hue so it stays recognisable until its art arrives.
 
 ## 2. Color DNA and palette inheritance
 
@@ -121,9 +124,8 @@ Existing saves must migrate deterministically. Migration may derive semantic col
 
 This supplement does **not** decide:
 
-- the exact normal → Water/Power/Fly type development/evolution formula;
-- whether/how base type itself is inherited at breeding time;
-- the final list of body types;
+- per-type hue ranges (for example Water only in blues);
+- the final list of body types beyond the forms above;
 - exact allowed wing/crystal variants per type;
 - patterns or independently colored pattern regions;
 - shiny/special-coat rules;

@@ -1,4 +1,6 @@
 using System;
+using Godot;
+using Voidling.Application.Garden;
 using Voidling.Application.Shop;
 using Voidling.Application.Training;
 
@@ -13,6 +15,22 @@ public static class PlayerActionFailureText
 {
     public const string MissingVoidling = "That Voidling is no longer in the Garden.";
     public const string MissingFailedEgg = "That failed egg is no longer in the Garden.";
+
+    public static string ForBiomeTile(BiomeTileFailure failure)
+        => failure switch
+        {
+            BiomeTileFailure.None => string.Empty,
+            BiomeTileFailure.UnknownBiome => TranslationServer.Translate("UI_BIOME_FAILURE_UNKNOWN"),
+            BiomeTileFailure.ModuleNotFound => TranslationServer.Translate("UI_BIOME_FAILURE_NO_HEX"),
+            BiomeTileFailure.NotPlaced => TranslationServer.Translate("UI_BIOME_FAILURE_NOT_PLACED"),
+            BiomeTileFailure.NotEnoughCurrency => TranslationServer.Translate("UI_BIOME_FAILURE_COINS"),
+            BiomeTileFailure.NoTileOwned => TranslationServer.Translate("UI_BIOME_FAILURE_NO_TILE"),
+            BiomeTileFailure.TileDoesNotMatch => TranslationServer.Translate("UI_BIOME_FAILURE_NO_MATCH"),
+            BiomeTileFailure.MaxStars => TranslationServer.Translate("UI_BIOME_FAILURE_MAX_STARS"),
+            BiomeTileFailure.NotBiome => TranslationServer.Translate("UI_BIOME_FAILURE_PLAIN"),
+            BiomeTileFailure.TileIsPermanent => TranslationServer.Translate("UI_BIOME_FAILURE_PERMANENT"),
+            _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)
+        };
 
     public static string ForShop(ShopFailure failure)
         => failure switch
@@ -36,7 +54,7 @@ public static class PlayerActionFailureText
             TrainingFailure.CreatureNotFound => MissingVoidling,
             TrainingFailure.NotEnoughCurrency => "Not enough sprouts.",
             TrainingFailure.NoItemOwned => $"Buy a {statLabel} treat first.",
-            TrainingFailure.StatAtCap => $"That Voidling's {statLabel} training is capped by its current DNA rank.",
+            TrainingFailure.StatAtCap => $"That Voidling's {statLabel} is already at level 99.",
             _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)
         };
 
@@ -50,8 +68,8 @@ public static class PlayerActionFailureText
             GardenModuleFailure.ModuleNotFound => "That land tile is no longer available.",
             GardenModuleFailure.AlreadyPlaced => "That land piece is already part of the island.",
             GardenModuleFailure.NotPlaced => "Put that land down on the island first.",
-            GardenModuleFailure.NotTrainingGround => "That hex is plain ground. Build training ground on it first.",
-            GardenModuleFailure.AlreadyTrainingGround => "That hex is already training ground.",
+            GardenModuleFailure.NotTrainingGround => "That hex is plain ground. Put a biome tile on it first.",
+            GardenModuleFailure.AlreadyTrainingGround => "That hex already has a biome.",
             GardenModuleFailure.DoesNotFit => "Land has to touch the island and cannot overlap what is already there.",
             GardenModuleFailure.NotEnoughCurrency => "Not enough sprouts.",
             GardenModuleFailure.MaxLevel => "That land tile is already at its current maximum level.",
@@ -65,7 +83,7 @@ public static class PlayerActionFailureText
             PassiveTrainingFailure.UnknownStat => "That passive training option is unavailable.",
             PassiveTrainingFailure.CreatureNotFound => MissingVoidling,
             PassiveTrainingFailure.LandNotPlaced => "That land is not on the island yet.",
-            PassiveTrainingFailure.LandNotTrainingGround => "That hex is plain ground. Build training ground on it first.",
+            PassiveTrainingFailure.LandNotTrainingGround => "That hex is plain ground. Put a biome tile on it first.",
             PassiveTrainingFailure.LandFull => "That hex is already taken. One Voidling trains per hex.",
             _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)
         };

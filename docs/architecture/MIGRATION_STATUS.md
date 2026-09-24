@@ -48,7 +48,11 @@ Implemented use cases/services include:
 - `RaceParticipantSnapshotFactory`;
 - `RaceEntryFactory` for immutable player/CPU race entry creation;
 - `RaceResultUseCase`;
-- `GameStateMigrationService`.
+- `GameStateMigrationService`;
+- `BiomeTileUseCase` for buying, placing, stacking and picking up biome tiles (`Application/Garden`);
+- `SpecialVariantTracker` and `EncyclopediaRecorder` for the Swamp guy's life cycle and the journal (`Application/Collection`).
+
+The Chao-style stat rules (`StatProgressionService`), adult forms (`EvolutionService`), biomes (`BiomeCatalog`), incubation time (`IncubationPolicy`), special variants (`SpecialVariantCatalog`) and journal entries (`EncyclopediaCatalog`) are pure Domain. See `docs/LIFECYCLE_BIOMES_ENCYCLOPEDIA_IMPLEMENTATION_PLAN.md`.
 
 Application returns data/results and mutates the supplied runtime aggregate. It does not render, persist files, play audio or call Godot APIs.
 

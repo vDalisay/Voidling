@@ -60,7 +60,7 @@ public sealed class LineageTreeProjectionServiceTests
     {
         var state = new GameStateData();
         var creature = CreateCreature("runner", "", "", generation: 0);
-        creature.TrainingPoints["run"] = 24;
+        creature.Stats["run"] = new StatProgressData { Level = 3, Points = 60 };
         creature.Genome.AbilityGenes["run"] = new GenePairData
         {
             AlleleA = 2,
@@ -72,7 +72,7 @@ public sealed class LineageTreeProjectionServiceTests
         var projection = new LineageTreeProjectionService(Rules).Create(state, creature.Id);
         var run = Assert.Single(Assert.Single(projection.Members).Stats.Where(stat => stat.StatId == "run"));
 
-        creature.TrainingPoints["run"] = 0;
+        creature.Stats["run"].Level = 0;
         creature.Genome.AbilityGenes["run"].AlleleB = 0;
 
         Assert.Equal(2, run.AlleleA);
@@ -130,7 +130,7 @@ public sealed class LineageTreeProjectionServiceTests
                 AlleleB = 1,
                 ExpressedAlleleIndex = 0
             };
-            creature.TrainingPoints[statId] = 0;
+            creature.Stats[statId] = new StatProgressData();
         }
 
         return creature;
