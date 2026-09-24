@@ -117,14 +117,22 @@ public sealed record StatGrowthRules(int TrainingPointsPerLevel, int MaxLevel, i
 
 public sealed record PassiveTrainingRules(float PointsPerMinute);
 public sealed record FavoriteFoodRules(int BonusTrainingPoints);
+/// <summary>Baby stage length in seconds of open-game time; hours, not weeks, for an idle game.</summary>
 public sealed record LifecycleRules(float ChildToAdultSeconds);
 public sealed record ReincarnationRules(
     // Adult lifetime in seconds of open-game time. The simulation only advances while the game is
     // running, so this is playtime rather than wall-clock age.
     float AdultLifespanSeconds,
+    // Hidden happiness is the only reincarnation condition: at or above this a Voidling reincarnates.
     float MinimumHappiness,
-    float MaximumStress,
-    float RetainedTrainingFraction);
+    float RetainedTrainingFraction)
+{
+    /// <summary>
+    /// Below this the Garden log warns once that a Voidling needs care. Kept apart from
+    /// <see cref="MinimumHappiness"/>, which is high enough that every small dip would warn.
+    /// </summary>
+    public float CareRiskHappiness { get; init; } = 30.0f;
+}
 
 public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice, int EggShellSalePrice)
 {
@@ -222,9 +230,8 @@ public sealed record GameBalanceRules(
     public FavoriteFoodRules FavoriteFood { get; init; } = new(BonusTrainingPoints: 1);
     public EvolutionRules Evolution { get; init; } = new(SpecializationThreshold: 0.50f);
     public ReincarnationRules Reincarnation { get; init; } = new(
-        AdultLifespanSeconds: 21600.0f,
-        MinimumHappiness: 10.0f,
-        MaximumStress: 70.0f,
+        AdultLifespanSeconds: 28800.0f,
+        MinimumHappiness: 70.0f,
         RetainedTrainingFraction: 0.10f);
     public EconomyRules Economy { get; init; } = new(GardenCoinsPerMinute: 1.0f);
     public NeedsRules Needs { get; init; } = new(
@@ -267,7 +274,7 @@ public sealed record GameBalanceRules(
             HatchFailurePercentByBurden: Array.AsReadOnly(new[] { 0, 20, 50, 80, 100 })),
         Hatching: new HatchingRules(IncubationSeconds: 22.0f),
         Stats: new StatGrowthRules(TrainingPointsPerLevel: 12, MaxLevel: 99, MaxTrainingPoints: 120),
-        Lifecycle: new LifecycleRules(ChildToAdultSeconds: 45.0f),
+        Lifecycle: new LifecycleRules(ChildToAdultSeconds: 5400.0f),
         Shop: new ShopRules(StoreEggPrice: 30, TrainingItemPrice: 8, EggShellSalePrice: 5),
         Racing: new RaceRules(
             BaseStamina: 72.0f,

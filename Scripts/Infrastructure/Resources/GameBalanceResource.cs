@@ -69,8 +69,8 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "0,60,0.1")]
     public float PassiveTrainingPointsPerMinute { get; set; } = 1.0f;
 
-    [Export(PropertyHint.Range, "1,3600,1")]
-    public float ChildToAdultSeconds { get; set; } = 45.0f;
+    [Export(PropertyHint.Range, "1,86400,1")]
+    public float ChildToAdultSeconds { get; set; } = 5400.0f;
 
     [ExportGroup("Favorite Food")]
     [Export(PropertyHint.Range, "0,20,1")]
@@ -109,14 +109,15 @@ public partial class GameBalanceResource : Resource
     public float EvolutionSpecializationThreshold { get; set; } = 0.50f;
 
     [ExportGroup("Lifecycle / Reincarnation")]
-    [Export(PropertyHint.Range, "30,86400,1")]
-    public float AdultLifespanSeconds { get; set; } = 21600.0f;
+    [Export(PropertyHint.Range, "30,172800,1")]
+    public float AdultLifespanSeconds { get; set; } = 28800.0f;
 
     [Export(PropertyHint.Range, "0,100,0.5")]
-    public float ReincarnationMinimumHappiness { get; set; } = 10.0f;
+    public float ReincarnationMinimumHappiness { get; set; } = 70.0f;
 
+    /// <summary>Happiness below which the Garden log warns that a Voidling needs care.</summary>
     [Export(PropertyHint.Range, "0,100,0.5")]
-    public float ReincarnationMaximumStress { get; set; } = 70.0f;
+    public float CareRiskHappiness { get; set; } = 30.0f;
 
     [Export(PropertyHint.Range, "0,1,0.01")]
     public float ReincarnationRetainedTrainingFraction { get; set; } = 0.10f;
@@ -321,9 +322,9 @@ public partial class GameBalanceResource : Resource
             Reincarnation = defaults.Reincarnation with
             {
                 AdultLifespanSeconds = Positive(AdultLifespanSeconds, 1.0f),
-                MinimumHappiness = ClampFinite(ReincarnationMinimumHappiness, 0.0f, 100.0f, 10.0f),
-                MaximumStress = ClampFinite(ReincarnationMaximumStress, 0.0f, 100.0f, 70.0f),
-                RetainedTrainingFraction = ClampFinite(ReincarnationRetainedTrainingFraction, 0.0f, 1.0f, 0.10f)
+                MinimumHappiness = ClampFinite(ReincarnationMinimumHappiness, 0.0f, 100.0f, 70.0f),
+                RetainedTrainingFraction = ClampFinite(ReincarnationRetainedTrainingFraction, 0.0f, 1.0f, 0.10f),
+                CareRiskHappiness = ClampFinite(CareRiskHappiness, 0.0f, 100.0f, 30.0f)
             },
             Needs = defaults.Needs with
             {

@@ -162,7 +162,7 @@ public sealed class AdvanceSimulationUseCase
     }
 
     private bool IsCareLifecycleSafe(VoidlingData creature)
-        => creature.Needs.Happiness >= _rules.Reincarnation.MinimumHappiness && creature.Needs.Stress <= _rules.Reincarnation.MaximumStress;
+        => creature.Needs.Happiness >= _rules.Reincarnation.CareRiskHappiness;
 
     private bool AdvanceGardenIncome(GameStateData state, float elapsedSeconds)
     {

@@ -160,8 +160,7 @@ public sealed class CreatureProfileProjectionService
             Array.AsReadOnly(stats),
             Array.AsReadOnly(rareTraits))
         {
-            CareDemeanor = creature.Needs.Happiness >= _rules.Reincarnation.MinimumHappiness &&
-                           creature.Needs.Stress <= _rules.Reincarnation.MaximumStress
+            CareDemeanor = creature.Needs.Happiness >= _rules.Reincarnation.MinimumHappiness
                 ? CreatureCareDemeanor.Settled
                 : CreatureCareDemeanor.NeedsCare,
             DiscoveredFavoriteFoodId = creature.FavoriteFoodDiscovered &&

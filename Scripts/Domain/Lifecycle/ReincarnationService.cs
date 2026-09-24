@@ -15,14 +15,12 @@ public enum LifecycleEndOutcome
 
 public readonly record struct LifecycleEndDecision(
     LifecycleEndOutcome Outcome,
-    float Happiness,
-    float Stress);
+    float Happiness);
 
 /// <summary>
-/// Pure lifecycle-end policy and reincarnation mutation. Eligibility is based on the confirmed
-/// hidden-care inputs; the exact threshold and retention percentage are authorable prototype
-/// balance. Reincarnation deliberately does not promote a DNA rank yet because the exact
-/// reincarnation rank-promotion rule remains a separate unresolved product decision.
+/// Pure lifecycle-end policy and reincarnation mutation. Hidden happiness is the only condition:
+/// at or above the authored threshold a Voidling reincarnates, below it the Voidling dies.
+/// Reincarnation deliberately does not promote a DNA rank; that remains a separate product rule.
 /// </summary>
 public sealed class ReincarnationService
 {
@@ -32,12 +30,9 @@ public sealed class ReincarnationService
         ArgumentNullException.ThrowIfNull(rules);
 
         var happiness = Math.Clamp(creature.Needs?.Happiness ?? 0.0f, 0.0f, 100.0f);
-        var stress = Math.Clamp(creature.Needs?.Stress ?? 0.0f, 0.0f, 100.0f);
-        var eligible = happiness >= rules.MinimumHappiness && stress <= rules.MaximumStress;
         return new LifecycleEndDecision(
-            eligible ? LifecycleEndOutcome.Reincarnate : LifecycleEndOutcome.Die,
-            happiness,
-            stress);
+            happiness >= rules.MinimumHappiness ? LifecycleEndOutcome.Reincarnate : LifecycleEndOutcome.Die,
+            happiness);
     }
 
     public void ApplyReincarnation(VoidlingData creature, ReincarnationRules rules)
