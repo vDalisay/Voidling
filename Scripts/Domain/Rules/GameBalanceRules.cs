@@ -13,7 +13,8 @@ public sealed record GeneticsRules(
     double RareFounderTraitChance,
     double RareTraitTransmissionChance,
     IReadOnlyList<string> FounderTraitIds,
-    int RelatedAncestorDepth);
+    int RelatedAncestorDepth,
+    int RareTraitMaxTransmittedGenerations);
 
 public sealed record AppearanceRules(
     IReadOnlyList<string> PaletteHex,
@@ -254,7 +255,8 @@ public sealed record GameBalanceRules(
             RareFounderTraitChance: 0.0005,
             RareTraitTransmissionChance: 0.10,
             FounderTraitIds: Array.AsReadOnly(new[] { "Lustrous", "Prismatic", "Aurora" }),
-            RelatedAncestorDepth: 3),
+            RelatedAncestorDepth: 3,
+            RareTraitMaxTransmittedGenerations: 2),
         Appearance: new AppearanceRules(
             PaletteHex: Array.AsReadOnly(new[]
             {
