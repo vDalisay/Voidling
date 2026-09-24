@@ -1327,3 +1327,21 @@ msgstr "{0} tile"
 
 msgid "UI_SHOP_BIOME_TRAINS"
 msgstr "Trains {0}."
+
+msgid "LOG_SPECIAL_EGG_LAID"
+msgstr "Something stirs: this egg is the {0}'s! It only hatches on a {1} that has never hatched one."
+
+msgid "LOG_SPECIAL_EGG_BOUGHT"
+msgstr "Bought the {0}'s egg. Put it on a {1} that has never hatched one."
+
+msgid "LOG_SPECIAL_HATCHED"
+msgstr "{0} hatched: the {1} is here!"
+
+msgid "LOG_SPECIAL_RESPAWN_AVAILABLE"
+msgstr "The {0} is gone. A new {0} egg is in the Shop; it needs a {1} that has never hatched one."
+
+msgid "UI_SHOP_SPECIAL_EGG"
+msgstr "{0} egg"
+
+msgid "UI_SHOP_SPECIAL_EGG_HINT"
+msgstr "Hatches only on a {0} that has never hatched one."

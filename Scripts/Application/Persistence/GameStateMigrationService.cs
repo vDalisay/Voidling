@@ -10,6 +10,7 @@ using Voidling.Application.Multiplayer.Leaderboards;
 using Voidling.Application.Multiplayer.Trading;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Care;
+using Voidling.Domain.Creatures;
 using Voidling.Domain.Evolution;
 using Voidling.Domain.Genetics;
 using Voidling.Domain.Preferences;
@@ -111,6 +112,7 @@ public sealed class GameStateMigrationService
             egg.Genome ??= new GenomeData();
             NormalizeGenome(egg.Genome);
             egg.RareTraits ??= new List<RareTraitData>();
+            egg.SpecialVariantId = SpecialVariantCatalog.Find(egg.SpecialVariantId)?.Id ?? string.Empty;
             egg.Appearance = NormalizeAppearance(egg.Genome, egg.Appearance);
             egg.IncubationSeconds = NonNegativeFinite(egg.IncubationSeconds);
             egg.RequiredIncubationSeconds = NonNegativeFinite(egg.RequiredIncubationSeconds);
@@ -119,6 +121,14 @@ public sealed class GameStateMigrationService
         }
 
         _lineage.EnsureCurrentEntries(state);
+
+        state.SpecialVariants = state.SpecialVariants
+            .Where(entry => entry != null && SpecialVariantCatalog.Find(entry.VariantId) != null)
+            .GroupBy(entry => entry.VariantId, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .ToList();
+        foreach (var entry in state.SpecialVariants)
+            entry.CreatureId ??= string.Empty;
 
         state.PendingTradeJournal.RemoveAll(entry => entry == null || string.IsNullOrWhiteSpace(entry.TradeId));
         state.AppliedTradeIds = state.AppliedTradeIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToList();
@@ -167,6 +177,7 @@ public sealed class GameStateMigrationService
         StatProgressionService.EnsureStats(creature, _rules.Genetics.StatIds, _rules.Stats);
 
         creature.RareTraits ??= new List<RareTraitData>();
+        creature.SpecialVariantId = SpecialVariantCatalog.Find(creature.SpecialVariantId)?.Id ?? string.Empty;
         creature.Appearance = NormalizeAppearance(creature.Genome, creature.Appearance);
 
         // Adults from before adult forms existed are Neutral: bigger than babies, and the artist's

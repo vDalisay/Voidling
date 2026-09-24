@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Common;
 
 namespace VoidlingGame;
 
@@ -535,10 +536,15 @@ public partial class GardenController : Node2D
                 visual.Holder.Position = new Vector2(egg.WorldX, egg.WorldY);
             visual.Sprite.Modulate = egg.State == EggState.Failed
                 ? new Color(0.55f, 0.55f, 0.55f, 1.0f)
-                : GameRules.TintColor(egg.TintHex);
+                : egg.SpecialVariantId.Length > 0
+                    ? VoidlingFormPresentationCatalog.SpecialEggTint(egg.SpecialVariantId)
+                    : GameRules.TintColor(egg.TintHex);
             var remaining = Math.Max(0, (int)Math.Ceiling(egg.RequiredIncubationSeconds - egg.IncubationSeconds));
-            // Strong and rare eggs take minutes now, so long waits read as m:ss.
+            // A Swamp guy egg names where it has to go until it sits there; strong and rare eggs
+            // take minutes, so long waits read as m:ss.
+            var waitingFor = _session.EnvironmentEggIsWaitingFor(egg);
             visual.Label.Text = egg.State == EggState.Failed ? "X"
+                : waitingFor.Length > 0 ? BiomePresentationCatalog.NameFor(waitingFor).ToUpperInvariant()
                 : remaining >= 60 ? $"{remaining / 60}:{remaining % 60:00}" : $"{remaining}s";
             visual.Hitbox.InputPickable = true;
         }

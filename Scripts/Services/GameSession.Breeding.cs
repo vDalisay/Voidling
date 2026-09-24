@@ -1,5 +1,7 @@
 using Godot;
 using Voidling.Application.Breeding;
+using Voidling.Domain.Creatures;
+using Voidling.Presentation.UI.Common;
 
 namespace VoidlingGame;
 
@@ -82,6 +84,9 @@ public partial class GameSession
             : "";
         ToastRequested?.Invoke($"Breeding produced an egg.{warning}");
         RaiseGardenEvent($"{parentAName} and {parentBName} produced a new egg.");
+        if (SpecialVariantCatalog.Find(result.SpecialVariantId) is { } variant)
+            RaiseGardenEvent(string.Format(Tr("LOG_SPECIAL_EGG_LAID"),
+                VoidlingFormPresentationCatalog.NameFor(variant.VisualTypeId), BiomePresentationCatalog.NameFor(variant.Environment)));
         return true;
     }
 

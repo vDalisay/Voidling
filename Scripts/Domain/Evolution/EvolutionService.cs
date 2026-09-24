@@ -90,7 +90,9 @@ public static class EvolutionService
 
         creature.EvolutionSpecialization = specialization;
         creature.Appearance ??= new VoidlingAppearanceData();
-        creature.Appearance.VisualTypeId = VisualTypeFor(specialization);
+        // A special variant (the Swamp guy) keeps its own look for life; only the stats grow up.
+        if (string.IsNullOrEmpty(creature.SpecialVariantId))
+            creature.Appearance.VisualTypeId = VisualTypeFor(specialization);
 
         var promotion = PromoteExpressedAllele(creature, promotedStatId, rules, specialization);
         return promotion with { DecidingStatId = chosen.StatId, DecidingLevel = Math.Max(0, topLevel) };

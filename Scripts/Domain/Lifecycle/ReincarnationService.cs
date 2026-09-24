@@ -59,9 +59,11 @@ public sealed class ReincarnationService
         creature.RunPowerInfluence = 0.0f;
         creature.EvolutionSpecialization = EvolutionSpecialization.None;
         creature.EvolutionMagnitude = 0.0f;
-        // A baby again: the adult form is chosen afresh at the next adulthood.
+        // A baby again: the adult form is chosen afresh at the next adulthood. A special variant
+        // keeps its own look through every life.
         creature.Appearance ??= new VoidlingAppearanceData();
-        creature.Appearance.VisualTypeId = EvolutionService.BabyVisualTypeId;
+        if (string.IsNullOrEmpty(creature.SpecialVariantId))
+            creature.Appearance.VisualTypeId = EvolutionService.BabyVisualTypeId;
         creature.Needs = new CreatureNeedsState();
     }
 }

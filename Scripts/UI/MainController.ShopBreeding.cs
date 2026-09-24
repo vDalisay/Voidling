@@ -1,8 +1,10 @@
 using System;
 using System.Linq;
 using Godot;
+using Voidling.Domain.Creatures;
 using Voidling.Domain.Garden;
 using Voidling.Application.Breeding;
+using Voidling.Application.Collection;
 using Voidling.Domain.Shop;
 using Voidling.Presentation.UI.Breeding;
 using Voidling.Presentation.UI.Common;
@@ -74,6 +76,17 @@ public partial class MainController : Node
                 Price: GameRules.GardenModuleRules.BiomeTilePrice))
             .ToArray();
 
+        // A departed special variant's respawn egg is sold only while it is gone.
+        var specialEggs = SpecialVariantCatalog.All
+            .Where(variant => SpecialVariantTracker.RespawnAvailable(state, variant))
+            .Select(variant => new ShopSpecialEggViewState(
+                variant.Id,
+                string.Format(Tr("UI_SHOP_SPECIAL_EGG"), VoidlingFormPresentationCatalog.NameFor(variant.VisualTypeId)),
+                string.Format(Tr("UI_SHOP_SPECIAL_EGG_HINT"), BiomePresentationCatalog.NameFor(variant.Environment)),
+                VoidlingFormPresentationCatalog.SpecialEggTint(variant.Id),
+                GameRules.SpecialVariantEggPrice))
+            .ToArray();
+
         var box = OpenRailModal(Tr("UI_SHOP_TITLE"), new Vector2(520, 344),
             panelTint: new Color(232f / 220f, 207f / 224f, 166f / 210f));
         box.AddThemeConstantOverride("separation", 4);
@@ -81,7 +94,8 @@ public partial class MainController : Node
         var screen = new ShopScreen();
         screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rareOffer, landPieces)
         {
-            BiomeTiles = biomeTiles
+            BiomeTiles = biomeTiles,
+            SpecialEggs = specialEggs
         }, _shopCategory, _shopSelection);
         screen.SelectionChanged += (category, selection) =>
         {
@@ -114,6 +128,11 @@ public partial class MainController : Node
         screen.BiomeTilePurchaseRequested += biomeId =>
         {
             _session.BuyBiomeTile(biomeId);
+            RenderShop();
+        };
+        screen.SpecialEggPurchaseRequested += variantId =>
+        {
+            _session.BuySpecialVariantEgg(variantId);
             RenderShop();
         };
         screen.RareOfferPurchaseRequested += itemId =>

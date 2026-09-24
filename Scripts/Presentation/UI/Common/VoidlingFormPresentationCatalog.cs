@@ -27,4 +27,10 @@ public static class VoidlingFormPresentationCatalog
 
     public static string NameFor(string? visualTypeId)
         => TranslationServer.Translate(NameKeyFor(visualTypeId));
+
+    /// <summary>A special variant's egg looks the part in the Garden, the inventory and the shop.</summary>
+    public static Color SpecialEggTint(string? variantId)
+        => string.Equals(variantId, "swamp-variant", StringComparison.OrdinalIgnoreCase)
+            ? Color.FromHtml("#7FA35A")
+            : Colors.White;
 }

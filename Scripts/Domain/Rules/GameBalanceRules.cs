@@ -138,6 +138,9 @@ public sealed record ShopRules(int StoreEggPrice, int TrainingItemPrice, int Egg
     public int StoreEggSlotCount { get; init; } = 3;
     public double RareOfferAppearanceChance { get; init; } = 0.20;
     public int FullIncubationSkipPrice { get; init; } = 45;
+
+    /// <summary>A special variant's respawn egg, sold only after that variant has departed.</summary>
+    public int SpecialVariantEggPrice { get; init; } = 250;
 }
 
 public sealed record EconomyRules(float GardenCoinsPerMinute);

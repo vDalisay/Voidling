@@ -50,6 +50,7 @@ public partial class GameSession
 
         SaveAndNotify($"{result.Name} left the farm forever. Their family record remains.");
         RaiseGardenEvent($"{result.Name} left the garden. Their family record remains.");
+        AnnounceSpecialVariantDeparture(creatureId);
         return true;
     }
 

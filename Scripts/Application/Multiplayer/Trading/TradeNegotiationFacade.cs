@@ -271,6 +271,8 @@ public sealed class TradeNegotiationFacade
 
     private TradeVoidlingChoiceView[] BuildLocalVoidlings()
         => _stateProvider().Voidlings
+            // Special variants (the Swamp guy) are never tradeable, so they are never offered.
+            .Where(voidling => string.IsNullOrEmpty(voidling.SpecialVariantId))
             .OrderBy(voidling => voidling.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(voidling => voidling.Id, StringComparer.Ordinal)
             .Select(voidling =>

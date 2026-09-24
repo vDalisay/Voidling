@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Domain.Creatures;
 using Voidling.Domain.Shop;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Inventory;
@@ -131,8 +132,13 @@ public partial class MainController : Node
             .Select(egg => new StoredEggViewState(
                 egg.Id,
                 string.Format(Tr(EggNameKey(egg)), NumberWithinSource(state, egg)),
-                Tr(egg.Source == EggSource.Bred ? "UI_INVENTORY_EGG_BRED" : "UI_INVENTORY_EGG_COMMON"),
-                GameRules.TintColor(egg.TintHex),
+                // A special variant's egg says where it has to go to hatch.
+                SpecialVariantCatalog.Find(egg.SpecialVariantId) is { } variant
+                    ? string.Format(Tr("UI_SHOP_SPECIAL_EGG_HINT"), BiomePresentationCatalog.NameFor(variant.Environment))
+                    : Tr(egg.Source == EggSource.Bred ? "UI_INVENTORY_EGG_BRED" : "UI_INVENTORY_EGG_COMMON"),
+                egg.SpecialVariantId.Length > 0
+                    ? VoidlingFormPresentationCatalog.SpecialEggTint(egg.SpecialVariantId)
+                    : GameRules.TintColor(egg.TintHex),
                 egg.Source == EggSource.Bred))
             .ToList();
 

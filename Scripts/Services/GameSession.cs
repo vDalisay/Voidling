@@ -10,6 +10,7 @@ using Voidling.Application.Settings;
 using Voidling.Application.Shop;
 using Voidling.Application.Simulation;
 using Voidling.Application.Training;
+using Voidling.Domain.Creatures;
 using Voidling.Domain.Evolution;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shop;
@@ -104,14 +105,18 @@ public partial class GameSession : Node
                 case CreatureReincarnatedEvent reincarnated:
                     Announce($"{reincarnated.Name} reincarnated and began a new life.", true); break;
                 case CreatureDiedEvent died:
-                    Announce($"{died.Name} reached the end of their life.", true); break;
+                    Announce($"{died.Name} reached the end of their life.", true);
+                    AnnounceSpecialVariantDeparture(died.CreatureId); break;
                 case CreatureCareRiskEvent risk:
                     RaiseGardenEvent($"{risk.Name} seems unsettled and needs more care before the end of this life."); break;
                 case CreaturePassiveTrainingCappedEvent capped:
                     RaiseGardenEvent($"{capped.Name} reached level 99 in {DisplayStatId(capped.StatId)}."); break;
                 case CreatureHatchedEvent hatched:
                     RecordDailyMissionEvent(DailyMissionEventKind.HatchEgg);
-                    Announce($"An egg hatched and {hatched.Name} was born!", true); break;
+                    Announce(hatched.SpecialVariantId.Length > 0
+                        ? string.Format(Tr("LOG_SPECIAL_HATCHED"), hatched.Name,
+                            VoidlingFormPresentationCatalog.NameFor(SpecialVariantCatalog.Find(hatched.SpecialVariantId)?.VisualTypeId))
+                        : $"An egg hatched and {hatched.Name} was born!", true); break;
                 case EggFailedEvent:
                     Announce("An egg failed to hatch.", true); break;
                 case EggWaitingForGardenSpaceEvent:
@@ -121,6 +126,17 @@ public partial class GameSession : Node
         if (!result.Changed) return;
         Save();
         StateChanged?.Invoke();
+    }
+
+    /// <summary>When a special variant leaves, say that its respawn egg is now in the shop.</summary>
+    private void AnnounceSpecialVariantDeparture(string creatureId)
+    {
+        var departed = State.DepartedVoidlings.Find(creature => creature.Id == creatureId);
+        if (SpecialVariantCatalog.Find(departed?.SpecialVariantId) is not { } variant)
+            return;
+
+        RaiseGardenEvent(string.Format(Tr("LOG_SPECIAL_RESPAWN_AVAILABLE"),
+            VoidlingFormPresentationCatalog.NameFor(variant.VisualTypeId), BiomePresentationCatalog.NameFor(variant.Environment)));
     }
 
     private void Announce(string message, bool toast)

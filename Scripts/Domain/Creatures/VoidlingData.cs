@@ -50,6 +50,13 @@ public sealed class VoidlingData
     public VoidlingAppearanceData Appearance { get; set; } = new();
 
     public List<RareTraitData> RareTraits { get; set; } = new();
+
+    /// <summary>
+    /// Blank for an ordinary Voidling; a special variant's ID (the Swamp guy) otherwise. A special
+    /// variant keeps its look for life, cannot be traded, and its looks do not pass on.
+    /// </summary>
+    public string SpecialVariantId { get; set; } = "";
+
     public CreatureNeedsState Needs { get; set; } = new();
 
     // Core food preference travels with the Voidling across saves/trades/reincarnation. The ID is

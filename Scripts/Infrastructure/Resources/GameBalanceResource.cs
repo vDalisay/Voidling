@@ -251,6 +251,10 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "0,10000,1")]
     public int FullIncubationSkipPrice { get; set; } = 45;
 
+    /// <summary>The Swamp guy's respawn egg, sold after he has died or been said goodbye to.</summary>
+    [Export(PropertyHint.Range, "0,100000,1")]
+    public int SpecialVariantEggPrice { get; set; } = 250;
+
     public GameBalanceRules ToDomainRules()
     {
         var defaults = GameBalanceRules.DemoDefaults;
@@ -384,7 +388,8 @@ public partial class GameBalanceResource : Resource
                 StoreEggSlotCount = Math.Clamp(StoreEggSlotCount, 1, 12),
                 EggRotationIntervalSeconds = Positive(EggRotationIntervalSeconds, 1.0f),
                 RareOfferAppearanceChance = Probability(RareOfferAppearanceChance),
-                FullIncubationSkipPrice = Math.Max(0, FullIncubationSkipPrice)
+                FullIncubationSkipPrice = Math.Max(0, FullIncubationSkipPrice),
+                SpecialVariantEggPrice = Math.Max(0, SpecialVariantEggPrice)
             }
         };
     }

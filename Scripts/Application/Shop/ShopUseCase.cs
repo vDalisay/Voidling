@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using Voidling.Application.Collection;
+using Voidling.Domain.Creatures;
 using Voidling.Domain.Hatching;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shop;
@@ -108,6 +110,38 @@ public sealed class ShopUseCase
         egg.WorldX = worldX;
         egg.WorldY = worldY;
         return ShopFailure.None;
+    }
+
+    /// <summary>
+    /// A departed special variant's respawn egg: a new individual with founder genes and the
+    /// variant's guaranteed stat. It goes to the inventory and, like the first one, only incubates
+    /// on an unused hex of the variant's environment (a Swamp that never hatched one).
+    /// </summary>
+    public StoreEggPurchaseResult BuySpecialVariantEgg(GameStateData state, string variantId, string eggId, ulong eggSeed)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var variant = SpecialVariantCatalog.Find(variantId);
+        if (variant == null || !SpecialVariantTracker.RespawnAvailable(state, variant))
+            return new StoreEggPurchaseResult(ShopFailure.RareOfferNotFound, null);
+        var price = Math.Max(0, _rules.Shop.SpecialVariantEggPrice);
+        if (state.Coins < price)
+            return new StoreEggPurchaseResult(ShopFailure.NotEnoughCurrency, null);
+        if (string.IsNullOrWhiteSpace(eggId) || state.OwnedEggs.Any(egg => egg.Id == eggId))
+            return new StoreEggPurchaseResult(ShopFailure.EggNotFound, null);
+
+        var egg = _storeEggFactory.Create(eggId, eggSeed);
+        SpecialVariantCatalog.ForceGenes(variant, egg.Genome);
+        egg.SpecialVariantId = variant.Id;
+        egg.Appearance.VisualTypeId = variant.VisualTypeId;
+        egg.RequiredIncubationSeconds = IncubationPolicy.RequiredSeconds(egg.Genome, egg.RareTraits, isSpecialVariant: true, _rules.Hatching);
+        egg.IsViable = true;
+        egg.State = EggState.Stored;
+        egg.IncubationSeconds = 0.0f;
+
+        state.Coins -= price;
+        state.OwnedEggs.Add(egg);
+        SpecialVariantTracker.RecordEgg(state, variant, egg.Id, fromBreeding: false);
+        return new StoreEggPurchaseResult(ShopFailure.None, egg);
     }
 
     public ShopFailure BuyRareOffer(GameStateData state, string itemId)

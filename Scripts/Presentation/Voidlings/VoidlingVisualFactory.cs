@@ -23,6 +23,7 @@ public static class VoidlingVisualFactory
     private static readonly VoidlingVisualCatalog Catalog = LoadCatalog();
     private static readonly IReadOnlyDictionary<string, VoidlingVisualDefinition> Definitions =
         BuildDefinitionMap(Catalog);
+    private static readonly IReadOnlyDictionary<string, float> PlaceholderHues = BuildPlaceholderHues(Catalog);
     private static readonly HashSet<string> AuthoredColorTypes = new(
         (Catalog.AuthoredColorVisualTypeIds ?? Array.Empty<string>())
             .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -269,15 +270,39 @@ public static class VoidlingVisualFactory
             appearance.FallbackTintHex);
     }
 
-    /// <summary>Authored-color types render the sheet exactly as drawn: no palette swap, no tint.</summary>
+    /// <summary>
+    /// Authored-color types render the sheet exactly as drawn: no palette swap, no tint. One whose
+    /// own art is not registered yet borrows the default body at its placeholder hue instead.
+    /// </summary>
     private static VoidlingVisualAppearance ForRendering(VoidlingVisualAppearance appearance)
-        => UsesAuthoredColors(appearance.VisualTypeId)
-            ? appearance with
-            {
-                PaletteHue = VoidlingAppearanceData.LegacyUninitializedPaletteHue,
-                FallbackTintHex = "#FFFFFF"
-            }
-            : appearance;
+    {
+        if (!UsesAuthoredColors(appearance.VisualTypeId))
+            return appearance;
+
+        var typeId = appearance.VisualTypeId.Trim().ToLowerInvariant();
+        if (!Definitions.ContainsKey(typeId) && PlaceholderHues.TryGetValue(typeId, out var hue))
+            return appearance with { PaletteHue = hue };
+
+        return appearance with
+        {
+            PaletteHue = VoidlingAppearanceData.LegacyUninitializedPaletteHue,
+            FallbackTintHex = "#FFFFFF"
+        };
+    }
+
+    private static IReadOnlyDictionary<string, float> BuildPlaceholderHues(VoidlingVisualCatalog catalog)
+    {
+        var hues = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+        var ids = catalog.PlaceholderHueVisualTypeIds ?? Array.Empty<string>();
+        var values = catalog.PlaceholderHues ?? Array.Empty<float>();
+        for (var i = 0; i < Math.Min(ids.Length, values.Length); i++)
+        {
+            if (!string.IsNullOrWhiteSpace(ids[i]) && VoidlingAppearanceData.IsValidHue(values[i]))
+                hues[ids[i].Trim()] = values[i];
+        }
+
+        return hues;
+    }
 
     private static VoidlingVisualCatalog LoadCatalog()
     {
