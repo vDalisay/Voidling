@@ -20,8 +20,26 @@ public partial class VoidlingVisualDefinition : Resource
     public Texture2D SwimAtlas { get; set; } = null!;
 
     [ExportGroup("Palette Recoloring")]
+    private Color[] _sourcePaletteColorValues = System.Array.Empty<Color>();
+
     [Export]
-    public Godot.Collections.Array<Color> SourcePaletteColors { get; set; } = new();
+    public Color[] SourcePaletteColorValues
+    {
+        get => _sourcePaletteColorValues;
+        set
+        {
+            _sourcePaletteColorValues = value ?? System.Array.Empty<Color>();
+            SourcePaletteColors.Clear();
+            foreach (var color in _sourcePaletteColorValues)
+                SourcePaletteColors.Add(color);
+        }
+    }
+
+    /// <summary>
+    /// Runtime-friendly typed palette view. Godot serializes C# Color[] as PackedColorArray, while
+    /// this collection keeps the existing palette application code type-safe and allocation-free.
+    /// </summary>
+    public Godot.Collections.Array<Color> SourcePaletteColors { get; } = new();
 
     [Export(PropertyHint.Range, "0.0001,0.2,0.0005")]
     public float PaletteMatchTolerance { get; set; } = 0.0125f;

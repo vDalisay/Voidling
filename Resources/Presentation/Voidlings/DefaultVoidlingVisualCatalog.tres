@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="VoidlingVisualCatalog" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="VoidlingVisualCatalog" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Presentation/Voidlings/VoidlingVisualCatalog.cs" id="1_catalog"]
 [ext_resource type="Resource" path="res://Resources/Presentation/Voidlings/DefaultVoidlingVisual.tres" id="2_normal"]
+[ext_resource type="Resource" path="res://Resources/Presentation/Voidlings/FlyingVoidlingVisual.tres" id="3_flying"]
+[ext_resource type="Resource" path="res://Resources/Presentation/Voidlings/WaterVoidlingVisual.tres" id="4_water"]
 
 [resource]
 script = ExtResource("1_catalog")
 DefaultVisualTypeId = "normal"
-Definitions = Array[Resource]([ExtResource("2_normal")])
+Definitions = Array[Resource]([ExtResource("2_normal"), ExtResource("3_flying"), ExtResource("4_water")])
