@@ -188,6 +188,9 @@ public partial class MainController
                         : stat)
                     .ToArray()
             };
+            // The half-second simulation step refreshes the UI from the save whenever it changes
+            // something, which would swap this synthetic profile back out mid-check.
+            _session.StateChanged -= RefreshUi;
             inspector.Render(expandedProfile, GameRules.StatIds[0], true);
             await SettleGardenUi();
             RequireOnScreen(inspector);
@@ -204,6 +207,7 @@ public partial class MainController
             if (activeRate is not { Visible: true } || !activeRate.Text.Contains("EXP/s", StringComparison.Ordinal))
                 throw new InvalidOperationException("Inspector did not show the active training rate.");
             await CaptureGardenUi("companion-expanded");
+            _session.StateChanged += RefreshUi;
             RefreshUi();
             await SettleGardenUi();
             var giveTreat = FindGardenButton(inspector, "GiveTreat");
