@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Motion;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Inventory;
@@ -152,6 +153,9 @@ public partial class InventoryScreen : HBoxContainer
                     other.ButtonPressed = other.Name == "Category" + _category;
                 RebuildSlots();
                 FocusSelection();
+                // A new pocket: its slots pop in one after another, then the card turns over.
+                UiMotion.StaggerIn(_grid.GetChildren().OfType<CanvasItem>().ToArray(), 0.025f, 0.22f, 0.1f);
+                UiMotion.Appear(_detail, 0.05, UiMotion.Quick, 0.06f);
             };
             _categories.AddChild(button);
         }
@@ -199,24 +203,27 @@ public partial class InventoryScreen : HBoxContainer
         {
             var count = UiFactory.CreateLabel("x" + slot.Count, 6);
             count.Position = new Vector2(2, 36);
-            count.Size = new Vector2(48, 12);
+            count.Size = new Vector2(46, 12);
             count.HorizontalAlignment = HorizontalAlignment.Right;
             count.MouseFilter = MouseFilterEnum.Ignore;
+            count.AddThemeColorOverride("font_outline_color", UiSkin.Cream);
+            count.AddThemeConstantOverride("outline_size", 3);
             button.AddChild(count);
         }
-        button.Pressed += () => { _selection = slot.Key; RebuildSlots(); FocusSelection(); };
+        button.Pressed += () =>
+        {
+            _selection = slot.Key;
+            RebuildSlots();
+            FocusSelection();
+            UiMotion.Appear(_detail, 0.0, UiMotion.Quick, 0.06f);
+        };
         return button;
     }
 
     private void BuildDetail(Slot slot)
     {
         var artPanel = new PanelContainer { CustomMinimumSize = new Vector2(0, 56) };
-        artPanel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
-        {
-            BgColor = Color.FromHtml("#F7E5BD"),
-            CornerRadiusTopLeft = 3, CornerRadiusTopRight = 3,
-            CornerRadiusBottomLeft = 3, CornerRadiusBottomRight = 3
-        });
+        artPanel.AddThemeStyleboxOverride("panel", UiSkin.Well());
         var center = new CenterContainer();
         var art = slot.Art();
         if (art.CustomMinimumSize == Vector2.Zero) art.CustomMinimumSize = new Vector2(46, 46);
@@ -239,7 +246,7 @@ public partial class InventoryScreen : HBoxContainer
 
         _detail.AddChild(new ColorRect
         {
-            Color = Color.FromHtml("#B7926F"),
+            Color = UiPalette.Tan,
             CustomMinimumSize = new Vector2(1, 1),
             MouseFilter = MouseFilterEnum.Ignore
         });
@@ -248,7 +255,7 @@ public partial class InventoryScreen : HBoxContainer
         if (slot.ActionText == null || slot.Action == null) return;
         var action = UiFactory.CreateButton(slot.ActionText);
         action.Name = "ItemAction";
-        action.CustomMinimumSize = new Vector2(125, 28);
+        action.CustomMinimumSize = new Vector2(125, 30);
         UiFactory.ApplyPrimaryStyle(action);
         action.Pressed += slot.Action;
         _detail.AddChild(action);

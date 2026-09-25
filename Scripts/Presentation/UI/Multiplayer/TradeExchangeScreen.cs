@@ -181,7 +181,7 @@ public partial class TradeExchangeScreen : Control
 
     private void AddStation(float x, string heading)
     {
-        var panel = UiFactory.CreatePanel(new Vector2(160, 176));
+        var panel = UiFactory.CreatePaperPanel(new Vector2(160, 176));
         panel.Position = new Vector2(x, 76);
         panel.Size = new Vector2(160, 176);
         AddChild(panel);

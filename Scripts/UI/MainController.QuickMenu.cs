@@ -2,6 +2,7 @@ using System.Linq;
 using Godot;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Garden;
+using Voidling.Presentation.UI.Motion;
 using Voidling.Presentation.Voidlings;
 
 namespace VoidlingGame;
@@ -24,17 +25,21 @@ public partial class MainController
         _quickMenu.VoidlingPicked += OnQuickMenuVoidlingPicked;
         _uiRoot.AddChild(_quickMenu);
 
+        // The placement hint is a paper note hanging at the top of the Garden, bobbing gently
+        // while the player chooses where to put something.
         _placementHint = UiFactory.CreateLabel(Tr("UI_GARDEN_PLACE_EGG_HINT"), 8);
         _placementHint.Position = new Vector2(210, 66);
         _placementHint.Size = new Vector2(248, 28);
         _placementHint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        _placementHint.AddThemeColorOverride("font_color", Color.FromHtml("#F9F4D8"));
-        _placementHint.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
-        _placementHint.AddThemeConstantOverride("outline_size", 2);
+        _placementHint.HorizontalAlignment = HorizontalAlignment.Center;
+        _placementHint.VerticalAlignment = VerticalAlignment.Center;
+        _placementHint.AddThemeStyleboxOverride("normal", UiSkin.Paper());
+        _placementHint.AddThemeColorOverride("font_color", UiSkin.Ink);
+        _placementHint.MouseFilter = Control.MouseFilterEnum.Ignore;
         _placementHint.Visible = false;
         _uiRoot.AddChild(_placementHint);
 
-        _landPurchaseActions = UiFactory.CreatePanel(new Vector2(258, 38));
+        _landPurchaseActions = UiFactory.CreateWindowPanel(new Vector2(258, 38));
         _landPurchaseActions.Name = "LandPurchaseActions";
         _landPurchaseActions.Position = new Vector2((ScreenWidth - 258) / 2f, 312);
         _landPurchaseActions.Size = new Vector2(258, 38);
@@ -67,7 +72,10 @@ public partial class MainController
     private void OnLandPlacementModeChanged(bool placing)
     {
         ShowPlacementHint(placing, "UI_GARDEN_PLACE_LAND_HINT");
-        _landPurchaseActions.Visible = placing && _shopLandPurchaseId.Length > 0;
+        var showActions = placing && _shopLandPurchaseId.Length > 0;
+        if (showActions && !_landPurchaseActions.Visible)
+            UiMotion.Appear(_landPurchaseActions, 0.0, UiMotion.Normal, 0.1f);
+        _landPurchaseActions.Visible = showActions;
         if (!placing && _shopLandPurchaseId.Length > 0)
             FinishShopLandPlacement();
     }
@@ -76,7 +84,25 @@ public partial class MainController
     {
         if (placing)
             _placementHint.Text = Tr(hintKey);
+        var appearing = placing && !_placementHint.Visible;
         _placementHint.Visible = placing;
+        if (!placing)
+        {
+            UiMotion.Kill(_placementHint, "bob");
+            _placementHint.Position = new Vector2(210, 66);
+            return;
+        }
+        if (!appearing) return;
+        UiMotion.Appear(_placementHint, 0.0, UiMotion.Normal, 0.12f);
+        var bob = UiMotion.Loop(_placementHint, "bob");
+        if (bob == null) return;
+        foreach (var step in UiMotionMath.BobSteps)
+        {
+            var y = 66 + step;
+            bob.TweenCallback(Callable.From(() => _placementHint.Position = new Vector2(210, y)));
+            bob.TweenInterval(0.16);
+        }
+        bob.TweenInterval(0.5);
     }
 
     // Picking from the quick menu both inspects and tracks, which is the whole point of the

@@ -4,6 +4,7 @@ using System.Linq;
 using Godot;
 using Voidling.Application.Roster;
 using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Motion;
 using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
@@ -28,6 +29,7 @@ public partial class GardenInspector : PanelContainer
     private TextureRect _portrait = null!;
     private CreatureProfileProjection _visualProfile = null!;
     private readonly Dictionary<string, (Label rank, Label level, Label rate, ProgressBar progress, StyleBoxFlat background)> _stats = new();
+    private readonly Dictionary<string, int> _levels = new();
     private string _trainingStat = string.Empty;
     public string CreatureId { get; private set; } = string.Empty;
 
@@ -36,12 +38,12 @@ public partial class GardenInspector : PanelContainer
         CreatureId = profile.CreatureId;
         Name = "GardenInspector";
         CustomMinimumSize = new Vector2(162, 230);
-        var chrome = UiFactory.CreatePanel(Vector2.Zero);
-        var style = (StyleBoxTexture)chrome.GetThemeStylebox("panel").Duplicate();
-        chrome.Free();
+        var style = UiSkin.Window();
         style.ContentMarginLeft = style.ContentMarginRight = 9;
         style.ContentMarginTop = style.ContentMarginBottom = 9;
         AddThemeStyleboxOverride("panel", style);
+        // Pops in beside the Garden rather than blinking into place.
+        Callable.From(() => UiMotion.Appear(this, 0.0, UiMotion.Normal, 0.08f)).CallDeferred();
 
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 3);
@@ -52,7 +54,9 @@ public partial class GardenInspector : PanelContainer
         _portrait = CreatePortrait(profile);
         identity.AddChild(_portrait);
         var heading = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        heading.AddChild(UiFactory.CreateLabel(Tr("UI_GARDEN_COMPANION"), 8));
+        var eyebrow = UiFactory.CreateLabel(Tr("UI_GARDEN_COMPANION"), 7);
+        eyebrow.AddThemeColorOverride("font_color", UiSkin.InkSoft);
+        heading.AddChild(eyebrow);
         _name = new LineEdit
         {
             Text = profile.Name, MaxLength = 18, ExpandToTextLength = false,
@@ -66,9 +70,8 @@ public partial class GardenInspector : PanelContainer
         heading.AddChild(_name);
         identity.AddChild(heading);
         var close = MakeButton("CloseInspector", "UI_COMMON_CLOSE", () => CloseRequested?.Invoke());
-        close.Text = "×";
+        UiSkin.ApplyIconButton(close, UiSkin.IconGlyph.SmallClose);
         close.TooltipText = Tr("UI_COMMON_CLOSE");
-        close.CustomMinimumSize = new Vector2(18, 18);
         close.SizeFlagsHorizontal = SizeFlags.ShrinkEnd;
         close.SizeFlagsVertical = SizeFlags.ShrinkBegin;
         identity.AddChild(close);
@@ -93,9 +96,9 @@ public partial class GardenInspector : PanelContainer
         foreach (var stat in profile.Stats)
         {
             var label = UiFactory.CreateLabel(StatPresentationCatalog.NameFor(stat.StatId), 8);
-            label.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(stat.StatId));
-            label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
-            label.AddThemeConstantOverride("outline_size", 1);
+            // The paper-ink shade of the stat colour, as in the treat chooser: the bright bar colours
+            // (yellow Swim above all) are unreadable as text on the tan panel.
+            label.AddThemeColorOverride("font_color", PaperCard.Ink(StatPresentationCatalog.ColorFor(stat.StatId)));
             var statName = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
             statName.AddThemeConstantOverride("separation", 3);
             statName.AddChild(label);
@@ -118,14 +121,7 @@ public partial class GardenInspector : PanelContainer
         actions.AddThemeConstantOverride("h_separation", 4);
         actions.AddThemeConstantOverride("v_separation", 3);
         _treat = MakeButton("GiveTreat", "UI_PROFILE_GIVE_TREAT", () => TreatRequested?.Invoke());
-        foreach (var state in new[] { "normal", "hover", "pressed", "hover_pressed" })
-        {
-            var buttonStyle = (StyleBoxTexture)_treat.GetThemeStylebox(state).Duplicate();
-            buttonStyle.ModulateColor = Color.FromHtml("#587E60");
-            _treat.AddThemeStyleboxOverride(state, buttonStyle);
-        }
-        foreach (var state in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color" })
-            _treat.AddThemeColorOverride(state, Color.FromHtml("#FFF7DE"));
+        UiFactory.ApplyPrimaryStyle(_treat);
         actions.AddChild(_treat);
         actions.AddChild(MakeButton("Details", "UI_GARDEN_DETAILS", () => DetailsRequested?.Invoke()));
         actions.AddChild(MakeButton("Family", "UI_GARDEN_FAMILY", () => FamilyRequested?.Invoke()));
@@ -136,17 +132,28 @@ public partial class GardenInspector : PanelContainer
         box.AddChild(actions);
     }
 
-    public override void _Process(double delta)
+    /// <summary>
+    /// The stat being trained on its land wears a pulsing border. A looping tween on that one
+    /// bar's border replaces a per-frame update of every bar.
+    /// </summary>
+    private void PulseTrainingStat(string statId)
     {
-        var pulse = (Mathf.Sin((float)Time.GetTicksMsec() / 240.0f) + 1.0f) * 0.5f;
-        foreach (var (statId, view) in _stats)
+        foreach (var (id, view) in _stats)
         {
-            var active = string.Equals(statId, _trainingStat, StringComparison.Ordinal);
-            view.background.SetBorderWidthAll(active ? 1 : 0);
-            var border = StatPresentationCatalog.ColorFor(statId);
-            border.A = 0.45f + pulse * 0.45f;
-            view.background.BorderColor = border;
+            if (id == statId) continue;
+            UiMotion.Kill(view.progress, "pulse");
+            view.background.SetBorderWidthAll(0);
         }
+        if (!_stats.TryGetValue(statId, out var active)) return;
+        active.background.SetBorderWidthAll(1);
+        var color = StatPresentationCatalog.ColorFor(statId);
+        active.background.BorderColor = color;
+        var pulse = UiMotion.Loop(active.progress, "pulse");
+        if (pulse == null) return;
+        var dim = color;
+        dim.A = 0.45f;
+        pulse.TweenProperty(active.background, "border_color", dim, 0.38).SetTrans(Tween.TransitionType.Sine);
+        pulse.TweenProperty(active.background, "border_color", color, 0.38).SetTrans(Tween.TransitionType.Sine);
     }
 
     public void FocusCare() => _treat.GrabFocus();
@@ -177,16 +184,48 @@ public partial class GardenInspector : PanelContainer
         _favorite.TooltipText = _favorite.Text;
         foreach (var stat in profile.Stats)
         {
-            _stats[stat.StatId].rank.Text = stat.InheritedRank;
-            _stats[stat.StatId].level.Text = string.Format(Tr("UI_PROFILE_LEVEL_VALUE"), stat.TrainingLevel);
-            _stats[stat.StatId].progress.Value = stat.TrainingProgress;
+            var view = _stats[stat.StatId];
+            view.rank.Text = stat.InheritedRank;
+            view.level.Text = string.Format(Tr("UI_PROFILE_LEVEL_VALUE"), stat.TrainingLevel);
+            var levelledUp = _levels.TryGetValue(stat.StatId, out var previousLevel) && stat.TrainingLevel > previousLevel;
+            _levels[stat.StatId] = stat.TrainingLevel;
+            SetProgress(view.progress, stat.TrainingProgress, levelledUp);
+            if (levelledUp)
+            {
+                // A level earned while watching: the level pops, the bar flashes and sparks fly.
+                UiMotion.Pop(view.level, 0.3f, UiMotion.Slow);
+                UiMotion.Flash(view.progress, new Color(1.6f, 1.6f, 1.4f), UiMotion.Slow);
+                PixelBurst.Spawn(this, view.level.GetGlobalRect().GetCenter(), PixelBurst.Palette.Leafy, 12);
+            }
             _stats[stat.StatId].rate.Visible = stat.TrainingPointsPerSecond > 0;
             _stats[stat.StatId].rate.Text = stat.TrainingPointsPerSecond > 0
                 ? string.Format(Tr("UI_PROFILE_EXP_PER_SECOND"), stat.TrainingPointsPerSecond)
                 : string.Empty;
         }
         _follow.SetPressedNoSignal(following);
-        _trainingStat = trainingStat;
+        if (!string.Equals(_trainingStat, trainingStat, StringComparison.Ordinal) || !_pulseStarted)
+        {
+            _pulseStarted = true;
+            _trainingStat = trainingStat;
+            PulseTrainingStat(trainingStat);
+        }
+    }
+
+    private bool _pulseStarted;
+
+    /// <summary>Progress fills smoothly as it grows; a new level (the bar wrapping) starts clean.</summary>
+    private static void SetProgress(ProgressBar bar, double value, bool wrapped)
+    {
+        if (wrapped || value < bar.Value || !bar.IsVisibleInTree())
+        {
+            UiMotion.Kill(bar, "fill");
+            bar.Value = value;
+            return;
+        }
+        if (Math.Abs(value - bar.Value) < 0.0005) return;
+        var fill = UiMotion.Start(bar, "fill");
+        if (fill == null) { bar.Value = value; return; }
+        fill.TweenProperty(bar, "value", value, 0.25).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
     }
 
     private static HBoxContainer CreateStatRow(Control name, Control rank, Control level)
@@ -212,10 +251,13 @@ public partial class GardenInspector : PanelContainer
             ShowPercentage = false,
             CustomMinimumSize = new Vector2(0, 4)
         };
-        var background = new StyleBoxFlat { BgColor = Color.FromHtml("#C5B798") };
-        var fill = new StyleBoxFlat { BgColor = StatPresentationCatalog.ColorFor(statId) };
-        background.SetCornerRadiusAll(1);
-        fill.SetCornerRadiusAll(1);
+        // Square pixel bars: a dark trough and a fill with a lit top row, never anti-aliased.
+        var background = UiSkin.BarTrack();
+        var fill = new StyleBoxFlat
+        {
+            BgColor = StatPresentationCatalog.ColorFor(statId), AntiAliasing = false,
+            BorderColor = StatPresentationCatalog.ColorFor(statId).Lightened(0.35f), BorderWidthTop = 1
+        };
         bar.AddThemeStyleboxOverride("background", background);
         bar.AddThemeStyleboxOverride("fill", fill);
         return (bar, background);

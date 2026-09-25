@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Motion;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Shop;
@@ -69,7 +70,6 @@ public partial class ShopScreen : VBoxContainer
         AddThemeConstantOverride("separation", 5);
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
         SizeFlagsVertical = SizeFlags.ExpandFill;
-        AddChild(BuildSummary());
 
         var body = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
         body.AddThemeConstantOverride("separation", 6);
@@ -94,7 +94,7 @@ public partial class ShopScreen : VBoxContainer
         var scroll = new ScrollContainer
         {
             Name = "Catalogue",
-            CustomMinimumSize = new Vector2(185, 205),
+            CustomMinimumSize = new Vector2(185, 229),
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill
         };
@@ -104,11 +104,8 @@ public partial class ShopScreen : VBoxContainer
         _catalogue.AddThemeConstantOverride("separation", 4);
         scroll.AddChild(_catalogue);
 
-        var receiptPanel = UiFactory.CreatePanel(new Vector2(145, 225));
+        var receiptPanel = UiFactory.CreatePaperPanel(new Vector2(145, 225));
         receiptPanel.Name = "Receipt";
-        var receiptStyle = (StyleBoxTexture)receiptPanel.GetThemeStylebox("panel").Duplicate();
-        receiptStyle.ModulateColor = new Color(230f / 220f, 212f / 224f, 173f / 210f);
-        receiptPanel.AddThemeStyleboxOverride("panel", receiptStyle);
         body.AddChild(receiptPanel);
         _receipt = new VBoxContainer();
         _receipt.AddThemeConstantOverride("separation", 5);
@@ -121,27 +118,6 @@ public partial class ShopScreen : VBoxContainer
 
     public void FocusSelection()
         => (_selectedButton ?? _categories.GetChildren().OfType<Button>().FirstOrDefault())?.GrabFocus();
-
-    private Control BuildSummary()
-    {
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 6);
-        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
-        var wallet = UiFactory.CreatePanel(new Vector2(112, 24));
-        var walletStyle = (StyleBoxTexture)wallet.GetThemeStylebox("panel").Duplicate();
-        walletStyle.ModulateColor = new Color(232f / 220f, 207f / 224f, 166f / 210f);
-        wallet.AddThemeStyleboxOverride("panel", walletStyle);
-        var walletRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-        walletRow.AddThemeConstantOverride("separation", 3);
-        walletRow.AddChild(SproutIcon(12));
-        var walletLabel = UiFactory.CreateLabel(_state!.Coins.ToString(), 8);
-        walletLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        walletLabel.VerticalAlignment = VerticalAlignment.Center;
-        walletRow.AddChild(walletLabel);
-        wallet.AddChild(walletRow);
-        row.AddChild(wallet);
-        return row;
-    }
 
     private void RebuildCategories()
     {
@@ -198,6 +174,9 @@ public partial class ShopScreen : VBoxContainer
             button.ButtonPressed = button.Name == "Category" + _category;
         RebuildProducts();
         FocusSelection();
+        // A new shelf: its rows deal in one after another and the receipt turns over.
+        UiMotion.StaggerIn(_catalogue.GetChildren().OfType<CanvasItem>().ToArray(), 0.035f, 0.22f, 0.05f);
+        UiMotion.Appear(_receipt, 0.05, UiMotion.Quick, 0.06f);
     }
 
     private void SelectProduct(Product product)
@@ -206,7 +185,14 @@ public partial class ShopScreen : VBoxContainer
         SelectionChanged?.Invoke(_category, _selection);
         RebuildProducts();
         FocusSelection();
+        UiMotion.Appear(_receipt, 0.0, UiMotion.Quick, 0.06f);
     }
+
+    /// <summary>Where the Buy button sits, for the burst a successful purchase earns.</summary>
+    public Vector2? PurchaseOrigin
+        => _receipt.GetNodeOrNull<Control>("BuySelected") is { } buy && buy.IsVisibleInTree()
+            ? buy.GetGlobalRect().GetCenter()
+            : null;
 
     private void NormalizeSelection()
     {
@@ -257,9 +243,10 @@ public partial class ShopScreen : VBoxContainer
         row.AddChild(copy);
         var price = new HBoxContainer { CustomMinimumSize = new Vector2(38, 26), Alignment = BoxContainer.AlignmentMode.End };
         price.AddThemeConstantOverride("separation", 2);
-        price.AddChild(SproutIcon(10));
+        price.AddChild(SproutIcon(16));
         var priceValue = UiFactory.CreateLabel(product.Price.ToString(), 8);
         priceValue.VerticalAlignment = VerticalAlignment.Center;
+        priceValue.MouseFilter = MouseFilterEnum.Ignore;
         price.AddChild(priceValue);
         row.AddChild(price);
         button.AddChild(row);
@@ -268,13 +255,8 @@ public partial class ShopScreen : VBoxContainer
 
     private void BuildReceipt(Product product)
     {
-        var iconPanel = new PanelContainer { CustomMinimumSize = new Vector2(0, 48) };
-        iconPanel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
-        {
-            BgColor = Color.FromHtml("#F7E5BD"),
-            CornerRadiusTopLeft = 3, CornerRadiusTopRight = 3,
-            CornerRadiusBottomLeft = 3, CornerRadiusBottomRight = 3
-        });
+        var iconPanel = new PanelContainer { CustomMinimumSize = new Vector2(0, 52) };
+        iconPanel.AddThemeStyleboxOverride("panel", UiSkin.Well());
         var iconCenter = new CenterContainer();
         var icon = product.Icon();
         icon.CustomMinimumSize = new Vector2(44, 44);
@@ -286,18 +268,22 @@ public partial class ShopScreen : VBoxContainer
         name.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _receipt.AddChild(name);
         _receipt.AddChild(UiFactory.CreateLabel(product.Status, 6));
-        _receipt.AddChild(new ColorRect { Color = Color.FromHtml("#B7926F"), CustomMinimumSize = new Vector2(1, 1), MouseFilter = MouseFilterEnum.Ignore });
+        _receipt.AddChild(new ColorRect { Color = Color.FromHtml("#C9A57A"), CustomMinimumSize = new Vector2(1, 1), MouseFilter = MouseFilterEnum.Ignore });
         var price = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         price.AddThemeConstantOverride("separation", 3);
-        price.AddChild(UiFactory.CreateLabel(Tr("UI_SHOP_PRICE_HEADER").ToUpperInvariant(), 8));
-        price.AddChild(SproutIcon(11));
-        price.AddChild(UiFactory.CreateLabel(product.Price.ToString(), 8));
+        var priceHeader = UiFactory.CreateLabel(Tr("UI_SHOP_PRICE_HEADER").ToUpperInvariant(), 8);
+        priceHeader.VerticalAlignment = VerticalAlignment.Center;
+        price.AddChild(priceHeader);
+        price.AddChild(SproutIcon(16));
+        var priceValue = UiFactory.CreateLabel(product.Price.ToString(), 8);
+        priceValue.VerticalAlignment = VerticalAlignment.Center;
+        price.AddChild(priceValue);
         _receipt.AddChild(price);
         var buy = UiFactory.CreateButton(string.Format(Tr("UI_SHOP_BUY"), product.Price));
         buy.Icon = UiFactory.CreateSproutIcon();
-        buy.AddThemeConstantOverride("icon_max_width", 12);
+        buy.AddThemeConstantOverride("icon_max_width", 16);
         buy.Name = "BuySelected";
-        buy.CustomMinimumSize = new Vector2(125, 28);
+        buy.CustomMinimumSize = new Vector2(125, 30);
         UiFactory.ApplyPrimaryStyle(buy);
         buy.Pressed += product.Buy;
         _receipt.AddChild(buy);

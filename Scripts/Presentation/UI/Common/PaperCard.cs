@@ -16,19 +16,13 @@ public static class PaperCard
         UiFactory.UiRoot + "Icons/special icons/Hearts in wood.png");
 
     /// <summary>The window's warm paper, one shade lighter, so a card reads as part of the same sheet.</summary>
-    public static PanelContainer Panel(Vector2 minimumSize)
-    {
-        var panel = UiFactory.CreatePanel(minimumSize);
-        var style = (StyleBoxTexture)panel.GetThemeStylebox("panel").Duplicate();
-        style.ModulateColor = new Color(247f / 220f, 233f / 224f, 197f / 210f);
-        panel.AddThemeStyleboxOverride("panel", style);
-        return panel;
-    }
+    public static PanelContainer Panel(Vector2 minimumSize) => UiFactory.CreatePaperPanel(minimumSize);
 
     /// <summary>A quiet column header, the screens' replacement for an explanatory sentence.</summary>
     public static Label Header(string text, float width = 0.0f)
     {
         var label = UiFactory.CreateLabel(text, 7);
+        label.AddThemeColorOverride("font_color", UiSkin.InkSoft);
         if (width > 0) label.CustomMinimumSize = new Vector2(width, 0);
         return label;
     }
@@ -39,14 +33,9 @@ public static class PaperCard
     /// </summary>
     public static PanelContainer EmptySlot(Vector2 size)
     {
-        var slot = new PanelContainer { CustomMinimumSize = size, MouseFilter = Control.MouseFilterEnum.Ignore };
-        var style = new StyleBoxFlat
-        {
-            BgColor = new Color(0.72f, 0.66f, 0.52f, 0.30f),
-            BorderColor = new Color(0.62f, 0.55f, 0.42f, 0.45f)
-        };
-        style.SetBorderWidthAll(1);
-        style.SetCornerRadiusAll(3);
+        var slot = new PanelContainer { CustomMinimumSize = size, MouseFilter = Control.MouseFilterEnum.Ignore, Name = "EmptySlot" };
+        var style = UiSkin.Well();
+        style.ModulateColor = new Color(1, 1, 1, 0.5f);
         slot.AddThemeStyleboxOverride("panel", style);
         return slot;
     }

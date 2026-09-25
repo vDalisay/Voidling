@@ -8,6 +8,7 @@ using Voidling.Application.Collection;
 using Voidling.Domain.Shop;
 using Voidling.Presentation.UI.Breeding;
 using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Motion;
 using Voidling.Presentation.UI.Shop;
 using Voidling.Presentation.Voidlings;
 
@@ -87,9 +88,9 @@ public partial class MainController : Node
                 GameRules.SpecialVariantEggPrice))
             .ToArray();
 
-        var box = OpenRailModal(Tr("UI_SHOP_TITLE"), new Vector2(520, 344),
-            panelTint: new Color(232f / 220f, 207f / 224f, 166f / 210f));
+        var box = OpenRailModal(Tr("UI_SHOP_TITLE"), new Vector2(520, 344), icon: ScreenIcons.Shop);
         box.AddThemeConstantOverride("separation", 4);
+        _modalHost.ShowWallet(state.Coins);
 
         var screen = new ShopScreen();
         screen.Configure(new ShopScreenState(state.Coins, trainingItems, eggs, rareOffer, landPieces)
@@ -105,17 +106,22 @@ public partial class MainController : Node
         screen.InventoryRequested += ShowInventory;
         screen.TrainingItemPurchaseRequested += statId =>
         {
+            var origin = screen.PurchaseOrigin;
+            var coinsBefore = state.Coins;
             _session.BuyTrainingItem(statId);
             RenderShop();
+            if (state.Coins != coinsBefore) Celebrate(origin);
         };
         screen.EggPurchaseRequested += eggId =>
         {
             var tint = GameRules.TintColor(
                 state.StoreEggs.FirstOrDefault(egg => egg.Id == eggId)?.TintHex ?? "#F6F0C9");
             var coinsBefore = state.Coins;
+            var origin = screen.PurchaseOrigin;
             _session.BuyStoreEgg(eggId);
             if (state.Coins != coinsBefore)
             {
+                Celebrate(origin);
                 PurchaseCelebration.ShowEgg(
                     _uiRoot,
                     new Vector2(ScreenWidth, ScreenHeight),
@@ -127,22 +133,33 @@ public partial class MainController : Node
         };
         screen.BiomeTilePurchaseRequested += biomeId =>
         {
+            var origin = screen.PurchaseOrigin;
+            var coinsBefore = state.Coins;
             _session.BuyBiomeTile(biomeId);
             RenderShop();
+            if (state.Coins != coinsBefore) Celebrate(origin);
         };
         screen.SpecialEggPurchaseRequested += variantId =>
         {
+            var origin = screen.PurchaseOrigin;
+            var coinsBefore = state.Coins;
             _session.BuySpecialVariantEgg(variantId);
             RenderShop();
+            if (state.Coins != coinsBefore) Celebrate(origin);
         };
         screen.RareOfferPurchaseRequested += itemId =>
         {
+            var origin = screen.PurchaseOrigin;
+            var coinsBefore = state.Coins;
             _session.BuyRareShopOffer(itemId);
             RenderShop();
+            if (state.Coins != coinsBefore) Celebrate(origin);
         };
         screen.LandPurchaseRequested += shapeId =>
         {
+            var origin = screen.PurchaseOrigin;
             var moduleId = _session.BuyLandShape(shapeId);
+            if (moduleId != null) Celebrate(origin);
             if (moduleId == null)
             {
                 RenderShop();
@@ -200,7 +217,7 @@ public partial class MainController : Node
             ? CreateBreedingPreviewView(_session.GetBreedingPairInfo(parentViews[0].Id, parentViews[1].Id))
             : new BreedingPreviewViewState(Tr("UI_BREED_NEED_TWO_ADULTS"), false);
 
-        var box = OpenModal(Tr("UI_BREED_TITLE"), new Vector2(520, 282));
+        var box = OpenModal(Tr("UI_BREED_TITLE"), new Vector2(520, 282), ScreenIcons.Breeding);
         var screen = new BreedingScreen();
         screen.Configure(new BreedingScreenState(parentViews, initialPreview));
         screen.PairChanged += (parentAId, parentBId) =>
@@ -225,6 +242,7 @@ public partial class MainController : Node
                 return;
             }
 
+            Celebrate(ModalPoint("BreedAction"), PixelBurst.Palette.Rosy);
             CloseModal();
             _garden.PlayBreedingAnimation(
                 parentA.Id,

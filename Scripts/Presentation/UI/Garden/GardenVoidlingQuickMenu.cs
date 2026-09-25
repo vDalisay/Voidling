@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Motion;
 using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
@@ -37,7 +39,7 @@ public partial class GardenVoidlingQuickMenu : Control
         MouseFilter = MouseFilterEnum.Ignore;
         Size = PanelSize;
 
-        _panel = UiFactory.CreatePanel(PanelSize);
+        _panel = UiFactory.CreateWindowPanel(PanelSize);
         _panel.Position = Vector2.Zero;
         _panel.Size = PanelSize;
         _panel.Visible = false;
@@ -47,7 +49,9 @@ public partial class GardenVoidlingQuickMenu : Control
         column.AddThemeConstantOverride("separation", 4);
         _panel.AddChild(column);
 
-        column.AddChild(UiFactory.CreateLabel(Tr("UI_GARDEN_VOIDLINGS"), 8));
+        var title = UiFactory.CreateLabel(Tr("UI_GARDEN_VOIDLINGS"), 9);
+        title.AddThemeColorOverride("font_color", UiSkin.Ink);
+        column.AddChild(title);
 
         _search = new LineEdit
         {
@@ -84,6 +88,12 @@ public partial class GardenVoidlingQuickMenu : Control
         if (!_panel.Visible) return;
         RebuildList();
         _search.GrabFocus();
+        // Slides out of the rail's side: the board pops, then the roster rows cascade in.
+        UiMotion.Appear(_panel, 0.0, UiMotion.Quick, 0.08f);
+        var rows = new List<CanvasItem>();
+        foreach (var child in _list.GetChildren())
+            if (child is CanvasItem row) rows.Add(row);
+        UiMotion.StaggerIn(rows, 0.035f, 0.25f, 0.0f);
     }
 
     public void SetVoidlings(IReadOnlyList<QuickMenuVoidlingViewState> voidlings)

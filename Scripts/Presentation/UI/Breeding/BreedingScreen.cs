@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Motion;
 using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
@@ -48,6 +49,7 @@ public partial class BreedingScreen : HBoxContainer
     private VBoxContainer _pairBox = null!;
     private Label? _preview;
     private TextureRect? _verdict;
+    private TextureRect? _heart;
     private Button? _breed;
 
     public void Configure(BreedingScreenState state)
@@ -107,6 +109,27 @@ public partial class BreedingScreen : HBoxContainer
             _verdict.Texture = preview.CanBreed ? CheckMark : CrossMark;
         if (_breed != null && GodotObject.IsInstanceValid(_breed))
             _breed.Disabled = !preview.CanBreed;
+        if (_verdict != null && GodotObject.IsInstanceValid(_verdict))
+            UiMotion.Pop(_verdict, 0.3f, UiMotion.Slow);
+        RefreshHeartbeat();
+    }
+
+    /// <summary>A double beat now and then while the chosen pair can breed; still otherwise.</summary>
+    private void RefreshHeartbeat()
+    {
+        if (_heart == null || !GodotObject.IsInstanceValid(_heart) || !_heart.IsInsideTree()) return;
+        if (!_currentPreview.CanBreed)
+        {
+            UiMotion.Kill(_heart, "beat");
+            return;
+        }
+        var beat = UiMotion.Loop(_heart, "beat");
+        if (beat == null) return;
+        var heart = _heart;
+        beat.TweenCallback(Callable.From(() => UiMotion.Pop(heart, 0.16f, UiMotion.Quick)));
+        beat.TweenInterval(0.2);
+        beat.TweenCallback(Callable.From(() => UiMotion.Pop(heart, 0.1f, UiMotion.Quick)));
+        beat.TweenInterval(1.1);
     }
 
     public void FocusSelection() => _breed?.GrabFocus();
@@ -160,21 +183,26 @@ public partial class BreedingScreen : HBoxContainer
         var portraits = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         portraits.AddThemeConstantOverride("separation", 4);
         portraits.AddChild(PortraitColumn(parentA, "ParentA"));
-        portraits.AddChild(new TextureRect
+        // The pack's wooden heart at its own 32px, beating while the pair can breed.
+        var heart = new TextureRect
         {
+            Name = "PairHeart",
             Texture = new AtlasTexture { Atlas = WoodHearts, Region = new Rect2(0, 0, 32, 32) },
-            CustomMinimumSize = new Vector2(26, 26),
+            CustomMinimumSize = new Vector2(32, 32),
             SizeFlagsVertical = SizeFlags.ShrinkCenter,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            StretchMode = TextureRect.StretchModeEnum.KeepCentered,
             MouseFilter = MouseFilterEnum.Ignore
-        });
+        };
+        portraits.AddChild(heart);
+        _heart = heart;
+        Callable.From(RefreshHeartbeat).CallDeferred();
         portraits.AddChild(PortraitColumn(parentB, "ParentB"));
         _pairBox.AddChild(portraits);
 
         _pairBox.AddChild(new ColorRect
         {
-            Color = Color.FromHtml("#B7926F"),
+            Color = UiPalette.Tan,
             CustomMinimumSize = new Vector2(1, 1),
             MouseFilter = MouseFilterEnum.Ignore
         });

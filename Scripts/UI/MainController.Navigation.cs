@@ -78,14 +78,14 @@ public partial class MainController : Node
             stats,
             rareTraits);
 
-        var box = OpenModal($"{profile.Name.ToUpperInvariant()} — DETAILS", new Vector2(536, 318));
+        var box = OpenModal($"{profile.Name.ToUpperInvariant()} — DETAILS", new Vector2(536, 318), ScreenIcons.Details);
         var screen = new DetailsScreen();
         screen.Configure(state);
         box.AddChild(screen);
         var goodbye = UiFactory.CreateButton(Tr("UI_GARDEN_GOODBYE"));
         goodbye.Name = "Goodbye";
         goodbye.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd;
-        goodbye.AddThemeColorOverride("font_color", Color.FromHtml("#914E42"));
+        UiFactory.ApplyDangerStyle(goodbye);
         goodbye.Pressed += () => ShowGoodbyeFirst(profile.CreatureId);
         box.AddChild(goodbye);
     }
@@ -99,7 +99,7 @@ public partial class MainController : Node
         var projection = _session.CreateLineageTreeProjection(data.Id);
         var membersById = projection.Members.ToDictionary(member => member.CreatureId, StringComparer.Ordinal);
 
-        var box = OpenModal($"{data.Name.ToUpperInvariant()} — FAMILY TREE", new Vector2(612, 330));
+        var box = OpenModal($"{data.Name.ToUpperInvariant()} — FAMILY TREE", new Vector2(612, 330), ScreenIcons.Family);
         var note = UiFactory.CreateLabel("Drag empty space with left mouse. Click a family member for stats and parents.", 6);
         box.AddChild(note);
 
@@ -114,7 +114,7 @@ public partial class MainController : Node
         tree.Build(projection);
         content.AddChild(tree);
 
-        var inspector = UiFactory.CreatePanel(new Vector2(153, 252));
+        var inspector = UiFactory.CreatePaperPanel(new Vector2(153, 252));
         inspector.CustomMinimumSize = new Vector2(153, 252);
         inspector.Visible = false;
         content.AddChild(inspector);
@@ -136,15 +136,18 @@ public partial class MainController : Node
                 old.QueueFree();
             }
 
+            var appearing = !inspector.Visible;
             inspector.Visible = true;
+            if (appearing) Voidling.Presentation.UI.Motion.UiMotion.Appear(inspector, 0.0, Voidling.Presentation.UI.Motion.UiMotion.Quick, 0.06f);
             tree.SetSelectedMember(memberId);
 
             var heading = new HBoxContainer();
             var memberName = UiFactory.CreateTitle(member.DisplayName);
             memberName.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
             heading.AddChild(memberName);
-            var dismiss = UiFactory.CreateButton("X");
-            dismiss.CustomMinimumSize = new Vector2(24, 20);
+            var dismiss = UiFactory.CreateButton(string.Empty);
+            UiSkin.ApplyIconButton(dismiss, UiSkin.IconGlyph.SmallClose);
+            dismiss.TooltipText = Tr("UI_COMMON_CLOSE");
             dismiss.Pressed += () => inspector.Visible = false;
             heading.AddChild(dismiss);
             inspectorBox.AddChild(heading);
@@ -189,7 +192,8 @@ public partial class MainController : Node
                 {
                     var label = UiFactory.CreateLabel(
                         $"{StatPresentationCatalog.NameFor(stat.StatId)}  {GameRules.GradeName(stat.ExpressedAllele)}  LV{stat.Level}", 6);
-                    label.AddThemeColorOverride("font_color", StatPresentationCatalog.ColorFor(stat.StatId));
+                    // Paper ink of the stat colour: the bright bar colours are unreadable as text on paper.
+                    label.AddThemeColorOverride("font_color", PaperCard.Ink(StatPresentationCatalog.ColorFor(stat.StatId)));
                     inspectorBox.AddChild(label);
                 }
             }
@@ -227,7 +231,7 @@ public partial class MainController : Node
         if (data == null)
             return;
 
-        var box = OpenModal("SAY GOODBYE?", new Vector2(405, 175));
+        var box = OpenModal("SAY GOODBYE?", new Vector2(405, 175), ScreenIcons.Warning);
         var text = UiFactory.CreateLabel(
             $"Send {data.Name} away from the farm? They disappear from the garden but remain in family trees.", 8);
         text.AutowrapMode = TextServer.AutowrapMode.WordSmart;
@@ -239,6 +243,7 @@ public partial class MainController : Node
         cancel.Pressed += CloseModal;
         row.AddChild(cancel);
         var next = UiFactory.CreateButton("Continue");
+        UiFactory.ApplyDangerStyle(next);
         next.Pressed += () => ShowGoodbyeFinal(creatureId);
         row.AddChild(next);
         box.AddChild(row);
@@ -253,7 +258,7 @@ public partial class MainController : Node
             return;
         }
 
-        var box = OpenModal("FINAL WARNING", new Vector2(420, 185));
+        var box = OpenModal("FINAL WARNING", new Vector2(420, 185), ScreenIcons.Warning);
         var warning = UiFactory.CreateLabel(
             $"This cannot be undone. {data.Name} will leave the farm forever. Their grey family-tree record remains.", 8);
         warning.AutowrapMode = TextServer.AutowrapMode.WordSmart;
@@ -266,7 +271,7 @@ public partial class MainController : Node
         keep.Pressed += CloseModal;
         row.AddChild(keep);
         var goodbye = UiFactory.CreateButton("Goodbye forever");
-        goodbye.AddThemeColorOverride("font_color", Color.FromHtml("#9C514B"));
+        UiFactory.ApplyDangerStyle(goodbye);
         goodbye.Pressed += () =>
         {
             CloseModal();
@@ -284,7 +289,7 @@ public partial class MainController : Node
 
     private void ShowResetConfirm()
     {
-        var box = OpenModal("RESET DEMO?", new Vector2(320, 155));
+        var box = OpenModal("RESET DEMO?", new Vector2(320, 155), ScreenIcons.Warning);
         var label = UiFactory.CreateLabel("Clears this local MVP save and restores the starter Voidlings.", 8);
         label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         box.AddChild(label);
@@ -295,6 +300,7 @@ public partial class MainController : Node
         cancel.Pressed += CloseModal;
         row.AddChild(cancel);
         var reset = UiFactory.CreateButton("Reset");
+        UiFactory.ApplyDangerStyle(reset);
         reset.Pressed += () =>
         {
             CloseModal();

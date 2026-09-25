@@ -1,5 +1,7 @@
+using System.Linq;
 using Godot;
-using Voidling.Application.Daily;
+using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Garden;
 
 namespace VoidlingGame;
 
@@ -8,78 +10,44 @@ public partial class MainController
     private void ShowDailyMissions()
     {
         var status = _session.GetDailyMissionStatus();
-        var box = OpenModal(Tr("UI_GARDEN_MISSIONS"), new Vector2(438, 244), ShowGardenActivities);
+        var box = OpenModal(Tr("UI_GARDEN_MISSIONS"), new Vector2(438, 244), ShowGardenActivities, ScreenIcons.Missions);
         box.AddThemeConstantOverride("separation", 5);
+        _modalHost.ShowWallet(WalletToShow);
 
-        var intro = UiFactory.CreateLabel(
-            "Complete today’s goals while raising your Voidlings. Rewards reset with your local calendar day.",
-            6);
-        intro.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        intro.CustomMinimumSize = new Vector2(398, 30);
-        box.AddChild(intro);
-
-        foreach (var mission in status.Missions)
-            box.AddChild(CreateDailyMissionRow(mission));
-
-        var back = UiFactory.CreateButton(Tr("UI_GARDEN_ACTIVITIES"));
-        back.CustomMinimumSize = new Vector2(112, 22);
-        back.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd;
-        UiFactory.ApplyPixelFont(back, 7);
-        back.Pressed += ShowGardenActivities;
-        box.AddChild(back);
-    }
-
-    private Control CreateDailyMissionRow(DailyMissionView mission)
-    {
-        var panel = UiFactory.CreatePanel(new Vector2(398, 48));
-        panel.CustomMinimumSize = new Vector2(398, 48);
-
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 7);
-        panel.AddChild(row);
-
-        var textColumn = new VBoxContainer();
-        textColumn.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        textColumn.AddThemeConstantOverride("separation", 1);
-        row.AddChild(textColumn);
-
-        var description = UiFactory.CreateLabel(DailyMissionText(mission.MissionId), 7);
-        description.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-        textColumn.AddChild(description);
-
-        var progress = UiFactory.CreateLabel(
-            $"Progress {mission.Progress}/{mission.Target}  •  Reward +{mission.CoinReward} sprouts",
-            6);
-        progress.AddThemeColorOverride("font_color", Color.FromHtml("#786C5B"));
-        textColumn.AddChild(progress);
-
-        var claimText = mission.Claimed
-            ? "Claimed"
-            : mission.CanClaim
-                ? $"Claim +{mission.CoinReward}"
-                : $"{mission.Progress}/{mission.Target}";
-        var claim = UiFactory.CreateButton(claimText);
-        claim.CustomMinimumSize = new Vector2(94, 23);
-        claim.Disabled = !mission.CanClaim;
-        UiFactory.ApplyPixelFont(claim, 6);
-        claim.Pressed += () =>
+        var screen = new DailyMissionsScreen();
+        screen.Configure(status.Missions
+            .Select(mission => new MissionViewState(
+                mission.MissionId,
+                Tr(DailyMissionTextKey(mission.MissionId)),
+                mission.Progress,
+                mission.Target,
+                mission.CoinReward,
+                mission.CanClaim,
+                mission.Claimed))
+            .ToArray());
+        screen.ClaimRequested += missionId =>
         {
-            if (_session.ClaimDailyMission(mission.MissionId))
-                ShowDailyMissions();
+            var origin = screen.ClaimOrigin(missionId);
+            var before = _session.State.Coins;
+            if (!_session.ClaimDailyMission(missionId)) return;
+            _walletShownBeforeReward = before;
+            ShowDailyMissions();
+            _walletShownBeforeReward = null;
+            FlyRewardToWallet(origin, before, (int)(_session.State.Coins - before));
         };
-        row.AddChild(claim);
-        return panel;
+        screen.BackRequested += ShowGardenActivities;
+        box.AddChild(screen);
     }
 
-    private static string DailyMissionText(string missionId)
+    private static string DailyMissionTextKey(string missionId)
         => missionId switch
         {
-            "pet-2" => "Pet a Voidling twice",
-            "train-1" => "Use a training treat",
-            "breed-1" => "Breed a new egg",
-            "hatch-1" => "Hatch an egg",
-            "race-1" => "Finish a standard race",
-            "shop-1" => "Buy something from the shop",
-            _ => "Daily Garden goal"
+            "pet-2" => "UI_MISSION_PET_2",
+            "train-1" => "UI_MISSION_TRAIN_1",
+            "breed-1" => "UI_MISSION_BREED_1",
+            "hatch-1" => "UI_MISSION_HATCH_1",
+            "race-1" => "UI_MISSION_RACE_1",
+            "shop-1" => "UI_MISSION_SHOP_1",
+            _ => "UI_MISSION_DEFAULT"
         };
 }

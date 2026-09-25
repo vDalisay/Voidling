@@ -1,6 +1,8 @@
 using System;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Motion;
 using Voidling.Presentation.Voidlings;
 
 namespace VoidlingGame;
@@ -21,7 +23,8 @@ public static class UiFactory
     private static readonly Texture2D FarmingPlants = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - premium pack/Objects/Farming Plants.png");
 
-    private static readonly Font InterfaceFont = new SystemFont
+    /// <summary>The readable UI face for words; numbers use <see cref="UiSkin.NumberFont"/>.</summary>
+    public static readonly Font InterfaceFont = new SystemFont
     {
         FontNames = new[] { "Segoe UI", "Noto Sans", "DejaVu Sans" },
         FontWeight = 500
@@ -34,6 +37,30 @@ public static class UiFactory
         if (wood)
             style.Texture = new AtlasTexture { Atlas = ButtonTexture, Region = new Rect2(0, 80, 16, 16) };
         panel.AddThemeStyleboxOverride("panel", style);
+        return panel;
+    }
+
+    /// <summary>A light paper card from the pack's inventory blocks, for content inside a window.</summary>
+    public static PanelContainer CreatePaperPanel(Vector2 minimumSize)
+    {
+        var panel = new PanelContainer { CustomMinimumSize = minimumSize };
+        panel.AddThemeStyleboxOverride("panel", UiSkin.Paper());
+        return panel;
+    }
+
+    /// <summary>The pack's window board: modal windows and the HUD panels that float over the Garden.</summary>
+    public static PanelContainer CreateWindowPanel(Vector2 minimumSize, Color? tint = null)
+    {
+        var panel = new PanelContainer { CustomMinimumSize = minimumSize };
+        panel.AddThemeStyleboxOverride("panel", UiSkin.Window(tint));
+        return panel;
+    }
+
+    /// <summary>The side board: the pack's window in its own beige, a step darker than the windows.</summary>
+    public static PanelContainer CreateBoardPanel(Vector2 minimumSize)
+    {
+        var panel = new PanelContainer { CustomMinimumSize = minimumSize };
+        panel.AddThemeStyleboxOverride("panel", UiSkin.Board());
         return panel;
     }
 
@@ -74,33 +101,51 @@ public static class UiFactory
         return button;
     }
 
+    /// <summary>
+    /// The pack's 26x19 wooden button, 9-sliced, with real up and pressed frames and the juice
+    /// component (hover pop, press squash, release bounce, focus brackets). Every factory button
+    /// wears this, so a restyle here reaches every screen.
+    /// </summary>
     public static void ApplyButtonChrome(Button button)
-    {
-        button.AddThemeStyleboxOverride("normal", CreateButtonStyle(new Rect2(0, 32, 16, 16), Colors.White));
-        button.AddThemeStyleboxOverride("hover", CreateButtonStyle(new Rect2(0, 0, 16, 16), Colors.White));
-        button.AddThemeStyleboxOverride("pressed", CreateButtonStyle(new Rect2(16, 32, 16, 16), Colors.White));
-        button.AddThemeStyleboxOverride("hover_pressed", CreateButtonStyle(new Rect2(16, 0, 16, 16), Colors.White));
-        button.AddThemeStyleboxOverride("disabled", CreateButtonStyle(new Rect2(16, 32, 16, 16), new Color(0.88f, 0.88f, 0.84f, 0.65f)));
-        button.AddThemeStyleboxOverride("focus", new StyleBoxFlat
-        {
-            DrawCenter = false, BorderColor = Color.FromHtml("#426653"),
-            BorderWidthLeft = 2, BorderWidthRight = 2, BorderWidthTop = 2, BorderWidthBottom = 2,
-            CornerRadiusTopLeft = 4, CornerRadiusTopRight = 4,
-            CornerRadiusBottomLeft = 4, CornerRadiusBottomRight = 4
-        });
+        => ApplyButtonChrome(button, ButtonTone.Tan);
 
-        button.AddThemeColorOverride("font_color", Color.FromHtml("#4F5948"));
-        button.AddThemeColorOverride("font_hover_color", Color.FromHtml("#2F4437"));
-        button.AddThemeColorOverride("font_pressed_color", Color.FromHtml("#2F4437"));
-        button.AddThemeColorOverride("font_hover_pressed_color", Color.FromHtml("#2F4437"));
-        button.AddThemeColorOverride("font_disabled_color", Color.FromHtml("#756E60"));
-        button.AddThemeColorOverride("font_focus_color", Color.FromHtml("#2F4437"));
+    public static void ApplyButtonChrome(Button button, ButtonTone tone)
+    {
+        button.AddThemeStyleboxOverride("normal", UiSkin.Button(tone, UiSkin.ButtonState.Normal));
+        button.AddThemeStyleboxOverride("hover", UiSkin.Button(tone, UiSkin.ButtonState.Hover));
+        var pressed = tone == ButtonTone.Tan ? UiSkin.DefaultPressed : UiSkin.Button(tone, UiSkin.ButtonState.Pressed);
+        button.AddThemeStyleboxOverride("pressed", pressed);
+        button.AddThemeStyleboxOverride("hover_pressed", pressed);
+        button.AddThemeStyleboxOverride("disabled", UiSkin.Button(tone, UiSkin.ButtonState.Disabled));
+        button.AddThemeStyleboxOverride("focus", new StyleBoxEmpty());
+
+        var ink = tone switch
+        {
+            ButtonTone.Primary => UiSkin.InkOnGreen,
+            ButtonTone.Danger => UiSkin.InkOnRed,
+            _ => UiSkin.Ink
+        };
+        button.AddThemeColorOverride("font_color", ink);
+        button.AddThemeColorOverride("font_hover_color", ink);
+        button.AddThemeColorOverride("font_pressed_color", ink);
+        button.AddThemeColorOverride("font_hover_pressed_color", ink);
+        button.AddThemeColorOverride("font_focus_color", ink);
+        button.AddThemeColorOverride("font_disabled_color", Color.FromHtml("#9A8C78"));
+        // Light text on the green and red buttons, outlined in the button's own dark edge.
+        if (tone != ButtonTone.Tan)
+        {
+            button.AddThemeColorOverride("font_outline_color", tone == ButtonTone.Primary
+                ? Color.FromHtml("#2E5A22") : Color.FromHtml("#7A2E22"));
+            button.AddThemeConstantOverride("outline_size", 3);
+        }
+        button.AddThemeColorOverride("icon_disabled_color", new Color(1, 1, 1, 0.45f));
+        ButtonJuice.Attach(button, tone == ButtonTone.Tan ? ButtonFeel.Standard : ButtonFeel.Primary);
     }
 
     public static Label CreateLabel(string text, int size = 10)
     {
         var label = new Label { Text = text };
-        label.AddThemeColorOverride("font_color", Color.FromHtml("#465247"));
+        label.AddThemeColorOverride("font_color", UiSkin.Ink);
         ApplyPixelFont(label, size);
         return label;
     }
@@ -108,7 +153,6 @@ public static class UiFactory
     public static Label CreateTitle(string text)
     {
         var label = CreateLabel(text, 14);
-        label.AddThemeColorOverride("font_color", Color.FromHtml("#3B5044"));
         return label;
     }
 
@@ -177,7 +221,7 @@ public static class UiFactory
         var label = CreateLabel(name, 6);
         label.HorizontalAlignment = HorizontalAlignment.Center;
         label.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-        label.AddThemeColorOverride("font_color", Color.FromHtml("#2F4437"));
+        label.AddThemeColorOverride("font_color", UiSkin.Ink);
         entry.AddChild(label);
         return entry;
     }
@@ -299,25 +343,14 @@ public static class UiFactory
         return container;
     }
 
-    /// <summary>Green confirm chrome shared by the Shop's Buy and the race-entry Start action.</summary>
-    public static void ApplyPrimaryStyle(Button button)
-    {
-        static StyleBoxFlat Style(Color color) => new()
-        {
-            BgColor = color,
-            BorderColor = Color.FromHtml("#315A42"),
-            BorderWidthLeft = 2, BorderWidthRight = 2,
-            BorderWidthTop = 2, BorderWidthBottom = 2,
-            CornerRadiusTopLeft = 3, CornerRadiusTopRight = 3,
-            CornerRadiusBottomLeft = 3, CornerRadiusBottomRight = 3
-        };
-        button.AddThemeStyleboxOverride("normal", Style(Color.FromHtml("#477052")));
-        button.AddThemeStyleboxOverride("hover", Style(Color.FromHtml("#568761")));
-        button.AddThemeStyleboxOverride("pressed", Style(Color.FromHtml("#355D43")));
-        button.AddThemeColorOverride("font_color", Color.FromHtml("#FFF3D2"));
-        button.AddThemeColorOverride("font_hover_color", Colors.White);
-        button.AddThemeColorOverride("font_pressed_color", Colors.White);
-    }
+    /// <summary>
+    /// The leaf-green call to action (Buy, Breed, Claim, Place, Start): the pack's white button
+    /// tinted green, with a bigger pop and a periodic shine.
+    /// </summary>
+    public static void ApplyPrimaryStyle(Button button) => ApplyButtonChrome(button, ButtonTone.Primary);
+
+    /// <summary>Clay-red chrome for actions that cannot be taken back (goodbye, discard, reset).</summary>
+    public static void ApplyDangerStyle(Button button) => ApplyButtonChrome(button, ButtonTone.Danger);
 
     public static void ApplyPixelFont(Control control, int size)
     {
@@ -372,44 +405,64 @@ public static class UiFactory
     {
         var scrollbar = scroll.GetVScrollBar();
         scrollbar.CustomMinimumSize = new Vector2(5, 0);
-        scrollbar.AddThemeStyleboxOverride("scroll", new StyleBoxEmpty());
-        scrollbar.AddThemeStyleboxOverride("scroll_focus", new StyleBoxEmpty());
-        var thumb = new StyleBoxFlat
+        scrollbar.AddThemeStyleboxOverride("scroll", new StyleBoxFlat
         {
-            BgColor = Color.FromHtml("#91A08A"),
-            ContentMarginLeft = 2, ContentMarginRight = 2, ContentMarginTop = 8, ContentMarginBottom = 8,
-            CornerRadiusTopLeft = 2, CornerRadiusTopRight = 2,
-            CornerRadiusBottomLeft = 2, CornerRadiusBottomRight = 2
+            BgColor = new Color(0.55f, 0.42f, 0.3f, 0.18f), AntiAliasing = false,
+            ContentMarginLeft = 1, ContentMarginRight = 1
+        });
+        scrollbar.AddThemeStyleboxOverride("scroll_focus", new StyleBoxEmpty());
+        // A wooden peg: square pixels, a lit left edge, never anti-aliased.
+        static StyleBoxFlat Thumb(Color color) => new()
+        {
+            BgColor = color, AntiAliasing = false,
+            BorderColor = color.Lightened(0.25f), BorderWidthLeft = 1,
+            ContentMarginLeft = 2, ContentMarginRight = 2, ContentMarginTop = 8, ContentMarginBottom = 8
         };
-        scrollbar.AddThemeStyleboxOverride("grabber", thumb);
-        scrollbar.AddThemeStyleboxOverride("grabber_highlight", thumb);
-        scrollbar.AddThemeStyleboxOverride("grabber_pressed", thumb);
+        scrollbar.AddThemeStyleboxOverride("grabber", Thumb(UiPalette.Tan));
+        scrollbar.AddThemeStyleboxOverride("grabber_highlight", Thumb(UiPalette.Tan.Lightened(0.12f)));
+        scrollbar.AddThemeStyleboxOverride("grabber_pressed", Thumb(UiPalette.Bark));
     }
 
     public static void StyleInput(LineEdit input)
     {
-        input.AddThemeStyleboxOverride("normal", CreateButtonStyle(new Rect2(16, 0, 16, 16), Colors.White));
-        input.AddThemeColorOverride("font_color", Color.FromHtml("#2F4437"));
-        input.AddThemeColorOverride("font_placeholder_color", Color.FromHtml("#53634E"));
-        input.AddThemeColorOverride("caret_color", Color.FromHtml("#2F4437"));
+        input.AddThemeStyleboxOverride("normal", UiSkin.Well());
+        input.AddThemeStyleboxOverride("focus", new StyleBoxEmpty());
+        input.AddThemeStyleboxOverride("read_only", UiSkin.Well());
+        input.AddThemeColorOverride("font_color", UiSkin.Ink);
+        input.AddThemeColorOverride("font_placeholder_color", UiSkin.InkSoft);
+        input.AddThemeColorOverride("caret_color", UiSkin.Ink);
+        input.AddThemeColorOverride("selection_color", new Color(0.56f, 0.8f, 0.42f, 0.45f));
     }
 
-    private static StyleBoxTexture CreateButtonStyle(Rect2 region, Color modulate)
+    /// <summary>
+    /// The UI root's theme: whatever a screen does not style itself (tooltips, stray buttons, line
+    /// edits) still comes out in the pack's chrome and the UI face.
+    /// </summary>
+    public static Theme CreateRootTheme()
     {
-        var atlas = new AtlasTexture { Atlas = ButtonTexture, Region = region };
-        var style = new StyleBoxTexture
-        {
-            Texture = atlas,
-            ModulateColor = modulate
-        };
-        style.TextureMarginLeft = 7;
-        style.TextureMarginRight = 7;
-        style.TextureMarginTop = 7;
-        style.TextureMarginBottom = 7;
-        style.ContentMarginLeft = 7;
-        style.ContentMarginRight = 7;
-        style.ContentMarginTop = 3;
-        style.ContentMarginBottom = 3;
-        return style;
+        var theme = new Theme { DefaultFont = InterfaceFont, DefaultFontSize = 8 };
+        theme.SetStylebox("normal", "Button", UiSkin.Button(ButtonTone.Tan, UiSkin.ButtonState.Normal));
+        theme.SetStylebox("hover", "Button", UiSkin.Button(ButtonTone.Tan, UiSkin.ButtonState.Hover));
+        theme.SetStylebox("pressed", "Button", UiSkin.DefaultPressed);
+        theme.SetStylebox("hover_pressed", "Button", UiSkin.DefaultPressed);
+        theme.SetStylebox("disabled", "Button", UiSkin.Button(ButtonTone.Tan, UiSkin.ButtonState.Disabled));
+        theme.SetStylebox("focus", "Button", new StyleBoxEmpty());
+        foreach (var colour in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color" })
+            theme.SetColor(colour, "Button", UiSkin.Ink);
+        theme.SetStylebox("normal", "LineEdit", UiSkin.Well());
+        theme.SetStylebox("focus", "LineEdit", new StyleBoxEmpty());
+        theme.SetColor("font_color", "LineEdit", UiSkin.Ink);
+        theme.SetColor("font_placeholder_color", "LineEdit", UiSkin.InkSoft);
+        theme.SetColor("caret_color", "LineEdit", UiSkin.Ink);
+
+        var tooltip = UiSkin.Paper();
+        tooltip.ContentMarginLeft = tooltip.ContentMarginRight = 7;
+        tooltip.ContentMarginTop = 4;
+        tooltip.ContentMarginBottom = 6;
+        theme.SetStylebox("panel", "TooltipPanel", tooltip);
+        theme.SetColor("font_color", "TooltipLabel", UiSkin.Ink);
+        theme.SetFont("font", "TooltipLabel", InterfaceFont);
+        theme.SetFontSize("font_size", "TooltipLabel", 8);
+        return theme;
     }
 }

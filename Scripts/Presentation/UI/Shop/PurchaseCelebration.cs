@@ -1,15 +1,18 @@
 using Godot;
+using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Motion;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Shop;
 
 /// <summary>
-/// Brief "you bought this" flourish: the item pulses in the middle of the screen and then clears
-/// itself. Purely presentational feedback for a transaction the Application layer already applied.
+/// Brief "you bought this" flourish: the egg pops into the middle of the screen at a whole 3x
+/// scale, hops twice in pixel steps over a burst, and clears itself. Purely presentational
+/// feedback for a transaction the Application layer already applied; it never takes input.
 /// </summary>
 public partial class PurchaseCelebration : Control
 {
-    private const double HoldSeconds = 1.15;
+    private const double HoldSeconds = 1.1;
 
     private static readonly Texture2D EggTexture = GD.Load<Texture2D>(
         "res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Egg item.png");
@@ -33,42 +36,56 @@ public partial class PurchaseCelebration : Control
         {
             MouseFilter = MouseFilterEnum.Ignore,
             Alignment = BoxContainer.AlignmentMode.Center,
-            Position = new Vector2(screenSize.X * 0.5f - 70.0f, screenSize.Y * 0.5f - 46.0f),
+            Position = (new Vector2(screenSize.X * 0.5f - 70.0f, screenSize.Y * 0.5f - 46.0f)).Round(),
             Size = new Vector2(140, 92)
         };
-        center.AddThemeConstantOverride("separation", 6);
+        center.AddThemeConstantOverride("separation", 4);
         AddChild(center);
 
+        // The 16px pack egg at exactly 3x, so it stays pixel-crisp while it celebrates.
+        var holder = new Control { CustomMinimumSize = new Vector2(48, 48), MouseFilter = MouseFilterEnum.Ignore };
         var icon = new TextureRect
         {
             Texture = EggTexture,
             Modulate = tint,
-            CustomMinimumSize = new Vector2(56, 56),
+            Size = new Vector2(48, 48),
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            MouseFilter = MouseFilterEnum.Ignore,
-            PivotOffset = new Vector2(28, 28)
+            MouseFilter = MouseFilterEnum.Ignore
         };
-        center.AddChild(icon);
+        holder.AddChild(icon);
+        center.AddChild(holder);
 
         var label = UiFactory.CreateLabel(caption, 9);
         label.HorizontalAlignment = HorizontalAlignment.Center;
         label.CustomMinimumSize = new Vector2(140, 16);
-        label.AddThemeColorOverride("font_color", Color.FromHtml("#F9F4D8"));
-        label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
-        label.AddThemeConstantOverride("outline_size", 2);
+        var slip = UiSkin.Paper();
+        slip.ContentMarginTop = 2;
+        slip.ContentMarginBottom = 4;
+        label.AddThemeStyleboxOverride("normal", slip);
         label.MouseFilter = MouseFilterEnum.Ignore;
         center.AddChild(label);
 
-        var pulse = CreateTween().SetLoops();
-        pulse.TweenProperty(icon, "scale", new Vector2(1.18f, 1.18f), 0.28)
-            .SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
-        pulse.TweenProperty(icon, "scale", Vector2.One, 0.28)
-            .SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+        UiMotion.Appear(center, 0.0, UiMotion.Normal, 0.3f);
+        var hop = UiMotion.Loop(icon, "hop");
+        if (hop != null)
+        {
+            foreach (var step in new[] { 0, -3, -5, -6, -5, -3, 0, 0 })
+            {
+                var y = step;
+                hop.TweenCallback(Callable.From(() => icon.Position = new Vector2(0, y)));
+                hop.TweenInterval(0.05);
+            }
+        }
+        Callable.From(() =>
+        {
+            if (GodotObject.IsInstanceValid(holder))
+                PixelBurst.Spawn(this, holder.GetGlobalRect().GetCenter(), PixelBurst.Palette.Leafy, 24);
+        }).CallDeferred();
 
         var exit = CreateTween();
         exit.TweenInterval(HoldSeconds);
-        exit.TweenProperty(this, "modulate:a", 0.0f, 0.3);
+        exit.TweenProperty(this, "modulate:a", 0.0f, 0.25);
         exit.Finished += QueueFree;
     }
 }

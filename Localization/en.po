@@ -1408,3 +1408,46 @@ msgstr "Breed two Swim adults while you own a Swamp: their egg hatches him on a 
 
 msgid "LOG_JOURNAL_NEW"
 msgstr "New journal entry: {0}, found with {1}!"
+
+# Garden UI overhaul (docs/GARDEN_UI_OVERHAUL_PLAN.md)
+msgid "UI_GARDEN_WALLET_TOOLTIP"
+msgstr "Sprouts: earned from races, check-ins and missions, spent in the market."
+
+msgid "UI_SETTINGS_REDUCE_MOTION"
+msgstr "Reduce motion"
+
+msgid "UI_SETTINGS_REDUCE_MOTION_TOOLTIP"
+msgstr "Calmer menus: no bouncing buttons, bursts, flying rewards or rolling numbers."
+
+msgid "UI_MISSIONS_INTRO"
+msgstr "Complete today's goals while raising your Voidlings. Rewards reset with your local calendar day."
+
+msgid "UI_MISSION_CLAIM"
+msgstr "Claim +{0}"
+
+msgid "UI_MISSION_CLAIMED"
+msgstr "Claimed"
+
+msgid "UI_MISSION_IN_PROGRESS"
+msgstr "In progress"
+
+msgid "UI_MISSION_PET_2"
+msgstr "Pet a Voidling twice"
+
+msgid "UI_MISSION_TRAIN_1"
+msgstr "Use a training treat"
+
+msgid "UI_MISSION_BREED_1"
+msgstr "Breed a new egg"
+
+msgid "UI_MISSION_HATCH_1"
+msgstr "Hatch an egg"
+
+msgid "UI_MISSION_RACE_1"
+msgstr "Finish a standard race"
+
+msgid "UI_MISSION_SHOP_1"
+msgstr "Buy something from the shop"
+
+msgid "UI_MISSION_DEFAULT"
+msgstr "Daily Garden goal"

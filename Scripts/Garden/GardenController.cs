@@ -451,7 +451,12 @@ public partial class GardenController : Node2D
             TrackAtmosphereVoidling(actor, data);
 
             if (_initialRefreshComplete && data.Stage == LifeStage.Child)
+            {
                 actor.PlayHatchJump();
+                // The same confirmation burst the menus use, where the newborn stands on screen.
+                Voidling.Presentation.UI.Motion.PixelBurst.Spawn(
+                    this, actor.GetGlobalTransformWithCanvas().Origin + new Vector2(0, -10), count: 22);
+            }
         }
 
         Select(_selectedId);

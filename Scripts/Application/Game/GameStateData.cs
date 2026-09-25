@@ -148,6 +148,10 @@ public sealed class GameStateData
     // behaviour they already had.
     public bool GardenTint { get; set; } = true;
 
+    // Presentation comfort only: calmer menus (no pops, bursts or rolling numbers). Saves written
+    // before this setting existed deserialize to false, the animated menus they already had.
+    public bool ReduceMotion { get; set; }
+
     public bool TutorialCompleted { get; set; }
 }
 
