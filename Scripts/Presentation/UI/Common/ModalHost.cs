@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Voidling.Presentation.UI.Audio;
 using Voidling.Presentation.UI.Motion;
 using VoidlingGame;
 
@@ -66,6 +67,7 @@ public partial class ModalHost : Control
         var swapping = IsOpen;
         if (swapping)
             Exit(keepShade: true);
+        UiSounds.Play(this, UiCue.Open);
 
         ClearContent();
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
@@ -178,7 +180,11 @@ public partial class ModalHost : Control
 
     public void Close()
     {
-        if (IsOpen) Exit(keepShade: false);
+        if (IsOpen)
+        {
+            Exit(keepShade: false);
+            UiSounds.Play(this, UiCue.Close);
+        }
         IsOpen = false;
         ClearContent();
         Visible = false;

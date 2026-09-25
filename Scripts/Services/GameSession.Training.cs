@@ -120,9 +120,9 @@ public partial class GameSession
             return;
 
         RecordDailyMissionEvent(DailyMissionEventKind.PurchaseShopItem);
-        SaveAndNotify("Bought a piece of land.");
-        if (!module.Placed)
-            RaiseGardenEvent("A new piece of land is waiting in your inventory.");
+        SaveAndNotify(module.Placed
+            ? "Bought a piece of land."
+            : "Bought a piece of land. It is waiting in your inventory.");
     }
 
     public bool CancelLandPurchase(string moduleId)

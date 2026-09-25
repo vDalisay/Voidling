@@ -547,10 +547,10 @@ public partial class FamilyTreeView : Control
         _cardNameLabels[member.Id] = name;
 
         var generationText = member.InbreedingHistoryFlag
-            ? $"G{member.FamilyGeneration} • INBRED"
-            : $"G{member.FamilyGeneration}";
+            ? string.Format(Tr("UI_FAMILY_TREE_GENERATION_INBRED"), member.FamilyGeneration)
+            : string.Format(Tr("UI_FAMILY_TREE_GENERATION"), member.FamilyGeneration);
         if (departed)
-            generationText += " • LEFT";
+            generationText = string.Format(Tr("UI_FAMILY_TREE_GENERATION_LEFT"), generationText);
 
         var detail = UiFactory.CreateLabel(generationText, 6);
         detail.HorizontalAlignment = HorizontalAlignment.Center;
@@ -599,7 +599,7 @@ public partial class FamilyTreeView : Control
 
         var first = _membersById.TryGetValue(member.ParentAId, out var a) ? a.Name : "?";
         var second = _membersById.TryGetValue(member.ParentBId, out var b) ? b.Name : "?";
-        return $"P: {first} + {second}";
+        return string.Format(Tr("UI_FAMILY_TREE_PARENTS_SHORT"), first, second);
     }
 
     private static HashSet<string> CollectConnectedFamily(

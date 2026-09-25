@@ -1451,3 +1451,129 @@ msgstr "Buy something from the shop"
 
 msgid "UI_MISSION_DEFAULT"
 msgstr "Daily Garden goal"
+
+msgid "UI_COMMON_NEXT"
+msgstr "Next"
+
+msgid "UI_TUTORIAL_WELCOME"
+msgstr "Welcome to your Garden. This short tour shows the main places you will use; you can skip it at any time."
+
+msgid "UI_TUTORIAL_START"
+msgstr "Start"
+
+msgid "UI_TUTORIAL_SELECT_VOIDLING"
+msgstr "Click any Voidling in the Garden. Selecting one opens its quick profile without pausing the world."
+
+msgid "UI_TUTORIAL_OPEN_DETAILS"
+msgstr "Open Details"
+
+msgid "UI_TUTORIAL_DETAILS"
+msgstr "Details separates trained stats, DNA potential and inherited visual traits so you can inspect a Voidling before racing or breeding."
+
+msgid "UI_TUTORIAL_INVENTORY"
+msgstr "Inventory shows treats, eggs and eggshells. Rare convenience items such as an incubation skip are used here on the egg you choose."
+
+msgid "UI_TUTORIAL_BREEDING"
+msgstr "Breeding lets two adults create an egg. The preview warns about related pairings and hatch-failure risk before you commit."
+
+msgid "UI_TUTORIAL_RACE"
+msgstr "Race lets you choose a Voidling and course. Race outcomes use stats and deterministic simulation, not hidden personality bonuses."
+
+msgid "UI_TUTORIAL_ONLINE"
+msgstr "Online contains connected Gardens, challenges, friend races and trading when multiplayer transport is available."
+
+msgid "UI_TUTORIAL_SETTINGS"
+msgstr "Settings controls audio, camera behavior and race presentation. Opening menus does not stop the Garden simulation."
+
+msgid "UI_TUTORIAL_COMPLETE"
+msgstr "That is the core loop: care for individuals, train them actively or through Modules, breed toward goals and race the results. The rest is yours to discover."
+
+msgid "UI_TUTORIAL_FINISH"
+msgstr "Finish"
+
+msgid "UI_FAMILY_TREE_TITLE"
+msgstr "{0} — FAMILY TREE"
+
+msgid "UI_FAMILY_TREE_HINT"
+msgstr "Drag empty space with left mouse. Click a family member for stats and parents."
+
+msgid "UI_FAMILY_TREE_DEPARTED"
+msgstr "LEFT THE FARM"
+
+msgid "UI_FAMILY_TREE_ARCHIVED"
+msgstr "ARCHIVED RECORD"
+
+msgid "UI_FAMILY_TREE_BURDEN"
+msgstr "Burden {0}"
+
+msgid "UI_FAMILY_TREE_BURDEN_MARKED"
+msgstr "Burden {0} • history marked"
+
+msgid "UI_FAMILY_TREE_HISTORY_MARK"
+msgstr "Historical inbreeding mark"
+
+msgid "UI_FAMILY_TREE_NO_STATS"
+msgstr "Stats not retained in archive."
+
+msgid "UI_FAMILY_TREE_STAT_LINE"
+msgstr "{0}  {1}  LV{2}"
+
+msgid "UI_FAMILY_TREE_PARENTS"
+msgstr "Parents:\n{0}\n+ {1}"
+
+msgid "UI_FAMILY_TREE_FOUNDER"
+msgstr "Parents:\nFounder / store line"
+
+msgid "UI_FAMILY_TREE_GENERATION"
+msgstr "G{0}"
+
+msgid "UI_FAMILY_TREE_GENERATION_INBRED"
+msgstr "G{0} • INBRED"
+
+msgid "UI_FAMILY_TREE_GENERATION_LEFT"
+msgstr "{0} • LEFT"
+
+msgid "UI_FAMILY_TREE_PARENTS_SHORT"
+msgstr "P: {0} + {1}"
+
+msgid "UI_GOODBYE_TITLE"
+msgstr "SAY GOODBYE?"
+
+msgid "UI_GOODBYE_BODY"
+msgstr "Send {0} away from the farm? They disappear from the garden but remain in family trees."
+
+msgid "UI_GOODBYE_FINAL_TITLE"
+msgstr "FINAL WARNING"
+
+msgid "UI_GOODBYE_FINAL_BODY"
+msgstr "This cannot be undone. {0} will leave the farm forever. Their grey family-tree record remains."
+
+msgid "UI_GOODBYE_KEEP"
+msgstr "Keep Voidling"
+
+msgid "UI_GOODBYE_CONFIRM"
+msgstr "Goodbye forever"
+
+msgid "UI_RESET_TITLE"
+msgstr "RESET DEMO?"
+
+msgid "UI_RESET_BODY"
+msgstr "Clears this local MVP save and restores the starter Voidlings."
+
+msgid "UI_RESET_CONFIRM"
+msgstr "Reset"
+
+msgid "UI_FAMILY_TREE_UNKNOWN"
+msgstr "Unknown"
+
+msgid "UI_DECORATION_SIZE_SMALL"
+msgstr "Small"
+
+msgid "UI_DECORATION_SIZE_MEDIUM"
+msgstr "Medium"
+
+msgid "UI_DECORATION_SIZE_LARGE"
+msgstr "Large"
+
+msgid "UI_DECORATION_SIZE_LINE"
+msgstr "Size: {0}"

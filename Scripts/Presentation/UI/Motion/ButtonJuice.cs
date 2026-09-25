@@ -1,4 +1,5 @@
 using Godot;
+using Voidling.Presentation.UI.Audio;
 using Voidling.Presentation.UI.Common;
 
 namespace Voidling.Presentation.UI.Motion;
@@ -17,8 +18,10 @@ public enum ButtonFeel
 /// <summary>
 /// The incremental-game feel on any button, as a component: hover (or keyboard focus) lifts it with
 /// an overshoot pop, pressing squashes it, releasing bounces it home, and a click on a disabled
-/// button gets a small "no" shove instead. Focus shows the pack's selector brackets. The click
-/// itself is never delayed: every effect is decoration on the button's own signals.
+/// button gets a small "no" shove instead. Focus shows the pack's selector brackets, the pointer
+/// turns to the pointing paw, and hover, press and refusal each have a soft sound (see
+/// <see cref="UiSounds"/>). The click itself is never delayed: every effect is decoration on the
+/// button's own signals.
 ///
 /// The rest states come from the chrome (hover draws one pixel higher, pressed one lower), so a
 /// button at rest is always at scale 1 on whole pixels. Many screens rebuild a list when a row is
@@ -65,6 +68,8 @@ public partial class ButtonJuice : Node
         _button.GuiInput += OnGuiInput;
         _button.Resized += OnResized;
         OnResized();
+        if (_button.MouseDefaultCursorShape == Control.CursorShape.Arrow)
+            _button.MouseDefaultCursorShape = Control.CursorShape.PointingHand;
 
         if (_button is Button button && button.ToggleMode &&
             button.GetThemeStylebox("pressed") == UiSkin.DefaultPressed)
@@ -96,6 +101,7 @@ public partial class ButtonJuice : Node
     {
         if (_button.Disabled || (_button.ButtonPressed && _button.ToggleMode)) return;
         UiMotion.Pop(_button, HoverPop);
+        UiSounds.Play(_button, UiCue.Hover);
     }
 
     private void OnFocused()
@@ -112,6 +118,7 @@ public partial class ButtonJuice : Node
     {
         if (_button.Disabled) return;
         UiMotion.Squash(_button);
+        UiSounds.Play(_button, UiCue.Press);
     }
 
     private void OnUp()
@@ -130,6 +137,7 @@ public partial class ButtonJuice : Node
             return;
         UiMotion.Nudge(_button);
         UiMotion.Flash(_button, new Color(0.8f, 0.72f, 0.68f), UiMotion.Normal);
+        UiSounds.Play(_button, UiCue.Denied);
     }
 
     private void OnResized()

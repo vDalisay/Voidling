@@ -1,5 +1,6 @@
 using System;
 using Godot;
+using Voidling.Presentation.UI.Audio;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Motion;
 using VoidlingGame;
@@ -164,6 +165,7 @@ public partial class SettingsScreen : VBoxContainer
         button.Pressed += () =>
         {
             var on = button.ButtonPressed;
+            UiSounds.Play(button, on ? UiCue.ToggleOn : UiCue.ToggleOff);
             // The knob slides across in the pack's own frames; the setting has already changed.
             var slide = UiMotion.Start(mark, "switch");
             if (slide == null)

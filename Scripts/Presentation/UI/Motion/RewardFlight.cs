@@ -1,5 +1,6 @@
 using System;
 using Godot;
+using Voidling.Presentation.UI.Audio;
 
 namespace Voidling.Presentation.UI.Motion;
 
@@ -33,8 +34,11 @@ public partial class RewardFlight : TextureRect
 
         var to = target.GetGlobalRect().GetCenter();
         var fired = false;
+        var landed = 0;
         void Land()
         {
+            // Each sprout plinks into the purse a little higher than the last.
+            UiSounds.Play(context, UiCue.Coin, landed++);
             if (GodotObject.IsInstanceValid(target))
             {
                 UiMotion.Pop(target, 0.12f);

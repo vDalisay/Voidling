@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Audio;
 using Voidling.Domain.Creatures;
 using Voidling.Domain.Garden;
 using Voidling.Application.Breeding;
@@ -121,7 +122,7 @@ public partial class MainController : Node
             _session.BuyStoreEgg(eggId);
             if (state.Coins != coinsBefore)
             {
-                Celebrate(origin);
+                Celebrate(origin, cue: UiCue.Celebrate);
                 PurchaseCelebration.ShowEgg(
                     _uiRoot,
                     new Vector2(ScreenWidth, ScreenHeight),
@@ -242,7 +243,7 @@ public partial class MainController : Node
                 return;
             }
 
-            Celebrate(ModalPoint("BreedAction"), PixelBurst.Palette.Rosy);
+            Celebrate(ModalPoint("BreedAction"), PixelBurst.Palette.Rosy, UiCue.Celebrate);
             CloseModal();
             _garden.PlayBreedingAnimation(
                 parentA.Id,

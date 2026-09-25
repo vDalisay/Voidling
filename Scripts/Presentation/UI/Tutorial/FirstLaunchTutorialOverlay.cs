@@ -60,12 +60,12 @@ public partial class FirstLaunchTutorialOverlay : Control
         actions.AddThemeConstantOverride("separation", 6);
         content.AddChild(actions);
 
-        var skip = UiFactory.CreateButton("Skip");
+        var skip = UiFactory.CreateButton(Tr("UI_COMMON_SKIP"));
         skip.CustomMinimumSize = new Vector2(70, 22);
         skip.Pressed += () => SkipRequested?.Invoke();
         actions.AddChild(skip);
 
-        _continue = UiFactory.CreateButton("Next");
+        _continue = UiFactory.CreateButton(Tr("UI_COMMON_NEXT"));
         _continue.CustomMinimumSize = new Vector2(76, 22);
         UiFactory.ApplyPrimaryStyle(_continue);
         _continue.Pressed += () => ContinueRequested?.Invoke();

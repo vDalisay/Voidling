@@ -163,8 +163,7 @@ public partial class GameSession : Node
         State = CreateFreshState();
         State.TutorialCompleted = tutorialCompleted;
         ApplyAudioSettings();
-        SaveAndNotify("Demo save reset.");
-        RaiseGardenEvent("The garden was reset.");
+        SaveAndNotify("The garden was reset.");
     }
 
     public void NotifyExternallyPersistedStateChanged()

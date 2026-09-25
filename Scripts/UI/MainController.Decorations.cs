@@ -88,6 +88,7 @@ public partial class MainController
         // A kind you can still place reads lighter than one already standing in the garden.
         art.Modulate = new Color(1, 1, 1, slot.InstanceId == null ? 0.6f : 1.0f);
         button.AddChild(art);
+        button.AddChild(DecorationSizeTag(slot.TypeId));
 
         var capturedKey = slot.Key;
         button.Pressed += () => { _selectedDecoration = capturedKey; CallDeferred(nameof(ShowGardenDecorations)); };
@@ -107,6 +108,11 @@ public partial class MainController
         name.Name = "DecorationName";
         name.HorizontalAlignment = HorizontalAlignment.Center;
         detail.AddChild(name);
+
+        var size = UiFactory.CreateLabel(string.Format(Tr("UI_DECORATION_SIZE_LINE"), DecorationSizeName(slot.TypeId)), 7);
+        size.Name = "DecorationSize";
+        size.HorizontalAlignment = HorizontalAlignment.Center;
+        detail.AddChild(size);
 
         var state = UiFactory.CreateLabel(Tr(slot.InstanceId == null ? "UI_DECORATION_CATALOGUE" : "UI_DECORATION_PLACED"), 7);
         state.HorizontalAlignment = HorizontalAlignment.Center;
@@ -158,6 +164,44 @@ public partial class MainController
             StretchMode = TextureRect.StretchModeEnum.KeepCentered,
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
+    }
+
+    /// <summary>
+    /// A small paper tag in the slot's lower corner naming the decoration's size, since the art is
+    /// drawn at its true pixel size and a small tree looks the same as a large one here.
+    /// </summary>
+    private Control DecorationSizeTag(string typeId)
+    {
+        var tag = new PanelContainer { Name = "SizeTag", MouseFilter = Control.MouseFilterEnum.Ignore };
+        var style = new StyleBoxFlat
+        {
+            BgColor = UiPalette.Parchment, AntiAliasing = false,
+            BorderColor = UiPalette.Tan, ContentMarginLeft = 3, ContentMarginRight = 3,
+            ContentMarginTop = 0, ContentMarginBottom = 1
+        };
+        style.SetBorderWidthAll(1);
+        tag.AddThemeStyleboxOverride("panel", style);
+        var label = UiFactory.CreateLabel(DecorationSizeName(typeId), 6);
+        label.MouseFilter = Control.MouseFilterEnum.Ignore;
+        tag.AddChild(label);
+        // Pinned to the slot's lower-right corner on whole pixels, above the art.
+        tag.SetAnchorsPreset(Control.LayoutPreset.BottomRight);
+        tag.GrowHorizontal = Control.GrowDirection.Begin;
+        tag.GrowVertical = Control.GrowDirection.Begin;
+        tag.OffsetRight = -4;
+        tag.OffsetBottom = -5;
+        return tag;
+    }
+
+    private string DecorationSizeName(string typeId)
+    {
+        var scale = GardenDecorationCatalog.TryGet(typeId, out var definition) ? definition.Scale : 1.0f;
+        return Tr(GardenDecorationSizing.For(scale) switch
+        {
+            GardenDecorationSize.Small => "UI_DECORATION_SIZE_SMALL",
+            GardenDecorationSize.Large => "UI_DECORATION_SIZE_LARGE",
+            _ => "UI_DECORATION_SIZE_MEDIUM"
+        });
     }
 
     private static string DecorationName(string typeId)

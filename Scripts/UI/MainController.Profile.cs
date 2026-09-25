@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Audio;
 using Voidling.Domain.Creatures;
 using Voidling.Domain.Shop;
 using Voidling.Presentation.UI.Common;
@@ -128,7 +129,10 @@ public partial class MainController : Node
                 _garden.PlayTreatEating(creatureId, capturedStatId, spawnFood: true);
                 var remaining = _session.State.TrainingItems.TryGetValue(capturedStatId, out var left) ? left : 0;
                 if (remaining < stockCounter.Value)
+                {
                     PixelBurst.Spawn(this, give.GetGlobalRect().GetCenter(), PixelBurst.Palette.Leafy, 10);
+                    UiSounds.Play(this, UiCue.Confirm);
+                }
                 stockCounter.SetValue(remaining);
                 label.TooltipText = string.Format(Tr("UI_PROFILE_TREAT_STOCK"),
                     StatPresentationCatalog.NameFor(capturedStatId), remaining);

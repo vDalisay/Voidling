@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Audio;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Motion;
 
@@ -68,9 +69,10 @@ public partial class MainController
             .FirstOrDefault(control => !control.IsQueuedForDeletion() && control.IsVisibleInTree())
             ?.GetGlobalRect().GetCenter();
 
-    /// <summary>A burst where the confirming button was; purchases and claims only.</summary>
-    private void Celebrate(Vector2? origin, PixelBurst.Palette palette = PixelBurst.Palette.Leafy)
+    /// <summary>A burst where the confirming button was, and its chime; purchases and claims only.</summary>
+    private void Celebrate(Vector2? origin, PixelBurst.Palette palette = PixelBurst.Palette.Leafy, UiCue cue = UiCue.Confirm)
     {
+        UiSounds.Play(this, cue);
         if (origin.HasValue) PixelBurst.Spawn(this, origin.Value, palette);
     }
 
@@ -84,7 +86,7 @@ public partial class MainController
         if (!_modalHost.IsOpen) return;
         var wallet = _modalHost.ShowWallet(before);
         var coins = _session.State.Coins;
-        Celebrate(origin);
+        Celebrate(origin, cue: UiCue.Reward);
         if (!origin.HasValue)
         {
             wallet.SetValue(coins);

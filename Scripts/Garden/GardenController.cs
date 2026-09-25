@@ -456,6 +456,7 @@ public partial class GardenController : Node2D
                 // The same confirmation burst the menus use, where the newborn stands on screen.
                 Voidling.Presentation.UI.Motion.PixelBurst.Spawn(
                     this, actor.GetGlobalTransformWithCanvas().Origin + new Vector2(0, -10), count: 22);
+                Voidling.Presentation.UI.Audio.UiSounds.Play(this, Voidling.Presentation.UI.Audio.UiCue.Celebrate);
             }
         }
 

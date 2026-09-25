@@ -68,7 +68,8 @@ Lands by Cup Nooble").
 | Check-in and claimed stamps | `UI Sprites/Other UI sprites/Xs and check marks/1s/check mark.png` |
 | Day/night dial | `emojis/emoji style ui/weather/Weather_UI.png` small frame, plate, sun/moon insert and pointer frames; `Weather_Icons_small.png` |
 | Tutorial "continue" arrow | `UI Sprites/Dialouge UI/dialog box character finished talking click to continue indicator - spritesheet .png` |
-| Review video cursor (probe only) | `UI Sprites/Mouse sprites/Catpaw Mouse icon.png`, `Catpaw holding Mouse icon.png` |
+| Mouse pointer (whole game) | `UI Sprites/Mouse sprites/Catpaw Mouse icon.png` (arrow), `Catpaw pointing Mouse icon.png` (over buttons), `Catpaw holding Mouse icon.png` (dragging), scaled by the window's whole stretch factor (`PixelCursor`) |
+| UI sounds | Sprout Lands Sorry pack `Audio/`: `blup_1` hover, `blup_2` press and sprout landings, `squick_1`/`squick_2` switches, `bip_1` window open/close, `bing_1` confirm, `flute_1` reward, `flute_3` celebration, `boo_1` refusal (imported trimmed and normalised) |
 | Rail icons, sprout currency, treats, eggs | existing: `UI Sprites/Icons/All Icons.png`, Sprites premium `Farming Plants.png`, `fruit-n-berries-items.png`, Basic pack `Egg item.png` |
 | Generated | shine-sweep shader (`Resources/Presentation/UI/UiShine.gdshader`), square-pixel bursts, reward flights, one-pixel dividers, pixel progress-bar fills, the modal shade |
 
@@ -174,6 +175,16 @@ for colour as each piece is cut (`PaletteSwap`), keeping every sprite's shapes a
   pixels, and the day dial lost its 0.75 scale.
 - Smoke: `SettleGardenUi` also waits (up to 1.5 s) for `UiMotion.IsSettling`; the day-dial checks
   follow the new dial (drawn pointer frames instead of a rotated arrow, time centred on its plate).
-- Not done: no UI sounds (the project has a UI bus and volume but no sound hooks or UI sounds yet);
-  the race HUD, pause menu and results card keep their own panels (their buttons pick up the new
+- Sounds (`Presentation/UI/Audio/UiSounds`): every factory button blips on hover and press and
+  sounds a soft "no" when refused; windows open and close with a bip; purchases, gifts and
+  level-ups chime; claimed rewards play a flute and each sprout plinks into the purse a little
+  higher; bought eggs, breeding and hatching get the celebration flute; switches squeak. All play
+  on the UI bus, so the Interface and Master volumes control them.
+- The cat paw is the game's pointer (pointing over buttons, closed while dragging).
+- One message per action: the Garden log and toasts no longer repeat a purchase or placement in
+  other words (the second, reworded garden event is gone).
+- The goodbye and reset dialogs, family tree and tutorial are localized.
+- Decorate slots and the decoration card name the size (Small, Medium, Large), which the 1:1 art
+  no longer shows.
+- Not done: the race HUD, pause menu and results card keep their own panels (their buttons pick up the new
   chrome through `UiFactory`).

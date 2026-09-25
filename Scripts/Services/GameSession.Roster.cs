@@ -43,8 +43,7 @@ public partial class GameSession
         if (!_roster!.DiscardFailedEgg(State, eggId))
             return;
 
-        SaveAndNotify("Removed the failed egg.");
-        RaiseGardenEvent("A failed egg was removed from the garden.");
+        SaveAndNotify("Removed the failed egg from the garden.");
     }
 
     public bool SayGoodbye(string creatureId)
@@ -54,7 +53,6 @@ public partial class GameSession
             return false;
 
         SaveAndNotify($"{result.Name} left the farm forever. Their family record remains.");
-        RaiseGardenEvent($"{result.Name} left the garden. Their family record remains.");
         AnnounceSpecialVariantDeparture(creatureId);
         return true;
     }

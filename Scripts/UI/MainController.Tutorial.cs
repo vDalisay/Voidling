@@ -115,29 +115,29 @@ public partial class MainController
         {
             case FirstLaunchTutorialStep.Welcome:
                 _tutorialOverlay.ShowStep(
-                    "Welcome to your Garden. This short tour shows the main places you will use; you can skip it at any time.",
-                    "Start",
+                    Tr("UI_TUTORIAL_WELCOME"),
+                    Tr("UI_TUTORIAL_START"),
                     true,
                     null);
                 break;
             case FirstLaunchTutorialStep.SelectVoidling:
                 _tutorialOverlay.ShowStep(
-                    "Click any Voidling in the Garden. Selecting one opens its quick profile without pausing the world.",
-                    "Next",
+                    Tr("UI_TUTORIAL_SELECT_VOIDLING"),
+                    Tr("UI_COMMON_NEXT"),
                     false,
                     new Rect2(110, 82, 348, 180));
                 break;
             case FirstLaunchTutorialStep.SelectedVoidling:
                 _tutorialOverlay.ShowStep(
                     Tr("UI_TUTORIAL_GARDEN_PROFILE"),
-                    "Open Details",
+                    Tr("UI_TUTORIAL_OPEN_DETAILS"),
                     true,
                     new Rect2(468, 82, 162, 268));
                 break;
             case FirstLaunchTutorialStep.Details:
                 _tutorialOverlay.ShowStep(
-                    "Details separates trained stats, DNA potential and inherited visual traits so you can inspect a Voidling before racing or breeding.",
-                    "Next",
+                    Tr("UI_TUTORIAL_DETAILS"),
+                    Tr("UI_COMMON_NEXT"),
                     true,
                     modalHighlight);
                 break;
@@ -151,49 +151,49 @@ public partial class MainController
             case FirstLaunchTutorialStep.Modules:
                 _tutorialOverlay.ShowStep(
                     Tr("UI_TUTORIAL_GARDEN_BUILD"),
-                    "Next",
+                    Tr("UI_COMMON_NEXT"),
                     true,
                     modalHighlight);
                 break;
             case FirstLaunchTutorialStep.Inventory:
                 _tutorialOverlay.ShowStep(
-                    "Inventory shows treats, eggs and eggshells. Rare convenience items such as an incubation skip are used here on the egg you choose.",
-                    "Next",
+                    Tr("UI_TUTORIAL_INVENTORY"),
+                    Tr("UI_COMMON_NEXT"),
                     true,
                     modalHighlight);
                 break;
             case FirstLaunchTutorialStep.Breeding:
                 _tutorialOverlay.ShowStep(
-                    "Breeding lets two adults create an egg. The preview warns about related pairings and hatch-failure risk before you commit.",
-                    "Next",
+                    Tr("UI_TUTORIAL_BREEDING"),
+                    Tr("UI_COMMON_NEXT"),
                     true,
                     modalHighlight);
                 break;
             case FirstLaunchTutorialStep.Race:
                 _tutorialOverlay.ShowStep(
-                    "Race lets you choose a Voidling and course. Race outcomes use stats and deterministic simulation, not hidden personality bonuses.",
-                    "Next",
+                    Tr("UI_TUTORIAL_RACE"),
+                    Tr("UI_COMMON_NEXT"),
                     true,
                     modalHighlight);
                 break;
             case FirstLaunchTutorialStep.Online:
                 _tutorialOverlay.ShowStep(
-                    "Online contains connected Gardens, challenges, friend races and trading when multiplayer transport is available.",
-                    "Next",
+                    Tr("UI_TUTORIAL_ONLINE"),
+                    Tr("UI_COMMON_NEXT"),
                     true,
                     modalHighlight);
                 break;
             case FirstLaunchTutorialStep.Settings:
                 _tutorialOverlay.ShowStep(
-                    "Settings controls audio, camera behavior and race presentation. Opening menus does not stop the Garden simulation.",
-                    "Next",
+                    Tr("UI_TUTORIAL_SETTINGS"),
+                    Tr("UI_COMMON_NEXT"),
                     true,
                     modalHighlight);
                 break;
             case FirstLaunchTutorialStep.Complete:
                 _tutorialOverlay.ShowStep(
-                    "That is the core loop: care for individuals, train them actively or through Modules, breed toward goals and race the results. The rest is yours to discover.",
-                    "Finish",
+                    Tr("UI_TUTORIAL_COMPLETE"),
+                    Tr("UI_TUTORIAL_FINISH"),
                     true,
                     null);
                 break;

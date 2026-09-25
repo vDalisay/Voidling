@@ -142,6 +142,9 @@ Result presentation is also presentation-only: podium pop/tilt animations, confe
   `FloatingNumber`, `PixelBurst`, `RewardFlight`, `AttentionBadge`, `ToastStack`, `TooltipJuice`
   and the `UiFxLayer` overlay, all routed through the static `UiMotion` helpers. `UiMotionMath` is
   the Godot-free, unit-tested arithmetic behind them.
+- `Presentation/UI/Audio` (`UiSounds`, `UiSoundPlayer`) plays the menu sounds on the `UI` bus, found
+  from any node like `UiFxLayer`; `ButtonJuice`, `ModalHost` and the celebration hooks call it. The
+  game-wide cat-paw pointer is `Presentation/UI/Common/PixelCursor`, added by `GameBootstrap`.
 - `UiMotion.Reduced` mirrors the persisted `ReduceMotion` setting (additive, default off; set by
   `MainController`). It is presentation-global on purpose, like the translation server: components
   are created by static factories and must not thread a settings object through every call.

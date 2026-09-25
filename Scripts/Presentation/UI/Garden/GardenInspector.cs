@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Audio;
 using Voidling.Application.Roster;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.UI.Motion;
@@ -196,6 +197,7 @@ public partial class GardenInspector : PanelContainer
                 UiMotion.Pop(view.level, 0.3f, UiMotion.Slow);
                 UiMotion.Flash(view.progress, new Color(1.6f, 1.6f, 1.4f), UiMotion.Slow);
                 PixelBurst.Spawn(this, view.level.GetGlobalRect().GetCenter(), PixelBurst.Palette.Leafy, 12);
+                UiSounds.Play(this, UiCue.Confirm);
             }
             _stats[stat.StatId].rate.Visible = stat.TrainingPointsPerSecond > 0;
             _stats[stat.StatId].rate.Text = stat.TrainingPointsPerSecond > 0

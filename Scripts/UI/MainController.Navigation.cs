@@ -99,8 +99,8 @@ public partial class MainController : Node
         var projection = _session.CreateLineageTreeProjection(data.Id);
         var membersById = projection.Members.ToDictionary(member => member.CreatureId, StringComparer.Ordinal);
 
-        var box = OpenModal($"{data.Name.ToUpperInvariant()} — FAMILY TREE", new Vector2(612, 330), ScreenIcons.Family);
-        var note = UiFactory.CreateLabel("Drag empty space with left mouse. Click a family member for stats and parents.", 6);
+        var box = OpenModal(string.Format(Tr("UI_FAMILY_TREE_TITLE"), data.Name.ToUpperInvariant()), new Vector2(612, 330), ScreenIcons.Family);
+        var note = UiFactory.CreateLabel(Tr("UI_FAMILY_TREE_HINT"), 6);
         box.AddChild(note);
 
         var content = new HBoxContainer();
@@ -123,7 +123,7 @@ public partial class MainController : Node
         inspector.AddChild(inspectorBox);
 
         string NameFor(string memberId)
-            => membersById.TryGetValue(memberId, out var known) ? known.DisplayName : "Unknown";
+            => membersById.TryGetValue(memberId, out var known) ? known.DisplayName : Tr("UI_FAMILY_TREE_UNKNOWN");
 
         void ShowMember(string memberId)
         {
@@ -166,32 +166,33 @@ public partial class MainController : Node
             inspectorBox.AddChild(portrait);
 
             if (member.Presence == LineageMemberPresence.Departed)
-                inspectorBox.AddChild(UiFactory.CreateLabel("LEFT THE FARM", 6));
+                inspectorBox.AddChild(UiFactory.CreateLabel(Tr("UI_FAMILY_TREE_DEPARTED"), 6));
             else if (member.Presence == LineageMemberPresence.Archived)
-                inspectorBox.AddChild(UiFactory.CreateLabel("ARCHIVED RECORD", 6));
+                inspectorBox.AddChild(UiFactory.CreateLabel(Tr("UI_FAMILY_TREE_ARCHIVED"), 6));
 
             if (member.ActiveInbreedingBurden.HasValue)
             {
                 var burdenLabel = member.InbreedingHistoryFlag
-                    ? $"Burden {member.ActiveInbreedingBurden.Value} • history marked"
-                    : $"Burden {member.ActiveInbreedingBurden.Value}";
+                    ? string.Format(Tr("UI_FAMILY_TREE_BURDEN_MARKED"), member.ActiveInbreedingBurden.Value)
+                    : string.Format(Tr("UI_FAMILY_TREE_BURDEN"), member.ActiveInbreedingBurden.Value);
                 inspectorBox.AddChild(UiFactory.CreateLabel(burdenLabel, 5));
             }
             else if (member.InbreedingHistoryFlag)
             {
-                inspectorBox.AddChild(UiFactory.CreateLabel("Historical inbreeding mark", 5));
+                inspectorBox.AddChild(UiFactory.CreateLabel(Tr("UI_FAMILY_TREE_HISTORY_MARK"), 5));
             }
 
             if (member.Stats.Count == 0)
             {
-                inspectorBox.AddChild(UiFactory.CreateLabel("Stats not retained in archive.", 5));
+                inspectorBox.AddChild(UiFactory.CreateLabel(Tr("UI_FAMILY_TREE_NO_STATS"), 5));
             }
             else
             {
                 foreach (var stat in member.Stats)
                 {
                     var label = UiFactory.CreateLabel(
-                        $"{StatPresentationCatalog.NameFor(stat.StatId)}  {GameRules.GradeName(stat.ExpressedAllele)}  LV{stat.Level}", 6);
+                        string.Format(Tr("UI_FAMILY_TREE_STAT_LINE"), StatPresentationCatalog.NameFor(stat.StatId),
+                            GameRules.GradeName(stat.ExpressedAllele), stat.Level), 6);
                     // Paper ink of the stat colour: the bright bar colours are unreadable as text on paper.
                     label.AddThemeColorOverride("font_color", PaperCard.Ink(StatPresentationCatalog.ColorFor(stat.StatId)));
                     inspectorBox.AddChild(label);
@@ -199,8 +200,8 @@ public partial class MainController : Node
             }
 
             var parentText = member.ParentAId.Length > 0
-                ? $"Parents:\n{NameFor(member.ParentAId)}\n+ {NameFor(member.ParentBId)}"
-                : "Parents:\nFounder / store line";
+                ? string.Format(Tr("UI_FAMILY_TREE_PARENTS"), NameFor(member.ParentAId), NameFor(member.ParentBId))
+                : Tr("UI_FAMILY_TREE_FOUNDER");
             var parents = UiFactory.CreateLabel(parentText, 6);
             parents.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             inspectorBox.AddChild(parents);
@@ -231,18 +232,18 @@ public partial class MainController : Node
         if (data == null)
             return;
 
-        var box = OpenModal("SAY GOODBYE?", new Vector2(405, 175), ScreenIcons.Warning);
+        var box = OpenModal(Tr("UI_GOODBYE_TITLE"), new Vector2(405, 175), ScreenIcons.Warning);
         var text = UiFactory.CreateLabel(
-            $"Send {data.Name} away from the farm? They disappear from the garden but remain in family trees.", 8);
+            string.Format(Tr("UI_GOODBYE_BODY"), data.Name), 8);
         text.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         box.AddChild(text);
 
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 10);
-        var cancel = UiFactory.CreateButton("Cancel");
+        var cancel = UiFactory.CreateButton(Tr("UI_COMMON_CANCEL"));
         cancel.Pressed += CloseModal;
         row.AddChild(cancel);
-        var next = UiFactory.CreateButton("Continue");
+        var next = UiFactory.CreateButton(Tr("UI_COMMON_CONTINUE"));
         UiFactory.ApplyDangerStyle(next);
         next.Pressed += () => ShowGoodbyeFinal(creatureId);
         row.AddChild(next);
@@ -258,19 +259,19 @@ public partial class MainController : Node
             return;
         }
 
-        var box = OpenModal("FINAL WARNING", new Vector2(420, 185), ScreenIcons.Warning);
+        var box = OpenModal(Tr("UI_GOODBYE_FINAL_TITLE"), new Vector2(420, 185), ScreenIcons.Warning);
         var warning = UiFactory.CreateLabel(
-            $"This cannot be undone. {data.Name} will leave the farm forever. Their grey family-tree record remains.", 8);
+            string.Format(Tr("UI_GOODBYE_FINAL_BODY"), data.Name), 8);
         warning.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         warning.AddThemeColorOverride("font_color", Color.FromHtml("#9C514B"));
         box.AddChild(warning);
 
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 10);
-        var keep = UiFactory.CreateButton("Keep Voidling");
+        var keep = UiFactory.CreateButton(Tr("UI_GOODBYE_KEEP"));
         keep.Pressed += CloseModal;
         row.AddChild(keep);
-        var goodbye = UiFactory.CreateButton("Goodbye forever");
+        var goodbye = UiFactory.CreateButton(Tr("UI_GOODBYE_CONFIRM"));
         UiFactory.ApplyDangerStyle(goodbye);
         goodbye.Pressed += () =>
         {
@@ -289,17 +290,17 @@ public partial class MainController : Node
 
     private void ShowResetConfirm()
     {
-        var box = OpenModal("RESET DEMO?", new Vector2(320, 155), ScreenIcons.Warning);
-        var label = UiFactory.CreateLabel("Clears this local MVP save and restores the starter Voidlings.", 8);
+        var box = OpenModal(Tr("UI_RESET_TITLE"), new Vector2(320, 155), ScreenIcons.Warning);
+        var label = UiFactory.CreateLabel(Tr("UI_RESET_BODY"), 8);
         label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         box.AddChild(label);
 
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 8);
-        var cancel = UiFactory.CreateButton("Cancel");
+        var cancel = UiFactory.CreateButton(Tr("UI_COMMON_CANCEL"));
         cancel.Pressed += CloseModal;
         row.AddChild(cancel);
-        var reset = UiFactory.CreateButton("Reset");
+        var reset = UiFactory.CreateButton(Tr("UI_RESET_CONFIRM"));
         UiFactory.ApplyDangerStyle(reset);
         reset.Pressed += () =>
         {
