@@ -154,7 +154,7 @@ public partial class MainController
     private static TextureRect DecorationArt(string typeId)
     {
         GardenDecorationCatalog.TryGet(typeId, out var definition);
-        var region = definition.AtlasRegion == default ? new Rect2(0, 0, 32, 48) : definition.AtlasRegion;
+        var region = definition.AtlasRegion == default ? GardenDecorationCatalog.RoundTreeRegion : definition.AtlasRegion;
         return new TextureRect
         {
             Texture = new AtlasTexture { Atlas = DecorationTexture, Region = region },
