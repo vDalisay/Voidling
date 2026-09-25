@@ -189,6 +189,8 @@ public partial class RaceTrackShotProbe : Node
 
             shots.Add(($"live-{segment.Id}-entry", Mathf.Lerp(segment.StartX, segment.EndX, 0.2f)));
             shots.Add(($"live-{segment.Id}-mid", Mathf.Lerp(segment.StartX, segment.EndX, 0.6f)));
+            if (segment.Kind != RaceSegmentKind.Climb)
+                shots.Add(($"live-{segment.Id}-zoom", Mathf.Lerp(segment.StartX, segment.EndX, 0.4f)));
         }
 
         if (course.HasGlideSegment)
@@ -199,7 +201,7 @@ public partial class RaceTrackShotProbe : Node
 
         var climb = course.Segments.FirstOrDefault(segment => segment.Kind == RaceSegmentKind.Climb);
         if (climb.EndX > climb.StartX)
-            shots.Add(("live-climb-zoom", Mathf.Lerp(climb.StartX, climb.EndX, 0.75f)));
+            shots.Add(("live-climb-zoom", Mathf.Lerp(climb.StartX, climb.EndX, 0.25f)));
 
         var firstGround = course.Segments.First(segment => segment.Kind == RaceSegmentKind.Ground);
         shots.Add(("live-running", Mathf.Lerp(firstGround.StartX, firstGround.EndX, 0.45f)));

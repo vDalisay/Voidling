@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.Racing;
 using Voidling.Presentation.UI.Common;
 using Voidling.Presentation.Voidlings;
 using VoidlingGame;
@@ -255,26 +256,29 @@ public partial class RaceEntryScreen : Control
 
     // ---- Step 1: course and difficulty ------------------------------------------------------
 
+    // The Chao Stadium's race board: the courses as cards down the left, each showing the kinds of
+    // stretch it has and its level medals, and on the right a live window onto the picked course
+    // with its profile and record underneath.
     private Control BuildCourseStep()
     {
         var row = new HBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkCenter };
         row.AddThemeConstantOverride("separation", 8);
 
-        var listPanel = PaperPanel(new Vector2(268, 0));
+        var listPanel = PaperPanel(new Vector2(250, 0));
         listPanel.Name = "CourseListPanel";
+        listPanel.SizeFlagsVertical = SizeFlags.ShrinkBegin;
         var left = new VBoxContainer();
         left.AddThemeConstantOverride("separation", 4);
         listPanel.AddChild(left);
 
         var headers = new HBoxContainer();
         headers.AddThemeConstantOverride("separation", 4);
-        headers.AddChild(Header(string.Empty, 14));
-        headers.AddChild(Header(Tr("UI_RACE_PICKER_COURSE"), 136));
-        headers.AddChild(Header(Tr("UI_RACE_LEVEL"), 100));
+        headers.AddChild(Header(Tr("UI_RACE_PICKER_COURSE"), 150));
+        headers.AddChild(Header(Tr("UI_RACE_LEVEL"), 0));
         left.AddChild(headers);
 
         var list = new VBoxContainer { Name = "CourseList" };
-        list.AddThemeConstantOverride("separation", 4);
+        list.AddThemeConstantOverride("separation", 5);
         foreach (var course in _state!.Courses)
             list.AddChild(BuildCourseRow(course));
         left.AddChild(list);
@@ -286,19 +290,20 @@ public partial class RaceEntryScreen : Control
 
     private Control BuildCourseRow(RacePickerCourseViewState course)
     {
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 4);
-
         var selected = CourseKey(course) == CourseKey(_selectedCourseId, _selectedCourseVersion);
 
-        // A gold star marks the picked course, so the row the record card is describing is obvious
-        // without having to read the button states.
+        // The picked card glows gold, so the course the board is describing is obvious at a glance.
+        var card = new PanelContainer { Name = "CourseCard_" + course.Id };
+        card.AddThemeStyleboxOverride("panel", CardStyle(selected));
+        var box = new VBoxContainer();
+        box.AddThemeConstantOverride("separation", 3);
+        card.AddChild(box);
 
         var name = UiFactory.CreateButton(course.Name);
         name.Name = "Course_" + course.Id;
         name.ToggleMode = true;
         name.ButtonPressed = selected;
-        name.CustomMinimumSize = new Vector2(136, 30);
+        name.CustomMinimumSize = new Vector2(226, 24);
         name.Alignment = HorizontalAlignment.Left;
         UiFactory.ApplyPixelFont(name, 8);
         name.Pressed += () =>
@@ -308,7 +313,12 @@ public partial class RaceEntryScreen : Control
             RaiseSelectionChanged();
             RebuildStep();
         };
-        row.AddChild(name);
+        box.AddChild(name);
+
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 3);
+        row.AddChild(SectionChips(course, 12.0f));
+        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
 
         for (var level = MinLevel; level <= MaxLevel; level++)
         {
@@ -324,11 +334,12 @@ public partial class RaceEntryScreen : Control
             };
             row.AddChild(pill);
         }
-        return row;
+        box.AddChild(row);
+        return card;
     }
 
-    // Difficulty pills reuse the premium round-button sheet: tan for an unpicked level, blue for the
-    // picked one, so the row reads at a glance without any extra wording.
+    // Difficulty pills reuse the premium round-button sheet: tan for an unpicked level, and green,
+    // yellow or red for the picked one, so the row reads at a glance without any extra wording.
     private Button BuildLevelPill(RacePickerCourseViewState course, int level, bool active)
     {
         var button = new Button
@@ -337,7 +348,7 @@ public partial class RaceEntryScreen : Control
             Text = level.ToString(),
             ToggleMode = true,
             ButtonPressed = active,
-            CustomMinimumSize = new Vector2(32, 32),
+            CustomMinimumSize = new Vector2(26, 26),
             FocusMode = FocusModeEnum.All
         };
         var colorRow = active ? LevelColorRows[Mathf.Clamp(level, MinLevel, MaxLevel) - 1] : 1;
@@ -363,7 +374,7 @@ public partial class RaceEntryScreen : Control
 
     private Control BuildRecordPanel()
     {
-        var panel = PaperPanel(new Vector2(246, 0));
+        var panel = PaperPanel(new Vector2(334, 0));
         panel.Name = "CourseRecord";
         panel.SizeFlagsVertical = SizeFlags.ShrinkBegin;
         var box = new VBoxContainer();
@@ -371,28 +382,66 @@ public partial class RaceEntryScreen : Control
         panel.AddChild(box);
 
         var course = SelectedCourse();
+        box.AddChild(BuildPreviewFrame(course, new Vector2(318, 100)));
+
+        var titleRow = new HBoxContainer();
+        titleRow.AddThemeConstantOverride("separation", 6);
         var title = UiFactory.CreateLabel(course.Name, 10);
-        title.HorizontalAlignment = HorizontalAlignment.Center;
-        box.AddChild(title);
-        box.AddChild(BuildStarRating(_level));
-        box.AddChild(Header(Tr("UI_RACE_COURSE_RECORD"), 0));
+        title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        title.VerticalAlignment = VerticalAlignment.Center;
+        title.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        titleRow.AddChild(title);
+        titleRow.AddChild(PaperCard.StarRating(_level, MaxLevel, 16.0f));
+        box.AddChild(titleRow);
+
+        box.AddChild(BuildMinimap(course, new Vector2(318, 38)));
+        box.AddChild(BuildCourseDetail(course));
+        box.AddChild(BuildRecordPlaque(course));
+        return panel;
+    }
+
+    /// <summary>
+    /// The record as a wooden plaque: trophy, holder and time on one line. The time keeps its node
+    /// name, which the Garden UI smoke reads.
+    /// </summary>
+    private Control BuildRecordPlaque(RacePickerCourseViewState course)
+    {
+        var plaque = new PanelContainer { Name = "RecordPlaque" };
+        var style = new StyleBoxFlat { BgColor = Color.FromHtml("#E8CE8E"), BorderColor = Color.FromHtml("#B08A55") };
+        style.SetBorderWidthAll(1);
+        style.SetCornerRadiusAll(3);
+        style.SetContentMarginAll(3);
+        style.ContentMarginLeft = 6;
+        style.ContentMarginRight = 8;
+        plaque.AddThemeStyleboxOverride("panel", style);
+
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 6);
+        plaque.AddChild(row);
+        row.AddChild(new TextureRect
+        {
+            Texture = UiFactory.CreateGardenIcon(13, 1),
+            CustomMinimumSize = new Vector2(14, 14),
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            MouseFilter = MouseFilterEnum.Ignore
+        });
+        var heading = Header(Tr("UI_RACE_COURSE_RECORD"), 0);
+        heading.VerticalAlignment = VerticalAlignment.Center;
+        row.AddChild(heading);
+
         var record = Record(course, _level);
         var holder = UiFactory.CreateLabel(
             string.IsNullOrEmpty(record.CreatureName) ? Tr("UI_RACE_NO_RECORD") : record.CreatureName, 8);
-        holder.HorizontalAlignment = HorizontalAlignment.Center;
+        holder.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        holder.HorizontalAlignment = HorizontalAlignment.Right;
         holder.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-        box.AddChild(holder);
+        row.AddChild(holder);
         var time = UiFactory.CreateLabel(record.Time, 10);
         time.Name = "RecordTime";
-        time.HorizontalAlignment = HorizontalAlignment.Center;
-        box.AddChild(time);
-
-        box.AddChild(BuildMinimap(course, new Vector2(230, 74)));
-        var detail = UiFactory.CreateLabel(
-            $"{string.Join(" · ", course.Sections)}   {course.LengthMeters} M", 6);
-        detail.HorizontalAlignment = HorizontalAlignment.Center;
-        box.AddChild(detail);
-        return panel;
+        time.AddThemeColorOverride("font_color", Color.FromHtml("#4A3218"));
+        row.AddChild(time);
+        return plaque;
     }
 
     // ---- Step 2: racer ----------------------------------------------------------------------
@@ -518,27 +567,31 @@ public partial class RaceEntryScreen : Control
         var course = SelectedCourse();
         var racer = SelectedRacer();
 
-        var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+        var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter };
         row.AddThemeConstantOverride("separation", 8);
 
-        var coursePanel = PaperPanel(new Vector2(300, 0));
+        var coursePanel = PaperPanel(new Vector2(330, 0));
         coursePanel.Name = "ConfirmCourse";
         coursePanel.SizeFlagsVertical = SizeFlags.ShrinkBegin;
         var courseBox = new VBoxContainer();
         courseBox.AddThemeConstantOverride("separation", 4);
         coursePanel.AddChild(courseBox);
+        courseBox.AddChild(BuildPreviewFrame(course, new Vector2(314, 96)));
+
+        var titleRow = new HBoxContainer();
+        titleRow.AddThemeConstantOverride("separation", 6);
         var courseName = UiFactory.CreateLabel(course.Name, 11);
-        courseName.HorizontalAlignment = HorizontalAlignment.Center;
-        courseBox.AddChild(courseName);
+        courseName.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        courseName.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        titleRow.AddChild(courseName);
         var levelLine = UiFactory.CreateLabel(string.Format(Tr("UI_RACE_LEVEL_VALUE"), _level), 8);
-        levelLine.HorizontalAlignment = HorizontalAlignment.Center;
-        courseBox.AddChild(levelLine);
-        courseBox.AddChild(BuildStarRating(_level));
-        courseBox.AddChild(BuildMinimap(course, new Vector2(284, 84)));
-        var detail = UiFactory.CreateLabel(
-            $"{string.Join(" · ", course.Sections)}   {course.LengthMeters} M", 6);
-        detail.HorizontalAlignment = HorizontalAlignment.Center;
-        courseBox.AddChild(detail);
+        levelLine.VerticalAlignment = VerticalAlignment.Center;
+        titleRow.AddChild(levelLine);
+        titleRow.AddChild(BuildStarRating(_level));
+        courseBox.AddChild(titleRow);
+
+        courseBox.AddChild(BuildMinimap(course, new Vector2(314, 36)));
+        courseBox.AddChild(BuildCourseDetail(course));
         var record = Record(course, _level);
         var recordLine = UiFactory.CreateLabel(
             string.Format(Tr("UI_RACE_RECORD_LINE"),
@@ -553,6 +606,91 @@ public partial class RaceEntryScreen : Control
     }
 
     // ---- Shared ------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The live course preview in a dark timber frame, like a window onto the stadium. Courses the
+    /// catalog cannot resolve simply show no window; the profile strip below still describes them.
+    /// </summary>
+    private static Control BuildPreviewFrame(RacePickerCourseViewState course, Vector2 size)
+    {
+        var frame = new PanelContainer { Name = "CoursePreviewFrame", MouseFilter = MouseFilterEnum.Ignore };
+        var style = new StyleBoxFlat { BgColor = Color.FromHtml("#9CCB6B"), BorderColor = Color.FromHtml("#6B4A31") };
+        style.SetBorderWidthAll(3);
+        style.SetCornerRadiusAll(3);
+        style.SetContentMarginAll(3);
+        frame.AddThemeStyleboxOverride("panel", style);
+
+        var preview = new CoursePreview { Name = "CoursePreview", CustomMinimumSize = size };
+        if (preview.SetCourse(course.Id, course.Version))
+        {
+            frame.AddChild(preview);
+        }
+        else
+        {
+            preview.QueueFree();
+            frame.Visible = false;
+        }
+        return frame;
+    }
+
+    /// <summary>Section chips followed by the section names and course length.</summary>
+    private static Control BuildCourseDetail(RacePickerCourseViewState course)
+    {
+        var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        row.AddThemeConstantOverride("separation", 6);
+        row.AddChild(SectionChips(course, 10.0f));
+        var detail = UiFactory.CreateLabel($"{string.Join(" · ", course.Sections)}   {course.LengthMeters} M", 6);
+        detail.VerticalAlignment = VerticalAlignment.Center;
+        row.AddChild(detail);
+        return row;
+    }
+
+    /// <summary>
+    /// One coloured chip per kind of stretch the course contains, carrying the same glyph as the
+    /// signposts on the track.
+    /// </summary>
+    private static Control SectionChips(RacePickerCourseViewState course, float glyphSize)
+    {
+        var chips = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+        chips.AddThemeConstantOverride("separation", 2);
+        foreach (var kind in course.Segments.Select(segment => segment.Kind).Distinct())
+        {
+            var chip = new PanelContainer { MouseFilter = MouseFilterEnum.Ignore, SizeFlagsVertical = SizeFlags.ShrinkCenter };
+            var style = new StyleBoxFlat
+            {
+                BgColor = CourseMinimap.ColorForKind(kind),
+                BorderColor = CourseMinimap.ColorForKind(kind).Darkened(0.35f)
+            };
+            style.SetBorderWidthAll(1);
+            style.SetCornerRadiusAll(2);
+            style.SetContentMarginAll(2);
+            chip.AddThemeStyleboxOverride("panel", style);
+            chip.AddChild(new TextureRect
+            {
+                Texture = RaceSectionGlyphs.For(kind, Color.FromHtml("#4A3A2C")),
+                CustomMinimumSize = new Vector2(glyphSize, glyphSize),
+                ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                TextureFilter = TextureFilterEnum.Nearest,
+                MouseFilter = MouseFilterEnum.Ignore
+            });
+            chips.AddChild(chip);
+        }
+        return chips;
+    }
+
+    private static StyleBoxFlat CardStyle(bool selected)
+    {
+        var style = new StyleBoxFlat
+        {
+            BgColor = Color.FromHtml(selected ? "#F6DC96" : "#EFE0BC"),
+            BorderColor = Color.FromHtml(selected ? "#C08A2E" : "#C4A77A")
+        };
+        style.SetBorderWidthAll(selected ? 2 : 1);
+        style.SetCornerRadiusAll(4);
+        style.SetContentMarginAll(4);
+        return style;
+    }
 
     private Control BuildMinimap(RacePickerCourseViewState course, Vector2 size)
     {
