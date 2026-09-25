@@ -184,7 +184,9 @@ public partial class GardenController
             Texture = DecorationTexture(definition.AtlasRegion),
             Material = SpriteNormalMaps.LitMaterial,
             Scale = Vector2.One * definition.Scale,
-            Position = new Vector2(0, -definition.AtlasRegion.Size.Y * definition.Scale * 0.42f),
+            // The trunk's foot (the region's bottom row) stands on the placement point, which is
+            // also what the decorations' y-sort compares.
+            Position = new Vector2(0, -(definition.AtlasRegion.Size.Y * 0.5f - 1.0f) * definition.Scale),
             Modulate = ghost ? new Color(1, 1, 1, 0.58f) : Colors.White,
             ZIndex = 1
         };

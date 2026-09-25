@@ -19,11 +19,18 @@ public static class GardenDecorationCatalog
 {
     public const string TexturePath = "res://Assets/Sprout Lands - Sprites - Basic pack/Objects/Basic Grass Biom things 1.png";
 
+    /// <summary>
+    /// The sheet's big round tree: exactly its 32x32 cell, so no neighbouring sprite (the small tree
+    /// to its left, the cherries below) is cut in with it. The three sizes are one tree at three
+    /// scales.
+    /// </summary>
+    public static readonly Rect2 RoundTreeRegion = new(16, 0, 32, 32);
+
     private static readonly GardenDecorationDefinition[] Definitions =
     {
-        new("tree", "Tree", new Rect2(0, 0, 32, 48), 1.00f),
-        new("small_tree", "Small Tree", new Rect2(0, 0, 32, 48), 0.78f),
-        new("large_tree", "Large Tree", new Rect2(0, 0, 32, 48), 1.22f)
+        new("tree", "Tree", RoundTreeRegion, 1.00f),
+        new("small_tree", "Small Tree", RoundTreeRegion, 0.78f),
+        new("large_tree", "Large Tree", RoundTreeRegion, 1.22f)
     };
 
     public static IReadOnlyList<GardenDecorationDefinition> All => Definitions;
