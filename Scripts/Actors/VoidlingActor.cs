@@ -12,6 +12,14 @@ public partial class VoidlingActor : Node2D
     public LifeStage Stage { get; private set; }
     public bool IsPointerHovered => _hovered;
 
+    /// <summary>The body sprite, for presentation that mirrors it (the sea's reflection).</summary>
+    public AnimatedSprite2D Body => _sprite;
+
+    public VoidlingVisualAppearance VisualAppearance => _appearance;
+
+    /// <summary>Roughly how tall the drawn body stands, in world pixels.</summary>
+    public float BodyHeight => VoidlingVisualFactory.WorldHitboxSize(Stage == LifeStage.Adult, _visualTypeId).Y;
+
     private readonly RandomNumberGenerator _rng = new();
     private AnimatedSprite2D _sprite = null!;
     private Rect2 _wanderBounds;

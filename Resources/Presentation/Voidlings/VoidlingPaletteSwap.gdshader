@@ -1,5 +1,8 @@
 shader_type canvas_item;
 
+// In-world frames carry generated normal maps; Garden lights shade them through this.
+#include "res://Resources/Presentation/Lighting/BalancedKeyLight.gdshaderinc"
+
 uniform int palette_size = 0;
 uniform float match_tolerance = 0.0125;
 uniform vec4 source_0 : source_color;
@@ -38,4 +41,5 @@ void fragment() {
     else if (palette_size > 6 && matches(texel, source_6.rgb)) swapped = target_6.rgb;
     else if (palette_size > 7 && matches(texel, source_7.rgb)) swapped = target_7.rgb;
     COLOR.rgb *= swapped / max(texel, vec3(1.0 / 255.0));
+    LIGHT_VERTEX = texel_light_vertex(LIGHT_VERTEX, UV, TEXTURE_PIXEL_SIZE);
 }

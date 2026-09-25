@@ -4,6 +4,8 @@ using System.Linq;
 using Godot;
 using Voidling.Application.Garden;
 using Voidling.Presentation.Garden;
+using Voidling.Presentation.Garden.Atmosphere;
+using Voidling.Presentation.Lighting;
 
 namespace VoidlingGame;
 
@@ -15,7 +17,11 @@ public partial class GardenController
 {
     public event Action<bool>? DecorationPlacementModeChanged;
 
-    private static readonly Texture2D DecorationAtlas = GD.Load<Texture2D>(GardenDecorationCatalog.TexturePath);
+    /// <summary>
+    /// Each decoration's region of the atlas, cut out on its own and given a generated normal map
+    /// so the Garden's light shades it like the island's own trees.
+    /// </summary>
+    private static readonly Dictionary<Rect2, Texture2D> DecorationTextures = new();
     private readonly Dictionary<string, Node2D> _decorationVisuals = new(StringComparer.Ordinal);
     private Node2D? _playerDecorationsRoot;
     private Sprite2D? _decorationGhost;
@@ -173,14 +179,27 @@ public partial class GardenController
 
     private static Sprite2D CreateDecorationSprite(GardenDecorationDefinition definition, bool ghost)
     {
-        var texture = new AtlasTexture { Atlas = DecorationAtlas, Region = definition.AtlasRegion };
         return new Sprite2D
         {
-            Texture = texture,
+            Texture = DecorationTexture(definition.AtlasRegion),
+            Material = SpriteNormalMaps.LitMaterial,
             Scale = Vector2.One * definition.Scale,
             Position = new Vector2(0, -definition.AtlasRegion.Size.Y * definition.Scale * 0.42f),
             Modulate = ghost ? new Color(1, 1, 1, 0.58f) : Colors.White,
             ZIndex = 1
         };
+    }
+
+    private static Texture2D DecorationTexture(Rect2 region)
+    {
+        if (!DecorationTextures.TryGetValue(region, out var texture))
+        {
+            texture = SpriteNormalMaps.Lit(GardenAtmosphereAssets.Slice(
+                GardenDecorationCatalog.TexturePath,
+                (int)region.Position.X, (int)region.Position.Y, (int)region.Size.X, (int)region.Size.Y));
+            DecorationTextures[region] = texture;
+        }
+
+        return texture;
     }
 }

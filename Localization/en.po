@@ -64,7 +64,7 @@ msgid "UI_SETTINGS_EDGE_PAN_TOOLTIP"
 msgstr "Move the cursor to an edge to pan the garden or family tree."
 
 msgid "UI_SETTINGS_GARDEN_TINT_TOOLTIP"
-msgstr "Tint the garden by time of day and season. Off shows the artwork's own colours."
+msgstr "Light the garden by time of day, season and weather. Off shows the artwork's own colours."
 
 msgid "UI_SHOP_TITLE"
 msgstr "Sprout Market"

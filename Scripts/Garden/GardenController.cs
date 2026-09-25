@@ -58,6 +58,7 @@ public partial class GardenController : Node2D
         AddChild(_landRoot);
         _camera = GetNode<Camera2D>("Camera2D");
         _zoomTarget = _camera.Zoom.X;
+        InstallAtmosphere();
 
         _session.StateChanged += Refresh;
         Refresh();
@@ -420,6 +421,7 @@ public partial class GardenController : Node2D
         {
             _actors[staleId].QueueFree();
             _actors.Remove(staleId);
+            UntrackAtmosphereVoidling(staleId);
 
             if (_followId == staleId)
                 StopFollowing();
@@ -446,6 +448,7 @@ public partial class GardenController : Node2D
             actor.RunningStride += OnRunningStride;
             _actorsRoot.AddChild(actor);
             _actors[data.Id] = actor;
+            TrackAtmosphereVoidling(actor, data);
 
             if (_initialRefreshComplete && data.Stage == LifeStage.Child)
                 actor.PlayHatchJump();
