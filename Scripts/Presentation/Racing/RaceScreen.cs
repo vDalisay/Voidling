@@ -98,13 +98,6 @@ public partial class RaceScreen : Node2D
 
     private static RaceTrackLayout Layout => new(TrackTop, TrackBottom, ScreenWidth, ScreenHeight, RaceTrackArt.ClimbHeight);
 
-    /// <summary>
-    /// The river's own colour, drawn over a swimmer's submerged body. Matching the water exactly is
-    /// what keeps the overlay from reading as a tinted box floating on the surface.
-    /// </summary>
-    private static readonly Color SubmergedWater = new(0.608f, 0.831f, 0.765f, 0.56f);
-    private static readonly Color WakeRipple = new(1.0f, 1.0f, 1.0f, 0.42f);
-
     // Lanes spread across the full dirt band. The old 33px cluster stacked four racers on top of
     // each other on the start line and left most of the track empty.
     private readonly float[] _racerOffsets = { -30.0f, -10.0f, 10.0f, 30.0f };
@@ -133,7 +126,6 @@ public partial class RaceScreen : Node2D
     private string? _firstFinisherId;
     private RacerVisual? _playerVisual;
     private Random _vfxRandom = new(1);
-    private float _waterPhase;
     private float _zoom = MinZoom;
     private float _zoomTarget = MinZoom;
     private float _cameraPeekOffset;
@@ -158,7 +150,13 @@ public partial class RaceScreen : Node2D
 
         /// <summary>Water drawn over the submerged part of the body while swimming.</summary>
         public Polygon2D Submersion { get; init; } = null!;
+        public CpuParticles2D Pebbles { get; init; } = null!;
+        public CpuParticles2D Sparkles { get; init; } = null!;
         public float DustDistance { get; set; }
+        public float WakeDistance { get; set; }
+        public float WakeX { get; set; }
+        public bool WasSwimming { get; set; }
+        public bool WasGliding { get; set; }
 
         /// <summary>How far past the line this racer coasts, and how far through that coast it is.</summary>
         public bool Finished { get; set; }
@@ -217,9 +215,6 @@ public partial class RaceScreen : Node2D
                 _entry.SimulationSeed);
         }
 
-        // Tiled DrawTextureRect needs repeat sampling on this canvas item.
-        TextureRepeat = TextureRepeatEnum.Enabled;
-
         BuildCoursePresentation();
         CreateEntrantVisuals(_entry.Entrants);
         CreateCamera();
@@ -239,12 +234,10 @@ public partial class RaceScreen : Node2D
 
     public override void _Process(double delta)
     {
-        // The stream keeps flowing, and the camera keeps answering the wheel, on the start line,
-        // during the opening flyover and on the results screen.
-        _waterPhase = (_waterPhase + (float)delta * 2.2f) % 1.0f;
+        // The camera keeps answering the wheel on the start line, during the opening flyover and on
+        // the results screen. The track animates itself through its shaders.
         UpdateZoom((float)delta);
         UpdateCameraPeek((float)delta);
-        QueueRedraw();
 
         // Keep the framing on the player between the countdown and the podium too, so a zoom taken
         // on the start line or after the finish is centred on the same Voidling. The flyover owns
@@ -324,9 +317,6 @@ public partial class RaceScreen : Node2D
         }
     }
 
-    public override void _Draw()
-        => RaceTrackArt.Paint(this, Course, Layout, _waterPhase);
-
     /// <summary>
     /// What a segment kind looks like on the track. Ground needs no extra geometry because the track
     /// itself is the ground surface; every other kind must name the geometry it adds.
@@ -349,8 +339,10 @@ public partial class RaceScreen : Node2D
 
     private void BuildCoursePresentation()
     {
-        // Terrain is painted in _Draw by RaceTrackArt. The HUD names the section the player is in,
-        // so the track itself carries no signposting.
+        // Terrain, water and scenery are layered under the racers by RaceTrackLayers; the HUD still
+        // names the section the player is in, and signposts on the verge announce each stretch.
+        RaceTrackLayers.Build(this, Course, Layout);
+        RaceTrackFurniture.Build(this, Course, Layout);
         foreach (var obstacleX in Course.Obstacles)
             AddHurdle(obstacleX + 18.0f);
     }
@@ -396,23 +388,14 @@ public partial class RaceScreen : Node2D
                 visualTypeId);
             AddChild(mutationAdornment);
 
-            // Drawn over the sprite, inside it, so only what is above the waterline stays visible.
-            // Frame-local units, so it follows the sprite's own scale and any art revision with it.
-            var submersion = new Polygon2D
-            {
-                Polygon = BuildSubmersionPolygon(),
-                Color = SubmergedWater,
-                ZIndex = 5,
-                Visible = false
-            };
-            submersion.AddChild(new Line2D
-            {
-                Points = BuildRipplePolygon(),
-                Closed = true,
-                Width = 1.4f,
-                DefaultColor = WakeRipple
-            });
+            // Drawn over the sprite, so only what is above the waterline stays clear. Frame-local
+            // units, so it follows the sprite's own scale and any art revision with it.
+            var submersion = CreateSubmersion(i);
             sprite.AddChild(submersion);
+            var pebbles = CreatePebbles();
+            sprite.AddChild(pebbles);
+            var sparkles = CreateSparkles();
+            sprite.AddChild(sparkles);
 
             var visual = new RacerVisual
             {
@@ -422,7 +405,10 @@ public partial class RaceScreen : Node2D
                 Shadow = shadow,
                 BaseY = baseY,
                 Submersion = submersion,
-                LastX = Course.StartX
+                Pebbles = pebbles,
+                Sparkles = sparkles,
+                LastX = Course.StartX,
+                WakeX = Course.StartX
             };
             _visuals.Add(entrant.Participant.CreatureId, visual);
 
@@ -585,6 +571,11 @@ public partial class RaceScreen : Node2D
 
         var yOffset = 0.0f;
         var swimming = state.Terrain is RaceTerrain.Swim or RaceTerrain.FailedGlideSwim;
+        var climbing = false;
+
+        // Where along the track the racer is drawn: its simulated X, except on a climb, where the
+        // wall takes up most of the stretch's time rather than a blink of it.
+        var trackX = RaceTrackArt.PresentationX(Course, state.X);
 
         if (visual.Celebrates && state.Finished && visual.FinishSeconds >= FinishCoastSeconds)
         {
@@ -602,7 +593,16 @@ public partial class RaceScreen : Node2D
             yOffset = 7.0f + Mathf.Sin((float)Time.GetTicksMsec() / 150.0f + visual.BaseY) * 2.0f;
             visual.Sprite.Rotation = 0.0f;
         }
-        else if (InLaunchRamp(state.X))
+        else if (RaceTrackArt.WallProgress(Course, trackX, out var ascending) is { } wall && !state.Finished)
+        {
+            // Scaling the cliff: pitched up against the face, hauling hand over hand. Going down
+            // the far side it leans back and picks its way down instead.
+            var haul = Mathf.Sin((float)Time.GetTicksMsec() / 95.0f + visual.BaseY);
+            visual.Sprite.Rotation = ascending ? -1.05f + haul * 0.06f : 0.55f + haul * 0.04f;
+            yOffset = -Mathf.Abs(haul) * 1.5f;
+            climbing = ascending && wall > 0.05f && wall < 0.98f;
+        }
+        else if (InLaunchRamp(trackX))
         {
             // The ramp is a surface the racer runs up, not altitude: the lift below carries it, and
             // only the lean forward is animation.
@@ -653,12 +653,14 @@ public partial class RaceScreen : Node2D
 
         // The clifftop and the launch ramp raise the ground itself, so sprite and shadow move
         // together and the racer stays planted on the surface RaceTrackArt draws.
-        var groundLift = SurfaceLiftAt(state.X);
+        var groundLift = SurfaceLiftAt(trackX);
 
         var visualTypeId = visual.Appearance.VisualTypeId;
-        var drawX = RetreatX(visual, state.X) + finishOffset;
+        var drawX = RetreatX(visual, trackX) + finishOffset;
         UpdateSubmersion(visual, swimming);
-        HandleRunningDust(visual, state, drawX, swimming);
+        UpdateTerrainEffects(visual, swimming, state.Terrain == RaceTerrain.Glide && !state.Finished, climbing, drawX);
+        HandleRunningDust(visual, state, drawX, swimming || RaceTrackArt.WallProgress(Course, trackX, out _) != null);
+        HandleWake(visual, drawX, swimming);
 
         visual.Sprite.Position = new Vector2(
             drawX,
@@ -756,12 +758,16 @@ public partial class RaceScreen : Node2D
         visual.Submersion.Position = new Vector2(0.0f, waterline);
     }
 
-    private void HandleRunningDust(RacerVisual visual, RaceParticipantStateSnapshot state, float drawX, bool swimming)
+    /// <summary>
+    /// Dust behind a running racer. <paramref name="offGround"/> covers swimming and clinging to a
+    /// cliff, where there is no track under the feet to kick up.
+    /// </summary>
+    private void HandleRunningDust(RacerVisual visual, RaceParticipantStateSnapshot state, float drawX, bool offGround)
     {
         var moved = drawX - visual.LastX;
         visual.LastX = drawX;
 
-        var grounded = !swimming &&
+        var grounded = !offGround &&
                        state.Terrain != RaceTerrain.Glide &&
                        visual.JumpSeconds <= 0.0f &&
                        !state.Finished;
@@ -966,37 +972,6 @@ public partial class RaceScreen : Node2D
         blow.Finished += streak.QueueFree;
     }
 
-    /// <summary>
-    /// The water a swimmer sits in: a soft waterline curved over the shoulders, straight sides down.
-    /// A plain rectangle read as a pane of glass laid over the creature.
-    /// </summary>
-    private static Vector2[] BuildSubmersionPolygon()
-    {
-        var points = new List<Vector2>();
-        const float halfWidth = 13.0f;
-        for (var i = 0; i <= 12; i++)
-        {
-            var t = i / 12.0f;
-            var x = Mathf.Lerp(-halfWidth, halfWidth, t);
-            points.Add(new Vector2(x, -Mathf.Sin(t * Mathf.Pi) * 3.4f));
-        }
-        points.Add(new Vector2(halfWidth, 30.0f));
-        points.Add(new Vector2(-halfWidth, 30.0f));
-        return points.ToArray();
-    }
-
-    /// <summary>The wake ring where the body breaks the surface.</summary>
-    private static Vector2[] BuildRipplePolygon()
-    {
-        var points = new Vector2[16];
-        for (var i = 0; i < points.Length; i++)
-        {
-            var angle = Mathf.Tau * i / points.Length;
-            points[i] = new Vector2(Mathf.Cos(angle) * 12.0f, Mathf.Sin(angle) * 2.4f);
-        }
-        return points;
-    }
-
     private static Vector2[] BuildCircle(float radius)
     {
         var points = new Vector2[10];
@@ -1018,6 +993,7 @@ public partial class RaceScreen : Node2D
             PositionSmoothingEnabled = false
         };
         AddChild(_camera);
+        RaceTrackLayers.AttachAmbience(_camera, Layout);
     }
 
     private void CreatePlayerMarker()
@@ -1220,7 +1196,7 @@ public partial class RaceScreen : Node2D
             : Mathf.Clamp(focusY, halfHeight, ScreenHeight - halfHeight);
 
         _camera.Position = new Vector2(player.X + _cameraPeekOffset, cameraY);
-        _playerMarker.Position = new Vector2(player.X, _playerVisual.Sprite.Position.Y - 21.0f);
+        _playerMarker.Position = new Vector2(_playerVisual.Sprite.Position.X, _playerVisual.Sprite.Position.Y - 21.0f);
     }
 
     private async void QueueResults(IReadOnlyList<string>? multiplayerFinishOrder = null)
@@ -1569,21 +1545,9 @@ public partial class RaceScreen : Node2D
             entrant.OtherMutationCount,
             size);
 
+    // Hurdles stand on the running surface, which is a clifftop wherever a climb has raised it.
     private void AddHurdle(float x)
-    {
-        // Hurdles stand on the running surface, which is a clifftop wherever a climb has raised it.
-        var lift = SurfaceLiftAt(x);
-        for (var y = TrackTop + 9.0f; y < TrackBottom; y += 18.0f)
-        {
-            AddChild(new Sprite2D
-            {
-                Texture = RaceTrackArt.FencePost,
-                Position = new Vector2(x, y - lift),
-                Scale = new Vector2(1.15f, 1.15f),
-                ZIndex = 6
-            });
-        }
-    }
+        => RaceTrackFurniture.AddHurdle(this, x, Layout, SurfaceLiftAt(x));
 
     private static void SetVisualMode(RacerVisual visual, string mode)
     {
