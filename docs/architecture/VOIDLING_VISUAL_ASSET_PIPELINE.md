@@ -211,6 +211,12 @@ Do not rebuild identical `SpriteFrames` for every actor if profiling or simple i
 
 Do not share mutable per-creature state that would make animation speed/selection on one actor alter another unexpectedly.
 
+### Generated normal maps
+
+In-world frames (world, race and layer frames) are cut from a `CanvasTexture` that pairs the canonical sheet with a normal map generated from that sheet's own silhouette (`Presentation/Lighting/SpriteNormalMapBuilder`, cached per sheet and frame size by `SpriteNormalMaps`). The sheet in `DefaultVoidlingVisual.tres` stays the only authored art; the normal map is derived, never authored or loaded separately, so new or replaced art is lit correctly with no extra asset. Each frame cell is rounded on its own so neighbouring frames never bleed into each other, and the art's colours never feed the map, so drawn shading is not turned into bumps.
+
+World sprites use the palette shader, or the shared `LitSprite` material when they have no palette swap, and both shade lights through `BalancedKeyLight.gdshaderinc`: a pixel facing the viewer is lit exactly like the ground, and only turned edges gain up to two flat steps of light or shade, measured once per art pixel, so lit Voidlings stay crisp pixel art. Portrait textures are cut from the raw sheet and carry no material, since interface layers are never lit. Without a Light2D nearby the frames draw exactly as before.
+
 ---
 
 ## 7. Mutation/adornment composition

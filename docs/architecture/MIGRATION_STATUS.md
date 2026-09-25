@@ -217,6 +217,8 @@ Family Tree, goodbye/reset confirmation and the persistent selected-Voidling HUD
 
 Its session dependency is explicit; there is no static service-locator access.
 
+The sea, lighting, weather, reflections and ambient wildlife are one composed presentation component, `Presentation/Garden/Atmosphere/GardenAtmosphere`, fed by the thin `GardenController.Atmosphere` partial (island shape, Voidlings to reflect, clock). Its time of day and weather are cosmetic and must never be read by game rules. The day/night tint is a `CanvasModulate` there rather than a `Modulate` on the controller, so Light2D sources can glow over it.
+
 ## Completed major migration phases
 
 ### Phase B — deterministic domain seams

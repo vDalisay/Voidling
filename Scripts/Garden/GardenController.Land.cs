@@ -5,6 +5,8 @@ using Godot;
 using Voidling.Application.Garden;
 using Voidling.Application.Training;
 using Voidling.Domain.Garden;
+using Voidling.Presentation.Garden.Atmosphere;
+using Voidling.Presentation.Lighting;
 using Voidling.Presentation.UI.Common;
 
 namespace VoidlingGame;
@@ -40,11 +42,13 @@ public partial class GardenController
         GroundCell(4, 5), GroundCell(5, 5), GroundCell(0, 6), GroundCell(3, 6), GroundCell(5, 6)
     };
 
-    private static readonly Texture2D TreeTexture = new AtlasTexture
-    {
-        Atlas = GD.Load<Texture2D>("res://Assets/Sprout Lands - Sprites - premium pack/Objects/Trees, stumps and bushes.png"),
-        Region = new Rect2(144, 48, 48, 50)
-    };
+    /// <summary>
+    /// The premium big tree, cut out as its own texture so the wind shader can tell its canopy from
+    /// its trunk by the texture's own height, and given a generated normal map so the canopy's
+    /// edges catch the light on the side it comes from.
+    /// </summary>
+    private static readonly Texture2D TreeTexture = SpriteNormalMaps.Lit(GardenAtmosphereAssets.Slice(
+        GardenAtmosphereAssets.Premium + "Objects/Trees, stumps and bushes.png", 144, 48, 48, 50));
 
     private static readonly Texture2D SignTexture = new AtlasTexture
     {
@@ -75,8 +79,8 @@ public partial class GardenController
         return ImageTexture.CreateFromImage(tile);
     }
 
-    private static readonly Color CoastSand = Color.FromHtml("#E4C58C");
-    private static readonly Color CoastShadow = Color.FromHtml("#8A6A46");
+    private static readonly Color CoastEdge = Color.FromHtml("#4F6E3A");
+    private static readonly Color CoastLip = Color.FromHtml("#D6E07C");
     private static readonly Color GrassEdge = Color.FromHtml("#5E9455");
     private static readonly Color RefusedGround = Color.FromHtml("#9C514B");
 
@@ -313,6 +317,7 @@ public partial class GardenController
         }
 
         _landBounds = BoundsOf(placed);
+        RefreshAtmosphereIsland(placed, occupied);
         _hoveredModuleId = "";
         if (IsPlacingLand)
             BuildSnapGrid();
@@ -437,39 +442,88 @@ public partial class GardenController
     private static (int X, int Y) PointKey(Vector2 point)
         => ((int)MathF.Round(point.X * 4.0f), (int)MathF.Round(point.Y * 4.0f));
 
-    /// <summary>Dark shore around the loop with a sand line just inside it, both continuous.</summary>
+    /// <summary>
+    /// The shore around one loop of the island. Every south-facing edge drops to the water as an
+    /// earth cliff built from the premium ledge, so the island stands in the sea instead of lying
+    /// flat on it; the rim is a dark grass edge with a sunlit lip just inside it. Both lines run the
+    /// whole loop, so they stay continuous where hexes meet.
+    /// </summary>
     private void AddCoastLoop(IReadOnlyList<Vector2> loop, IReadOnlyList<Vector2> inwards)
     {
+        for (var i = 0; i < loop.Count; i++)
+        {
+            var from = loop[i];
+            var to = loop[(i + 1) % loop.Count];
+            if (-inwards[i].Y > 0.2f)
+                AddCliffFace(from, to);
+        }
+
         var ring = new Vector2[loop.Count + 1];
-        var sand = new Vector2[loop.Count + 1];
+        var lip = new Vector2[loop.Count + 1];
         for (var i = 0; i < loop.Count; i++)
         {
             // A corner belongs to the segment that ends there and the one that starts there, so the
-            // sand line follows the average of both, which keeps it inside on convex and concave turns.
+            // lip follows the average of both, which keeps it inside on convex and concave turns.
             var previous = inwards[(i + inwards.Count - 1) % inwards.Count];
             ring[i] = loop[i];
-            sand[i] = loop[i] + (previous + inwards[i]).Normalized() * 3.0f;
+            lip[i] = loop[i] + (previous + inwards[i]).Normalized() * 3.0f;
         }
 
         ring[^1] = ring[0];
-        sand[^1] = sand[0];
+        lip[^1] = lip[0];
 
         _coastRoot!.AddChild(new Line2D
         {
             Points = ring,
-            DefaultColor = CoastShadow,
-            Width = 7.0f,
+            DefaultColor = CoastEdge,
+            Width = 3.0f,
             JointMode = Line2D.LineJointMode.Round,
             Closed = true
         });
         _coastRoot.AddChild(new Line2D
         {
-            Points = sand,
-            DefaultColor = CoastSand,
-            Width = 5.0f,
+            Points = lip,
+            DefaultColor = CoastLip,
+            Width = 2.0f,
             JointMode = Line2D.LineJointMode.Round,
             Closed = true,
             ZIndex = 1
+        });
+    }
+
+    /// <summary>
+    /// An earth cliff under one shore edge, down to the waterline. The texture's courses follow the
+    /// edge's slope, and the face darkens towards the water where less light reaches.
+    /// </summary>
+    private void AddCliffFace(Vector2 from, Vector2 to)
+    {
+        var drop = new Vector2(0.0f, GardenCoast.CliffHeight);
+        var polygon = new[] { from, to, to + drop, from + drop };
+        _coastRoot!.AddChild(new Polygon2D
+        {
+            Polygon = polygon,
+            Texture = GardenCoast.CliffFace,
+            TextureRepeat = CanvasItem.TextureRepeatEnum.Enabled,
+            UV = new[]
+            {
+                new Vector2(from.X, 0.0f),
+                new Vector2(to.X, 0.0f),
+                new Vector2(to.X, GardenCoast.CliffHeight),
+                new Vector2(from.X, GardenCoast.CliffHeight)
+            },
+            ZIndex = -1
+        });
+        _coastRoot.AddChild(new Polygon2D
+        {
+            Polygon = polygon,
+            VertexColors = new[]
+            {
+                new Color(1.0f, 0.95f, 0.8f, 0.10f),
+                new Color(1.0f, 0.95f, 0.8f, 0.10f),
+                new Color(0.12f, 0.10f, 0.14f, 0.42f),
+                new Color(0.12f, 0.10f, 0.14f, 0.42f)
+            },
+            ZIndex = -1
         });
     }
 
@@ -516,7 +570,8 @@ public partial class GardenController
         {
             Texture = TreeTexture,
             Position = new Vector2(0.0f, -TreeSpriteRise),
-            ZIndex = 2
+            ZIndex = 2,
+            Material = GardenAtmosphere.FoliageMaterial
         });
         _actorsRoot.AddChild(tree);
         _treeProps.Add(tree);
