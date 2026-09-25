@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.Lighting;
 using VoidlingGame;
 
 namespace Voidling.Presentation.Voidlings;
@@ -254,7 +255,7 @@ public static class VoidlingVisualFactory
         appearance = ForRendering(appearance);
         if (!layer.PaletteAffected)
         {
-            item.Material = null;
+            item.Material = UnpalettedMaterial(item);
             item.Modulate = Colors.White;
             return;
         }
@@ -447,9 +448,16 @@ public static class VoidlingVisualFactory
             return;
         }
 
-        item.Material = null;
+        item.Material = UnpalettedMaterial(item);
         item.Modulate = ParseTint(fallbackTintHex);
     }
+
+    /// <summary>
+    /// A world sprite without a palette swap still needs the lit-sprite light model to be shaded like
+    /// the rest of the Voidling; interface portraits are never lit and keep no material.
+    /// </summary>
+    private static Material? UnpalettedMaterial(CanvasItem item)
+        => item is Node2D ? SpriteNormalMaps.LitMaterial : null;
 
     private static ShaderMaterial CreatePaletteMaterial(
         Godot.Collections.Array<Color> sourceColors,
@@ -579,8 +587,12 @@ public static class VoidlingVisualFactory
         frames.AddAnimation(name);
         frames.SetAnimationLoop(name, true);
         frames.SetAnimationSpeed(name, fps);
+
+        // In-world frames carry a normal map generated from the sheet itself, so Garden light shades
+        // the body and its layers round instead of flat. Without a light nearby it draws the same.
+        var lit = SpriteNormalMaps.Lit(atlas, frameWidth, frameHeight);
         for (var column = 0; column < frameCount; column++)
-            frames.AddFrame(name, CreateAtlasFrame(atlas, column, row, frameWidth, frameHeight));
+            frames.AddFrame(name, CreateAtlasFrame(lit, column, row, frameWidth, frameHeight));
     }
 
     private static AtlasTexture CreateAtlasFrame(

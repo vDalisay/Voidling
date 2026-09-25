@@ -1,16 +1,13 @@
 using System;
 using Godot;
-using Voidling.Presentation.Garden;
 
 namespace VoidlingGame;
 
 public partial class GardenController
 {
     private const double GardenEnvironmentRefreshSeconds = 30.0;
-    private const double GardenEnvironmentBlendSeconds = 2.0;
 
     private Timer? _gardenEnvironmentTimer;
-    private Tween? _gardenEnvironmentTween;
     private bool _gardenEnvironmentInstalled;
     public DateTime EnvironmentLocalTime { get; private set; } = DateTime.Now;
     public event Action<DateTime>? EnvironmentTimeChanged;
@@ -20,7 +17,7 @@ public partial class GardenController
         if (_gardenEnvironmentTimer != null && GodotObject.IsInstanceValid(_gardenEnvironmentTimer))
             return;
 
-        ApplyGardenEnvironment(DateTime.Now, immediate: true);
+        ApplyGardenEnvironment(DateTime.Now);
 
         _gardenEnvironmentTimer = new Timer
         {
@@ -52,32 +49,18 @@ public partial class GardenController
     }
 
     private void RefreshGardenEnvironmentFromSystemClock()
-        => ApplyGardenEnvironment(DateTime.Now, immediate: false);
+        => ApplyGardenEnvironment(DateTime.Now);
 
-    private void ApplyGardenEnvironment(DateTime localTime, bool immediate)
+    /// <summary>
+    /// The day, dusk and night light is the atmosphere's ambient light now rather than a tint on this
+    /// node, so lights in the Garden can glow on top of it. The atmosphere eases between colours
+    /// itself.
+    /// </summary>
+    private void ApplyGardenEnvironment(DateTime localTime)
     {
         EnvironmentLocalTime = localTime;
         EnvironmentTimeChanged?.Invoke(localTime);
-        var target = _session.State.GardenTint ? GardenEnvironmentPalette.Resolve(localTime) : Colors.White;
-        if (ColorsApproximatelyEqual(Modulate, target))
-            return;
-
-        if (immediate || !IsInsideTree())
-        {
-            Modulate = target;
-            return;
-        }
-
-        _gardenEnvironmentTween?.Kill();
-        _gardenEnvironmentTween = CreateTween();
-        _gardenEnvironmentTween.TweenProperty(this, "modulate", target, GardenEnvironmentBlendSeconds)
-            .SetTrans(Tween.TransitionType.Sine)
-            .SetEase(Tween.EaseType.InOut);
+        Modulate = Colors.White;
+        _atmosphere.SetClock(localTime, _session.State.GardenTint);
     }
-
-    private static bool ColorsApproximatelyEqual(Color first, Color second)
-        => Mathf.IsEqualApprox(first.R, second.R) &&
-           Mathf.IsEqualApprox(first.G, second.G) &&
-           Mathf.IsEqualApprox(first.B, second.B) &&
-           Mathf.IsEqualApprox(first.A, second.A);
 }

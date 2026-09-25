@@ -9,7 +9,7 @@ namespace Voidling.Presentation.Garden;
 /// </summary>
 public static class GardenEnvironmentPalette
 {
-    private static readonly Color Night = new(0.58f, 0.66f, 0.78f, 1.0f);
+    private static readonly Color Night = new(0.46f, 0.54f, 0.74f, 1.0f);
     private static readonly Color Dawn = new(0.93f, 0.82f, 0.76f, 1.0f);
     private static readonly Color Day = Colors.White;
     private static readonly Color Dusk = new(0.92f, 0.75f, 0.70f, 1.0f);
