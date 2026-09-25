@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Common;
 
 namespace VoidlingGame;
 
@@ -149,10 +150,13 @@ public partial class FamilyTreeView : Control
 
     public void SetSelectedMember(string memberId)
     {
+        var changed = _selectedId != memberId;
         _selectedId = memberId;
         _highlightedConnectionKey = "";
         ApplySelectionState();
         QueueRedraw();
+        if (changed && _cardPanels.TryGetValue(memberId, out var card))
+            Voidling.Presentation.UI.Motion.UiMotion.Pop(card, 0.1f);
     }
 
     public override void _GuiInput(InputEvent inputEvent)
@@ -466,16 +470,19 @@ public partial class FamilyTreeView : Control
         if (_worldLayer == null || !GodotObject.IsInstanceValid(_worldLayer))
             return;
 
-        _worldLayer.Position = _panOffset;
+        // Whole pixels, so the cards' pixel art never sits between two.
+        _worldLayer.Position = _panOffset.Round();
         _worldLayer.Scale = Vector2.One * _zoom;
     }
 
     private void ApplySelectionState()
     {
+        // The picked card warms to honey like every other selection in the menus; only the card
+        // itself is tinted, so the Voidling on it keeps its colours.
         foreach (var pair in _cardPanels)
         {
-            pair.Value.Modulate = pair.Key == _selectedId
-                ? new Color(0.78f, 0.72f, 0.62f, 1.0f)
+            pair.Value.SelfModulate = pair.Key == _selectedId
+                ? UiPalette.HoneyOnParchment
                 : Colors.White;
         }
 
@@ -515,8 +522,9 @@ public partial class FamilyTreeView : Control
 
     private void AddCard(VoidlingData member, Rect2 rect, bool departed)
     {
-        var panel = UiFactory.CreatePanel(rect.Size);
-        panel.Position = rect.Position;
+        var panel = UiFactory.CreatePaperPanel(rect.Size);
+        // Whole pixels, so the card's paper and portrait never sit between two.
+        panel.Position = rect.Position.Round();
         panel.Size = rect.Size;
         panel.MouseFilter = MouseFilterEnum.Pass;
         _worldLayer.AddChild(panel);
@@ -539,10 +547,10 @@ public partial class FamilyTreeView : Control
         _cardNameLabels[member.Id] = name;
 
         var generationText = member.InbreedingHistoryFlag
-            ? $"G{member.FamilyGeneration} • INBRED"
-            : $"G{member.FamilyGeneration}";
+            ? string.Format(Tr("UI_FAMILY_TREE_GENERATION_INBRED"), member.FamilyGeneration)
+            : string.Format(Tr("UI_FAMILY_TREE_GENERATION"), member.FamilyGeneration);
         if (departed)
-            generationText += " • LEFT";
+            generationText = string.Format(Tr("UI_FAMILY_TREE_GENERATION_LEFT"), generationText);
 
         var detail = UiFactory.CreateLabel(generationText, 6);
         detail.HorizontalAlignment = HorizontalAlignment.Center;
@@ -591,7 +599,7 @@ public partial class FamilyTreeView : Control
 
         var first = _membersById.TryGetValue(member.ParentAId, out var a) ? a.Name : "?";
         var second = _membersById.TryGetValue(member.ParentBId, out var b) ? b.Name : "?";
-        return $"P: {first} + {second}";
+        return string.Format(Tr("UI_FAMILY_TREE_PARENTS_SHORT"), first, second);
     }
 
     private static HashSet<string> CollectConnectedFamily(

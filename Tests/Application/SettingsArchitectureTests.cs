@@ -62,4 +62,24 @@ public sealed class SettingsArchitectureTests
     [Fact]
     public void GardenTint_DefaultsOnForSavesWithoutTheSetting()
         => Assert.True(new GameStateData().GardenTint);
+
+    /// <summary>A save written before Reduce motion existed keeps the animated menus it had.</summary>
+    [Fact]
+    public void ReduceMotion_DefaultsOffForSavesWithoutTheSetting()
+        => Assert.False(new GameStateData().ReduceMotion);
+
+    [Fact]
+    public void ReduceMotion_TogglesOnlyItsOwnValueAndRepeatsAreNoOps()
+    {
+        var settings = new SettingsUseCase();
+        var state = new GameStateData { GardenTint = true, EdgePanning = true };
+
+        Assert.True(settings.SetReduceMotion(state, true));
+        Assert.False(settings.SetReduceMotion(state, true));
+        Assert.True(state.ReduceMotion);
+        Assert.True(state.GardenTint);
+        Assert.True(state.EdgePanning);
+        Assert.True(settings.SetReduceMotion(state, false));
+        Assert.False(state.ReduceMotion);
+    }
 }

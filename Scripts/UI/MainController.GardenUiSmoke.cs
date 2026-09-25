@@ -77,32 +77,36 @@ public partial class MainController
             RequireSeparate(_dayNightDial, _uiRoot.GetNode<Control>("GardenStatus"));
             var clockLabel = _dayNightDial.FindChildren("*", "Label", true, false).OfType<Label>().Single();
             var art = clockLabel.GetParent<Control>();
-            var timeBoxCenter = art.GetGlobalTransformWithCanvas() * new Vector2(41, 70);
+            var timeBoxCenter = art.GetGlobalTransformWithCanvas() * Voidling.Presentation.UI.Garden.GardenDayNightDial.TimePlateCenter;
             if (clockLabel.GetGlobalRect().GetCenter().DistanceTo(timeBoxCenter) > 1)
-                throw new InvalidOperationException("Garden clock time is not centered in its dial.");
+                throw new InvalidOperationException(
+                    $"Garden clock time is not centered in its dial: {clockLabel.GetGlobalRect()} vs {timeBoxCenter}.");
             var arrow = (Node2D)(_dayNightDial.FindChild("DayNightArrow", true, false)
                 ?? throw new InvalidOperationException("Garden clock is missing its day/night arrow."));
-            if (arrow.Position.DistanceTo(new Vector2(55, 32)) > 0.01f)
+            if (arrow.Position.DistanceTo(Voidling.Presentation.UI.Garden.GardenDayNightDial.ArrowPivot) > 0.01f)
                 throw new InvalidOperationException("Garden clock pointer lost its fixed pivot.");
             if (arrow.FindChild("ArrowArtwork", true, false) is not TextureRect arrowArtwork ||
-                arrowArtwork.Texture is not AtlasTexture arrowTexture ||
-                arrowTexture.Region != new Rect2(336, 32, 16, 16))
+                arrowArtwork.Texture is not AtlasTexture arrowTexture)
                 throw new InvalidOperationException("Garden clock is not using the weather arrow artwork.");
-            foreach (var (hour, expectedArrowAngle) in new[]
-                     { (Hour: 0, Angle: 45f), (Hour: 5, Angle: 45f), (Hour: 9, Angle: -45f),
-                       (Hour: 18, Angle: -45f), (Hour: 19, Angle: 0f), (Hour: 20, Angle: 45f), (Hour: 22, Angle: 45f) })
+            // The pointer is drawn, not rotated: the pack's own up, level and down frames stay crisp.
+            var day = Voidling.Presentation.UI.Garden.GardenDayNightDial.DayArrow;
+            var dusk = Voidling.Presentation.UI.Garden.GardenDayNightDial.DuskArrow;
+            var night = Voidling.Presentation.UI.Garden.GardenDayNightDial.NightArrow;
+            foreach (var (hour, expectedArrow) in new[]
+                     { (Hour: 0, Frame: night), (Hour: 5, Frame: night), (Hour: 9, Frame: day),
+                       (Hour: 18, Frame: day), (Hour: 19, Frame: dusk), (Hour: 20, Frame: night), (Hour: 22, Frame: night) })
             {
                 var time = DateTime.Today.AddHours(hour);
                 _dayNightDial.ShowTime(time);
                 if (clockLabel.Text != time.ToShortTimeString())
                     throw new InvalidOperationException("Garden clock does not show the user's local time.");
-                if (Mathf.Abs(arrow.Rotation - Mathf.DegToRad(expectedArrowAngle)) > 0.001f)
-                    throw new InvalidOperationException("Garden clock pointer is not rotating around its fixed pivot.");
+                if (arrowTexture.Region != expectedArrow || arrow.Rotation != 0)
+                    throw new InvalidOperationException("Garden clock pointer does not follow day and night.");
                 await CaptureGardenUi("garden-" + hour);
             }
-            var nightArrow = arrow.Rotation;
+            var nightArrow = arrowTexture.Region;
             _dayNightDial.ShowTime(DateTime.Today.AddHours(12));
-            if (Mathf.Abs(arrow.Rotation - nightArrow) < 0.001f)
+            if (arrowTexture.Region == nightArrow)
                 throw new InvalidOperationException("Garden clock arrow did not react to day and night.");
             _dayNightDial.ShowTime(_garden.EnvironmentLocalTime);
             HandleRailResizeInput(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = true });
@@ -929,6 +933,10 @@ public partial class MainController
     private async Task SettleGardenUi()
     {
         for (var frame = 0; frame < 8; frame++)
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        // Pops and slides are decoration that settle on the laid-out rest state; measure that.
+        var deadline = Time.GetTicksMsec() + 1500;
+        while (Voidling.Presentation.UI.Motion.UiMotion.IsSettling && Time.GetTicksMsec() < deadline)
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
     }
 

@@ -45,6 +45,15 @@ public sealed class SettingsUseCase
         return true;
     }
 
+    public bool SetReduceMotion(GameStateData state, bool enabled)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (state.ReduceMotion == enabled)
+            return false;
+        state.ReduceMotion = enabled;
+        return true;
+    }
+
     private static bool SetVolume(
         GameStateData state,
         float value,

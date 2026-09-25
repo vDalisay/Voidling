@@ -1,6 +1,8 @@
 using System;
 using Godot;
+using Voidling.Presentation.UI.Audio;
 using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Motion;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Settings;
@@ -11,7 +13,8 @@ public readonly record struct SettingsScreenState(
     float UiSoundVolume,
     bool EdgePanning,
     bool AutoFinishRaces,
-    bool GardenTint);
+    bool GardenTint,
+    bool ReduceMotion = false);
 
 /// <summary>
 /// Settings on the same paper card as the rest of the overhauled screens: audio in one section,
@@ -26,11 +29,16 @@ public partial class SettingsScreen : VBoxContainer
     public event Action<bool>? EdgePanningChanged;
     public event Action<bool>? AutoFinishRacesChanged;
     public event Action<bool>? GardenTintChanged;
+    public event Action<bool>? ReduceMotionChanged;
 
-    private static readonly Texture2D CheckMark = GD.Load<Texture2D>(
-        UiFactory.UiRoot + "Other UI sprites/Xs and check marks/1s/check mark.png");
-    private static readonly Texture2D CrossMark = GD.Load<Texture2D>(
-        UiFactory.UiRoot + "Other UI sprites/Xs and check marks/1s/X.png");
+    // The pack's toggle switch: knob left on a bark track (off), knob right on a leaf track (on),
+    // and the knob-right-on-bark frame in between, stepped through when a switch flips.
+    private static readonly Texture2D SwitchOff = SwitchFrame(2);
+    private static readonly Texture2D SwitchMoving = SwitchFrame(34);
+    private static readonly Texture2D SwitchOn = SwitchFrame(66);
+
+    private static AtlasTexture SwitchFrame(int x)
+        => new() { Atlas = UiSkin.SettingsSheet, Region = new Rect2(x, 151, 28, 18) };
 
     private SettingsScreenState _state;
     private bool _configured;
@@ -67,6 +75,9 @@ public partial class SettingsScreen : VBoxContainer
         play.AddChild(BuildSwitch(
             "GardenTint", Tr("UI_SETTINGS_GARDEN_TINT"), Tr("UI_SETTINGS_GARDEN_TINT_TOOLTIP"), _state.GardenTint,
             enabled => { _state = _state with { GardenTint = enabled }; GardenTintChanged?.Invoke(enabled); }));
+        play.AddChild(BuildSwitch(
+            "ReduceMotion", Tr("UI_SETTINGS_REDUCE_MOTION"), Tr("UI_SETTINGS_REDUCE_MOTION_TOOLTIP"), _state.ReduceMotion,
+            enabled => { _state = _state with { ReduceMotion = enabled }; ReduceMotionChanged?.Invoke(enabled); }));
     }
 
     /// <summary>A headed paper card; the heading is the only text on the screen that is not a control.</summary>
@@ -75,6 +86,9 @@ public partial class SettingsScreen : VBoxContainer
         AddChild(PaperCard.Header(heading));
         var panel = PaperCard.Panel(Vector2.Zero);
         panel.Name = name;
+        var style = UiSkin.Paper();
+        style.ContentMarginTop = style.ContentMarginBottom = 6;
+        panel.AddThemeStyleboxOverride("panel", style);
         panel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         AddChild(panel);
         var box = new VBoxContainer();
@@ -95,16 +109,29 @@ public partial class SettingsScreen : VBoxContainer
         var thumb = GD.Load<Texture2D>(UiFactory.UiRoot + "Other UI sprites/Sliders/slider_b_1.png");
         volume.AddThemeIconOverride("grabber", thumb);
         volume.AddThemeIconOverride("grabber_highlight", thumb);
-        var rail = new StyleBoxFlat { BgColor = Color.FromHtml("#B5BEA9"), ContentMarginTop = 2, ContentMarginBottom = 2 };
+        // A wooden groove and a leaf-green fill, square-cornered so the track stays pixel-crisp.
+        var rail = UiSkin.BarTrack();
+        rail.ContentMarginTop = rail.ContentMarginBottom = 2;
         volume.AddThemeStyleboxOverride("slider", rail);
-        volume.AddThemeStyleboxOverride("grabber_area", new StyleBoxFlat { BgColor = Color.FromHtml("#708969"), ContentMarginTop = 2, ContentMarginBottom = 2 });
+        var filled = new StyleBoxFlat
+        {
+            BgColor = Color.FromHtml("#78B85A"), AntiAliasing = false, ContentMarginTop = 2, ContentMarginBottom = 2,
+            BorderColor = Color.FromHtml("#B8E08F"), BorderWidthTop = 1
+        };
+        volume.AddThemeStyleboxOverride("grabber_area", filled);
+        volume.AddThemeStyleboxOverride("grabber_area_highlight", filled);
         row.AddChild(volume);
         var volumeLabel = UiFactory.CreateLabel(FormatVolume(currentValue * 100.0f), 7);
         volumeLabel.CustomMinimumSize = new Vector2(46, 22);
         volumeLabel.HorizontalAlignment = HorizontalAlignment.Right;
         volumeLabel.VerticalAlignment = VerticalAlignment.Center;
         row.AddChild(volumeLabel);
-        volume.ValueChanged += value => { volumeLabel.Text = FormatVolume((float)value); changed((float)value / 100.0f); };
+        volume.ValueChanged += value =>
+        {
+            volumeLabel.Text = FormatVolume((float)value);
+            UiMotion.Pop(volumeLabel, 0.12f);
+            changed((float)value / 100.0f);
+        };
         return row;
     }
 
@@ -119,22 +146,40 @@ public partial class SettingsScreen : VBoxContainer
         button.TooltipText = tooltip;
         UiFactory.ApplyPixelFont(button, 7);
 
+        // The row itself does not stay pushed in: the switch at its right end shows the state.
+        button.AddThemeStyleboxOverride("pressed", UiSkin.Button(ButtonTone.Tan, UiSkin.ButtonState.Normal));
+        button.AddThemeStyleboxOverride("hover_pressed", UiSkin.Button(ButtonTone.Tan, UiSkin.ButtonState.Hover));
+
         var mark = new TextureRect
         {
             Name = "Mark",
-            Texture = enabled ? CheckMark : CrossMark,
-            CustomMinimumSize = new Vector2(16, 16),
-            Size = new Vector2(16, 16),
-            Position = new Vector2(206, 5),
+            Texture = enabled ? SwitchOn : SwitchOff,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            MouseFilter = Control.MouseFilterEnum.Ignore
+            StretchMode = TextureRect.StretchModeEnum.Keep,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            AnchorLeft = 1, AnchorRight = 1, AnchorTop = 0.5f, AnchorBottom = 0.5f,
+            OffsetLeft = -36, OffsetRight = -8, OffsetTop = -10, OffsetBottom = 8,
+            PivotOffset = new Vector2(14, 9)
         };
         button.AddChild(mark);
         button.Pressed += () =>
         {
-            mark.Texture = button.ButtonPressed ? CheckMark : CrossMark;
-            changed(button.ButtonPressed);
+            var on = button.ButtonPressed;
+            UiSounds.Play(button, on ? UiCue.ToggleOn : UiCue.ToggleOff);
+            // The knob slides across in the pack's own frames; the setting has already changed.
+            var slide = UiMotion.Start(mark, "switch");
+            if (slide == null)
+            {
+                mark.Texture = on ? SwitchOn : SwitchOff;
+            }
+            else
+            {
+                mark.Texture = SwitchMoving;
+                slide.TweenInterval(0.07);
+                slide.TweenCallback(Callable.From(() => mark.Texture = on ? SwitchOn : SwitchOff));
+                UiMotion.Pop(mark, 0.18f, UiMotion.Normal);
+            }
+            changed(on);
         };
         return button;
     }

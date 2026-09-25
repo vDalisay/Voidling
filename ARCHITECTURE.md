@@ -351,7 +351,7 @@ Standalone screens receive presentation-ready state and emit intent; they do not
 
 The Garden's `GardenInspector` consumes the existing immutable creature profile projection and emits care/navigation intent. Its controls remain alive across simulation updates so text editing and keyboard focus are preserved. `MainController` owns the manager's rail and modal return sequencing; layout changes do not pause Garden simulation or change application rules.
 
-`UiFactory` should remain reusable styling/widget construction. It must not become another controller or service locator.
+`UiFactory` should remain reusable styling/widget construction. It must not become another controller or service locator. Pack art regions and 9-slice margins live in `Presentation/UI/Common/UiSkin`; UI motion (button feel, counters, bursts, panel animation) lives in `Presentation/UI/Motion` behind the `UiMotion` helpers and the Reduce motion switch. Motion is decoration only: it runs after the action it follows, never delays input and always settles on whole-pixel rest states. UI sounds follow the same rule from `Presentation/UI/Audio` (`UiSounds`), playing pack sounds on the `UI` audio bus that the Interface volume setting controls.
 
 ## Garden architecture
 

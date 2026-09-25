@@ -98,7 +98,11 @@ Standalone Presentation components now include:
 - `RaceScreen`, a Godot-only shell over the pure `RaceSimulation`;
 - `StatPresentationCatalog` for player-facing stat labels/colors;
 - `VoidlingGroundVisualMetrics` for shared sprite-ground pivot/shadow proportions across world/challenge presentation;
-- `VoidlingVisualDefinition` + `VoidlingVisualFactory` for the canonical base Voidling art contract.
+- `VoidlingVisualDefinition` + `VoidlingVisualFactory` for the canonical base Voidling art contract;
+- `ActivitiesScreen` and `DailyMissionsScreen` (Garden daily check-in and missions), which replaced the
+  root-built activity rows;
+- `UiSkin` (pack chrome: buttons, window, paper, title tag, icon buttons, pixel number font) and the
+  motion subsystem in `Presentation/UI/Motion` (see below).
 
 These components receive presentation-ready snapshots and emit intent where interaction is needed. They do not reach through `GameSession` or the `GameRules` compatibility facade; CI enforces that boundary for `Scripts/Presentation/**`.
 
@@ -124,6 +128,32 @@ The old `voidling-cats` branch was reviewed rather than copied wholesale. Its ce
 `RaceScreen` receives an immutable `RaceEntry`, maps simulation snapshots/events to sprites/camera/HUD/minimap/podium, sends cheer through `RaceSimulation.TryCheer`, and uses the simulator's fast-forward path. VFX has a separate non-authoritative RNG, so particle timing can no longer perturb race outcomes.
 
 Result presentation is also presentation-only: podium pop/tilt animations, confetti and the fourth-place embarrassment drop do not affect simulation state or result RNG.
+
+#### Shared UI chrome and motion (Garden UI overhaul)
+
+`feature/garden-ui-overhaul` adds one shared subsystem every Garden screen goes through
+(`docs/GARDEN_UI_OVERHAUL_PLAN.md`):
+
+- `Presentation/UI/Common/UiSkin` is the only place Sprout Lands UI-pack regions and 9-slice margins
+  live. `UiFactory` builds its buttons, panels and inputs from it; screens do not load pack sheets for
+  chrome themselves.
+- `Presentation/UI/Motion` holds the incremental-game feel as small components: `ButtonJuice`
+  (attached by `UiFactory` to every factory button), `FocusCursor`, `RollingCounter`,
+  `FloatingNumber`, `PixelBurst`, `RewardFlight`, `AttentionBadge`, `ToastStack`, `TooltipJuice`
+  and the `UiFxLayer` overlay, all routed through the static `UiMotion` helpers. `UiMotionMath` is
+  the Godot-free, unit-tested arithmetic behind them.
+- `Presentation/UI/Audio` (`UiSounds`, `UiSoundPlayer`) plays the menu sounds on the `UI` bus, found
+  from any node like `UiFxLayer`; `ButtonJuice`, `ModalHost` and the celebration hooks call it. The
+  game-wide cat-paw pointer is `Presentation/UI/Common/PixelCursor`, added by `GameBootstrap`.
+- `UiMotion.Reduced` mirrors the persisted `ReduceMotion` setting (additive, default off; set by
+  `MainController`). It is presentation-global on purpose, like the translation server: components
+  are created by static factories and must not thread a settings object through every call.
+- Motion never decides or delays anything: every effect runs after the session has applied the
+  action, rest states are whole-pixel stylebox swaps, and transient tweens always end at scale 1.
+  `UiMotion.IsSettling` lets probes and the Garden UI smoke wait for layout to settle; gameplay never
+  reads it.
+- `ModalHost` now owns open/close/swap animation and redraws the same screen in place (header and
+  wallet chip kept), so a purchase rolls the purse instead of rebuilding it.
 
 `ModalHost` uses deferred `QueueFree()` disposal for modal subtrees. This is required because close/navigation can be requested from a button signal owned by the subtree itself; synchronous `Free()` during that signal emission is unsafe in Godot.
 

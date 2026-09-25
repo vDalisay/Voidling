@@ -20,4 +20,14 @@ public partial class GameSession
         Save();
         StateChanged?.Invoke();
     }
+
+    /// <summary>Notifies so the root UI switches its motion off or on straight away.</summary>
+    public void SetReduceMotion(bool enabled)
+    {
+        if (!_settings!.SetReduceMotion(State, enabled))
+            return;
+
+        Save();
+        StateChanged?.Invoke();
+    }
 }

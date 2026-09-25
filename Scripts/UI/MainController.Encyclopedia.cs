@@ -24,7 +24,7 @@ public partial class MainController
                 new VoidlingVisualAppearance(entry.VisualTypeId, entry.PaletteHue, System.Array.Empty<string>(), "#F6F0C9")))
             .ToArray();
 
-        var box = OpenModal(Tr("UI_JOURNAL_TITLE"), new Vector2(520, 300));
+        var box = OpenModal(Tr("UI_JOURNAL_TITLE"), new Vector2(520, 300), Voidling.Presentation.UI.Common.ScreenIcons.Journal);
         var screen = new EncyclopediaScreen();
         screen.Configure(new EncyclopediaScreenState(entries, projection.DiscoveredCount, projection.Total));
         box.AddChild(screen);

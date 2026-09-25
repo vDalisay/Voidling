@@ -20,8 +20,7 @@ public partial class GameSession
         }
 
         RecordDailyMissionEvent(DailyMissionEventKind.PurchaseShopItem);
-        SaveAndNotify("Bought a mystery egg.");
-        RaiseGardenEvent("A mystery egg was added to your inventory.");
+        SaveAndNotify("Bought a mystery egg. It is waiting in your inventory.");
     }
 
     /// <summary>Refills the empty store slots. The Shop screen calls this as it opens.</summary>
@@ -43,8 +42,7 @@ public partial class GameSession
             return false;
         }
 
-        SaveAndNotify("The egg is nestled in. Incubation started.");
-        RaiseGardenEvent("An egg was placed in the garden.");
+        SaveAndNotify("The egg is nestled in the garden. Incubation started.");
         return true;
     }
 

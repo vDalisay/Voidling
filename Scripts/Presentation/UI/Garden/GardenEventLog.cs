@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Motion;
 using VoidlingGame;
 
 namespace Voidling.Presentation.UI.Garden;
@@ -21,22 +23,28 @@ public partial class GardenEventLog : Control
     private readonly Queue<Entry> _entries = new();
     private RichTextLabel _history = null!;
     private Button _heightToggle = null!;
+    private Button _activities = null!;
+    private PanelContainer _board = null!;
     private Tween? _heightTween;
     private float _bottom;
     private int _nextActionId;
     public bool IsCompact { get; private set; }
+
+    /// <summary>The Activities button, for the claim badge its owner hangs on it.</summary>
+    public Button ActivitiesButton => _activities;
 
     public override void _Ready()
     {
         _bottom = Position.Y + Size.Y;
         MouseFilter = MouseFilterEnum.Pass;
 
-        var panel = UiFactory.CreatePanel(Vector2.Zero);
-        var background = (StyleBoxTexture)panel.GetThemeStylebox("panel").Duplicate();
-        background.ModulateColor = new Color(1, 1, 1, 0.5f);
+        // A paper notice pinned over the Garden: see-through enough to keep the island in view.
+        var panel = new PanelContainer { Name = "Board" };
+        var background = UiSkin.Paper(new Color(1, 1, 1, 0.9f));
         background.ContentMarginTop = background.ContentMarginBottom = 6;
         background.ContentMarginLeft = background.ContentMarginRight = 9;
         panel.AddThemeStyleboxOverride("panel", background);
+        _board = panel;
         panel.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         AddChild(panel);
         var column = new VBoxContainer();
@@ -57,6 +65,7 @@ public partial class GardenEventLog : Control
         UiFactory.ApplyPixelFont(activities, 8);
         activities.Pressed += () => ActivitiesRequested?.Invoke();
         heading.AddChild(activities);
+        _activities = activities;
         column.AddChild(heading);
         _history = new RichTextLabel
         {
@@ -73,7 +82,7 @@ public partial class GardenEventLog : Control
         UiFactory.ApplyPixelFont(_history, 6);
 
         _history.AddThemeStyleboxOverride("normal", new StyleBoxEmpty());
-        _history.AddThemeColorOverride("default_color", Color.FromHtml("#31473C"));
+        _history.AddThemeColorOverride("default_color", UiSkin.Ink);
         _history.AddThemeConstantOverride("line_separation", 3);
         column.AddChild(_history);
 
@@ -113,7 +122,29 @@ public partial class GardenEventLog : Control
         while (_entries.Count > MaxEntries)
             _entries.Dequeue();
 
+        var before = _history?.GetTotalCharacterCount() ?? 0;
         RefreshText();
+        TypeNewest(before);
+    }
+
+    /// <summary>
+    /// The newest line types itself out and the board gives a small nudge, like a note being
+    /// pinned; older lines stay put. Purely visual: the text is already in the log.
+    /// </summary>
+    private void TypeNewest(int alreadyShown)
+    {
+        if (_history == null || !GodotObject.IsInstanceValid(_history) || !IsVisibleInTree()) return;
+        var total = _history.GetTotalCharacterCount();
+        var tween = UiMotion.Start(_history, "type");
+        if (tween == null || IsCompact || total <= alreadyShown)
+        {
+            _history.VisibleCharacters = -1;
+            return;
+        }
+        _history.VisibleCharacters = alreadyShown;
+        tween.TweenProperty(_history, "visible_characters", total, Math.Clamp((total - alreadyShown) * 0.012, 0.12, 0.45));
+        tween.TweenCallback(Callable.From(() => _history.VisibleCharacters = -1));
+        UiMotion.Flash(_board, new Color(1.12f, 1.1f, 1.0f), UiMotion.Slow);
     }
 
     private void RefreshText()
@@ -159,11 +190,8 @@ public partial class GardenEventLog : Control
 
         var grabber = new StyleBoxFlat
         {
-            BgColor = new Color(0.20f, 0.29f, 0.24f, 0.45f),
-            CornerRadiusTopLeft = 2,
-            CornerRadiusTopRight = 2,
-            CornerRadiusBottomLeft = 2,
-            CornerRadiusBottomRight = 2
+            BgColor = UiPalette.Tan,
+            AntiAliasing = false
         };
         scrollbar.AddThemeStyleboxOverride("grabber", grabber);
         scrollbar.AddThemeStyleboxOverride("grabber_highlight", grabber);

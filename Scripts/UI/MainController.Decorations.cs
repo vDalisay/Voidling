@@ -26,7 +26,7 @@ public partial class MainController
 
     private void ShowGardenDecorations()
     {
-        var box = OpenModal(Tr("UI_GARDEN_BUILD_DECORATE"), new Vector2(520, 292), ShowGardenBuild);
+        var box = OpenModal(Tr("UI_GARDEN_BUILD_DECORATE"), new Vector2(520, 292), ShowGardenBuild, Voidling.Presentation.UI.Common.ScreenIcons.Decorate);
         box.AddThemeConstantOverride("separation", 5);
 
         var body = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ExpandFill };
@@ -83,11 +83,12 @@ public partial class MainController
         button.CustomMinimumSize = DecorationSlotSize;
         button.TooltipText = slot.Name;
 
-        var art = DecorationArt(slot.TypeId, new Vector2(30, 42));
-        art.Position = (DecorationSlotSize - art.CustomMinimumSize) * 0.5f - new Vector2(0, 3);
+        var art = DecorationArt(slot.TypeId);
+        art.Position = ((DecorationSlotSize - art.CustomMinimumSize) * 0.5f - new Vector2(0, 3)).Floor();
         // A kind you can still place reads lighter than one already standing in the garden.
         art.Modulate = new Color(1, 1, 1, slot.InstanceId == null ? 0.6f : 1.0f);
         button.AddChild(art);
+        button.AddChild(DecorationSizeTag(slot.TypeId));
 
         var capturedKey = slot.Key;
         button.Pressed += () => { _selectedDecoration = capturedKey; CallDeferred(nameof(ShowGardenDecorations)); };
@@ -97,9 +98,9 @@ public partial class MainController
     private void BuildDecorationDetail(VBoxContainer detail, DecorationSlot slot)
     {
         var artPanel = new PanelContainer { CustomMinimumSize = new Vector2(0, 64) };
-        artPanel.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = Color.FromHtml("#F7E5BD") });
+        artPanel.AddThemeStyleboxOverride("panel", Voidling.Presentation.UI.Common.UiSkin.Well());
         var center = new CenterContainer();
-        center.AddChild(DecorationArt(slot.TypeId, new Vector2(38, 54)));
+        center.AddChild(DecorationArt(slot.TypeId));
         artPanel.AddChild(center);
         detail.AddChild(artPanel);
 
@@ -107,6 +108,11 @@ public partial class MainController
         name.Name = "DecorationName";
         name.HorizontalAlignment = HorizontalAlignment.Center;
         detail.AddChild(name);
+
+        var size = UiFactory.CreateLabel(string.Format(Tr("UI_DECORATION_SIZE_LINE"), DecorationSizeName(slot.TypeId)), 7);
+        size.Name = "DecorationSize";
+        size.HorizontalAlignment = HorizontalAlignment.Center;
+        detail.AddChild(size);
 
         var state = UiFactory.CreateLabel(Tr(slot.InstanceId == null ? "UI_DECORATION_CATALOGUE" : "UI_DECORATION_PLACED"), 7);
         state.HorizontalAlignment = HorizontalAlignment.Center;
@@ -131,7 +137,7 @@ public partial class MainController
         remove.Name = "DecorationRemove";
         remove.CustomMinimumSize = new Vector2(152, 22);
         UiFactory.ApplyPixelFont(remove, 6);
-        remove.AddThemeColorOverride("font_color", Color.FromHtml("#914E42"));
+        UiFactory.ApplyDangerStyle(remove);
         remove.Pressed += () =>
         {
             if (!_session.RemoveGardenDecoration(capturedInstanceId)) return;
@@ -141,24 +147,61 @@ public partial class MainController
         detail.AddChild(remove);
     }
 
-    /// <summary>The decoration's own sprite, at the proportions the catalogue authored for it.</summary>
-    private static TextureRect DecorationArt(string typeId, Vector2 size)
+    /// <summary>
+    /// The decoration's own sprite at the pack's 1:1 pixel size, so it is exactly as crisp as it
+    /// is in the Garden; a small tree reads smaller than a large one because its sprite is.
+    /// </summary>
+    private static TextureRect DecorationArt(string typeId)
     {
         GardenDecorationCatalog.TryGet(typeId, out var definition);
         var region = definition.AtlasRegion == default ? new Rect2(0, 0, 32, 48) : definition.AtlasRegion;
-        // The catalogue's authored scale is relative to the garden's largest piece, so normalise
-        // against it: a small tree has to read as smaller than a large one inside the same slot.
-        var scale = definition.Scale <= 0.0f ? 1.0f : definition.Scale;
-        var scaled = size * Mathf.Clamp(scale / 1.25f, 0.5f, 1.0f);
         return new TextureRect
         {
             Texture = new AtlasTexture { Atlas = DecorationTexture, Region = region },
-            CustomMinimumSize = scaled,
-            Size = scaled,
+            CustomMinimumSize = region.Size,
+            Size = region.Size,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            StretchMode = TextureRect.StretchModeEnum.KeepCentered,
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
+    }
+
+    /// <summary>
+    /// A small paper tag in the slot's lower corner naming the decoration's size, since the art is
+    /// drawn at its true pixel size and a small tree looks the same as a large one here.
+    /// </summary>
+    private Control DecorationSizeTag(string typeId)
+    {
+        var tag = new PanelContainer { Name = "SizeTag", MouseFilter = Control.MouseFilterEnum.Ignore };
+        var style = new StyleBoxFlat
+        {
+            BgColor = UiPalette.Parchment, AntiAliasing = false,
+            BorderColor = UiPalette.Tan, ContentMarginLeft = 3, ContentMarginRight = 3,
+            ContentMarginTop = 0, ContentMarginBottom = 1
+        };
+        style.SetBorderWidthAll(1);
+        tag.AddThemeStyleboxOverride("panel", style);
+        var label = UiFactory.CreateLabel(DecorationSizeName(typeId), 6);
+        label.MouseFilter = Control.MouseFilterEnum.Ignore;
+        tag.AddChild(label);
+        // Pinned to the slot's lower-right corner on whole pixels, above the art.
+        tag.SetAnchorsPreset(Control.LayoutPreset.BottomRight);
+        tag.GrowHorizontal = Control.GrowDirection.Begin;
+        tag.GrowVertical = Control.GrowDirection.Begin;
+        tag.OffsetRight = -4;
+        tag.OffsetBottom = -5;
+        return tag;
+    }
+
+    private string DecorationSizeName(string typeId)
+    {
+        var scale = GardenDecorationCatalog.TryGet(typeId, out var definition) ? definition.Scale : 1.0f;
+        return Tr(GardenDecorationSizing.For(scale) switch
+        {
+            GardenDecorationSize.Small => "UI_DECORATION_SIZE_SMALL",
+            GardenDecorationSize.Large => "UI_DECORATION_SIZE_LARGE",
+            _ => "UI_DECORATION_SIZE_MEDIUM"
+        });
     }
 
     private static string DecorationName(string typeId)

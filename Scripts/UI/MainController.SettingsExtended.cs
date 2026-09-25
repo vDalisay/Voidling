@@ -13,7 +13,7 @@ public partial class MainController
 
     private void ShowSettingsExtended(System.Action backRequested)
     {
-        var box = OpenModal(Tr("UI_SETTINGS_TITLE"), new Vector2(410, 348), backRequested);
+        var box = OpenModal(Tr("UI_SETTINGS_TITLE"), new Vector2(410, 348), backRequested, Voidling.Presentation.UI.Common.ScreenIcons.Settings);
         var screen = new SettingsScreen();
         screen.Configure(new SettingsScreenState(
             _session.State.MasterVolume,
@@ -21,7 +21,8 @@ public partial class MainController
             _session.State.UiSoundVolume,
             _session.State.EdgePanning,
             _session.State.AutoFinishRaces,
-            _session.State.GardenTint));
+            _session.State.GardenTint,
+            _session.State.ReduceMotion));
 
         screen.MasterVolumeChanged += _session.SetMasterVolume;
         screen.SoundEffectVolumeChanged += _session.SetSoundEffectVolume;
@@ -29,10 +30,11 @@ public partial class MainController
         screen.EdgePanningChanged += _session.SetEdgePanning;
         screen.AutoFinishRacesChanged += _session.SetAutoFinishRaces;
         screen.GardenTintChanged += _session.SetGardenTint;
+        screen.ReduceMotionChanged += _session.SetReduceMotion;
         box.AddChild(screen);
         var reset = UiFactory.CreateButton(Tr("UI_TOP_RESET"));
         reset.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd;
-        reset.AddThemeColorOverride("font_color", Color.FromHtml("#914E42"));
+        UiFactory.ApplyDangerStyle(reset);
         reset.Pressed += ShowResetConfirm;
         box.AddChild(reset);
     }

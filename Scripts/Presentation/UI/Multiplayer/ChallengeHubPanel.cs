@@ -122,7 +122,7 @@ public partial class ChallengeHubPanel : VBoxContainer
 
     private Control BuildChallengeCard(ChallengeView challenge)
     {
-        var panel = UiFactory.CreatePanel(new Vector2(492, 86));
+        var panel = UiFactory.CreatePaperPanel(new Vector2(492, 86));
         panel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 3);

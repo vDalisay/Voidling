@@ -48,6 +48,9 @@ public partial class GameBootstrap : Node
 
     public override void _Ready()
     {
+        // The cat-paw pointer, for the whole game (Garden, menus and races alike).
+        AddChild(new Voidling.Presentation.UI.Common.PixelCursor { Name = "PixelCursor" });
+
         var rules = LoadBalanceRules();
 
         // Transitional presentation code still reads the GameRules facade. Configure it with

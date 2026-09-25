@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Voidling.Presentation.UI.Audio;
 using Voidling.Domain.Creatures;
 using Voidling.Domain.Shop;
 using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Motion;
 using Voidling.Presentation.UI.Inventory;
 using Voidling.Presentation.UI.Shop;
 
@@ -59,28 +61,65 @@ public partial class MainController : Node
         _detailsPanel.Visible = true;
     }
 
+    private static readonly Texture2D TreatSheet = GD.Load<Texture2D>(StatPresentationCatalog.TreatAtlasPath);
+
+    /// <summary>
+    /// The treat chooser: each treat as a paper row with its fruit, the stat it trains, a rolling
+    /// count and a green Give. It stays open so a hungry Voidling can be fed again and again; each
+    /// press spends exactly one treat, which the count rolls down to and throws as "-1".
+    /// </summary>
     private void ShowTreatChooser()
     {
         var creatureId = _selectedId;
         var profile = _session.CreateCreatureProfileProjection(creatureId);
         if (profile == null) return;
-        var box = OpenModal(Tr("UI_PROFILE_GIVE_TREAT"), new Vector2(320, 230));
-        var target = UiFactory.CreateLabel(profile.Name, 12);
+        var box = OpenModal(Tr("UI_PROFILE_GIVE_TREAT"), new Vector2(320, 230), ScreenIcons.Treats);
+        box.AddThemeConstantOverride("separation", 4);
+        var target = UiFactory.CreateLabel(profile.Name, 11);
         target.AutoTranslateMode = AutoTranslateModeEnum.Disabled;
         box.AddChild(target);
         foreach (var stat in profile.Stats)
         {
             var count = _session.State.TrainingItems.TryGetValue(stat.StatId, out var owned) ? owned : 0;
+            var card = UiFactory.CreatePaperPanel(Vector2.Zero);
+            var style = UiSkin.Paper();
+            style.ContentMarginTop = 3;
+            style.ContentMarginBottom = 4;
+            card.AddThemeStyleboxOverride("panel", style);
             var row = new HBoxContainer();
-            var label = UiFactory.CreateLabel(string.Format(Tr("UI_PROFILE_TREAT_STOCK"),
-                StatPresentationCatalog.NameFor(stat.StatId), count), 9);
+            row.AddThemeConstantOverride("separation", 6);
+            card.AddChild(row);
+            row.AddChild(new TextureRect
+            {
+                Texture = new AtlasTexture { Atlas = TreatSheet, Region = StatPresentationCatalog.TreatRegionFor(stat.StatId) },
+                CustomMinimumSize = new Vector2(16, 16),
+                StretchMode = TextureRect.StretchModeEnum.KeepCentered,
+                MouseFilter = Control.MouseFilterEnum.Ignore
+            });
+            var label = UiFactory.CreateLabel(StatPresentationCatalog.NameFor(stat.StatId), 9);
+            label.AddThemeColorOverride("font_color", PaperCard.Ink(StatPresentationCatalog.ColorFor(stat.StatId)));
             label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            label.VerticalAlignment = VerticalAlignment.Center;
+            label.TooltipText = string.Format(Tr("UI_PROFILE_TREAT_STOCK"), StatPresentationCatalog.NameFor(stat.StatId), count);
+            label.MouseFilter = Control.MouseFilterEnum.Pass;
             row.AddChild(label);
+            var stock = new Label
+            {
+                Name = "Stock_" + stat.StatId,
+                CustomMinimumSize = new Vector2(26, 0),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                AutoTranslateMode = AutoTranslateModeEnum.Disabled
+            };
+            UiSkin.ApplyNumberFont(stock);
+            row.AddChild(stock);
+            var stockCounter = RollingCounter.Attach(stock, count, value => "x" + value);
             var give = UiFactory.CreateButton(Tr("UI_PROFILE_GIVE"));
             give.Name = "Give_" + stat.StatId;
             give.Disabled = count <= 0;
             give.TooltipText = TrainingItemEffectPresentation.ProfileTooltip(StatPresentationCatalog.NameFor(stat.StatId), count);
             give.CustomMinimumSize = new Vector2(60, 22);
+            UiFactory.ApplyPrimaryStyle(give);
             var capturedStatId = stat.StatId;
             // The chooser deliberately stays open. Pressing again restarts the eating beat rather
             // than queueing a second one, so the player can spam a hungry Voidling.
@@ -89,12 +128,18 @@ public partial class MainController : Node
                 _session.UseTrainingItem(creatureId, capturedStatId);
                 _garden.PlayTreatEating(creatureId, capturedStatId, spawnFood: true);
                 var remaining = _session.State.TrainingItems.TryGetValue(capturedStatId, out var left) ? left : 0;
-                label.Text = string.Format(Tr("UI_PROFILE_TREAT_STOCK"),
+                if (remaining < stockCounter.Value)
+                {
+                    PixelBurst.Spawn(this, give.GetGlobalRect().GetCenter(), PixelBurst.Palette.Leafy, 10);
+                    UiSounds.Play(this, UiCue.Confirm);
+                }
+                stockCounter.SetValue(remaining);
+                label.TooltipText = string.Format(Tr("UI_PROFILE_TREAT_STOCK"),
                     StatPresentationCatalog.NameFor(capturedStatId), remaining);
                 give.Disabled = remaining <= 0;
             };
             row.AddChild(give);
-            box.AddChild(row);
+            box.AddChild(card);
         }
     }
 
@@ -185,7 +230,8 @@ public partial class MainController : Node
                 egg.Source == EggSource.Bred))
             .ToList();
 
-        var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(520, 292));
+        var box = OpenModal(Tr("UI_INVENTORY_TITLE"), new Vector2(520, 292), ScreenIcons.Inventory);
+        _modalHost.ShowWallet(WalletToShow);
         var screen = new InventoryScreen();
         screen.Configure(new InventoryScreenState(items, failedEggs, eggShells, incubationSkipCount, incubatingEggs, storedEggs, storedLand)
         {
@@ -193,11 +239,13 @@ public partial class MainController : Node
         });
         screen.PlaceStoredEggRequested += egg =>
         {
+            Celebrate(ModalPoint("ItemAction"));
             CloseModal();
             _garden.BeginEggPlacement(egg.EggId, egg.TintColor);
         };
         screen.PlaceStoredLandRequested += land =>
         {
+            Celebrate(ModalPoint("ItemAction"));
             CloseModal();
             _garden.BeginLandPlacement(land.ModuleId, land.ShapeId);
         };
@@ -214,12 +262,32 @@ public partial class MainController : Node
             var owned = _session.State.TrainingItems.TryGetValue(statId, out var stock) ? stock : 0;
             if (owned <= _session.DroppedTreatCount(statId))
                 return;
+            Celebrate(ModalPoint("ItemAction"));
             CloseModal();
             _garden.BeginTreatPlacement(statId);
         };
         screen.DiscardFailedEggRequested += eggId => { _session.DiscardFailedEgg(eggId); CallDeferred(nameof(ShowInventory)); };
-        screen.SellEggShellRequested += shellId => { if (_session.SellEggShell(shellId)) CallDeferred(nameof(ShowInventory)); };
-        screen.UseIncubationSkipRequested += eggId => { if (_session.UseFullIncubationSkip(eggId)) CallDeferred(nameof(ShowInventory)); };
+        screen.SellEggShellRequested += shellId =>
+        {
+            var origin = ModalPoint("ItemAction");
+            var before = _session.State.Coins;
+            if (!_session.SellEggShell(shellId)) return;
+            Callable.From(() =>
+            {
+                // The shell's price flies from the Sell button into the purse.
+                _walletShownBeforeReward = before;
+                ShowInventory();
+                _walletShownBeforeReward = null;
+                FlyRewardToWallet(origin, before, (int)(_session.State.Coins - before));
+            }).CallDeferred();
+        };
+        screen.UseIncubationSkipRequested += eggId =>
+        {
+            var origin = ModalPoint("ItemAction");
+            if (!_session.UseFullIncubationSkip(eggId)) return;
+            Celebrate(origin);
+            CallDeferred(nameof(ShowInventory));
+        };
         box.AddChild(screen);
         screen.CallDeferred(InventoryScreen.MethodName.FocusSelection);
     }

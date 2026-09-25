@@ -18,8 +18,7 @@ public partial class GameSession
             Y = y
         });
 
-        SaveAndNotify("Placed a garden decoration.");
-        RaiseGardenEvent("A new decoration was placed in the garden.");
+        SaveAndNotify("Placed a decoration in the garden.");
         return true;
     }
 
@@ -49,8 +48,7 @@ public partial class GameSession
         if (removed == 0)
             return false;
 
-        SaveAndNotify("Removed a garden decoration.");
-        RaiseGardenEvent("A decoration was put away.");
+        SaveAndNotify("Put a garden decoration away.");
         return true;
     }
 }

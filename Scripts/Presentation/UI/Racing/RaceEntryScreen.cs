@@ -4,6 +4,7 @@ using System.Linq;
 using Godot;
 using Voidling.Presentation.Racing;
 using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Motion;
 using Voidling.Presentation.Voidlings;
 using VoidlingGame;
 
@@ -126,13 +127,14 @@ public partial class RaceEntryScreen : Control
         column.AddThemeConstantOverride("separation", 5);
         AddChild(column);
 
-        var banner = new PanelContainer { Name = "StepBanner", SizeFlagsHorizontal = SizeFlags.ShrinkBegin };
-        var bannerStyle = new StyleBoxFlat { BgColor = Color.FromHtml("#E8B75C"), BorderColor = Color.FromHtml("#B07C33") };
-        bannerStyle.SetBorderWidthAll(2);
-        bannerStyle.SetCornerRadiusAll(4);
-        bannerStyle.SetContentMarginAll(5);
-        bannerStyle.ContentMarginLeft = 12;
-        bannerStyle.ContentMarginRight = 12;
+        // The step's name on a golden tag, the same shape as every window's title tag.
+        var banner = new PanelContainer
+        {
+            Name = "StepBanner", SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
+            CustomMinimumSize = new Vector2(0, UiSkin.TitleTagHeight)
+        };
+        var bannerStyle = UiSkin.TitleTag();
+        bannerStyle.ModulateColor = new Color(1.06f, 0.9f, 0.6f);
         banner.AddThemeStyleboxOverride("panel", bannerStyle);
         var bannerRow = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
         bannerRow.AddThemeConstantOverride("separation", 6);
@@ -165,6 +167,8 @@ public partial class RaceEntryScreen : Control
         _primary.Name = "EntryPrimary";
         _primary.CustomMinimumSize = new Vector2(180, 30);
         UiFactory.ApplyPrimaryStyle(_primary);
+        _primary.Icon = UiFactory.CreateGardenIcon(13, 1);
+        _primary.AddThemeConstantOverride("icon_max_width", 16);
         _primary.Pressed += GoForward;
         footer.AddChild(_primary);
         column.AddChild(footer);
@@ -233,6 +237,8 @@ public partial class RaceEntryScreen : Control
 
     private void RebuildStep()
     {
+        var stepChanged = _shownStep != _step;
+        _shownStep = _step;
         Clear(_body);
         switch (_step)
         {
@@ -252,7 +258,17 @@ public partial class RaceEntryScreen : Control
                 _body.AddChild(BuildConfirmStep());
                 break;
         }
+        if (!stepChanged || !IsInsideTree()) return;
+        // A new step deals its cards in and the banner re-stamps; picks within a step do not.
+        UiMotion.Pop(_stepTitle.GetParent().GetParent<Control>(), 0.1f, UiMotion.Slow);
+        var cards = new List<CanvasItem>();
+        foreach (var node in _body.FindChildren("*", "PanelContainer", true, false))
+            if (node is PanelContainer card && card.Name.ToString() is "CourseListPanel" or "CourseRecord" or "RosterPanel" or "RacerStats" or "ConfirmCourse")
+                cards.Add(card);
+        UiMotion.StaggerIn(cards, 0.06f, 0.2f, 0.05f);
     }
+
+    private RaceEntryStep? _shownStep;
 
     // ---- Step 1: course and difficulty ------------------------------------------------------
 
@@ -365,10 +381,12 @@ public partial class RaceEntryScreen : Control
                 ContentMarginTop = 0, ContentMarginBottom = 0
             });
         }
-        UiFactory.ApplyPixelFont(button, 8);
+        button.AddThemeFontOverride("font", UiSkin.NumberFont);
+        button.AddThemeFontSizeOverride("font_size", UiSkin.NumberFontSize);
         button.AddThemeColorOverride("font_color", Color.FromHtml(active ? "#3A2C18" : "#7A6650"));
         button.AddThemeColorOverride("font_hover_color", Colors.White);
         button.AddThemeColorOverride("font_pressed_color", Colors.White);
+        ButtonJuice.Attach(button, ButtonFeel.Soft);
         return button;
     }
 
@@ -407,10 +425,10 @@ public partial class RaceEntryScreen : Control
     private Control BuildRecordPlaque(RacePickerCourseViewState course)
     {
         var plaque = new PanelContainer { Name = "RecordPlaque" };
-        var style = new StyleBoxFlat { BgColor = Color.FromHtml("#E8CE8E"), BorderColor = Color.FromHtml("#B08A55") };
-        style.SetBorderWidthAll(1);
-        style.SetCornerRadiusAll(3);
-        style.SetContentMarginAll(3);
+        var style = UiSkin.Well();
+        style.ModulateColor = new Color(1.05f, 0.96f, 0.78f);
+        style.ContentMarginTop = 3;
+        style.ContentMarginBottom = 4;
         style.ContentMarginLeft = 6;
         style.ContentMarginRight = 8;
         plaque.AddThemeStyleboxOverride("panel", style);
@@ -547,13 +565,16 @@ public partial class RaceEntryScreen : Control
         };
         var background = new StyleBoxFlat
         {
-            BgColor = Color.FromHtml("#C5B798"),
-            BorderColor = Color.FromHtml("#8A7A5A")
+            BgColor = UiPalette.Beige,
+            BorderColor = UiPalette.Tan,
+            AntiAliasing = false
         };
         background.SetBorderWidthAll(1);
-        var fill = new StyleBoxFlat { BgColor = PaperInk(stat.Color) };
-        background.SetCornerRadiusAll(1);
-        fill.SetCornerRadiusAll(1);
+        var fill = new StyleBoxFlat
+        {
+            BgColor = PaperInk(stat.Color), AntiAliasing = false,
+            BorderColor = PaperInk(stat.Color).Lightened(0.3f), BorderWidthTop = 1
+        };
         bar.AddThemeStyleboxOverride("background", background);
         bar.AddThemeStyleboxOverride("fill", fill);
         block.AddChild(bar);
@@ -614,9 +635,13 @@ public partial class RaceEntryScreen : Control
     private static Control BuildPreviewFrame(RacePickerCourseViewState course, Vector2 size)
     {
         var frame = new PanelContainer { Name = "CoursePreviewFrame", MouseFilter = MouseFilterEnum.Ignore };
-        var style = new StyleBoxFlat { BgColor = Color.FromHtml("#9CCB6B"), BorderColor = Color.FromHtml("#6B4A31") };
+        // Dark timber around the window: square pixel edges with a lit inner rim.
+        var style = new StyleBoxFlat
+        {
+            BgColor = Color.FromHtml("#9CCB6B"), BorderColor = Color.FromHtml("#6B4A31"), AntiAliasing = false,
+            ShadowColor = new Color(0.25f, 0.16f, 0.1f, 0.35f), ShadowSize = 0, ShadowOffset = new Vector2(0, 2)
+        };
         style.SetBorderWidthAll(3);
-        style.SetCornerRadiusAll(3);
         style.SetContentMarginAll(3);
         frame.AddThemeStyleboxOverride("panel", style);
 
@@ -659,10 +684,10 @@ public partial class RaceEntryScreen : Control
             var style = new StyleBoxFlat
             {
                 BgColor = CourseMinimap.ColorForKind(kind),
-                BorderColor = CourseMinimap.ColorForKind(kind).Darkened(0.35f)
+                BorderColor = CourseMinimap.ColorForKind(kind).Darkened(0.35f),
+                AntiAliasing = false
             };
             style.SetBorderWidthAll(1);
-            style.SetCornerRadiusAll(2);
             style.SetContentMarginAll(2);
             chip.AddThemeStyleboxOverride("panel", style);
             chip.AddChild(new TextureRect
@@ -679,16 +704,13 @@ public partial class RaceEntryScreen : Control
         return chips;
     }
 
-    private static StyleBoxFlat CardStyle(bool selected)
+    /// <summary>Course cards are pack paper; the picked one glows gold.</summary>
+    private static StyleBoxTexture CardStyle(bool selected)
     {
-        var style = new StyleBoxFlat
-        {
-            BgColor = Color.FromHtml(selected ? "#F6DC96" : "#EFE0BC"),
-            BorderColor = Color.FromHtml(selected ? "#C08A2E" : "#C4A77A")
-        };
-        style.SetBorderWidthAll(selected ? 2 : 1);
-        style.SetCornerRadiusAll(4);
-        style.SetContentMarginAll(4);
+        var style = UiSkin.Paper(selected ? new Color(1.08f, 0.96f, 0.66f) : Colors.White);
+        style.ContentMarginLeft = style.ContentMarginRight = 5;
+        style.ContentMarginTop = 4;
+        style.ContentMarginBottom = 5;
         return style;
     }
 

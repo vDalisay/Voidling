@@ -5,6 +5,7 @@ using Godot;
 using Voidling.Application.Garden;
 using Voidling.Domain.Garden;
 using Voidling.Presentation.UI.Common;
+using Voidling.Presentation.UI.Motion;
 
 namespace VoidlingGame;
 
@@ -25,7 +26,7 @@ public partial class MainController
     /// </summary>
     private void ShowGardenModules()
     {
-        var box = OpenModal(Tr("UI_LAND_TITLE"), new Vector2(520, 292), ShowGardenBuild);
+        var box = OpenModal(Tr("UI_LAND_TITLE"), new Vector2(520, 292), ShowGardenBuild, ScreenIcons.Land);
         box.AddThemeConstantOverride("separation", 5);
 
         var body = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ExpandFill };
@@ -115,7 +116,7 @@ public partial class MainController
         var tint = LandShapePresentation.TintForBiome(module.BiomeId);
 
         var artPanel = new PanelContainer { CustomMinimumSize = new Vector2(0, 54) };
-        artPanel.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = Color.FromHtml("#F7E5BD") });
+        artPanel.AddThemeStyleboxOverride("panel", UiSkin.Well());
         var center = new CenterContainer();
         center.AddChild(LandShapePresentation.CreateShapeArt(module.ShapeId, tint));
         artPanel.AddChild(center);
@@ -175,7 +176,7 @@ public partial class MainController
         RebuildDetailsPanel();
 
         var biome = module.BiomeId.Length > 0;
-        var inspector = UiFactory.CreatePanel(new Vector2(162, 230));
+        var inspector = UiFactory.CreateWindowPanel(new Vector2(162, 230));
         inspector.Name = "LandInspector";
         inspector.Position = new Vector2(468, 82);
         inspector.Size = new Vector2(162, 230);
@@ -192,9 +193,10 @@ public partial class MainController
         if (biome)
             title.AddThemeColorOverride("font_color", BiomePresentationCatalog.ColorFor(module.BiomeId).Darkened(0.35f));
         heading.AddChild(title);
-        var close = UiFactory.CreateButton("×");
+        var close = UiFactory.CreateButton(string.Empty);
         close.Name = "CloseLandInspector";
-        close.CustomMinimumSize = new Vector2(20, 20);
+        UiSkin.ApplyIconButton(close, UiSkin.IconGlyph.SmallClose);
+        close.TooltipText = Tr("UI_COMMON_CLOSE");
         close.Pressed += CloseLandInspector;
         heading.AddChild(close);
         box.AddChild(heading);
@@ -231,6 +233,7 @@ public partial class MainController
         AddBiomeTileActions(box, module, 138, () => CallDeferred(nameof(ShowLandHexMenu), moduleId));
         _landInspector = inspector;
         _uiRoot.AddChild(inspector);
+        UiMotion.Appear(inspector, 0.0, UiMotion.Normal, 0.08f);
     }
 
     /// <summary>
@@ -259,7 +262,13 @@ public partial class MainController
                 UiFactory.ApplyPixelFont(build, 6);
                 build.AddThemeColorOverride("font_color", BiomePresentationCatalog.ColorFor(biomeId).Darkened(0.45f));
                 build.Disabled = _session.State.Coins < price;
-                build.Pressed += () => { if (_session.BuildBiome(moduleId, biomeId)) refresh(); };
+                build.Pressed += () =>
+                {
+                    var origin = build.GetGlobalRect().GetCenter();
+                    if (!_session.BuildBiome(moduleId, biomeId)) return;
+                    Celebrate(origin);
+                    refresh();
+                };
                 grid.AddChild(build);
             }
 
@@ -273,7 +282,13 @@ public partial class MainController
                 place.Name = $"PlaceTile_{biomeId}_{stars}";
                 place.CustomMinimumSize = new Vector2(width, 22);
                 UiFactory.ApplyPixelFont(place, 6);
-                place.Pressed += () => { if (_session.PlaceBiomeTile(moduleId, biomeId, stars)) refresh(); };
+                place.Pressed += () =>
+                {
+                    var origin = place.GetGlobalRect().GetCenter();
+                    if (!_session.PlaceBiomeTile(moduleId, biomeId, stars)) return;
+                    Celebrate(origin);
+                    refresh();
+                };
                 box.AddChild(place);
             }
             return;
@@ -291,7 +306,13 @@ public partial class MainController
             UiFactory.ApplyPrimaryStyle(stack);
             stack.Disabled = owned <= 0;
             var stars = module.Level;
-            stack.Pressed += () => { if (_session.PlaceBiomeTile(moduleId, baseBiome, stars)) refresh(); };
+            stack.Pressed += () =>
+            {
+                var origin = stack.GetGlobalRect().GetCenter();
+                if (!_session.PlaceBiomeTile(moduleId, baseBiome, stars)) return;
+                Celebrate(origin);
+                refresh();
+            };
             box.AddChild(stack);
 
             var pickUp = UiFactory.CreateButton(Tr("UI_LAND_PICK_UP_TILE"));
@@ -327,7 +348,7 @@ public partial class MainController
         _garden.StopFollowing();
         RebuildDetailsPanel();
 
-        var inspector = UiFactory.CreatePanel(new Vector2(162, 150));
+        var inspector = UiFactory.CreateWindowPanel(new Vector2(162, 150));
         inspector.Name = "FailedEggInspector";
         inspector.Position = new Vector2(468, 82);
         inspector.Size = new Vector2(162, 150);
@@ -341,9 +362,10 @@ public partial class MainController
         title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         title.AddThemeColorOverride("font_color", Color.FromHtml("#9C514B"));
         heading.AddChild(title);
-        var close = UiFactory.CreateButton("×");
+        var close = UiFactory.CreateButton(string.Empty);
         close.Name = "CloseLandInspector";
-        close.CustomMinimumSize = new Vector2(20, 20);
+        UiSkin.ApplyIconButton(close, UiSkin.IconGlyph.SmallClose);
+        close.TooltipText = Tr("UI_COMMON_CLOSE");
         close.Pressed += CloseLandInspector;
         heading.AddChild(close);
         box.AddChild(heading);
@@ -364,12 +386,13 @@ public partial class MainController
         discard.Name = "DiscardFailedEgg";
         discard.CustomMinimumSize = new Vector2(138, 24);
         UiFactory.ApplyPixelFont(discard, 7);
-        discard.AddThemeColorOverride("font_color", Color.FromHtml("#914E42"));
+        UiFactory.ApplyDangerStyle(discard);
         discard.Pressed += () => { _session.DiscardFailedEgg(eggId); CloseLandInspector(); };
         box.AddChild(discard);
 
         _landInspector = inspector;
         _uiRoot.AddChild(inspector);
+        UiMotion.Appear(inspector, 0.0, UiMotion.Normal, 0.08f);
     }
 
     private void CloseLandInspector()

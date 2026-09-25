@@ -221,7 +221,8 @@ public partial class DetailsScreen : VBoxContainer
         var style = new StyleBoxFlat
         {
             BgColor = background,
-            BorderColor = Color.FromHtml("#BE916C")
+            BorderColor = UiPalette.Tan,
+            AntiAliasing = false
         };
         style.SetBorderWidthAll(1);
         style.ContentMarginLeft = style.ContentMarginRight = 6;
@@ -234,9 +235,7 @@ public partial class DetailsScreen : VBoxContainer
 
         var name = UiFactory.CreateLabel(stat.DisplayName.ToUpperInvariant(), 8);
         name.CustomMinimumSize = new Vector2(75, 19);
-        name.AddThemeColorOverride("font_color", stat.IdentityColor);
-        name.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
-        name.AddThemeConstantOverride("outline_size", 1);
+        name.AddThemeColorOverride("font_color", PaperCard.Ink(stat.IdentityColor));
         row.AddChild(name);
 
         var values = UiFactory.CreateLabel(
@@ -285,8 +284,9 @@ public partial class DetailsScreen : VBoxContainer
         var panel = new PanelContainer { CustomMinimumSize = new Vector2(width, header ? 19 : 23) };
         var style = new StyleBoxFlat
         {
-            BgColor = background ?? (header ? Color.FromHtml("#C9B98D") : Color.FromHtml("#F1DCAA")),
-            BorderColor = Color.FromHtml("#BE916C")
+            BgColor = background ?? (header ? UiPalette.Beige : UiPalette.Parchment),
+            BorderColor = UiPalette.Tan,
+            AntiAliasing = false
         };
         style.SetBorderWidthAll(1);
         style.ContentMarginLeft = style.ContentMarginRight = 3;
@@ -298,9 +298,7 @@ public partial class DetailsScreen : VBoxContainer
         label.VerticalAlignment = VerticalAlignment.Center;
         if (fontColor.HasValue)
         {
-            label.AddThemeColorOverride("font_color", fontColor.Value);
-            label.AddThemeColorOverride("font_outline_color", Color.FromHtml("#465247"));
-            label.AddThemeConstantOverride("outline_size", 1);
+            label.AddThemeColorOverride("font_color", PaperCard.Ink(fontColor.Value));
         }
         panel.AddChild(label);
         return panel;
@@ -316,12 +314,12 @@ public partial class DetailsScreen : VBoxContainer
             ShowPercentage = false,
             CustomMinimumSize = size
         };
-        var background = new StyleBoxFlat { BgColor = Color.FromHtml("#6D6658") };
-        var fill = new StyleBoxFlat { BgColor = fillColor };
-        background.CornerRadiusTopLeft = background.CornerRadiusTopRight = 1;
-        background.CornerRadiusBottomLeft = background.CornerRadiusBottomRight = 1;
-        fill.CornerRadiusTopLeft = fill.CornerRadiusTopRight = 1;
-        fill.CornerRadiusBottomLeft = fill.CornerRadiusBottomRight = 1;
+        var background = UiSkin.BarTrack();
+        var fill = new StyleBoxFlat
+        {
+            BgColor = fillColor, AntiAliasing = false,
+            BorderColor = fillColor.Lightened(0.35f), BorderWidthTop = 1
+        };
         bar.AddThemeStyleboxOverride("background", background);
         bar.AddThemeStyleboxOverride("fill", fill);
         return bar;

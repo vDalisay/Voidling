@@ -124,7 +124,7 @@ public partial class EncyclopediaScreen : HBoxContainer
     private void BuildDetail(EncyclopediaEntryViewState entry)
     {
         var artPanel = new PanelContainer { CustomMinimumSize = new Vector2(0, 76) };
-        artPanel.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = Color.FromHtml("#F7E5BD") });
+        artPanel.AddThemeStyleboxOverride("panel", Voidling.Presentation.UI.Common.UiSkin.Well());
         var center = new CenterContainer();
         center.AddChild(CreateEntryPortrait(entry, new Vector2(64, 64)));
         artPanel.AddChild(center);

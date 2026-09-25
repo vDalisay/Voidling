@@ -155,7 +155,7 @@ public partial class TradeNegotiationPanel : VBoxContainer
         string emptyText,
         bool accepted)
     {
-        var panel = UiFactory.CreatePanel(new Vector2(205, 94));
+        var panel = UiFactory.CreatePaperPanel(new Vector2(205, 94));
         panel.CustomMinimumSize = new Vector2(205, 94);
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 1);
