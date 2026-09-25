@@ -66,6 +66,16 @@ public partial class UiSoundPlayer : Node
         }
     }
 
+    public override void _ExitTree()
+    {
+        // Let go of every playback before the audio server shuts down with the game.
+        foreach (var voice in _voices)
+        {
+            voice.Stop();
+            voice.Stream = null;
+        }
+    }
+
     public void Play(UiCue cue, int step)
     {
         if (!Sounds.TryGetValue(cue, out var sound))

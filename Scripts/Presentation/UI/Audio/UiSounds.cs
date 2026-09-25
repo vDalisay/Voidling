@@ -39,9 +39,13 @@ public enum UiCue
 /// </summary>
 public static class UiSounds
 {
+    // A headless run (smokes, CI) has no one to hear it, and a sound still playing when such a run
+    // quits is reported as a leaked resource.
+    private static readonly bool Silent = DisplayServer.GetName() == "headless";
+
     public static void Play(Node context, UiCue cue, int step = 0)
     {
-        if (GodotObject.IsInstanceValid(context) && context.IsInsideTree())
+        if (!Silent && GodotObject.IsInstanceValid(context) && context.IsInsideTree())
             UiSoundPlayer.For(context)?.Play(cue, step);
     }
 }
