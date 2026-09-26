@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="VoidlingVisualDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Presentation/Voidlings/VoidlingVisualDefinition.cs" id="1_visual"]
+[ext_resource type="Texture2D" path="res://Assets/Voidlings/Base/Flying/flying_voidling_walk.png" id="2_base"]
+
+[resource]
+script = ExtResource("1_visual")
+DefinitionId = "fly"
+BaseAtlas = ExtResource("2_base")
+FrameWidth = 32
+FrameHeight = 32
+WorldFrameCount = 6
+WalkDownRow = 0
+WalkUpRow = 0
+WalkLeftRow = 0
+WalkRightRow = 0
+WorldAnimationFps = 8.0
+RaceRunRow = 0
+RaceRunFrameCount = 6
+RaceRunFps = 10.0
+RaceSwimRow = 0
+RaceSwimFrameCount = 6
+RaceSwimFps = 8.0
+PortraitColumn = 1
+PortraitRow = 0
+AdultWorldScale = 1.15
+ChildWorldScale = 0.575
+WorldSpriteCenterYOffsetAtScaleOne = -13.0
+AdultHitboxSize = Vector2(31, 32)
+ChildHitboxSize = Vector2(16, 17)
+AdultShadowRadii = Vector2(7, 2.2)
+ShadowCenterYOffsetAtScaleOne = 1.0
+RaceScale = 1.15
+MutationAdultCenterYOffset = -15.0
+MutationCompactCenterYOffset = -7.5

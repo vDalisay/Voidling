@@ -18,6 +18,7 @@ public static class VoidlingFormPresentationCatalog
             ["run"] = "FORM_RUN",
             ["water"] = "FORM_SWIM",
             ["fly"] = "FORM_FLY",
+            ["rainbow"] = "FORM_RAINBOW",
             ["power"] = "FORM_POWER",
             ["swamp-variant"] = "FORM_SWAMP_VARIANT"
         };

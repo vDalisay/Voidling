@@ -1,12 +1,15 @@
-[gd_resource type="Resource" script_class="VoidlingVisualCatalog" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="VoidlingVisualCatalog" load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Presentation/Voidlings/VoidlingVisualCatalog.cs" id="1_catalog"]
 [ext_resource type="Resource" path="res://Resources/Presentation/Voidlings/DefaultVoidlingVisual.tres" id="2_normal"]
+[ext_resource type="Resource" path="res://Resources/Presentation/Voidlings/FlyingVoidlingVisual.tres" id="3_fly"]
+[ext_resource type="Resource" path="res://Resources/Presentation/Voidlings/WaterVoidlingVisual.tres" id="4_water"]
+[ext_resource type="Resource" path="res://Resources/Presentation/Voidlings/RainbowVoidlingVisual.tres" id="5_rainbow"]
 
 [resource]
 script = ExtResource("1_catalog")
 DefaultVisualTypeId = "normal"
-Definitions = Array[Resource]([ExtResource("2_normal")])
-AuthoredColorVisualTypeIds = PackedStringArray("neutral", "swamp-variant")
+Definitions = Array[Resource]([ExtResource("2_normal"), ExtResource("3_fly"), ExtResource("4_water"), ExtResource("5_rainbow")])
+AuthoredColorVisualTypeIds = PackedStringArray("neutral", "fly", "water", "swamp-variant")
 PlaceholderHueVisualTypeIds = PackedStringArray("swamp-variant")
 PlaceholderHues = PackedFloat32Array(0.3)

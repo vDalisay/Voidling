@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Voidling.Application.Shop;
 using Voidling.Domain.Hatching;
 using Voidling.Domain.Rules;
@@ -10,6 +11,23 @@ namespace Voidling.Tests.Application;
 public sealed class ShopArchitectureTests
 {
     private static readonly GameBalanceRules Rules = GameBalanceRules.DemoDefaults;
+
+    [Fact]
+    public void StoreEgg_RainbowRollIsOneIn8192AndLockedToSeed()
+    {
+        var factory = new StoreEggFactory(Rules);
+        var rainbowSeed = System.Linq.Enumerable.Range(0, 100000)
+            .Select(index => (ulong)index)
+            .First(RainbowEggRoll.IsRainbow);
+        var rainbow = factory.Create("rare", rainbowSeed);
+        var ordinary = factory.Create("ordinary", rainbowSeed + 1);
+
+        Assert.Equal(RainbowEggRoll.Odds, 8192);
+        Assert.Equal(RainbowEggRoll.VisualTypeId, rainbow.Appearance.VisualTypeId);
+        Assert.Equal(rainbow.Appearance.VisualTypeId, factory.Create("another-id", rainbowSeed).Appearance.VisualTypeId);
+        Assert.Equal(VoidlingAppearanceData.DefaultVisualTypeId, ordinary.Appearance.VisualTypeId);
+        Assert.Equal(RainbowEggRoll.VisualTypeId, rainbow.Appearance.CreateCanonicalCopy().VisualTypeId);
+    }
 
     [Fact]
     public void StoreEggFactory_SameIdentitySeedProducesSameLockedGenetics()

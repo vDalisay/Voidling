@@ -142,7 +142,9 @@ public sealed class BreedVoidlingsUseCase
                 // Newly hatched Voidlings currently begin from the neutral morphology. The visual
                 // catalog already supports later semantic type changes; the exact stat/evolution
                 // policy that changes normal -> water/fly/power is intentionally not invented here.
-                VisualTypeId = special?.VisualTypeId ?? VoidlingAppearanceData.DefaultVisualTypeId,
+                VisualTypeId = RainbowEggRoll.IsRainbow(eggSeed)
+                    ? RainbowEggRoll.VisualTypeId
+                    : special?.VisualTypeId ?? VoidlingAppearanceData.DefaultVisualTypeId,
                 PaletteHue = _colors.ResolvePaletteHue(genome)
             },
             RareTraits = rareTraits,

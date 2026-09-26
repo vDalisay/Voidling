@@ -95,6 +95,8 @@ public partial class MainController : Node
         Callable.From(StartFirstLaunchTutorialIfNeeded).CallDeferred();
         if (Array.Exists(OS.GetCmdlineUserArgs(), arg => arg == "--voidling-garden-ui-smoke"))
             Callable.From(RunGardenUiSmoke).CallDeferred();
+        if (Array.Exists(OS.GetCmdlineUserArgs(), arg => arg == "--voidling-evolution-refresh-smoke"))
+            Callable.From(RunEvolutionRefreshSmoke).CallDeferred();
         if (Array.Exists(OS.GetCmdlineUserArgs(), arg => arg == "--voidling-developer-menu-smoke"))
             Callable.From(RunDeveloperMenuSmoke).CallDeferred();
     }

@@ -3,6 +3,7 @@ using System.Linq;
 using Voidling.Application.Persistence;
 using Voidling.Domain.Evolution;
 using Voidling.Domain.Lifecycle;
+using Voidling.Domain.Hatching;
 using Voidling.Domain.Rules;
 using VoidlingGame;
 using Xunit;
@@ -104,6 +105,21 @@ public sealed class AdultFormTests
 
         Assert.Equal(EvolutionSpecialization.None, adult.EvolutionSpecialization);
         Assert.Equal("normal", adult.Appearance.VisualTypeId);
+    }
+
+    [Fact]
+    public void RainbowVoidling_KeepsRareAppearanceThroughAdulthoodAndReincarnation()
+    {
+        var creature = Baby("rainbow", ("swim", 20));
+        creature.Appearance.VisualTypeId = RainbowEggRoll.VisualTypeId;
+
+        var result = EvolutionService.ResolveFirstEvolution(creature, Rules);
+        Assert.Equal(EvolutionSpecialization.Swim, result.Specialization);
+        Assert.Equal(RainbowEggRoll.VisualTypeId, creature.Appearance.VisualTypeId);
+
+        creature.Stage = LifeStage.Adult;
+        new ReincarnationService().ApplyReincarnation(creature, Rules.Reincarnation, Rules.Stats);
+        Assert.Equal(RainbowEggRoll.VisualTypeId, creature.Appearance.VisualTypeId);
     }
 
     [Fact]

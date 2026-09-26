@@ -42,7 +42,9 @@ public sealed class StoreEggFactory
             TintHex = _colors.ResolveTint(genome),
             Appearance = new VoidlingAppearanceData
             {
-                VisualTypeId = VoidlingAppearanceData.DefaultVisualTypeId,
+                VisualTypeId = RainbowEggRoll.IsRainbow(eggSeed)
+                    ? RainbowEggRoll.VisualTypeId
+                    : VoidlingAppearanceData.DefaultVisualTypeId,
                 PaletteHue = _colors.ResolvePaletteHue(genome)
             },
             RareTraits = rareTraits,

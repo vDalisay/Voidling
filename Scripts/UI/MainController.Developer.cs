@@ -33,7 +33,7 @@ public partial class MainController
         actions.AddThemeConstantOverride("separation", 7);
         scroll.AddChild(actions);
 
-        var forms = new[] { "normal", "neutral", "run", "water", "fly", "power", "swamp-variant" };
+        var forms = new[] { "normal", "neutral", "run", "water", "fly", "power", "rainbow", "swamp-variant" };
         var form = DeveloperChoice(forms, id => VoidlingFormPresentationCatalog.NameFor(id));
         AddDeveloperRow(actions, "UI_DEV_VOIDLING", form, null, "UI_DEV_SPAWN", () =>
         {

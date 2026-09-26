@@ -1,6 +1,7 @@
 using System;
 using Voidling.Domain.Care;
 using Voidling.Domain.Evolution;
+using Voidling.Domain.Hatching;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Stats;
 using VoidlingGame;
@@ -62,7 +63,8 @@ public sealed class ReincarnationService
         // A baby again: the adult form is chosen afresh at the next adulthood. A special variant
         // keeps its own look through every life.
         creature.Appearance ??= new VoidlingAppearanceData();
-        if (string.IsNullOrEmpty(creature.SpecialVariantId))
+        if (string.IsNullOrEmpty(creature.SpecialVariantId) &&
+            creature.Appearance.VisualTypeId != RainbowEggRoll.VisualTypeId)
             creature.Appearance.VisualTypeId = EvolutionService.BabyVisualTypeId;
         creature.Needs = new CreatureNeedsState();
     }

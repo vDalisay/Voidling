@@ -12,6 +12,7 @@ using Voidling.Application.Simulation;
 using Voidling.Application.Training;
 using Voidling.Domain.Creatures;
 using Voidling.Domain.Evolution;
+using Voidling.Domain.Hatching;
 using Voidling.Domain.Rules;
 using Voidling.Domain.Shop;
 using Voidling.Domain.Stats;
@@ -125,7 +126,10 @@ public partial class GameSession : Node
                     RaiseGardenEvent($"{capped.Name} reached level 99 in {DisplayStatId(capped.StatId)}."); break;
                 case CreatureHatchedEvent hatched:
                     RecordDailyMissionEvent(DailyMissionEventKind.HatchEgg);
-                    Announce(hatched.SpecialVariantId.Length > 0
+                    Announce(State.Voidlings.Any(creature => creature.Id == hatched.CreatureId &&
+                        creature.Appearance.VisualTypeId == RainbowEggRoll.VisualTypeId)
+                        ? string.Format(Tr("LOG_RAINBOW_HATCHED"), hatched.Name)
+                        : hatched.SpecialVariantId.Length > 0
                         ? string.Format(Tr("LOG_SPECIAL_HATCHED"), hatched.Name,
                             VoidlingFormPresentationCatalog.NameFor(SpecialVariantCatalog.Find(hatched.SpecialVariantId)?.VisualTypeId))
                         : $"An egg hatched and {hatched.Name} was born!", true); break;

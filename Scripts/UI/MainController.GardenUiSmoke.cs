@@ -12,6 +12,37 @@ namespace VoidlingGame;
 
 public partial class MainController
 {
+    private void RunEvolutionRefreshSmoke()
+    {
+        try
+        {
+            if (!OS.GetCmdlineUserArgs().Any(arg => arg.StartsWith("--voidling-dev-profile=", StringComparison.Ordinal)))
+                throw new InvalidOperationException("Evolution smoke requires an isolated development save profile.");
+            _session.DeveloperRaisePopulationCap(256);
+            if (!_session.DeveloperSpawnVoidling("normal"))
+                throw new InvalidOperationException("Could not create a baby for the evolution smoke.");
+            var data = _session.State.Voidlings.Last();
+            var actors = _garden.GetNode<Node2D>("Actors");
+            var before = actors.GetChildren().OfType<VoidlingActor>().Single(actor => actor.CreatureId == data.Id);
+            var childScale = before.Body.Scale.X;
+            data.Stage = LifeStage.Adult;
+            data.Appearance.VisualTypeId = "water";
+            _session.NotifyExternallyPersistedStateChanged();
+            var after = actors.GetChildren().OfType<VoidlingActor>()
+                .Single(actor => actor.CreatureId == data.Id && !actor.IsQueuedForDeletion());
+            if (ReferenceEquals(before, after) || after.Stage != LifeStage.Adult ||
+                after.VisualAppearance.VisualTypeId != "water" || after.Body.Scale.X <= childScale)
+                throw new InvalidOperationException("Garden actor did not rebuild for the adult form.");
+            GD.Print("EVOLUTION_REFRESH_SMOKE_OK");
+            GetTree().Quit();
+        }
+        catch (Exception exception)
+        {
+            GD.PrintErr($"EVOLUTION_REFRESH_SMOKE_FAILED: {exception}");
+            GetTree().Quit(1);
+        }
+    }
+
     // Run with --voidling-garden-ui-smoke --voidling-dev-profile=cozy_ui.
     // Add --voidling-garden-ui-shots with a renderer to save the real screens for art review.
     private async void RunGardenUiSmoke()
@@ -391,6 +422,15 @@ public partial class MainController
 
         var eggIds = _session.State.StoreEggs.Select(egg => egg.Id).ToArray();
         await ClickGardenControl(FindGardenButton(ledger, "CategoryEggs"));
+        foreach (var storeEgg in _session.State.StoreEggs)
+        {
+            var row = FindGardenButton(ledger, "Product_egg_" + storeEgg.Id);
+            var expectedName = ShopEggName(storeEgg.TintHex,
+                Array.FindIndex(eggIds, id => id == storeEgg.Id) + 1);
+            if (!row.FindChildren("*", "Label", true, false).OfType<Label>()
+                    .Any(label => label.Text == expectedName))
+                throw new InvalidOperationException("Shop egg row does not name its visible shell color.");
+        }
         await CaptureGardenUi("shop-eggs");
         await ClickGardenControl(FindShopBuy(ledger));
         await SettleGardenUi();

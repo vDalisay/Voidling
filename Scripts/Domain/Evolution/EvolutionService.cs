@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Voidling.Domain.Rules;
+using Voidling.Domain.Hatching;
 using Voidling.Domain.Shared;
 using Voidling.Domain.Stats;
 using VoidlingGame;
@@ -91,7 +92,8 @@ public static class EvolutionService
         creature.EvolutionSpecialization = specialization;
         creature.Appearance ??= new VoidlingAppearanceData();
         // A special variant (the Swamp guy) keeps its own look for life; only the stats grow up.
-        if (string.IsNullOrEmpty(creature.SpecialVariantId))
+        if (string.IsNullOrEmpty(creature.SpecialVariantId) &&
+            creature.Appearance.VisualTypeId != RainbowEggRoll.VisualTypeId)
             creature.Appearance.VisualTypeId = VisualTypeFor(specialization);
 
         var promotion = PromoteExpressedAllele(creature, promotedStatId, rules, specialization);

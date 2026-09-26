@@ -22,6 +22,7 @@ public partial class GameSession
             "run" => EvolutionSpecialization.Run,
             "water" => EvolutionSpecialization.Swim,
             "fly" => EvolutionSpecialization.Fly,
+            "rainbow" => EvolutionSpecialization.None,
             "power" => EvolutionSpecialization.Power,
             "swamp-variant" => EvolutionSpecialization.Swim,
             _ => (EvolutionSpecialization?)null

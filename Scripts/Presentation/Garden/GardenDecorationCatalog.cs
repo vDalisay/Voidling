@@ -30,7 +30,7 @@ public static class GardenDecorationCatalog
     {
         new("tree", "Tree", RoundTreeRegion, 1.00f),
         new("small_tree", "Small Tree", RoundTreeRegion, 0.78f),
-        new("large_tree", "Large Tree", RoundTreeRegion, 1.22f)
+        new("large_tree", "Large Tree", RoundTreeRegion, 2.44f)
     };
 
     public static IReadOnlyList<GardenDecorationDefinition> All => Definitions;

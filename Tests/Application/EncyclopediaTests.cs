@@ -24,7 +24,7 @@ public sealed class EncyclopediaTests
     {
         var ids = EncyclopediaCatalog.All.Select(entry => entry.Id).ToArray();
 
-        Assert.Equal(new[] { "baby", "neutral", "run", "swim", "fly", "power", "swamp-guy" }, ids);
+        Assert.Equal(new[] { "baby", "neutral", "run", "swim", "fly", "power", "swamp-guy", "rainbow" }, ids);
         var projection = EncyclopediaRecorder.Project(new GameStateData());
         Assert.Equal(0, projection.DiscoveredCount);
         Assert.Equal(ids.Length, projection.Total);
@@ -76,6 +76,23 @@ public sealed class EncyclopediaTests
         Assert.Equal("swamp-guy", EncyclopediaRecorder.Discover(state, swampGuy));
         Assert.Null(EncyclopediaRecorder.Discover(state, swampGuy));
         Assert.True(EncyclopediaRecorder.Project(state).Entries.Single(entry => entry.EntryId == "swamp-guy").Discovered);
+    }
+
+    [Fact]
+    public void RainbowEgg_HatchesWithItsSavedAppearanceAndUnlocksJournalEntry()
+    {
+        var state = new GameStateData();
+        state.OwnedEggs.Add(new EggData
+        {
+            Id = "rainbow-egg", Genome = new GenomeFactory(Rules.Genetics).CreateRandom(7UL),
+            Appearance = new VoidlingAppearanceData { VisualTypeId = "rainbow" },
+            IsViable = true, FailureResolved = true, RequiredIncubationSeconds = 1.0f
+        });
+
+        var result = new AdvanceSimulationUseCase(Rules).Advance(state, 2.0f);
+
+        Assert.Equal("rainbow", Assert.Single(state.Voidlings).Appearance.VisualTypeId);
+        Assert.Contains(result.Events.OfType<EncyclopediaEntryDiscoveredEvent>(), entry => entry.EntryId == "rainbow");
     }
 
     [Fact]

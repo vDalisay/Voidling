@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using Voidling.Application.Breeding;
 using Voidling.Application.Ports;
 using Voidling.Domain.Breeding;
 using Voidling.Domain.Genetics;
+using Voidling.Domain.Hatching;
 using Voidling.Domain.Rules;
 using VoidlingGame;
 using Xunit;
@@ -14,6 +16,22 @@ namespace Voidling.Tests.Application;
 public sealed class BreedVoidlingsTransactionTests
 {
     private static readonly GameBalanceRules Rules = GameBalanceRules.DemoDefaults;
+
+    [Fact]
+    public void BredEgg_RainbowAppearanceIsSavedWithTheEgg()
+    {
+        var seed = Enumerable.Range(0, 100000).Select(index => (ulong)index).First(RainbowEggRoll.IsRainbow);
+        var state = CreateBreedingState();
+        var repository = new RecordingRepository();
+
+        var result = new BreedVoidlingsUseCase(Rules).ExecuteAndPersist(
+            state, "a", "b", seed, "rainbow-egg", 0, 0, repository);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(RainbowEggRoll.VisualTypeId, result.Egg!.Appearance.VisualTypeId);
+        var saved = JsonSerializer.Deserialize<GameStateData>(repository.LastSavedJson!)!;
+        Assert.Equal(RainbowEggRoll.VisualTypeId, Assert.Single(saved.OwnedEggs).Appearance.VisualTypeId);
+    }
 
     [Fact]
     public void Execute_ReportsTypedAdultAndCooldownFailuresWithoutCreatingEgg()

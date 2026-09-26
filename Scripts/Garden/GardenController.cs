@@ -433,12 +433,27 @@ public partial class GardenController : Node2D
 
         foreach (var data in _session.State.Voidlings)
         {
-            if (_actors.ContainsKey(data.Id))
-                continue;
+            Vector2? previousPosition = null;
+            if (_actors.TryGetValue(data.Id, out var existing))
+            {
+                var visualTypeId = data.Appearance?.VisualTypeId ?? VoidlingAppearanceData.DefaultVisualTypeId;
+                if (existing.Stage == data.Stage &&
+                    string.Equals(existing.VisualAppearance.VisualTypeId, visualTypeId, StringComparison.Ordinal))
+                    continue;
 
-            var start = Math.Abs(data.WorldX) > 0.01f || Math.Abs(data.WorldY) > 0.01f
+                // Adulthood and reincarnation change the body, scale, hitbox and shadow together.
+                // Rebuild this one actor at its current position so every art-dependent part updates.
+                previousPosition = existing.Position;
+                if (_pendingGrabId == data.Id) ClearPendingGrab();
+                if (_draggedId == data.Id) _draggedId = "";
+                existing.QueueFree();
+                _actors.Remove(data.Id);
+                UntrackAtmosphereVoidling(data.Id);
+            }
+
+            var start = previousPosition ?? (Math.Abs(data.WorldX) > 0.01f || Math.Abs(data.WorldY) > 0.01f
                 ? new Vector2(data.WorldX, data.WorldY)
-                : NextSpawnPosition();
+                : NextSpawnPosition());
 
             var actor = new VoidlingActor();
             actor.Setup(data, _landBounds, start);

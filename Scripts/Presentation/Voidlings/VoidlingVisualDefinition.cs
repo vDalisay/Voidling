@@ -40,6 +40,10 @@ public partial class VoidlingVisualDefinition : Resource
     [Export(PropertyHint.Range, "1,512,1")]
     public int FrameHeight { get; set; } = 48;
 
+    // Optional source columns for artist sheets whose six frames have uneven spacing.
+    [Export]
+    public int[] FrameColumnXOffsets { get; set; } = System.Array.Empty<int>();
+
     [Export(PropertyHint.Range, "1,32,1")]
     public int WorldFrameCount { get; set; } = 4;
 

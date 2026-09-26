@@ -29,7 +29,8 @@ public static class EncyclopediaCatalog
         new EncyclopediaEntryDefinition("swim", "water", EncyclopediaDiscoveryMethod.Evolved),
         new EncyclopediaEntryDefinition("fly", "fly", EncyclopediaDiscoveryMethod.Evolved),
         new EncyclopediaEntryDefinition("power", "power", EncyclopediaDiscoveryMethod.Evolved),
-        new EncyclopediaEntryDefinition("swamp-guy", "swamp-variant", EncyclopediaDiscoveryMethod.SpecialHatched)
+        new EncyclopediaEntryDefinition("swamp-guy", "swamp-variant", EncyclopediaDiscoveryMethod.SpecialHatched),
+        new EncyclopediaEntryDefinition("rainbow", "rainbow", EncyclopediaDiscoveryMethod.SpecialHatched)
     });
 
     public static EncyclopediaEntryDefinition? Find(string? entryId)

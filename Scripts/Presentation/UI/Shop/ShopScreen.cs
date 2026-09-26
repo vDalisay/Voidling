@@ -9,7 +9,7 @@ using VoidlingGame;
 namespace Voidling.Presentation.UI.Shop;
 
 public readonly record struct ShopTrainingItemViewState(string StatId, string DisplayName, Color IdentityColor, int Owned, int Price);
-public readonly record struct ShopEggViewState(string EggId, Color TintColor, int Number, int Price);
+public readonly record struct ShopEggViewState(string EggId, Color TintColor, string DisplayName, int Price);
 public readonly record struct ShopRareOfferViewState(string ItemId, string DisplayName, string Tooltip, int Price);
 public readonly record struct ShopLandPieceViewState(string ShapeId, string DisplayName, IReadOnlyList<(int Q, int R)> Cells, int Stored, int Price);
 /// <summary>A departed special variant's respawn egg (the Swamp guy's), sold only while he is gone.</summary>
@@ -307,7 +307,7 @@ public partial class ShopScreen : VBoxContainer
         if (_category == EggsCategory)
         {
             foreach (var egg in _state!.Eggs)
-                yield return new Product("egg:" + egg.EggId, string.Format(Tr("UI_SHOP_MYSTERY_EGG"), egg.Number),
+                yield return new Product("egg:" + egg.EggId, egg.DisplayName,
                     Tr("UI_SHOP_IN_STOCK"), egg.Price,
                     () => EggIcon(egg.TintColor), () => EggPurchaseRequested?.Invoke(egg.EggId));
             yield break;

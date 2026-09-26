@@ -18,6 +18,8 @@ public static class VoidlingVisualFactory
         "res://Resources/Presentation/Voidlings/DefaultVoidlingVisualCatalog.tres";
     public const string PaletteShaderPath =
         "res://Resources/Presentation/Voidlings/VoidlingPaletteSwap.gdshader";
+    public const string RainbowShaderPath =
+        "res://Resources/Presentation/Voidlings/VoidlingRainbow.gdshader";
 
     private const int MaxPaletteSlots = 8;
 
@@ -34,6 +36,8 @@ public static class VoidlingVisualFactory
     private static readonly Dictionary<string, SpriteFrames> RaceFrames = new(StringComparer.Ordinal);
     private static readonly Shader PaletteShader = GD.Load<Shader>(PaletteShaderPath)
         ?? throw new InvalidOperationException($"Voidling palette shader could not be loaded from {PaletteShaderPath}.");
+    private static readonly Shader RainbowShader = GD.Load<Shader>(RainbowShaderPath)
+        ?? throw new InvalidOperationException($"Voidling rainbow shader could not be loaded from {RainbowShaderPath}.");
 
     private static VoidlingVisualDefinition DefaultDefinition => ResolveDefinition(Catalog.DefaultVisualTypeId);
 
@@ -169,7 +173,8 @@ public static class VoidlingVisualFactory
             definition.PortraitColumn,
             definition.PortraitRow,
             definition.FrameWidth,
-            definition.FrameHeight);
+            definition.FrameHeight,
+            definition.FrameColumnXOffsets);
     }
 
     /// <summary>
@@ -186,12 +191,20 @@ public static class VoidlingVisualFactory
         appearance = ForRendering(appearance);
         var definition = ResolveDefinition(appearance.VisualTypeId);
         sprite.SpriteFrames = race ? GetRaceFrames(definition.DefinitionId) : GetWorldFrames(definition.DefinitionId);
-        ApplyPaletteOrFallback(
-            sprite,
-            definition.SourcePaletteColors,
-            appearance.PaletteHue,
-            definition.PaletteMatchTolerance,
-            appearance.FallbackTintHex);
+        if (definition.DefinitionId == "rainbow")
+        {
+            sprite.Modulate = Colors.White;
+            sprite.Material = new ShaderMaterial { Shader = RainbowShader };
+        }
+        else
+        {
+            ApplyPaletteOrFallback(
+                sprite,
+                definition.SourcePaletteColors,
+                appearance.PaletteHue,
+                definition.PaletteMatchTolerance,
+                appearance.FallbackTintHex);
+        }
 
         var existing = sprite.GetNodeOrNull<VoidlingVisualLayerSync2D>("__voidling_layers");
         if (existing != null && GodotObject.IsInstanceValid(existing))
@@ -365,12 +378,20 @@ public static class VoidlingVisualFactory
             throw new InvalidOperationException("Voidling held scale multiplier must be positive.");
         if (definition.SourcePaletteColors.Count > MaxPaletteSlots)
             throw new InvalidOperationException($"Voidling '{definition.DefinitionId}' palette exceeds {MaxPaletteSlots} slots.");
+        if (definition.FrameColumnXOffsets.Length > 0)
+        {
+            var required = Math.Max(definition.WorldFrameCount,
+                Math.Max(definition.RaceRunFrameCount, Math.Max(definition.RaceSwimFrameCount, definition.PortraitColumn + 1)));
+            if (definition.FrameColumnXOffsets.Length < required ||
+                definition.FrameColumnXOffsets.Any(offset => offset < 0 || offset + definition.FrameWidth > definition.BaseAtlas.GetWidth()))
+                throw new InvalidOperationException($"Voidling '{definition.DefinitionId}' has invalid source frame columns.");
+        }
 
         ValidateAtlasCoverage(
             definition.BaseAtlas,
             definition.FrameWidth,
             definition.FrameHeight,
-            definition.WorldFrameCount,
+            definition.FrameColumnXOffsets.Length > 0 ? 1 : definition.WorldFrameCount,
             definition.WalkDownRow,
             definition.WalkUpRow,
             definition.WalkLeftRow,
@@ -379,19 +400,19 @@ public static class VoidlingVisualFactory
             definition.BaseAtlas,
             definition.FrameWidth,
             definition.FrameHeight,
-            definition.RaceRunFrameCount,
+            definition.FrameColumnXOffsets.Length > 0 ? 1 : definition.RaceRunFrameCount,
             definition.RaceRunRow);
         ValidateAtlasCoverage(
             definition.BaseAtlas,
             definition.FrameWidth,
             definition.FrameHeight,
-            definition.PortraitColumn + 1,
+            definition.FrameColumnXOffsets.Length > 0 ? 1 : definition.PortraitColumn + 1,
             definition.PortraitRow);
         ValidateAtlasCoverage(
             definition.SwimAtlas ?? definition.BaseAtlas,
             definition.FrameWidth,
             definition.FrameHeight,
-            definition.RaceSwimFrameCount,
+            definition.FrameColumnXOffsets.Length > 0 ? 1 : definition.RaceSwimFrameCount,
             definition.RaceSwimRow);
 
         var layerIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -540,13 +561,13 @@ public static class VoidlingVisualFactory
         var count = frameCountOverride ?? definition.WorldFrameCount;
         var fps = fpsOverride ?? definition.WorldAnimationFps;
         AddAnimation(frames, "walk_down", atlas, definition.WalkDownRow, count,
-            fps, definition.FrameWidth, definition.FrameHeight);
+            fps, definition.FrameWidth, definition.FrameHeight, definition.FrameColumnXOffsets);
         AddAnimation(frames, "walk_up", atlas, definition.WalkUpRow, count,
-            fps, definition.FrameWidth, definition.FrameHeight);
+            fps, definition.FrameWidth, definition.FrameHeight, definition.FrameColumnXOffsets);
         AddAnimation(frames, "walk_left", atlas, definition.WalkLeftRow, count,
-            fps, definition.FrameWidth, definition.FrameHeight);
+            fps, definition.FrameWidth, definition.FrameHeight, definition.FrameColumnXOffsets);
         AddAnimation(frames, "walk_right", atlas, definition.WalkRightRow, count,
-            fps, definition.FrameWidth, definition.FrameHeight);
+            fps, definition.FrameWidth, definition.FrameHeight, definition.FrameColumnXOffsets);
         return frames;
     }
 
@@ -560,10 +581,10 @@ public static class VoidlingVisualFactory
         var frames = CreateEmptyFrames();
         AddAnimation(frames, "run", baseAtlas, definition.RaceRunRow,
             frameCountOverride ?? definition.RaceRunFrameCount,
-            fpsOverride ?? definition.RaceRunFps, definition.FrameWidth, definition.FrameHeight);
+            fpsOverride ?? definition.RaceRunFps, definition.FrameWidth, definition.FrameHeight, definition.FrameColumnXOffsets);
         AddAnimation(frames, "swim", swimAtlas, definition.RaceSwimRow,
             frameCountOverride ?? definition.RaceSwimFrameCount,
-            fpsOverride ?? definition.RaceSwimFps, definition.FrameWidth, definition.FrameHeight);
+            fpsOverride ?? definition.RaceSwimFps, definition.FrameWidth, definition.FrameHeight, definition.FrameColumnXOffsets);
         return frames;
     }
 
@@ -582,7 +603,8 @@ public static class VoidlingVisualFactory
         int frameCount,
         double fps,
         int frameWidth,
-        int frameHeight)
+        int frameHeight,
+        int[]? sourceColumns = null)
     {
         frames.AddAnimation(name);
         frames.SetAnimationLoop(name, true);
@@ -592,7 +614,7 @@ public static class VoidlingVisualFactory
         // the body and its layers round instead of flat. Without a light nearby it draws the same.
         var lit = SpriteNormalMaps.Lit(atlas, frameWidth, frameHeight);
         for (var column = 0; column < frameCount; column++)
-            frames.AddFrame(name, CreateAtlasFrame(lit, column, row, frameWidth, frameHeight));
+            frames.AddFrame(name, CreateAtlasFrame(lit, column, row, frameWidth, frameHeight, sourceColumns));
     }
 
     private static AtlasTexture CreateAtlasFrame(
@@ -600,12 +622,13 @@ public static class VoidlingVisualFactory
         int column,
         int row,
         int frameWidth,
-        int frameHeight)
+        int frameHeight,
+        int[]? sourceColumns = null)
         => new()
         {
             Atlas = atlas,
             Region = new Rect2(
-                column * frameWidth,
+                sourceColumns is { Length: > 0 } ? sourceColumns[column] : column * frameWidth,
                 row * frameHeight,
                 frameWidth,
                 frameHeight)

@@ -132,7 +132,8 @@ public sealed class ShopUseCase
         var egg = _storeEggFactory.Create(eggId, eggSeed);
         SpecialVariantCatalog.ForceGenes(variant, egg.Genome);
         egg.SpecialVariantId = variant.Id;
-        egg.Appearance.VisualTypeId = variant.VisualTypeId;
+        if (egg.Appearance.VisualTypeId != RainbowEggRoll.VisualTypeId)
+            egg.Appearance.VisualTypeId = variant.VisualTypeId;
         egg.RequiredIncubationSeconds = IncubationPolicy.RequiredSeconds(egg.Genome, egg.RareTraits, isSpecialVariant: true, _rules.Hatching);
         egg.IsViable = true;
         egg.State = EggState.Stored;

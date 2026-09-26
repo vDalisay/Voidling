@@ -184,7 +184,37 @@ msgid "UI_SHOP_EGGS_TITLE"
 msgstr "MYSTERY EGGS"
 
 msgid "UI_SHOP_EGGS_SUBTITLE"
-msgstr "Each egg already carries its own hidden DNA."
+msgstr "Shell color is shown. DNA and adult form remain a surprise."
+
+msgid "UI_SHOP_COLOR_EGG"
+msgstr "{0} EGG {1}"
+
+msgid "UI_EGG_COLOR_NEUTRAL"
+msgstr "NEUTRAL"
+
+msgid "UI_EGG_COLOR_RED"
+msgstr "RED"
+
+msgid "UI_EGG_COLOR_ORANGE"
+msgstr "ORANGE"
+
+msgid "UI_EGG_COLOR_YELLOW"
+msgstr "YELLOW"
+
+msgid "UI_EGG_COLOR_GREEN"
+msgstr "GREEN"
+
+msgid "UI_EGG_COLOR_TEAL"
+msgstr "TEAL"
+
+msgid "UI_EGG_COLOR_BLUE"
+msgstr "BLUE"
+
+msgid "UI_EGG_COLOR_PURPLE"
+msgstr "PURPLE"
+
+msgid "UI_EGG_COLOR_PINK"
+msgstr "PINK"
 
 msgid "UI_SHOP_OWNED"
 msgstr "OWNED {0}"
@@ -1292,6 +1322,9 @@ msgstr "Swim"
 msgid "FORM_FLY"
 msgstr "Fly"
 
+msgid "FORM_RAINBOW"
+msgstr "Rainbow Voidling"
+
 msgid "FORM_POWER"
 msgstr "Power"
 
@@ -1409,6 +1442,9 @@ msgstr "Bought the {0}'s egg. Put it on a {1} that has never hatched one."
 msgid "LOG_SPECIAL_HATCHED"
 msgstr "{0} hatched: the {1} is here!"
 
+msgid "LOG_RAINBOW_HATCHED"
+msgstr "{0} hatched as a Rainbow Voidling!"
+
 msgid "LOG_SPECIAL_RESPAWN_AVAILABLE"
 msgstr "The {0} is gone. A new {0} egg is in the Shop; it needs a {1} that has never hatched one."
 
@@ -1457,6 +1493,9 @@ msgstr "Power adult"
 msgid "JOURNAL_NAME_SWAMP_GUY"
 msgstr "Swamp guy"
 
+msgid "JOURNAL_NAME_RAINBOW"
+msgstr "Rainbow Voidling"
+
 msgid "JOURNAL_HOW_BABY"
 msgstr "Hatches from any egg."
 
@@ -1477,6 +1516,9 @@ msgstr "A baby grows into a Power adult when Power is its highest stat at level 
 
 msgid "JOURNAL_HOW_SWAMP_GUY"
 msgstr "Breed two Swim adults while you own a Swamp: their egg hatches him on a Swamp that never hatched one. Level 4 Water becomes a Swamp."
+
+msgid "JOURNAL_HOW_RAINBOW"
+msgstr "A rare 1 in 8,192 hatch from any egg. Its colors slowly shimmer through the rainbow."
 
 msgid "LOG_JOURNAL_NEW"
 msgstr "New journal entry: {0}, found with {1}!"
