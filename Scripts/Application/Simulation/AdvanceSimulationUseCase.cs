@@ -89,7 +89,7 @@ public sealed class AdvanceSimulationUseCase
                 egg.State = EggState.Failed; egg.FailureResolved = true; changed = true;
                 events.Add(new EggFailedEvent(egg.Id)); continue;
             }
-            if (state.Voidlings.Count >= Math.Max(1, _rules.Garden.MaxPopulation))
+            if (state.Voidlings.Count >= Math.Max(1, Math.Max(_rules.Garden.MaxPopulation, state.GardenPopulationCapOverride)))
             {
                 if (egg.State != EggState.WaitingForSpace)
                 { egg.State = EggState.WaitingForSpace; changed = true; events.Add(new EggWaitingForGardenSpaceEvent(egg.Id)); }
@@ -100,6 +100,30 @@ public sealed class AdvanceSimulationUseCase
         }
         changed |= RecordDiscoveries(state, events);
         return new SimulationStepResult(changed, events);
+    }
+
+    /// <summary>Playtest shortcut using the normal hatch construction and discovery bookkeeping.</summary>
+    public SimulationStepResult HatchImmediately(GameStateData state, string eggId)
+    {
+        var egg = state.OwnedEggs.Find(candidate => candidate.Id == eggId);
+        if (egg == null || egg.State == EggState.Failed ||
+            state.Voidlings.Count >= Math.Max(1, Math.Max(_rules.Garden.MaxPopulation, state.GardenPopulationCapOverride)))
+            return new SimulationStepResult(false, Array.Empty<GameSimulationEvent>());
+        var events = new List<GameSimulationEvent>();
+        if (!egg.IsViable)
+        {
+            egg.State = EggState.Failed;
+            egg.FailureResolved = true;
+            events.Add(new EggFailedEvent(egg.Id));
+        }
+        else
+        {
+            var creature = Hatch(state, egg);
+            events.Add(new CreatureHatchedEvent(egg.Id, creature.Id, creature.Name)
+                { SpecialVariantId = creature.SpecialVariantId });
+        }
+        RecordDiscoveries(state, events);
+        return new SimulationStepResult(true, events);
     }
 
     /// <summary>Hatching and growing up fill the journal the first time each look appears.</summary>

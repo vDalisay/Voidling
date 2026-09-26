@@ -9,6 +9,78 @@ msgstr ""
 msgid "UI_COMMON_CLOSE"
 msgstr "Close"
 
+msgid "UI_DEV_TITLE"
+msgstr "Developer menu"
+
+msgid "UI_DEV_HINT"
+msgstr "Playtest tools  •  ` to close  •  Garden changes save immediately"
+
+msgid "UI_DEV_VOIDLING"
+msgstr "Voidling form"
+
+msgid "UI_DEV_TILE"
+msgstr "Biome tile"
+
+msgid "UI_DEV_SPROUTS"
+msgstr "Sprouts"
+
+msgid "UI_DEV_ITEM"
+msgstr "Item"
+
+msgid "UI_DEV_EGG"
+msgstr "Egg"
+
+msgid "UI_DEV_HATCH"
+msgstr "Instant hatch"
+
+msgid "UI_DEV_CAP"
+msgstr "Maximum Voidlings"
+
+msgid "UI_DEV_SPEED"
+msgstr "Time speed"
+
+msgid "UI_DEV_HOURS"
+msgstr "Advance hours"
+
+msgid "UI_DEV_SPAWN"
+msgstr "Spawn"
+
+msgid "UI_DEV_ADD"
+msgstr "Add"
+
+msgid "UI_DEV_SET"
+msgstr "Set"
+
+msgid "UI_DEV_ADVANCE"
+msgstr "Advance"
+
+msgid "UI_DEV_TREAT"
+msgstr "treat"
+
+msgid "UI_DEV_INCUBATION_SKIP"
+msgstr "Incubation skip"
+
+msgid "UI_DEV_MYSTERY_EGG"
+msgstr "Mystery egg"
+
+msgid "UI_DEV_GARDEN_FULL"
+msgstr "Garden is full. Raise the cap first."
+
+msgid "UI_DEV_HATCH_FAILED"
+msgstr "Could not hatch this egg. Raise the cap or select another egg."
+
+msgid "UI_DEV_CHANGE_SAVED"
+msgstr "Playtest change saved."
+
+msgid "UI_DEV_EGG_HATCHED"
+msgstr "Egg hatched instantly."
+
+msgid "UI_DEV_EGG_RESOLVED"
+msgstr "Egg failure resolved instantly."
+
+msgid "UI_DEV_TIME_ADVANCED"
+msgstr "Game time advanced."
+
 msgid "UI_COMMON_CANCEL"
 msgstr "Cancel"
 

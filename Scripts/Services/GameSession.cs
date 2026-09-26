@@ -39,6 +39,9 @@ public partial class GameSession : Node
     public GameSessionStartupNotice StartupNotice { get; private set; }
 
     private double _simulationAccumulator;
+    private float _developerTimeScale = 1f;
+    public float DeveloperTimeScale => _developerTimeScale;
+    public void SetDeveloperTimeScale(float scale) => _developerTimeScale = Math.Clamp(scale, 1f, 100f);
     private IGameStateRepository? _stateRepository;
     private IGameStateRecoveryInfo? _stateRecoveryInfo;
     private IAudioSettingsAdapter? _audioSettings;
@@ -86,12 +89,21 @@ public partial class GameSession : Node
 
     public override void _Process(double delta)
     {
-        _simulationAccumulator += delta;
+        DeveloperClockOffsetSeconds += delta * (_developerTimeScale - 1f);
+        _simulationAccumulator += delta * _developerTimeScale;
         if (_simulationAccumulator < 0.5) return;
         var step = (float)_simulationAccumulator;
         _simulationAccumulator = 0.0;
         var result = _simulation!.Advance(State, step);
 
+        PresentSimulationEvents(result);
+        if (!result.Changed) return;
+        Save();
+        StateChanged?.Invoke();
+    }
+
+    private void PresentSimulationEvents(SimulationStepResult result)
+    {
         foreach (var simulationEvent in result.Events)
         {
             switch (simulationEvent)
@@ -126,9 +138,6 @@ public partial class GameSession : Node
                     Announce("The Garden is full. Say goodbye to a Voidling before this egg can hatch.", true); break;
             }
         }
-        if (!result.Changed) return;
-        Save();
-        StateChanged?.Invoke();
     }
 
     /// <summary>When a special variant leaves, say that its respawn egg is now in the shop.</summary>

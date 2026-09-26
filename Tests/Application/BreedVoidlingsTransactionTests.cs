@@ -63,6 +63,17 @@ public sealed class BreedVoidlingsTransactionTests
     }
 
     [Fact]
+    public void Preview_AllowsBreedingAfterDeveloperRaisesCap()
+    {
+        var state = CreateBreedingState();
+        while (state.Voidlings.Count < Rules.Garden.MaxPopulation)
+            state.Voidlings.Add(CreateAdult($"extra-{state.Voidlings.Count}", (ulong)state.Voidlings.Count));
+        state.GardenPopulationCapOverride = Rules.Garden.MaxPopulation + 1;
+
+        Assert.True(new BreedVoidlingsUseCase(Rules).Preview(state, "a", "b").CanBreed);
+    }
+
+    [Fact]
     public void ExecuteAndPersist_SavesFrozenEggAndCooldownsExactlyOnce()
     {
         var state = CreateBreedingState();

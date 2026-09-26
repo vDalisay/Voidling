@@ -17,7 +17,7 @@ public partial class GardenController
         if (_gardenEnvironmentTimer != null && GodotObject.IsInstanceValid(_gardenEnvironmentTimer))
             return;
 
-        ApplyGardenEnvironment(DateTime.Now);
+        RefreshGardenEnvironmentFromSystemClock();
 
         _gardenEnvironmentTimer = new Timer
         {
@@ -49,7 +49,9 @@ public partial class GardenController
     }
 
     private void RefreshGardenEnvironmentFromSystemClock()
-        => ApplyGardenEnvironment(DateTime.Now);
+        => ApplyGardenEnvironment(DateTime.Now.AddSeconds(_session.DeveloperClockOffsetSeconds));
+
+    public void RefreshDeveloperEnvironment() => RefreshGardenEnvironmentFromSystemClock();
 
     /// <summary>
     /// The day, dusk and night light is the atmosphere's ambient light now rather than a tint on this

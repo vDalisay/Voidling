@@ -95,6 +95,8 @@ public partial class MainController : Node
         Callable.From(StartFirstLaunchTutorialIfNeeded).CallDeferred();
         if (Array.Exists(OS.GetCmdlineUserArgs(), arg => arg == "--voidling-garden-ui-smoke"))
             Callable.From(RunGardenUiSmoke).CallDeferred();
+        if (Array.Exists(OS.GetCmdlineUserArgs(), arg => arg == "--voidling-developer-menu-smoke"))
+            Callable.From(RunDeveloperMenuSmoke).CallDeferred();
     }
 
     public override void _ExitTree()
@@ -121,6 +123,16 @@ public partial class MainController : Node
 
     public override void _Input(InputEvent inputEvent)
     {
+        if (inputEvent is InputEventKey { Pressed: true, Echo: false } key &&
+            (key.PhysicalKeycode == Key.Quoteleft || key.Keycode == Key.Quoteleft) &&
+            GetViewport().GuiGetFocusOwner() is not LineEdit &&
+            _race == null && _multiplayerRaceScreen == null && _tradeExchangeScreen == null)
+        {
+            if (_developerMenuOpen) CloseModal();
+            else ShowDeveloperMenu();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
         // A running race owns Escape: it opens its own pause menu so the player can leave mid-race.
         if (_race != null || _multiplayerRaceScreen != null || _tradeExchangeScreen != null ||
             !inputEvent.IsActionPressed("ui_cancel"))
@@ -508,6 +520,7 @@ public partial class MainController : Node
     private VBoxContainer OpenModal(string title, Vector2 size, Action? backRequested, float leftInset, bool usesRail,
         string eyebrow = "", Color? panelTint = null, Texture2D? icon = null)
     {
+        _developerMenuOpen = false;
         // An open window swaps (or redraws) in place inside the host, so the shade stays put and
         // the focus to return to is the one from before the first window.
         if (!_modalHost.IsOpen && (_modalReturnFocus == null || !GodotObject.IsInstanceValid(_modalReturnFocus)))
@@ -539,6 +552,7 @@ public partial class MainController : Node
 
     private void CloseModal(bool restoreGardenHud)
     {
+        _developerMenuOpen = false;
         _modalHost.Close();
         _modalBack = null;
         _modalUsesRail = false;

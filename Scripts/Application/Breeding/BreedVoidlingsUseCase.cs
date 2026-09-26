@@ -235,7 +235,7 @@ public sealed class BreedVoidlingsUseCase
             return (BreedingFailure.ParentNotFound, first, second);
         if (first.Id == second.Id)
             return (BreedingFailure.SameParent, first, second);
-        if (state.Voidlings.Count >= Math.Max(1, _rules.Garden.MaxPopulation))
+        if (state.Voidlings.Count >= Math.Max(1, Math.Max(_rules.Garden.MaxPopulation, state.GardenPopulationCapOverride)))
             return (BreedingFailure.GardenFull, first, second);
         if (first.Stage != LifeStage.Adult || second.Stage != LifeStage.Adult)
             return (BreedingFailure.ParentNotAdult, first, second);

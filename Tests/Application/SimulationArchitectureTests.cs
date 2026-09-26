@@ -12,6 +12,24 @@ public sealed class SimulationArchitectureTests
     private static readonly GameBalanceRules Rules = GameBalanceRules.DemoDefaults;
 
     [Fact]
+    public void DeveloperCapAndInstantHatch_UseTheNormalFrozenEgg()
+    {
+        var state = new GameStateData { GardenPopulationCapOverride = Rules.Garden.MaxPopulation + 1 };
+        for (var i = 0; i < Rules.Garden.MaxPopulation; i++)
+            state.Voidlings.Add(NewAdult($"adult-{i}"));
+        var genome = new GenomeFactory(Rules.Genetics).CreateRandom(42UL);
+        state.OwnedEggs.Add(new EggData { Id = "playtest-egg", Genome = genome, State = EggState.Stored });
+
+        var result = new AdvanceSimulationUseCase(Rules).HatchImmediately(state, "playtest-egg");
+
+        Assert.True(result.Changed);
+        Assert.Single(result.Events.OfType<CreatureHatchedEvent>());
+        Assert.Same(genome, state.Voidlings.Last().Genome);
+        Assert.Empty(state.OwnedEggs);
+        Assert.Equal(Rules.Garden.MaxPopulation + 1, state.Voidlings.Count);
+    }
+
+    [Fact]
     public void Advance_TransitionsChildAndClampsBreedingCooldown()
     {
         var child = new VoidlingData

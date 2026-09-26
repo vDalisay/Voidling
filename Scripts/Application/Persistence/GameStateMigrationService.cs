@@ -49,6 +49,7 @@ public sealed class GameStateMigrationService
     {
         ArgumentNullException.ThrowIfNull(state);
         var previousVersion = state.SaveVersion;
+        state.GardenPopulationCapOverride = Math.Clamp(state.GardenPopulationCapOverride, 0, 256);
 
         state.Voidlings ??= new List<VoidlingData>();
         state.DepartedVoidlings ??= new List<VoidlingData>();

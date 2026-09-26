@@ -31,6 +31,8 @@ public sealed class GameStateData
     /// <summary>Player-authored name for the island. Blank falls back to the localized default.</summary>
     public string GardenName { get; set; } = "";
     public int Coins { get; set; } = 120;
+    /// <summary>Zero uses the authored Garden limit; positive values are playtest overrides.</summary>
+    public int GardenPopulationCapOverride { get; set; }
     public double GardenIncomeCoinRemainder { get; set; }
     public double ShopEggRotationElapsedSeconds { get; set; }
     public long SeedCounter { get; set; } = 1;
