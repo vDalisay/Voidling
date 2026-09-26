@@ -58,6 +58,8 @@ public partial class VoidlingVisualSmokeProbe : Node
             throw new InvalidOperationException($"Portrait for '{visualTypeId}' resolved with invalid body dimensions.");
         if (definition.SourcePaletteColors.Count > 0 && body.Material == null)
             throw new InvalidOperationException($"Palette-enabled portrait '{visualTypeId}' did not receive a palette material.");
+        if (visualTypeId == "rainbow" && body.Material is not ShaderMaterial)
+            throw new InvalidOperationException("Rainbow portrait body lost its color-cycle shader.");
         if (portrait.GetNodeOrNull<Control>("__mutation_badge") == null)
             throw new InvalidOperationException($"Portrait mutation overlay for '{visualTypeId}' was not composed.");
 
@@ -85,6 +87,14 @@ public partial class VoidlingVisualSmokeProbe : Node
                 throw new InvalidOperationException(
                     $"Portrait layer '{expected.LayerId}' for '{visualTypeId}' changed relative Z order.");
             }
+        }
+
+        if (visualTypeId == "rainbow")
+        {
+            var eyesIndex = expectedLayers.ToList().FindIndex(layer => layer.LayerId == "rainbow_eyes");
+            var eyes = portraitLayers[eyesIndex];
+            if (eyes.Material is ShaderMaterial shader && shader.Shader?.ResourcePath == VoidlingVisualFactory.RainbowShaderPath)
+                throw new InvalidOperationException("Rainbow eye overlay inherited the body shader.");
         }
 
         portrait.QueueFree();
@@ -150,6 +160,8 @@ public partial class VoidlingVisualSmokeProbe : Node
         }
         if (definition.SourcePaletteColors.Count > 0 && sprite.Material == null)
             throw new InvalidOperationException($"Palette-enabled visual '{visualTypeId}' did not receive a palette material.");
+        if (visualTypeId == "rainbow" && sprite.Material is not ShaderMaterial)
+            throw new InvalidOperationException("Rainbow world body lost its color-cycle shader.");
 
         var expectedLayers = VoidlingVisualFactory.ResolveLayers(definition, appearance.LayerIds);
         var layerRoot = sprite.GetNodeOrNull<VoidlingVisualLayerSync2D>("__voidling_layers");
@@ -190,6 +202,20 @@ public partial class VoidlingVisualSmokeProbe : Node
             }
         }
 
+        if (visualTypeId == "rainbow")
+        {
+            var eyesIndex = expectedLayers.ToList().FindIndex(layer => layer.LayerId == "rainbow_eyes");
+            var eyes = actualLayers[eyesIndex];
+            if (eyes.Material is ShaderMaterial shader && shader.Shader?.ResourcePath == VoidlingVisualFactory.RainbowShaderPath)
+                throw new InvalidOperationException("Rainbow eye overlay inherited the body shader.");
+            if (eyes.SpriteFrames?.GetFrameCount(animation) != 1)
+                throw new InvalidOperationException("Rainbow eye overlay must use the supplied single-frame art.");
+            sprite.Frame = 3;
+            layerRoot._Process(0.0);
+            if (!Mathf.IsEqualApprox(eyes.Position.Y, 2.0f))
+                throw new InvalidOperationException("Rainbow eyes did not follow the body frame's vertical bob.");
+        }
+
         if (!race)
             ValidateHorizontalFacing(sprite, layerRoot, actualLayers, visualTypeId);
 
@@ -223,6 +249,14 @@ public partial class VoidlingVisualSmokeProbe : Node
     {
         var definition = VoidlingVisualFactory.ResolveDefinition(visualTypeId);
         var layers = VoidlingVisualFactory.ResolveLayers(definition, definition.DefaultLayerIds);
+
+        foreach (var required in new[] { "wings_golden_back", "wings_golden_front", "crown_golden" })
+        {
+            if (!layers.Any(layer => layer.LayerId == required))
+                throw new InvalidOperationException($"Voidling '{visualTypeId}' is missing its shared wing/halo layer '{required}'.");
+        }
+        if (visualTypeId == "rainbow" && !layers.Any(layer => layer.LayerId == "rainbow_eyes"))
+            throw new InvalidOperationException("Rainbow Voidling is missing its unshaded eye layer.");
 
         foreach (var group in layers
                      .Where(layer => !string.IsNullOrWhiteSpace(layer.MotionGroupId))

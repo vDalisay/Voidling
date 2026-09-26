@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace Voidling.Presentation.Voidlings;
@@ -65,9 +66,12 @@ public static class VoidlingPortraitComposer
             MouseFilter = Control.MouseFilterEnum.Ignore,
             ZIndex = zBias
         };
-        body.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         ApplyBasePalette(body, appearance);
         portrait.AddChild(body);
+        var surfaces = new List<(TextureRect Node, Vector2 Offset, Vector2 Size)>
+        {
+            (body, Vector2.Zero, new Vector2(definition.FrameWidth, definition.FrameHeight))
+        };
 
         var layerIndex = 0;
         foreach (var layerDefinition in resolvedLayers)
@@ -81,11 +85,53 @@ public static class VoidlingPortraitComposer
                 MouseFilter = Control.MouseFilterEnum.Ignore,
                 ZIndex = zBias + layerDefinition.ZIndexOffset
             };
-            layer.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-            layer.Position += layerDefinition.OffsetAtScaleOne;
-            layer.Scale = Vector2.One * layerDefinition.ScaleMultiplier;
             VoidlingVisualFactory.ApplyLayerPalette(layer, definition, layerDefinition, appearance);
             portrait.AddChild(layer);
+            var layerSize = new Vector2(
+                layerDefinition.FrameWidth > 0 ? layerDefinition.FrameWidth : definition.FrameWidth,
+                layerDefinition.FrameHeight > 0 ? layerDefinition.FrameHeight : definition.FrameHeight);
+            var portraitFrameOffset = layerDefinition.FrameYOffsets.Length > definition.PortraitColumn
+                ? layerDefinition.FrameYOffsets[definition.PortraitColumn]
+                : 0;
+            surfaces.Add((layer,
+                layerDefinition.OffsetAtScaleOne + new Vector2(0, portraitFrameOffset),
+                layerSize * layerDefinition.ScaleMultiplier));
+        }
+
+        LayoutSurfaces(portrait, surfaces);
+    }
+
+    private static void LayoutSurfaces(
+        TextureRect portrait,
+        IReadOnlyList<(TextureRect Node, Vector2 Offset, Vector2 Size)> surfaces)
+    {
+        var minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+        var maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+        foreach (var surface in surfaces)
+        {
+            minimum = minimum.Min(surface.Offset - surface.Size * 0.5f);
+            maximum = maximum.Max(surface.Offset + surface.Size * 0.5f);
+        }
+
+        var box = portrait.CustomMinimumSize;
+        if (box.X <= 0 || box.Y <= 0)
+            box = portrait.Size;
+        if (box.X <= 0 || box.Y <= 0)
+            box = new Vector2(48, 48);
+        var scale = Mathf.Min(box.X / (maximum.X - minimum.X), box.Y / (maximum.Y - minimum.Y));
+        var center = (minimum + maximum) * 0.5f;
+        foreach (var surface in surfaces)
+        {
+            var topLeft = (surface.Offset - surface.Size * 0.5f - center) * scale;
+            var bottomRight = topLeft + surface.Size * scale;
+            surface.Node.AnchorLeft = 0.5f;
+            surface.Node.AnchorRight = 0.5f;
+            surface.Node.AnchorTop = 0.5f;
+            surface.Node.AnchorBottom = 0.5f;
+            surface.Node.OffsetLeft = topLeft.X;
+            surface.Node.OffsetTop = topLeft.Y;
+            surface.Node.OffsetRight = bottomRight.X;
+            surface.Node.OffsetBottom = bottomRight.Y;
         }
     }
 
@@ -112,10 +158,11 @@ public static class VoidlingPortraitComposer
         {
             Atlas = layer.BaseAtlas,
             Region = new Rect2(
-                definition.PortraitColumn * definition.FrameWidth,
-                definition.PortraitRow * definition.FrameHeight,
-                definition.FrameWidth,
-                definition.FrameHeight)
+                (layer.SelfAnimatedFrameCount == 1 ? 0 : definition.PortraitColumn) *
+                    (layer.FrameWidth > 0 ? layer.FrameWidth : definition.FrameWidth),
+                definition.PortraitRow * (layer.FrameHeight > 0 ? layer.FrameHeight : definition.FrameHeight),
+                layer.FrameWidth > 0 ? layer.FrameWidth : definition.FrameWidth,
+                layer.FrameHeight > 0 ? layer.FrameHeight : definition.FrameHeight)
         };
     }
 }

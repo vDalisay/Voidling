@@ -231,6 +231,13 @@ public partial class VoidlingVisualLayerSync2D : Node2D
 
             layer.FlipH = _target.FlipH;
             layer.FlipV = _target.FlipV;
+            if (runtime.Definition.FrameYOffsets.Length > 0)
+            {
+                var position = layer.Position;
+                position.Y = runtime.Definition.OffsetAtScaleOne.Y +
+                    runtime.Definition.FrameYOffsets[Math.Clamp(_target.Frame, 0, runtime.Definition.FrameYOffsets.Length - 1)];
+                layer.Position = position;
+            }
         }
     }
 }

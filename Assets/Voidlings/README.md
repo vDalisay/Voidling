@@ -30,6 +30,12 @@ For each production body family:
 7. enter the exact source colors that are intended to be color-DNA-recolored in `SourcePaletteColors` in dark-to-light order;
 8. run CI.
 
+Every registered body must also list both golden wing layers and the golden halo
+(`crown_golden`) in its default visual layers. These accessories stay separate
+from the body shader. A layer with a different source frame grid declares its own
+`FrameWidth` and `FrameHeight`; the factory keeps it aligned in world and portraits.
+The visual smoke test checks this for every body family.
+
 Pixels not represented by source palette slots remain unchanged.
 
 ## Visual types to register
@@ -40,7 +46,9 @@ Gameplay already assigns these semantic types; until a type has its own definiti
 |---|---|---|
 | `normal` | every baby | color DNA |
 | `neutral` | Neutral adults | artist's colors |
-| `run`, `water`, `fly`, `power` | typed adults | color DNA |
+| `run`, `power` | typed adults using the normal fallback | color DNA |
+| `water`, `fly` | typed adults with their own sheets | artist's colors |
+| `rainbow` | rare hatch from any egg | color-cycling body, unshaded eyes |
 | `swamp-variant` | the Swamp guy | artist's colors |
 
 `AuthoredColorVisualTypeIds` in the catalog lists the types drawn in the artist's colors (no palette swap). `PlaceholderHueVisualTypeIds` / `PlaceholderHues` give an unregistered special variant a stand-in hue on the fallback body; the Swamp guy uses green (0.3) until his sheet is added. Registering a definition with that ID replaces the placeholder automatically.

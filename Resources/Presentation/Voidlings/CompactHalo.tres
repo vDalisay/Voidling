@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="VoidlingVisualLayerDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Presentation/Voidlings/VoidlingVisualLayerDefinition.cs" id="1_layer"]
+[ext_resource type="Texture2D" path="res://Assets/Voidlings/Layers/Crown/golden_crown_animated.png" id="2_atlas"]
+
+[resource]
+script = ExtResource("1_layer")
+LayerId = "crown_golden"
+SlotId = "crown"
+BaseAtlas = ExtResource("2_atlas")
+FrameWidth = 32
+FrameHeight = 48
+ZIndexOffset = 2
+OffsetAtScaleOne = Vector2(0, -6)
+PaletteAffected = false
+SelfAnimatedFrameCount = 8
+SelfAnimatedFps = 5.0

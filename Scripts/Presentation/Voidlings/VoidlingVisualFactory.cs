@@ -254,9 +254,11 @@ public static class VoidlingVisualFactory
         // rather than the body's walk/run frames.
         int? frameCount = layer.SelfAnimatedFrameCount > 0 ? layer.SelfAnimatedFrameCount : null;
         double? fps = layer.SelfAnimatedFrameCount > 0 ? layer.SelfAnimatedFps : null;
+        var frameWidth = layer.FrameWidth > 0 ? layer.FrameWidth : definition.FrameWidth;
+        var frameHeight = layer.FrameHeight > 0 ? layer.FrameHeight : definition.FrameHeight;
         return race
-            ? BuildRaceFrames(definition, baseAtlas, layer.SwimAtlas ?? baseAtlas, frameCount, fps)
-            : BuildWorldFrames(definition, baseAtlas, frameCount, fps);
+            ? BuildRaceFrames(definition, baseAtlas, layer.SwimAtlas ?? baseAtlas, frameCount, fps, frameWidth, frameHeight, useBodyColumns: false)
+            : BuildWorldFrames(definition, baseAtlas, frameCount, fps, frameWidth, frameHeight, useBodyColumns: false);
     }
 
     internal static void ApplyLayerPalette(
@@ -429,11 +431,20 @@ public static class VoidlingVisualFactory
             if (layer.SourcePaletteColors.Count > MaxPaletteSlots)
                 throw new InvalidOperationException($"Voidling layer '{layer.LayerId}' palette exceeds {MaxPaletteSlots} slots.");
 
+            var layerWidth = layer.FrameWidth > 0 ? layer.FrameWidth : definition.FrameWidth;
+            var layerHeight = layer.FrameHeight > 0 ? layer.FrameHeight : definition.FrameHeight;
+            var layerFrameCount = layer.SelfAnimatedFrameCount > 0 ? layer.SelfAnimatedFrameCount : definition.WorldFrameCount;
+            var layerRaceFrameCount = layer.SelfAnimatedFrameCount > 0 ? layer.SelfAnimatedFrameCount : definition.RaceSwimFrameCount;
+            var layerPortraitColumn = layer.SelfAnimatedFrameCount == 1 ? 0 : definition.PortraitColumn;
+            if (layer.FrameWidth < 0 || layer.FrameHeight < 0 ||
+                (layer.FrameYOffsets.Length > 0 && layer.FrameYOffsets.Length < definition.WorldFrameCount))
+                throw new InvalidOperationException($"Voidling layer '{layer.LayerId}' has invalid frame metadata.");
+
             ValidateAtlasCoverage(
                 layer.BaseAtlas,
-                definition.FrameWidth,
-                definition.FrameHeight,
-                definition.WorldFrameCount,
+                layerWidth,
+                layerHeight,
+                Math.Max(layerFrameCount, layerPortraitColumn + 1),
                 definition.WalkDownRow,
                 definition.WalkUpRow,
                 definition.WalkLeftRow,
@@ -441,9 +452,9 @@ public static class VoidlingVisualFactory
                 definition.RaceRunRow);
             ValidateAtlasCoverage(
                 layer.SwimAtlas ?? layer.BaseAtlas,
-                definition.FrameWidth,
-                definition.FrameHeight,
-                definition.RaceSwimFrameCount,
+                layerWidth,
+                layerHeight,
+                layerRaceFrameCount,
                 definition.RaceSwimRow);
         }
 
@@ -555,19 +566,25 @@ public static class VoidlingVisualFactory
         VoidlingVisualDefinition definition,
         Texture2D atlas,
         int? frameCountOverride = null,
-        double? fpsOverride = null)
+        double? fpsOverride = null,
+        int? frameWidthOverride = null,
+        int? frameHeightOverride = null,
+        bool useBodyColumns = true)
     {
         var frames = CreateEmptyFrames();
         var count = frameCountOverride ?? definition.WorldFrameCount;
         var fps = fpsOverride ?? definition.WorldAnimationFps;
+        var frameWidth = frameWidthOverride ?? definition.FrameWidth;
+        var frameHeight = frameHeightOverride ?? definition.FrameHeight;
+        var columns = useBodyColumns ? definition.FrameColumnXOffsets : Array.Empty<int>();
         AddAnimation(frames, "walk_down", atlas, definition.WalkDownRow, count,
-            fps, definition.FrameWidth, definition.FrameHeight, definition.FrameColumnXOffsets);
+            fps, frameWidth, frameHeight, columns);
         AddAnimation(frames, "walk_up", atlas, definition.WalkUpRow, count,
-            fps, definition.FrameWidth, definition.FrameHeight, definition.FrameColumnXOffsets);
+            fps, frameWidth, frameHeight, columns);
         AddAnimation(frames, "walk_left", atlas, definition.WalkLeftRow, count,
-            fps, definition.FrameWidth, definition.FrameHeight, definition.FrameColumnXOffsets);
+            fps, frameWidth, frameHeight, columns);
         AddAnimation(frames, "walk_right", atlas, definition.WalkRightRow, count,
-            fps, definition.FrameWidth, definition.FrameHeight, definition.FrameColumnXOffsets);
+            fps, frameWidth, frameHeight, columns);
         return frames;
     }
 
@@ -576,15 +593,21 @@ public static class VoidlingVisualFactory
         Texture2D baseAtlas,
         Texture2D swimAtlas,
         int? frameCountOverride = null,
-        double? fpsOverride = null)
+        double? fpsOverride = null,
+        int? frameWidthOverride = null,
+        int? frameHeightOverride = null,
+        bool useBodyColumns = true)
     {
         var frames = CreateEmptyFrames();
+        var frameWidth = frameWidthOverride ?? definition.FrameWidth;
+        var frameHeight = frameHeightOverride ?? definition.FrameHeight;
+        var columns = useBodyColumns ? definition.FrameColumnXOffsets : Array.Empty<int>();
         AddAnimation(frames, "run", baseAtlas, definition.RaceRunRow,
             frameCountOverride ?? definition.RaceRunFrameCount,
-            fpsOverride ?? definition.RaceRunFps, definition.FrameWidth, definition.FrameHeight, definition.FrameColumnXOffsets);
+            fpsOverride ?? definition.RaceRunFps, frameWidth, frameHeight, columns);
         AddAnimation(frames, "swim", swimAtlas, definition.RaceSwimRow,
             frameCountOverride ?? definition.RaceSwimFrameCount,
-            fpsOverride ?? definition.RaceSwimFps, definition.FrameWidth, definition.FrameHeight, definition.FrameColumnXOffsets);
+            fpsOverride ?? definition.RaceSwimFps, frameWidth, frameHeight, columns);
         return frames;
     }
 

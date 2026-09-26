@@ -23,6 +23,17 @@ public partial class VoidlingVisualLayerDefinition : Resource
     [Export]
     public Texture2D SwimAtlas { get; set; } = null!;
 
+    // Zero uses the body grid. Shared accessories may retain their own source frame size.
+    [Export]
+    public int FrameWidth { get; set; }
+
+    [Export]
+    public int FrameHeight { get; set; }
+
+    // Optional vertical bob for a static overlay, indexed by the body's current frame.
+    [Export]
+    public int[] FrameYOffsets { get; set; } = System.Array.Empty<int>();
+
     [Export]
     public int ZIndexOffset { get; set; } = 1;
 

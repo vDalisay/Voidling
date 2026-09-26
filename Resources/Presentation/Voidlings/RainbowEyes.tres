@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="VoidlingVisualLayerDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Presentation/Voidlings/VoidlingVisualLayerDefinition.cs" id="1_layer"]
+[ext_resource type="Texture2D" path="res://Assets/Voidlings/Layers/Eyes/rgb_eyes.png" id="2_atlas"]
+
+[resource]
+script = ExtResource("1_layer")
+LayerId = "rainbow_eyes"
+SlotId = "eyes"
+BaseAtlas = ExtResource("2_atlas")
+FrameWidth = 32
+FrameHeight = 32
+FrameYOffsets = PackedInt32Array(0, 0, 1, 2, 1, 1)
+ZIndexOffset = 3
+PaletteAffected = false
+SelfAnimatedFrameCount = 1

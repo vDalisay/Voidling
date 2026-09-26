@@ -1,12 +1,17 @@
-[gd_resource type="Resource" script_class="VoidlingVisualDefinition" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="VoidlingVisualDefinition" load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Presentation/Voidlings/VoidlingVisualDefinition.cs" id="1_visual"]
 [ext_resource type="Texture2D" path="res://Assets/Voidlings/Base/Water/water_voidling_walk.png" id="2_base"]
+[ext_resource type="Resource" path="res://Resources/Presentation/Voidlings/CompactBackWing.tres" id="3_back_wing"]
+[ext_resource type="Resource" path="res://Resources/Presentation/Voidlings/CompactFrontWing.tres" id="4_front_wing"]
+[ext_resource type="Resource" path="res://Resources/Presentation/Voidlings/CompactHalo.tres" id="5_halo"]
 
 [resource]
 script = ExtResource("1_visual")
 DefinitionId = "water"
 BaseAtlas = ExtResource("2_base")
+DefaultLayerIds = Array[String](["wings_golden_back", "wings_golden_front", "crown_golden"])
+Layers = Array[Resource]([ExtResource("3_back_wing"), ExtResource("4_front_wing"), ExtResource("5_halo")])
 FrameWidth = 47
 FrameHeight = 32
 FrameColumnXOffsets = PackedInt32Array(0, 47, 95, 142, 190, 237)

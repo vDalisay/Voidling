@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="VoidlingVisualLayerDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Presentation/Voidlings/VoidlingVisualLayerDefinition.cs" id="1_layer"]
+[ext_resource type="Texture2D" path="res://Assets/Voidlings/Layers/Wings/golden_front_wing.png" id="2_atlas"]
+
+[resource]
+script = ExtResource("1_layer")
+LayerId = "wings_golden_front"
+SlotId = "wings_front"
+BaseAtlas = ExtResource("2_atlas")
+FrameWidth = 32
+FrameHeight = 48
+ZIndexOffset = 1
+OffsetAtScaleOne = Vector2(0, -6)
+PaletteAffected = false
+MotionGroupId = "wings"
+VerticalFollowLagSeconds = 0.11
+MaxVerticalLagAtScaleOne = 2.0
