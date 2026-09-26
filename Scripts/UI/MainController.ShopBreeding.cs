@@ -41,7 +41,7 @@ public partial class MainController : Node
             .Select((egg, index) => new ShopEggViewState(
                 EggId: egg.Id,
                 TintColor: GameRules.TintColor(egg.TintHex),
-                DisplayName: ShopEggName(egg.TintHex, index + 1),
+                DisplayName: ShopEggName(egg, index + 1),
                 Price: GameRules.StoreEggPrice))
             .ToArray();
 
@@ -174,10 +174,11 @@ public partial class MainController : Node
         Callable.From(screen.FocusSelection).CallDeferred();
     }
 
-    private string ShopEggName(string tintHex, int number)
+    private string ShopEggName(EggData egg, int number)
     {
-        var colorName = VoidlingColorNameCatalog.NameFor(GameRules.TintColor(tintHex));
-        if (colorName is "Cream" or "Grey") colorName = "Neutral";
+        var colorAllele = egg.Genome.ExpressedColorIndex == 0
+            ? egg.Genome.ColorAlleleA : egg.Genome.ColorAlleleB;
+        var colorName = VoidlingColorNameCatalog.NameForAllele(colorAllele);
         return string.Format(Tr("UI_SHOP_COLOR_EGG"),
             Tr("UI_EGG_COLOR_" + colorName.ToUpperInvariant()), number);
     }

@@ -10,6 +10,7 @@
 script = ExtResource("1_visual")
 DefinitionId = "fly"
 BaseAtlas = ExtResource("2_base")
+SourcePaletteColors = Array[Color]([Color(0.360784, 0.301961, 0.780392, 1), Color(0.52549, 0.356863, 0.580392, 1), Color(0.619608, 0.411765, 0.690196, 1), Color(0.678431, 0.478431, 0.745098, 1), Color(0.780392, 0.611765, 0.835294, 1)])
 DefaultLayerIds = Array[String](["wings_golden_back", "wings_golden_front", "crown_golden"])
 Layers = Array[Resource]([ExtResource("3_back_wing"), ExtResource("4_front_wing"), ExtResource("5_halo")])
 FrameWidth = 32

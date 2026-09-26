@@ -32,8 +32,8 @@ public sealed record DetailsScreenState(
     Color TintColor,
     bool HasAngelMutation,
     int OtherMutationCount,
-    int ColorAlleleA,
-    int ColorAlleleB,
+    string ColorAlleleA,
+    string ColorAlleleB,
     int ExpressedColorIndex,
     IReadOnlyList<DetailsStatViewState> Stats,
     IReadOnlyList<DetailsRareTraitViewState> RareTraits);
@@ -160,8 +160,12 @@ public partial class DetailsScreen : VBoxContainer
         foreach (var stat in state.Stats)
             _body.AddChild(CreateDnaStatRow(stat));
 
-        _body.AddChild(UiFactory.CreateLabel(
-            string.Format(Tr("UI_DETAILS_COLOR_DNA"), state.ColorAlleleA, state.ColorAlleleB), 7));
+        var colorRow = new HBoxContainer();
+        colorRow.AddThemeConstantOverride("separation", 4);
+        colorRow.AddChild(CreateDnaCell(Tr("UI_DETAILS_COLOR_GENE"), 176, 7, false));
+        colorRow.AddChild(CreateDnaCell(state.ColorAlleleA, 142, 9, false));
+        colorRow.AddChild(CreateDnaCell(state.ColorAlleleB, 142, 9, false));
+        _body.AddChild(colorRow);
     }
 
     private void RenderVisual()

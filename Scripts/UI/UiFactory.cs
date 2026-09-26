@@ -138,6 +138,11 @@ public static class UiFactory
                 ? Color.FromHtml("#2E5A22") : Color.FromHtml("#7A2E22"));
             button.AddThemeConstantOverride("outline_size", 3);
         }
+        else
+        {
+            button.RemoveThemeColorOverride("font_outline_color");
+            button.RemoveThemeConstantOverride("outline_size");
+        }
         button.AddThemeColorOverride("icon_disabled_color", new Color(1, 1, 1, 0.45f));
         ButtonJuice.Attach(button, tone == ButtonTone.Tan ? ButtonFeel.Standard : ButtonFeel.Primary);
     }

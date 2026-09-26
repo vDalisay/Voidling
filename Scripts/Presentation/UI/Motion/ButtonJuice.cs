@@ -87,7 +87,10 @@ public partial class ButtonJuice : Node
     private void SetFeel(ButtonFeel feel)
     {
         _feel = feel;
-        if (IsInsideTree()) ApplyShine();
+        if (!IsInsideTree()) return;
+        if (feel != ButtonFeel.Primary && _button.Material is ShaderMaterial shine && shine.Shader == ShineTemplate?.Shader)
+            _button.Material = null;
+        ApplyShine();
     }
 
     private float HoverPop => _feel switch

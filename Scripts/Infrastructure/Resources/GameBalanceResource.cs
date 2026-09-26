@@ -30,10 +30,6 @@ public partial class GameBalanceResource : Resource
     [Export(PropertyHint.Range, "0,8,1")]
     public int RareTraitMaxTransmittedGenerations { get; set; } = 2;
 
-    [ExportGroup("Appearance Genetics")]
-    [Export(PropertyHint.Range, "0,0.49,0.01")]
-    public float PaletteBlendInfluence { get; set; } = 0.18f;
-
     [ExportGroup("Breeding / Hatching")]
     [Export(PropertyHint.Range, "0,300,0.5")]
     public float BreedCooldownSeconds { get; set; } = 8.0f;
@@ -272,10 +268,6 @@ public partial class GameBalanceResource : Resource
                 RareTraitTransmissionChance = Probability(RareTraitTransmissionChance),
                 RelatedAncestorDepth = Math.Max(1, RelatedAncestorDepth),
                 RareTraitMaxTransmittedGenerations = Math.Max(0, RareTraitMaxTransmittedGenerations)
-            },
-            Appearance = defaults.Appearance with
-            {
-                PaletteBlendInfluence = ClampFinite(PaletteBlendInfluence, 0.0f, 0.49f, 0.18f)
             },
             Breeding = defaults.Breeding with
             {

@@ -216,6 +216,15 @@ msgstr "PURPLE"
 msgid "UI_EGG_COLOR_PINK"
 msgstr "PINK"
 
+msgid "UI_EGG_COLOR_BLACK"
+msgstr "BLACK"
+
+msgid "UI_EGG_COLOR_GREY"
+msgstr "GREY"
+
+msgid "UI_EGG_COLOR_CREAM"
+msgstr "CREAM"
+
 msgid "UI_SHOP_OWNED"
 msgstr "OWNED {0}"
 
@@ -427,19 +436,22 @@ msgid "UI_DETAILS_INBREEDING"
 msgstr "Inbreeding burden: {0}"
 
 msgid "UI_DETAILS_DNA_HINT"
-msgstr "DNA1 and DNA2 are the two inherited ability genes."
+msgstr "DNA1 and DNA2 are inherited ability and color genes."
 
 msgid "UI_DETAILS_COLOR_DNA"
-msgstr "Color DNA1 #{0}    DNA2 #{1}"
+msgstr "Color DNA1 {0}    DNA2 {1}"
+
+msgid "UI_DETAILS_COLOR_GENE"
+msgstr "COLOR"
 
 msgid "UI_DETAILS_CURRENT_APPEARANCE"
 msgstr "CURRENT APPEARANCE"
 
 msgid "UI_DETAILS_SHOWN_COLOR"
-msgstr "Shown color DNA: #{0}"
+msgstr "Shown color DNA: {0}"
 
 msgid "UI_DETAILS_COLOR_PAIR"
-msgstr "Color DNA: #{0} / #{1}"
+msgstr "Color DNA: {0} / {1}"
 
 msgid "UI_DETAILS_NO_MUTATION"
 msgstr "Mutation: none"
@@ -1102,7 +1114,7 @@ msgid "UI_GARDEN_BUILD_DECORATE"
 msgstr "Decorate"
 
 msgid "UI_GARDEN_ACTIVITIES"
-msgstr "Activities"
+msgstr "Dailies"
 
 msgid "UI_GARDEN_MISSIONS"
 msgstr "Daily missions"
@@ -1162,7 +1174,7 @@ msgid "UI_TUTORIAL_GARDEN_PROFILE"
 msgstr "This profile keeps care and training close to your selected Voidling. Give treat chooses an owned treat; Details shows the full stats and DNA."
 
 msgid "UI_TUTORIAL_GARDEN_SHOP"
-msgstr "Use the left rail to visit the Shop for treats, eggs and land. Activities beside the Garden log opens daily check-ins and missions."
+msgstr "Use the left rail to visit the Shop for treats, eggs and land. Dailies beside the Garden log opens daily check-ins and missions."
 
 msgid "UI_TUTORIAL_GARDEN_BUILD"
 msgstr "Build groups your land and decorations. Open a land tile to manage its training, or place stored land from Inventory."

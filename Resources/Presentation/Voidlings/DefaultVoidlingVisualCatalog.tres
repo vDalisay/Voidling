@@ -10,6 +10,6 @@
 script = ExtResource("1_catalog")
 DefaultVisualTypeId = "normal"
 Definitions = Array[Resource]([ExtResource("2_normal"), ExtResource("3_fly"), ExtResource("4_water"), ExtResource("5_rainbow")])
-AuthoredColorVisualTypeIds = PackedStringArray("neutral", "fly", "water", "swamp-variant")
+AuthoredColorVisualTypeIds = PackedStringArray("swamp-variant")
 PlaceholderHueVisualTypeIds = PackedStringArray("swamp-variant")
 PlaceholderHues = PackedFloat32Array(0.3)

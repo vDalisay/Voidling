@@ -26,6 +26,8 @@ public partial class VoidlingVisualSmokeProbe : Node
                 ValidateLayerMotionContract(visualTypeId);
             }
 
+            ValidateInheritedAdultColors();
+
             GD.Print(
                 $"[voidling-visual-smoke] VOIDLING_VISUAL_SMOKE_SUCCESS types={string.Join(',', VoidlingVisualFactory.VisualTypeIds)}");
             GetTree().Quit(0);
@@ -34,6 +36,32 @@ public partial class VoidlingVisualSmokeProbe : Node
         {
             GD.PrintErr($"[voidling-visual-smoke] VOIDLING_VISUAL_SMOKE_FAILED: {exception.Message}");
             GetTree().Quit(5);
+        }
+    }
+
+    private void ValidateInheritedAdultColors()
+    {
+        foreach (var visualTypeId in new[] { "fly", "water" })
+        {
+            var definition = VoidlingVisualFactory.ResolveDefinition(visualTypeId);
+            float ShadeValue(string tintHex)
+            {
+                var sprite = new AnimatedSprite2D();
+                VoidlingVisualFactory.ApplyAppearance(sprite,
+                    new VoidlingVisualAppearance(visualTypeId, 0.0f, definition.DefaultLayerIds, tintHex),
+                    race: false);
+                AddChild(sprite);
+                if (sprite.Material is not ShaderMaterial material)
+                    throw new InvalidOperationException($"{visualTypeId} did not inherit its color palette.");
+                var color = material.GetShaderParameter("target_0").AsColor();
+                sprite.QueueFree();
+                if (color.R <= color.G + 0.02f || color.R <= color.B + 0.02f)
+                    throw new InvalidOperationException($"{visualTypeId} did not render red color DNA.");
+                return color.V;
+            }
+
+            if (ShadeValue("#FFD4D4") <= ShadeValue("#671C28"))
+                throw new InvalidOperationException($"{visualTypeId} lost inherited light/dark shade variation.");
         }
     }
 

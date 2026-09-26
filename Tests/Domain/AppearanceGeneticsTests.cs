@@ -11,21 +11,6 @@ public sealed class AppearanceGeneticsTests
     private static readonly GameBalanceRules Rules = GameBalanceRules.DemoDefaults;
 
     [Fact]
-    public void PaletteBlend_BlueWinnerMovesTowardPurpleWhileRedWinnerMovesTowardPink()
-    {
-        const float red = 0.0f;
-        const float blue = 2.0f / 3.0f;
-        const float influence = 0.18f;
-
-        var blueWinner = ColorPhenotypeResolver.MoveHueToward(blue, red, influence);
-        var redWinner = ColorPhenotypeResolver.MoveHueToward(red, blue, influence);
-
-        Assert.InRange(blueWinner, 0.72f, 0.73f);
-        Assert.InRange(redWinner, 0.93f, 0.95f);
-        Assert.NotEqual(blueWinner, redWinner);
-    }
-
-    [Fact]
     public void ChildColorDna_ComesOnlyFromSelectedParentsAndIsDeterministic()
     {
         var first = Parent("a", 0.00f, 0.05f);
@@ -64,7 +49,7 @@ public sealed class AppearanceGeneticsTests
     }
 
     [Fact]
-    public void PhenotypeResolution_NudgesWinnerWithoutCollapsingToMidpoint()
+    public void PhenotypeResolution_KeepsExpressedColorGroup()
     {
         var genome = new GenomeData
         {
@@ -76,8 +61,24 @@ public sealed class AppearanceGeneticsTests
 
         var hue = resolver.ResolvePaletteHue(genome);
 
-        Assert.InRange(hue, 0.93f, 0.95f);
-        Assert.True(CircularDistance(hue, 0.0f) < CircularDistance(hue, 2.0f / 3.0f));
+        Assert.Equal(0.0f, hue);
+        genome.ExpressedColorIndex = 1;
+        Assert.Equal(2.0f / 3.0f, resolver.ResolvePaletteHue(genome));
+    }
+
+    [Fact]
+    public void FounderShades_AreInheritedWithoutChangingGroup()
+    {
+        Assert.Equal(Rules.Genetics.ColorAlleleCount, Rules.Appearance.PaletteHex.Count);
+        var resolver = new ColorPhenotypeResolver(Rules.Appearance);
+        var parent = Parent("red", resolver.HueForLegacyAllele(32), resolver.HueForLegacyAllele(33));
+        parent.Genome.ColorAlleleA = 32;
+        parent.Genome.ColorAlleleB = 33;
+        var child = new GenomeInheritanceService(Rules.Genetics, Rules.Appearance).CreateChild(parent, parent, 541UL);
+        var expressed = child.ExpressedColorIndex == 0 ? child.ColorAlleleA : child.ColorAlleleB;
+
+        Assert.Contains(expressed, new[] { 32, 33 });
+        Assert.Equal(Rules.Appearance.PaletteHex[expressed], resolver.ResolveTint(child));
     }
 
     [Fact]

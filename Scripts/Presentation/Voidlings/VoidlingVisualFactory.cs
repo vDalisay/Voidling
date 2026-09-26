@@ -55,8 +55,7 @@ public static class VoidlingVisualFactory
     public static float PortraitMutationCompactPixelThreshold => DefaultDefinition.PortraitMutationCompactPixelThreshold;
 
     /// <summary>
-    /// True for visual types drawn in the artist's own colors (Neutral adults, special variants).
-    /// Color DNA still travels with those Voidlings; it is only not shown.
+    /// True for special variants that keep their authored body colors.
     /// </summary>
     public static bool UsesAuthoredColors(string? visualTypeId)
         => !string.IsNullOrWhiteSpace(visualTypeId) && AuthoredColorTypes.Contains(visualTypeId.Trim());
@@ -476,7 +475,7 @@ public static class VoidlingVisualFactory
         if (VoidlingAppearanceData.IsValidHue(targetHue) && sourceColors.Count > 0)
         {
             item.Modulate = Colors.White;
-            item.Material = CreatePaletteMaterial(sourceColors, targetHue, tolerance);
+            item.Material = CreatePaletteMaterial(sourceColors, targetHue, tolerance, ParseTint(fallbackTintHex));
             return;
         }
 
@@ -494,35 +493,29 @@ public static class VoidlingVisualFactory
     private static ShaderMaterial CreatePaletteMaterial(
         Godot.Collections.Array<Color> sourceColors,
         float targetHue,
-        float tolerance)
+        float tolerance,
+        Color tint)
     {
         var material = new ShaderMaterial { Shader = PaletteShader };
         var count = Math.Min(MaxPaletteSlots, sourceColors.Count);
         material.SetShaderParameter("palette_size", count);
         material.SetShaderParameter("match_tolerance", Math.Clamp(tolerance, 0.0001f, 0.2f));
 
-        var anchorHue = sourceColors.FirstOrDefault(color => color.S > 0.03f).H;
-        var delta = ShortestHueDelta(anchorHue, targetHue);
+        var anchor = sourceColors.OrderByDescending(color => color.V).First();
         for (var i = 0; i < MaxPaletteSlots; i++)
         {
             var source = i < count ? sourceColors[i] : Colors.Transparent;
             var target = source;
-            if (i < count && source.S > 0.03f)
-                target = Color.FromHsv(NormalizeHue(source.H + delta), source.S, source.V, source.A);
+            if (i < count)
+                target = Color.FromHsv(
+                    NormalizeHue(targetHue),
+                    Math.Clamp(source.S * tint.S / Math.Max(anchor.S, 0.01f), 0.0f, 1.0f),
+                    Math.Clamp(source.V * tint.V / Math.Max(anchor.V, 0.01f), 0.0f, 1.0f),
+                    source.A);
             material.SetShaderParameter($"source_{i}", source);
             material.SetShaderParameter($"target_{i}", target);
         }
         return material;
-    }
-
-    private static float ShortestHueDelta(float source, float target)
-    {
-        var delta = NormalizeHue(target) - NormalizeHue(source);
-        if (delta > 0.5f)
-            delta -= 1.0f;
-        else if (delta < -0.5f)
-            delta += 1.0f;
-        return delta;
     }
 
     private static float NormalizeHue(float hue)

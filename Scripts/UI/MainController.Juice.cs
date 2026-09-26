@@ -54,13 +54,19 @@ public partial class MainController
             _toasts.Post(message);
     }
 
-    /// <summary>The claimable-reward badge on the log's Activities button.</summary>
+    /// <summary>The claimable-reward badge and green shine on the Dailies button.</summary>
     private void RefreshAttention()
     {
         if (_activitiesBadge == null || !GodotObject.IsInstanceValid(_activitiesBadge)) return;
         var login = _session.GetDailyLoginStatus();
         var missions = _session.GetDailyMissionStatus();
-        _activitiesBadge.Active = login.CanClaim || missions.Missions.Any(mission => mission.CanClaim);
+        var claimable = login.CanClaim || missions.Missions.Any(mission => mission.CanClaim);
+        if (_activitiesBadge.Active != claimable)
+        {
+            if (claimable) UiFactory.ApplyPrimaryStyle(_gardenEventLog.ActivitiesButton);
+            else UiFactory.ApplyButtonChrome(_gardenEventLog.ActivitiesButton);
+        }
+        _activitiesBadge.Active = claimable;
     }
 
     /// <summary>The global centre of a live modal control, captured before a redraw replaces it.</summary>

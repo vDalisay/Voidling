@@ -8,11 +8,33 @@ namespace Voidling.Presentation.UI.Common;
 /// </summary>
 public static class VoidlingColorNameCatalog
 {
+    // The first ten allele IDs are saved data. IDs 10–29 add two shades of each existing group.
+    public static string NameForAllele(int allele)
+    {
+        if (allele is >= 10 and < 30) allele = (allele - 10) / 2;
+        if (allele is >= 30 and < 34) return "Red";
+        if (allele is >= 34 and < 38) return "Black";
+        return allele switch
+        {
+            1 => "Pink",
+            2 or 8 => "Green",
+            3 or 6 => "Purple",
+            4 => "Yellow",
+            5 => "Blue",
+            7 => "Orange",
+            _ => "Neutral"
+        };
+    }
+
     public static string NameFor(Color tint)
     {
         var hue = tint.H;
-        if (tint.S < 0.12f)
-            return tint.V < 0.5f ? "Grey" : "Cream";
+        if (tint.V < 0.22f)
+            return "Black";
+        if (tint.S < 0.16f)
+            return tint.V < 0.7f ? "Grey" : "Cream";
+        if (tint.S < 0.28f && tint.V > 0.9f && hue is > 0.10f and < 0.20f)
+            return "Cream";
 
         return hue switch
         {

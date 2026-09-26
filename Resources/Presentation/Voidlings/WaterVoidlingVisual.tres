@@ -10,6 +10,7 @@
 script = ExtResource("1_visual")
 DefinitionId = "water"
 BaseAtlas = ExtResource("2_base")
+SourcePaletteColors = Array[Color]([Color(0.360784, 0.482353, 0.2, 1), Color(0.470588, 0.623529, 0.270588, 1), Color(0.545098, 0.713725, 0.321569, 1), Color(0.670588, 0.858824, 0.423529, 1), Color(0.839216, 0.721569, 0.239216, 1), Color(1, 0.866667, 0.313725, 1)])
 DefaultLayerIds = Array[String](["wings_golden_back", "wings_golden_front", "crown_golden"])
 Layers = Array[Resource]([ExtResource("3_back_wing"), ExtResource("4_front_wing"), ExtResource("5_halo")])
 FrameWidth = 47

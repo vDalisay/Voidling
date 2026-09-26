@@ -16,9 +16,7 @@ public sealed record GeneticsRules(
     int RelatedAncestorDepth,
     int RareTraitMaxTransmittedGenerations);
 
-public sealed record AppearanceRules(
-    IReadOnlyList<string> PaletteHex,
-    double PaletteBlendInfluence);
+public sealed record AppearanceRules(IReadOnlyList<string> PaletteHex);
 
 public sealed record BreedingRules(float CooldownSeconds, IReadOnlyList<int> HatchFailurePercentByBurden);
 /// <summary>
@@ -258,8 +256,8 @@ public sealed record GameBalanceRules(
             GradeWeights: Array.AsReadOnly(new[] { 10, 24, 34, 21, 9, 2 }),
             HigherAlleleExpressionChance: 0.70,
             AbilityRankBreakthroughChance: 0.01,
-            // Keep the validated legacy palette cardinality. Continuous hue DNA is authoritative.
-            ColorAlleleCount: 10,
+            // Keep the first ten alleles stable for existing saves; new swatches add shades and groups.
+            ColorAlleleCount: 38,
             RareFounderTraitChance: 0.0005,
             RareTraitTransmissionChance: 0.10,
             FounderTraitIds: Array.AsReadOnly(new[] { "Lustrous", "Prismatic", "Aurora" }),
@@ -269,9 +267,13 @@ public sealed record GameBalanceRules(
             PaletteHex: Array.AsReadOnly(new[]
             {
                 "#F6F0C9", "#E7A6B6", "#A9D5C0", "#B7B2E8", "#F0C778",
-                "#A8C8EC", "#D4A7E8", "#E9B690", "#AFCB7A", "#D9D1C6"
-            }),
-            PaletteBlendInfluence: 0.18),
+                "#A8C8EC", "#D4A7E8", "#E9B690", "#AFCB7A", "#D9D1C6",
+                "#FFFBDD", "#766C3B", "#FCD9E4", "#773146", "#DDF8E8", "#2B6650",
+                "#E3E0FF", "#4E4985", "#FFE5A4", "#855A18", "#E0EFFF", "#285486",
+                "#F4DEFF", "#693880", "#FFE0C4", "#854B2B", "#E6F6BF", "#4A6826",
+                "#F3F1EE", "#53504E", "#FFD4D4", "#E76A6A", "#B92D38", "#671C28",
+                "#D8D8DE", "#74747B", "#303037", "#14141B"
+            })),
         Breeding: new BreedingRules(
             CooldownSeconds: 8.0f,
             HatchFailurePercentByBurden: Array.AsReadOnly(new[] { 0, 20, 50, 80, 100 })),

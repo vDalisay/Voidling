@@ -72,8 +72,8 @@ public partial class MainController : Node
             GameRules.TintColor(profile.TintHex),
             profile.HasAngelMutation,
             profile.OtherMutationCount,
-            profile.ColorAlleleA,
-            profile.ColorAlleleB,
+            Tr("UI_EGG_COLOR_" + VoidlingColorNameCatalog.NameForAllele(profile.ColorAlleleA).ToUpperInvariant()),
+            Tr("UI_EGG_COLOR_" + VoidlingColorNameCatalog.NameForAllele(profile.ColorAlleleB).ToUpperInvariant()),
             profile.ExpressedColorIndex,
             stats,
             rareTraits);

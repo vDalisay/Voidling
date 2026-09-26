@@ -6,10 +6,8 @@ using VoidlingGame;
 namespace Voidling.Domain.Genetics;
 
 /// <summary>
-/// Resolves semantic color DNA into a palette anchor hue. One DNA profile is selected as the
-/// dominant side (ExpressedColorIndex), then nudged a small configurable amount toward the other
-/// profile around the shortest direction of the hue wheel. This keeps breeding stochastic while
-/// allowing gradual color-family drift instead of selecting one fixed tint swatch forever.
+/// Resolves inherited color DNA. The expressed profile determines the color group and shade;
+/// the other profile stays available for offspring without blending into a different group.
 /// </summary>
 public sealed class ColorPhenotypeResolver
 {
@@ -29,13 +27,7 @@ public sealed class ColorPhenotypeResolver
     {
         ArgumentNullException.ThrowIfNull(genome);
 
-        var first = AlleleHue(genome, 0);
-        var second = AlleleHue(genome, 1);
-        var expressedIndex = genome.ExpressedColorIndex == 0 ? 0 : 1;
-        var winner = expressedIndex == 0 ? first : second;
-        var other = expressedIndex == 0 ? second : first;
-        var influence = (float)Math.Clamp(_rules.PaletteBlendInfluence, 0.0, 0.49);
-        return MoveHueToward(winner, other, influence);
+        return AlleleHue(genome, genome.ExpressedColorIndex == 0 ? 0 : 1);
     }
 
     public void EnsurePaletteGenes(GenomeData genome)
@@ -82,21 +74,6 @@ public sealed class ColorPhenotypeResolver
             return 0.0f;
         var hex = _rules.PaletteHex[Math.Clamp(allele, 0, _rules.PaletteHex.Count - 1)];
         return RgbHexToHsv(hex).Hue;
-    }
-
-    public static float MoveHueToward(float winnerHue, float otherHue, float influence)
-    {
-        winnerHue = VoidlingAppearanceData.NormalizeHue(winnerHue);
-        otherHue = VoidlingAppearanceData.NormalizeHue(otherHue);
-        influence = Math.Clamp(influence, 0.0f, 0.49f);
-
-        var delta = otherHue - winnerHue;
-        if (delta > 0.5f)
-            delta -= 1.0f;
-        else if (delta < -0.5f)
-            delta += 1.0f;
-
-        return VoidlingAppearanceData.NormalizeHue(winnerHue + delta * influence);
     }
 
     private static (float Hue, float Saturation, float Value) RgbHexToHsv(string hex)

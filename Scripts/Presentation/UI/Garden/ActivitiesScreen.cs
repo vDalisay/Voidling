@@ -81,6 +81,7 @@ public partial class ActivitiesScreen : VBoxContainer
         missions.Icon = UiSkin.Emoji(1, 24);
         missions.ExpandIcon = true;
         missions.AddThemeConstantOverride("icon_max_width", 16);
+        if (_missionsClaimable) UiFactory.ApplyPrimaryStyle(missions);
         missions.Pressed += () => MissionsRequested?.Invoke();
         AddChild(missions);
         if (_missionsClaimable)

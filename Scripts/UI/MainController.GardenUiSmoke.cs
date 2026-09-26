@@ -425,7 +425,7 @@ public partial class MainController
         foreach (var storeEgg in _session.State.StoreEggs)
         {
             var row = FindGardenButton(ledger, "Product_egg_" + storeEgg.Id);
-            var expectedName = ShopEggName(storeEgg.TintHex,
+            var expectedName = ShopEggName(storeEgg,
                 Array.FindIndex(eggIds, id => id == storeEgg.Id) + 1);
             if (!row.FindChildren("*", "Label", true, false).OfType<Label>()
                     .Any(label => label.Text == expectedName))

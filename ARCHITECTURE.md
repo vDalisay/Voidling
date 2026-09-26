@@ -160,6 +160,7 @@ Godot Nodes/scenes:
 - localization presentation.
 
 Presentation may map immutable/application state to colors/sprites/text, but it must not invent domain outcomes.
+Ordinary body forms use the inherited color DNA palette through `VoidlingVisualFactory`; evolution changes the body sheet without changing its color group or shade. Wings, halo, and eyes stay on independent layers.
 
 ### Bootstrap
 
