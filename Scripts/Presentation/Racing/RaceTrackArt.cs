@@ -13,7 +13,13 @@ internal readonly record struct RaceTrackLayout(
     float TrackBottom,
     float ScreenWidth,
     float ScreenHeight,
-    float ClimbHeight);
+    float ClimbHeight)
+{
+    internal const int LaneCount = 4;
+
+    // Shared by racers and lane props, including the course-selection preview.
+    internal float LaneY(int index) => TrackTop + 28.0f + 20.0f * Math.Clamp(index, 0, LaneCount - 1);
+}
 
 /// <summary>
 /// Paints the race course out of the Sprout Lands tiles.
@@ -21,7 +27,7 @@ internal readonly record struct RaceTrackLayout(
 /// The course is painted in three passes so the animated water can sit between them: the land and
 /// the raised track behind it, the water layers, then everything that stands in or over the water
 /// (banks, the cliff under the take-off lip) and the course furniture. Raised surfaces are drawn as
-/// thin polygon strips whose texture follows the slope, so walls and ramps have straight edges
+/// thin polygon strips whose texture follows the slope, so cliff walls have straight edges
 /// instead of the staircase stepped rectangles leave.
 ///
 /// Everything here is a pure function of the course, so two runs of the same course paint the same
@@ -32,8 +38,8 @@ internal static class RaceTrackArt
     /// <summary>Vertical rise, in world pixels, of the clifftop the climb section leads onto.</summary>
     internal const float ClimbHeight = 64.0f;
 
-    /// <summary>Vertical rise of the glide launch ramp above whatever surface it stands on.</summary>
-    internal const float RampHeight = 38.0f;
+    /// <summary>Airborne lift supplied by a flower spring above the surface it stands on.</summary>
+    internal const float SpringLaunchHeight = 38.0f;
 
     /// <summary>
     /// How much X a racer spends scaling a cliff. Short, so the wall is steep: the projection cannot
@@ -45,7 +51,6 @@ internal static class RaceTrackArt
     private const float StripWidth = 2.0f;
 
     private static readonly Color Shade = new(0.10f, 0.13f, 0.11f, 0.30f);
-    private static readonly Color DeepShade = new(0.08f, 0.10f, 0.09f, 0.45f);
     private static readonly Color RimLight = new(1.0f, 0.93f, 0.78f, 0.55f);
     private static readonly Color Vine = Color.FromHtml("#5E8C4A");
     private static readonly Color VineLight = Color.FromHtml("#8DBF62");
@@ -73,15 +78,17 @@ internal static class RaceTrackArt
 
     /// <summary>
     /// Where the course sits above its base band at <paramref name="x"/>: the clifftop a climb leads
-    /// onto plus the launch ramp's own slope. Art and racers both read this one function, so a racer
+    /// onto. Art and racers both read this one function, so a racer
     /// cannot walk through the surface it is standing on.
     /// </summary>
     internal static float SurfaceLift(RaceCourse course, float x)
-        => PlateauLift(course, x) + RampLift(course, x);
+        => PlateauLift(course, x);
 
-    /// <summary>Height a glider leaves the ramp lip at, measured from the base track band.</summary>
+    /// <summary>Spring launch altitude above the base track band, including any clifftop.</summary>
     internal static float LaunchHeight(RaceCourse course)
-        => course.HasGlideSegment ? SurfaceLift(course, course.GlideSegment.StartX - 0.5f) : RampHeight;
+        => course.HasGlideSegment
+            ? PlateauLift(course, course.GlideSegment.StartX - 0.5f) + SpringLaunchHeight
+            : SpringLaunchHeight;
 
     /// <summary>
     /// How far up a cliff wall a racer at <paramref name="x"/> is, 0 at the foot and 1 at the top,
@@ -150,20 +157,6 @@ internal static class RaceTrackArt
     }
 
     /// <summary>
-    /// The take-off ramp curves up like a ski jump: shallow at the foot, steepest at the lip, so the
-    /// racers are thrown up and out rather than rolled off a wedge.
-    /// </summary>
-    private static float RampLift(RaceCourse course, float x)
-    {
-        if (!OnLaunchRamp(course, x))
-            return 0.0f;
-
-        var span = Math.Max(1.0f, course.GlideSegment.StartX - course.GlideLaunchStartX);
-        var t = Mathf.Clamp((x - course.GlideLaunchStartX) / span, 0.0f, 1.0f);
-        return RampHeight * t * t;
-    }
-
-    /// <summary>
     /// Each climb raises the course until the next crossing it cannot stay raised over. A clifftop
     /// that ran straight into the glide launch does not drop: the racers leap off it.
     /// </summary>
@@ -204,8 +197,6 @@ internal static class RaceTrackArt
 
         PaintSurface(canvas, course, layout);
         PaintWallDressing(canvas, course, layout);
-        if (course.HasGlideSegment)
-            PaintRampDressing(canvas, course, layout);
     }
 
     /// <summary>
@@ -231,8 +222,8 @@ internal static class RaceTrackArt
     }
 
     /// <summary>
-    /// Walks the course in thin strips. Flat runs merge into one band draw; strips on a wall or
-    /// the ramp are drawn as quads whose texture is sheared by the lift, so slopes are straight.
+    /// Walks the course in thin strips. Flat runs merge into one band draw; wall strips are
+    /// drawn as quads whose texture is sheared by the lift, so cliff edges stay straight.
     /// </summary>
     private static void PaintSurface(CanvasItem canvas, RaceCourse course, RaceTrackLayout layout)
     {
@@ -247,7 +238,7 @@ internal static class RaceTrackArt
             var x1 = x + StripWidth;
             var p0 = PlateauLift(course, x);
             var p1 = PlateauLift(course, x1);
-            var flat = Mathf.IsEqualApprox(p0, p1) && !OnLaunchRamp(course, x);
+            var flat = Mathf.IsEqualApprox(p0, p1);
 
             if (flat && Mathf.IsEqualApprox(p0, runLift))
                 continue;
@@ -260,15 +251,7 @@ internal static class RaceTrackArt
                 continue;
             }
 
-            if (OnLaunchRamp(course, x))
-            {
-                PaintBandRun(canvas, layout, x, x1, p0);
-                PaintDeckStrip(canvas, course, layout, x, x1, p0);
-            }
-            else
-            {
-                PaintWallStrip(canvas, layout, x, x1, p0, p1);
-            }
+            PaintWallStrip(canvas, layout, x, x1, p0, p1);
 
             runStart = x1;
             runLift = p1;
@@ -385,58 +368,6 @@ internal static class RaceTrackArt
         }
     }
 
-    /// <summary>The take-off deck: bridge planks laid along the ramp's curve.</summary>
-    private static void PaintDeckStrip(CanvasItem canvas, RaceCourse course, RaceTrackLayout layout, float x0, float x1, float plateau)
-    {
-        var lift0 = plateau + RampLift(course, x0);
-        var lift1 = plateau + RampLift(course, x1);
-        var planks = RaceTrackTiles.Planks;
-        var size = planks.GetSize();
-
-        // Shadow the raised deck throws on the clifftop beneath it.
-        var shadowDrop = Math.Max(lift0, lift1) - plateau;
-        if (shadowDrop > 1.0f)
-        {
-            canvas.DrawRect(
-                new Rect2(x0, layout.TrackBottom - plateau - shadowDrop * 0.6f, x1 - x0, shadowDrop * 0.6f),
-                DeepShade);
-        }
-
-        TexturedQuad(
-            canvas,
-            planks,
-            new Vector2(x0, layout.TrackTop - lift0),
-            new Vector2(x1, layout.TrackTop - lift1),
-            new Vector2(x1, layout.TrackBottom - lift1),
-            new Vector2(x0, layout.TrackBottom - lift0),
-            // UVs from the unraised band, so the boards follow the curve instead of stepping.
-            new Vector2(x0 / size.X, layout.TrackTop / size.Y),
-            new Vector2(x1 / size.X, layout.TrackTop / size.Y),
-            new Vector2(x1 / size.X, layout.TrackBottom / size.Y),
-            new Vector2(x0 / size.X, layout.TrackBottom / size.Y),
-            Colors.White);
-
-        // The deck's edge beams.
-        canvas.DrawPolygon(
-            new[]
-            {
-                new Vector2(x0, layout.TrackBottom - lift0 - 1.0f),
-                new Vector2(x1, layout.TrackBottom - lift1 - 1.0f),
-                new Vector2(x1, layout.TrackBottom - lift1 + 3.0f),
-                new Vector2(x0, layout.TrackBottom - lift0 + 3.0f)
-            },
-            new[] { TimberDark });
-        canvas.DrawPolygon(
-            new[]
-            {
-                new Vector2(x0, layout.TrackTop - lift0),
-                new Vector2(x1, layout.TrackTop - lift1),
-                new Vector2(x1, layout.TrackTop - lift1 + 2.0f),
-                new Vector2(x0, layout.TrackTop - lift0 + 2.0f)
-            },
-            new[] { TimberDark });
-    }
-
     /// <summary>
     /// Cliff rock of any height under a raised band: the premium earth courses, deepening to shadow
     /// at the foot, with the ledge's tufted base where it meets the grass.
@@ -527,87 +458,6 @@ internal static class RaceTrackArt
                 }
             }
         }
-    }
-
-    /// <summary>
-    /// The launch ramp's timberwork. The deck itself is painted with the surface; this adds the
-    /// trestle holding it up, the premium fence rails that follow its curve, the take-off chevrons
-    /// and the flagged lip.
-    /// </summary>
-    private static void PaintRampDressing(CanvasItem canvas, RaceCourse course, RaceTrackLayout layout)
-    {
-        var startX = course.GlideLaunchStartX;
-        var endX = course.GlideSegment.StartX;
-        if (endX <= startX)
-            return;
-
-        var plateau = PlateauLift(course, startX);
-
-        // Trestle legs from the deck's near edge down onto the surface it stands on.
-        var previousTop = Vector2.Zero;
-        var previousFoot = Vector2.Zero;
-        var first = true;
-        for (var x = startX + 10.0f; x < endX; x += 12.0f)
-        {
-            var deckBottom = layout.TrackBottom - SurfaceLift(course, x) + 2.0f;
-            var foot = layout.TrackBottom - plateau;
-            if (foot - deckBottom < 3.0f)
-                continue;
-
-            canvas.DrawRect(new Rect2(x - 2.0f, deckBottom, 4.0f, foot - deckBottom), Timber);
-            canvas.DrawRect(new Rect2(x - 2.0f, deckBottom, 1.0f, foot - deckBottom), TimberDark);
-            canvas.DrawRect(new Rect2(x - 3.0f, foot - 2.0f, 6.0f, 2.0f), TimberDark);
-
-            var top = new Vector2(x, deckBottom + 2.0f);
-            var footPoint = new Vector2(x, foot - 2.0f);
-            if (!first)
-            {
-                canvas.DrawLine(previousTop, footPoint, TimberDark, 1.0f);
-                canvas.DrawLine(previousFoot, top, Timber, 1.0f);
-            }
-            first = false;
-            previousTop = top;
-            previousFoot = footPoint;
-        }
-
-        // Rails ride the curve, one fence piece per tile width, each turned to the local slope.
-        for (var x = startX; x < endX - 4.0f; x += 14.0f)
-        {
-            var lift = SurfaceLift(course, x + 7.0f);
-            var slope = (SurfaceLift(course, x + 14.0f) - SurfaceLift(course, x)) / 14.0f;
-            var angle = -Mathf.Atan(slope);
-            DrawRotated(canvas, RaceTrackTiles.FenceRail, new Vector2(x + 7.0f, layout.TrackTop - lift - 5.0f), angle);
-            DrawRotated(canvas, RaceTrackTiles.FenceRail, new Vector2(x + 7.0f, layout.TrackBottom - lift - 3.0f), angle);
-        }
-
-        // Chevrons painted on the deck, brighter towards the lip.
-        for (var x = startX + 12.0f; x < endX - 10.0f; x += 16.0f)
-        {
-            var top = layout.TrackTop - SurfaceLift(course, x);
-            var tone = Mathf.InverseLerp(startX, endX, x);
-            var color = new Color(1.0f, 0.90f, 0.42f, 0.35f + tone * 0.55f);
-            for (var y = top + 26.0f; y < top + (layout.TrackBottom - layout.TrackTop) - 18.0f; y += 30.0f)
-            {
-                canvas.DrawLine(new Vector2(x, y - 5.0f), new Vector2(x + 6.0f, y), color, 2.0f);
-                canvas.DrawLine(new Vector2(x + 6.0f, y), new Vector2(x, y + 5.0f), color, 2.0f);
-            }
-        }
-
-        // The lip: a painted board with flag poles either side and bunting strung between them.
-        var lipTop = layout.TrackTop - SurfaceLift(course, endX - 0.5f);
-        var lipBottom = layout.TrackBottom - SurfaceLift(course, endX - 0.5f);
-        canvas.DrawRect(new Rect2(endX - 4.0f, lipTop, 4.0f, lipBottom - lipTop), Cream);
-        for (var y = lipTop; y < lipBottom; y += 8.0f)
-            canvas.DrawRect(new Rect2(endX - 4.0f, y, 4.0f, Math.Min(4.0f, lipBottom - y)), BuntingColors[0]);
-
-        foreach (var poleY in new[] { lipTop - 2.0f, lipBottom - 4.0f })
-        {
-            canvas.DrawRect(new Rect2(endX - 5.0f, poleY - 30.0f, 2.0f, 30.0f), TimberDark);
-            canvas.DrawColoredPolygon(
-                new[] { new Vector2(endX - 3.0f, poleY - 30.0f), new Vector2(endX + 9.0f, poleY - 26.0f), new Vector2(endX - 3.0f, poleY - 22.0f) },
-                BuntingColors[1]);
-        }
-        Bunting(canvas, new Vector2(endX - 4.0f, lipTop - 30.0f), new Vector2(endX - 4.0f, lipBottom - 34.0f), 7);
     }
 
     // ---- Pass 3: in and over the water, and the course furniture ---------------------------
@@ -848,14 +698,10 @@ internal static class RaceTrackArt
         }
     }
 
-    /// <summary>Ground that belongs to the track: water, cliff, clifftop or ramp. Nothing grows here.</summary>
+    /// <summary>Ground that belongs to the track: water, cliff or clifftop. Nothing grows here.</summary>
     private static bool IsFeature(RaceCourse course, float x)
         => course.SegmentKindAt(x) is RaceSegmentKind.Swim or RaceSegmentKind.Climb or RaceSegmentKind.Glide ||
-           SurfaceLift(course, x) > 0.0f ||
-           OnLaunchRamp(course, x);
-
-    private static bool OnLaunchRamp(RaceCourse course, float x)
-        => course.HasGlideSegment && x >= course.GlideLaunchStartX && x < course.GlideSegment.StartX;
+           SurfaceLift(course, x) > 0.0f;
 
     // ---- Drawing helpers -----------------------------------------------------------------------
 
@@ -869,13 +715,6 @@ internal static class RaceTrackArt
         Vector2 ua, Vector2 ub, Vector2 uc, Vector2 ud,
         Color modulate)
         => canvas.DrawPolygon(new[] { a, b, c, d }, new[] { modulate, modulate, modulate, modulate }, new[] { ua, ub, uc, ud }, texture);
-
-    private static void DrawRotated(CanvasItem canvas, Texture2D texture, Vector2 center, float angle)
-    {
-        canvas.DrawSetTransform(center, angle, Vector2.One);
-        canvas.DrawTexture(texture, -texture.GetSize() * 0.5f);
-        canvas.DrawSetTransform(Vector2.Zero, 0.0f, Vector2.One);
-    }
 
     private static uint Hash(float x, float y)
     {

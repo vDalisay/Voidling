@@ -34,7 +34,6 @@ public partial class RaceScreen : Node2D
 
     private const float ScreenWidth = 640.0f;
     private const float ScreenHeight = 360.0f;
-    private const float TrackY = 184.0f;
     private const float TrackTop = 126.0f;
     private const float TrackBottom = 244.0f;
     private const float FlightAltitude = 38.0f;
@@ -98,9 +97,7 @@ public partial class RaceScreen : Node2D
 
     private static RaceTrackLayout Layout => new(TrackTop, TrackBottom, ScreenWidth, ScreenHeight, RaceTrackArt.ClimbHeight);
 
-    // Lanes spread across the full dirt band. The old 33px cluster stacked four racers on top of
-    // each other on the start line and left most of the track empty.
-    private readonly float[] _racerOffsets = { -30.0f, -10.0f, 10.0f, 30.0f };
+    private IReadOnlyList<RaceFlowerSpring> _flowerSprings = Array.Empty<RaceFlowerSpring>();
     private readonly Dictionary<string, RacerVisual> _visuals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, float> _cheerParticleAccumulators = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _previousObstacleIndices = new(StringComparer.Ordinal);
@@ -140,6 +137,8 @@ public partial class RaceScreen : Node2D
         public AnimatedSprite2D Sprite { get; init; } = null!;
         public Polygon2D Shadow { get; init; } = null!;
         public float BaseY { get; init; }
+        public RaceFlowerSpring? FlowerSpring { get; init; }
+        public float PreviousTrackX { get; set; }
         public float JumpSeconds { get; set; }
         public float JumpDuration { get; set; } = JumpMaxDurationSeconds;
         public float JumpPeak { get; set; } = JumpMaxPeak;
@@ -321,7 +320,7 @@ public partial class RaceScreen : Node2D
     /// What a segment kind looks like on the track. Ground needs no extra geometry because the track
     /// itself is the ground surface; every other kind must name the geometry it adds.
     /// </summary>
-    internal readonly record struct SegmentVisual(bool Water, bool Climb, bool Ramp);
+    internal readonly record struct SegmentVisual(bool Water, bool Climb, bool Spring);
 
     /// <summary>
     /// The single declaration of race terrain geometry. BuildCoursePresentation renders from it and
@@ -341,7 +340,7 @@ public partial class RaceScreen : Node2D
     {
         // Terrain, water and scenery are layered under the racers by RaceTrackLayers; the HUD still
         // names the section the player is in, and signposts on the verge announce each stretch.
-        RaceTrackLayers.Build(this, Course, Layout);
+        _flowerSprings = RaceTrackLayers.Build(this, Course, Layout);
         RaceTrackFurniture.Build(this, Course, Layout);
         foreach (var obstacleX in Course.Obstacles)
             AddHurdle(obstacleX + 18.0f);
@@ -354,7 +353,7 @@ public partial class RaceScreen : Node2D
             var entrant = entrants[i];
             var appearance = AppearanceFor(entrant.Participant);
             var visualTypeId = appearance.VisualTypeId;
-            var baseY = TrackY + _racerOffsets[Math.Min(i, _racerOffsets.Length - 1)];
+            var baseY = Layout.LaneY(i);
             var raceScale = VoidlingVisualFactory.RaceScaleFor(visualTypeId);
 
             var shadow = new Polygon2D
@@ -404,6 +403,8 @@ public partial class RaceScreen : Node2D
                 Sprite = sprite,
                 Shadow = shadow,
                 BaseY = baseY,
+                FlowerSpring = i < _flowerSprings.Count ? _flowerSprings[i] : null,
+                PreviousTrackX = Course.StartX,
                 Submersion = submersion,
                 Pebbles = pebbles,
                 Sparkles = sparkles,
@@ -504,6 +505,7 @@ public partial class RaceScreen : Node2D
         if (_simulation == null)
             return;
 
+        AdvanceFlowerSprings(delta);
         foreach (var pair in _visuals)
         {
             var state = _simulation.GetState(pair.Key);
@@ -513,6 +515,7 @@ public partial class RaceScreen : Node2D
 
     private void RenderMultiplayerFrame(MultiplayerRaceFrameView frame, float delta)
     {
+        AdvanceFlowerSprings(delta);
         var entrants = _entry!.Entrants.ToDictionary(
             entrant => entrant.Participant.CreatureId,
             StringComparer.Ordinal);
@@ -560,8 +563,12 @@ public partial class RaceScreen : Node2D
             visual.RecoverySeconds = Math.Max(0.0f, visual.RecoverySeconds - delta);
 
         var finishOffset = UpdateFinish(visual, state, delta);
+        var trackX = RaceTrackArt.PresentationX(Course, state.X);
+        var springPose = UpdateFlowerLaunch(visual, state, trackX, delta);
         if (state.Finished && !visual.Celebrates && visual.FinishSeconds >= FinishCoastSeconds)
             visual.Sprite.Stop();
+        else if (springPose is { } spring)
+            SetVisualMode(visual, spring.Released ? "glide" : spring.Holding ? "spring" : "run");
         else if (state.Terrain is RaceTerrain.Swim or RaceTerrain.FailedGlideSwim)
             SetVisualMode(visual, "swim");
         else if (state.Terrain == RaceTerrain.Glide)
@@ -573,15 +580,25 @@ public partial class RaceScreen : Node2D
         var swimming = state.Terrain is RaceTerrain.Swim or RaceTerrain.FailedGlideSwim;
         var climbing = false;
 
-        // Where along the track the racer is drawn: its simulated X, except on a climb, where the
-        // wall takes up most of the stretch's time rather than a blink of it.
-        var trackX = RaceTrackArt.PresentationX(Course, state.X);
+        // Climbing and spring contact remap drawing only; simulated X and race results are intact.
+        if (springPose is { } positionedSpring)
+            trackX = positionedSpring.X;
+        var groundLift = SurfaceLiftAt(trackX);
 
         if (visual.Celebrates && state.Finished && visual.FinishSeconds >= FinishCoastSeconds)
         {
             // Hopping on the spot, over and over, for as long as the podium takes to appear.
             var hop = Mathf.Abs(Mathf.Sin((visual.FinishSeconds - FinishCoastSeconds) * 6.4f));
             yOffset = -hop * 13.0f;
+        }
+        else if (springPose is { } launch)
+        {
+            // Elevation is absolute above the track's base band. Cancelling ground lift here
+            // keeps the launch continuous when the plateau ends at the lake boundary.
+            yOffset = groundLift - launch.Elevation;
+            visual.Sprite.Rotation = launch.Rotation;
+            if (launch.Released)
+                SpawnHeadwind(visual, 0.0f, delta);
         }
         else if (visual.JumpSeconds > 0.0f)
         {
@@ -602,35 +619,12 @@ public partial class RaceScreen : Node2D
             yOffset = -Mathf.Abs(haul) * 1.5f;
             climbing = ascending && wall > 0.05f && wall < 0.98f;
         }
-        else if (InLaunchRamp(trackX))
-        {
-            // The ramp is a surface the racer runs up, not altitude: the lift below carries it, and
-            // only the lean forward is animation.
-            var progress = Mathf.Clamp(
-                (state.X - Course.GlideLaunchStartX) / (Course.GlideSegment.StartX - Course.GlideLaunchStartX),
-                0.0f,
-                1.0f);
-            visual.Sprite.Rotation = -0.09f * progress;
-        }
         else if (state.Terrain == RaceTerrain.Glide)
         {
-            var glideSpan = Math.Max(1.0f, state.GlideEndX - Course.GlideSegment.StartX);
-            var glideProgress = Mathf.Clamp((state.X - Course.GlideSegment.StartX) / glideSpan, 0.0f, 1.0f);
-            var easedDescent = Mathf.Pow(glideProgress, 1.35f);
-            var fallsIntoWater = state.GlideEndX < Course.GlideSegment.EndX - 1.0f;
-            var destinationY = fallsIntoWater ? 7.0f : 0.0f;
-            // The glide starts at exactly the height the ramp lip left the racer at, so a take-off
-            // from a clifftop launches from the clifftop rather than snapping back to ground level.
-            var seconds = (float)Time.GetTicksMsec() / 1000.0f;
-            var gust = Mathf.Sin(seconds * 5.1f + visual.BaseY) * 0.6f +
-                       Mathf.Sin(seconds * 11.3f + visual.BaseY * 0.5f) * 0.3f;
-            yOffset = Mathf.Lerp(-RaceTrackArt.LaunchHeight(Course), destinationY, easedDescent) +
-                      gust * 2.2f * (1.0f - glideProgress * 0.6f);
-
-            // Nose held up into the headwind, buffeted by the gusts, easing level as the lift runs
-            // out. The old linear tilt read as a falling brick rather than a glide.
-            visual.Sprite.Rotation = Mathf.Lerp(-0.20f, 0.06f, easedDescent) + gust * 0.045f;
-            SpawnHeadwind(visual, glideProgress, delta);
+            var glide = GlidePoseFor(visual, state);
+            yOffset = groundLift - glide.Elevation;
+            visual.Sprite.Rotation = glide.Rotation;
+            SpawnHeadwind(visual, glide.Progress, delta);
         }
         else
         {
@@ -638,7 +632,7 @@ public partial class RaceScreen : Node2D
         }
 
         // One altitude rule for every airborne branch: the shadow shrinks and fades on the way up
-        // and grows back on the way down, so jump, ramp and glide cannot drift apart.
+        // and grows back on the way down, so hop, spring launch and glide cannot drift apart.
         var altitude = Mathf.Clamp(
             -yOffset / Math.Max(FlightAltitude, RaceTrackArt.LaunchHeight(Course)),
             0.0f,
@@ -651,15 +645,13 @@ public partial class RaceScreen : Node2D
             shadowAlpha = 0.15f;
         }
 
-        // The clifftop and the launch ramp raise the ground itself, so sprite and shadow move
-        // together and the racer stays planted on the surface RaceTrackArt draws.
-        var groundLift = SurfaceLiftAt(trackX);
-
         var visualTypeId = visual.Appearance.VisualTypeId;
         var drawX = RetreatX(visual, trackX) + finishOffset;
+        var gliding = springPose?.Released ?? (state.Terrain == RaceTerrain.Glide);
         UpdateSubmersion(visual, swimming);
-        UpdateTerrainEffects(visual, swimming, state.Terrain == RaceTerrain.Glide && !state.Finished, climbing, drawX);
-        HandleRunningDust(visual, state, drawX, swimming || RaceTrackArt.WallProgress(Course, trackX, out _) != null);
+        UpdateTerrainEffects(visual, swimming, gliding && !state.Finished, climbing, drawX);
+        HandleRunningDust(visual, state, drawX,
+            swimming || springPose != null || RaceTrackArt.WallProgress(Course, trackX, out _) != null);
         HandleWake(visual, drawX, swimming);
 
         visual.Sprite.Position = new Vector2(
@@ -1180,7 +1172,7 @@ public partial class RaceScreen : Node2D
     ///
     /// Vertically it centres on the creature but never past the edge of the wide framing, so at the
     /// furthest zoom the view is byte-for-byte the one the race has always had, and every step in
-    /// follows the Voidling up the cliff, off the ramp and down through a glide instead of leaving
+    /// follows the Voidling up the cliff, off the spring and down through a glide instead of leaving
     /// it to drift off the top of a zoomed-in screen.
     /// </summary>
     private void UpdatePlayerTracking()
@@ -1558,6 +1550,10 @@ public partial class RaceScreen : Node2D
         visual.Sprite.Rotation = 0.0f;
         switch (mode)
         {
+            case "spring":
+                visual.Sprite.Play("run");
+                visual.Sprite.SpeedScale = 0.0f;
+                break;
             case "swim":
                 visual.Sprite.Play("swim");
                 visual.Sprite.SpeedScale = 1.0f;
@@ -1582,11 +1578,6 @@ public partial class RaceScreen : Node2D
 
     /// <summary>How far the running surface sits above the base track band at <paramref name="x"/>.</summary>
     private float SurfaceLiftAt(float x) => RaceTrackArt.SurfaceLift(Course, x);
-
-    private bool InLaunchRamp(float x)
-        => Course.HasGlideSegment &&
-           x >= Course.GlideLaunchStartX &&
-           x < Course.GlideSegment.StartX;
 
     private static Color ParseTint(string html)
         => string.IsNullOrWhiteSpace(html) ? Colors.White : Color.FromHtml(html);

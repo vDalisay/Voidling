@@ -24,7 +24,6 @@ internal static class RaceTrackTiles
     private const string GrassHillSheet = Premium + "Tilesets/ground tiles/New tiles/Grass_Hill_Tiles_v2.png";
     private const string SoilSheet = Premium + "Tilesets/ground tiles/New tiles/Soil_Ground_Tiles.png";
     private const string CliffSheet = Premium + "Tilesets/ground tiles/Old tiles/Hills.png";
-    private const string BridgeSheet = Premium + "Tilesets/Building parts/Wooden_Bridge_v2.png";
     private const string FenceSheet = Premium + "Tilesets/Building parts/Fences.png";
     private const string TreeSheet = Premium + "Objects/Trees, stumps and bushes.png";
     private const string NatureSheet = Premium + "Objects/Mushrooms, Flowers, Stones.png";
@@ -59,9 +58,6 @@ internal static class RaceTrackTiles
     internal static readonly Texture2D CliffFace = ComposeCliffFace();
     internal static readonly Texture2D CliffFoot = Slice(CliffSheet, 16, 44, 16, 4);
     internal static readonly Texture2D CliffOverhang = Slice(CliffSheet, 16, 32, 16, 8);
-
-    // Wooden take-off ramp deck: rows 33-46 of the bridge span, which tile without seams.
-    internal static readonly Texture2D Planks = Slice(BridgeSheet, 0, 33, 16, 14);
 
     // Premium fences: column 0 is a vertical run (top, middle, bottom); row 0 columns 1-3 are the
     // left, middle and right pieces of a horizontal run.
