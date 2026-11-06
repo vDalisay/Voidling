@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Voidling.Application.Racing;
@@ -109,10 +110,14 @@ public partial class RaceTrackShotProbe : Node
             // before polling, or every shot behind that point fires on the first frame.
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             var pending = ActionShots(course).ToList();
+            var playerSpring = race.GetChildren().OfType<RaceFlowerSpring>().FirstOrDefault();
+            var springPhases = new HashSet<string>(StringComparer.Ordinal);
             var raceDeadline = Time.GetTicksMsec() + 120000;
             while (pending.Count > 0 && Time.GetTicksMsec() < raceDeadline)
             {
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+                CaptureSpringPhase(playerSpring, prefix, springPhases);
                 var here = camera.Position.X;
                 var hit = pending.FirstOrDefault(shot => here >= shot.X);
                 if (hit.Name == null)
@@ -151,6 +156,9 @@ public partial class RaceTrackShotProbe : Node
                 }
             }
 
+            if (playerSpring != null && springPhases.Count != 4)
+                GD.PushWarning($"[race-shots] Spring phase captures for {prefix}: {string.Join(',', springPhases)}");
+
             // Finally the podium, which is where portrait alignment shows up.
             var resultsDeadline = Time.GetTicksMsec() + 90000;
             Engine.TimeScale = 8.0;
@@ -178,7 +186,33 @@ public partial class RaceTrackShotProbe : Node
         }
     }
 
-    /// <summary>Points where a racer is mid-feature: on the cliff, in the water, off the ramp.</summary>
+    /// <summary>
+    /// Contact and release hold the same drawing X, so capture those poses from the flower's
+    /// actual phase after drawing instead of hoping a camera-distance threshold catches them.
+    /// </summary>
+    private void CaptureSpringPhase(RaceFlowerSpring? spring, string prefix, HashSet<string> captured)
+    {
+        if (spring == null || !spring.HasTriggered)
+            return;
+
+        var phase = spring.CurrentFrame switch
+        {
+            1 => "contact",
+            2 => "compression",
+            3 => "release",
+            _ when spring.ElapsedSeconds >= RaceFlowerSpring.LaunchDelaySeconds + RaceScreen.SpringRiseSeconds * 0.75f => "airborne",
+            _ => null
+        };
+        if (phase == null || !captured.Add(phase))
+            return;
+
+        var path = $"{OutputDirectory}/{prefix}-live-spring-{phase}.png";
+        GetViewport().GetTexture().GetImage().SavePng(path);
+        GD.Print($"[race-shots] wrote {ProjectSettings.GlobalizePath(path)} " +
+                 $"spring_frame={spring.CurrentFrame} elapsed={spring.ElapsedSeconds:0.000}s");
+    }
+
+    /// <summary>Points where a racer is mid-feature: on the cliff, in the water, approaching a spring.</summary>
     private static (string Name, float X)[] ActionShots(RaceCourse course)
     {
         var shots = new System.Collections.Generic.List<(string, float)>();
@@ -194,7 +228,7 @@ public partial class RaceTrackShotProbe : Node
         }
 
         if (course.HasGlideSegment)
-            shots.Add(("live-launch-ramp", Mathf.Lerp(course.GlideLaunchStartX, course.GlideSegment.StartX, 0.7f)));
+            shots.Add(("live-spring-approach", RaceTrackLayers.SpringXFor(course) - RaceScreen.SpringHopDistance * 0.5f));
 
         for (var i = 0; i < course.Obstacles.Count; i++)
             shots.Add(($"live-hurdle-{i}", course.Obstacles[i] + 14.0f));
@@ -255,7 +289,7 @@ public partial class RaceTrackShotProbe : Node
         }
 
         if (course.HasGlideSegment)
-            stops.Add(($"{index:00}-launch-ramp", (course.GlideLaunchStartX + course.GlideSegment.StartX) * 0.5f));
+            stops.Add(($"{index:00}-flower-springs", RaceTrackLayers.SpringXFor(course)));
 
         stops.Add(("99-finish", course.EndX - 40.0f));
         return stops.ToArray();

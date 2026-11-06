@@ -39,7 +39,7 @@ internal static class RaceTrackLayers
     private static readonly Shader SwayShader = GD.Load<Shader>(ShaderRoot + "RaceFoliageSway.gdshader");
     private static readonly Shader CloudShader = GD.Load<Shader>(ShaderRoot + "RaceCloudShadows.gdshader");
 
-    internal static void Build(Node2D owner, RaceCourse course, RaceTrackLayout layout)
+    internal static IReadOnlyList<RaceFlowerSpring> Build(Node2D owner, RaceCourse course, RaceTrackLayout layout)
     {
         owner.AddChild(new RaceTrackCanvas(canvas => RaceTrackArt.PaintBack(canvas, course, layout))
         {
@@ -72,6 +72,37 @@ internal static class RaceTrackLayers
             ZIndex = 30,
             Material = sway
         });
+
+        return BuildFlowerSprings(owner, course, layout);
+    }
+
+    /// <summary>The whole flower stands on land, just before the existing glide crossing.</summary>
+    internal static float SpringXFor(RaceCourse course) => course.GlideSegment.StartX - 20.0f;
+
+    internal static IReadOnlyList<RaceFlowerSpring> BuildFlowerSprings(
+        Node2D owner, RaceCourse course, RaceTrackLayout layout)
+    {
+        if (!course.HasGlideSegment)
+            return Array.Empty<RaceFlowerSpring>();
+
+        var springs = new RaceFlowerSpring[RaceTrackLayout.LaneCount];
+        var x = SpringXFor(course);
+        var groundLift = RaceTrackArt.SurfaceLift(course, x);
+        for (var lane = 0; lane < springs.Length; lane++)
+        {
+            var spring = new RaceFlowerSpring
+            {
+                Name = $"FlowerSpring_Lane{lane + 1}",
+                Position = new Vector2(x, layout.LaneY(lane) - groundLift),
+                // Share this lane's racer depth. Springs are added first, so its own racer is
+                // above the petals while racers in higher lanes remain behind lower-lane flowers.
+                ZIndex = 10 + lane
+            };
+            owner.AddChild(spring);
+            springs[lane] = spring;
+        }
+
+        return springs;
     }
 
     /// <summary>
